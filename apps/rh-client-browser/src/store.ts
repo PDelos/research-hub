@@ -1,7 +1,19 @@
 // App state: the agent transcript from the live stream (through @rh/sdk's AgentModel), plus info, runs and costs.
 // The browser talks to /ui/v1, the server-side proxy that holds the token, so no token ever reaches this page.
 import { reactive, shallowRef } from "vue";
-import { AgentModel, HubClient, type AgentState, type CostTotals, type Info, type RunDetail, type RunSummary } from "@rh/sdk";
+import {
+  AgentModel,
+  HubClient,
+  type AgentState,
+  type CharterView,
+  type CostTotals,
+  type Info,
+  type ProjectOverview,
+  type RunDetail,
+  type RunSummary,
+  type ScheduledRun,
+  type ScheduleSettings,
+} from "@rh/sdk";
 
 export const client = new HubClient({ base: "/ui/v1" });
 
@@ -11,6 +23,10 @@ export const store = reactive({
   totals: undefined as CostTotals | undefined,
   runs: [] as RunSummary[],
   run: undefined as RunDetail | undefined,
+  project: undefined as ProjectOverview | undefined,
+  charter: undefined as CharterView | undefined,
+  schedule: undefined as ScheduleSettings | undefined,
+  scheduledRuns: [] as ScheduledRun[],
   connected: false,
   error: "",
 });
@@ -18,6 +34,42 @@ export const store = reactive({
 const model = new AgentModel();
 export const transcript = shallowRef(model.state);
 model.subscribe(() => (transcript.value = { ...model.state }));
+
+/** Reload the project overview and charter; while a charter run is in progress, poll until it settles. */
+let charterPoll: ReturnType<typeof setTimeout> | undefined;
+export async function refreshProject() {
+  try {
+    const [project, charter] = await Promise.all([client.project(), client.charter()]);
+    store.project = project;
+    store.charter = charter;
+    if (charter.run?.status === "running" && !charterPoll)
+      charterPoll = setTimeout(() => {
+        charterPoll = undefined;
+        void refreshProject();
+      }, 1500);
+  } catch (e) {
+    store.error = e instanceof Error ? e.message : String(e);
+  }
+}
+
+export async function refreshSchedule() {
+  const [schedule, runs] = await Promise.all([client.schedule(), client.scheduledRuns()]);
+  store.schedule = schedule;
+  store.scheduledRuns = runs;
+}
+
+/** Run an action, then refresh the project; errors land in store.error and are rethrown for the caller. */
+export async function act<T>(fn: () => Promise<T>): Promise<T> {
+  try {
+    store.error = "";
+    return await fn();
+  } catch (e) {
+    store.error = e instanceof Error ? e.message : String(e);
+    throw e;
+  } finally {
+    await refreshProject();
+  }
+}
 
 let refreshTimer: ReturnType<typeof setTimeout> | undefined;
 function refreshRunsSoon() {
@@ -35,6 +87,7 @@ export async function connect() {
   try {
     store.info = await client.info();
     document.title = `${store.info.project} · Research Hub`;
+    await Promise.all([refreshProject(), refreshSchedule()]);
   } catch (e) {
     store.error = String(e);
   }
@@ -52,6 +105,7 @@ export async function connect() {
         else if (frame.type === "usage") {
           store.totals = frame.totals;
           refreshRunsSoon();
+          void refreshProject();
         } else model.apply(frame);
       }
     } catch (e) {

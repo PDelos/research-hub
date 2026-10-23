@@ -53,10 +53,16 @@ export function validateCharter(input: unknown): Charter {
   const body = isRecord(input) ? input : {};
   if (!isRecord(input)) problems.push("charter: must be an object");
   const list = (field: string, [min, max]: readonly [number, number]): unknown[] => {
-    const value = body[field];
+    let value = body[field];
     if (value === undefined && min === 0) return [];
+    // Models sometimes send a list as a JSON-encoded string; accept it when it parses to an array.
+    if (typeof value === "string" && value.trim().startsWith("[")) {
+      try {
+        value = JSON.parse(value);
+      } catch {}
+    }
     if (!Array.isArray(value)) {
-      problems.push(`${field}: must be a list`);
+      problems.push(`${field}: must be a list (a JSON array), not ${value === undefined ? "missing" : typeof value}`);
       return [];
     }
     if (value.length < min || value.length > max)

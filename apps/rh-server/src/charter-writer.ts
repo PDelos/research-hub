@@ -42,7 +42,12 @@ export class CharterBusy extends Error {
   }
 }
 
-const loose = Type.Optional(Type.Unknown());
+// The schema tells the model the shape; counts and lengths are checked by validateCharter, whose messages are exact.
+const weighted = Type.Union([
+  Type.String(),
+  Type.Object({ text: Type.String(), weight: Type.Optional(Type.Number({ description: "0.1 to 2, default 1" })) }),
+]);
+const strings = (description: string) => Type.Array(Type.String(), { description });
 
 export class CharterWriter {
   readonly extension: Extension;
@@ -72,11 +77,11 @@ export class CharterWriter {
         "Save the complete charter draft: questions (3-7, {text, weight?}), concepts (1-30), subAreas (1-15), queries (5-20, text or {text, weight?}), outOfScope (0-20). Errors name exactly what to fix.",
       returns: "Text: the saved draft summary, or the exact rule violations to fix.",
       parameters: Type.Object({
-        questions: loose,
-        concepts: loose,
-        subAreas: loose,
-        queries: loose,
-        outOfScope: loose,
+        questions: Type.Array(weighted, { description: "3 to 7 research questions" }),
+        concepts: strings("1 to 30 key concepts"),
+        subAreas: strings("1 to 15 sub-areas"),
+        queries: Type.Array(weighted, { description: "5 to 20 search queries" }),
+        outOfScope: Type.Optional(strings("0 to 20 topics that are out of scope")),
       }),
       execute: async (args, api, ctx) => {
         const run = this.run();

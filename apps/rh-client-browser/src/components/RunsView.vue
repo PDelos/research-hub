@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { onMounted } from "vue";
 import { ago, k, usd } from "@rh/sdk";
-import { client, openRun, store } from "../store.ts";
+import { client, openRun, refreshSchedule, store } from "../store.ts";
 
 onMounted(async () => {
   store.runs = await client.runs();
+  await refreshSchedule();
 });
 </script>
 
@@ -31,6 +32,23 @@ onMounted(async () => {
           <td class="muted">{{ ago(run.startedAt) }}</td>
         </tr>
         <tr v-if="!store.runs.length"><td colspan="7" class="muted center">No runs yet.</td></tr>
+      </tbody>
+    </table>
+    <h3 class="section">Scheduled sweeps and reviews</h3>
+    <table>
+      <thead>
+        <tr><th>Kind</th><th>Slot</th><th>Trigger</th><th>Status</th><th>Reason</th><th>Recorded</th></tr>
+      </thead>
+      <tbody>
+        <tr v-for="r in store.scheduledRuns" :key="r.id" class="static">
+          <td>{{ r.kind }}</td>
+          <td class="muted">{{ r.slotAt ? new Date(r.slotAt).toLocaleString() : "now" }}</td>
+          <td>{{ r.trigger }}</td>
+          <td>{{ r.status }}</td>
+          <td class="muted">{{ r.reason ?? "" }}</td>
+          <td class="muted">{{ ago(r.createdAt) }}</td>
+        </tr>
+        <tr v-if="!store.scheduledRuns.length"><td colspan="6" class="muted center">No scheduled runs yet.</td></tr>
       </tbody>
     </table>
     <div v-if="store.run" class="run-detail">

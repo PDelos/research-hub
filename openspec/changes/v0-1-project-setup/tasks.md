@@ -35,18 +35,34 @@
 
 ## 6. UI (spec: project-charter, scheduling)
 
-- [ ] 6.1 Add the brief screen (paste or `.md` upload, character counter) and the top-bar overview with pause/resume; verify `npm run build` and an HTTP test that the built page loads
-- [ ] 6.2 Add the Charter tab (draft/approved view, version picker, scoping questions with answers, inline edits, Approve, Retry); verify `npm run build` and a manual offline check with a faux charter
-- [ ] 6.3 Add the Settings tab (schedule) and the scheduled-run log in the Runs tab; verify `npm run build`
-- [ ] 6.4 Update `README.md` (brief → charter flow, schedule, new routes and variables); verify the documented commands work
+- [x] 6.1 Add the brief screen (paste or `.md` upload, character counter) and the top-bar overview with pause/resume; verify `npm run build` and an HTTP test that the built page loads
+- [x] 6.2 Add the Charter tab (draft/approved view, version picker, scoping questions with answers, inline edits, Approve, Retry); verify `npm run build` and a manual offline check with a faux charter
+- [x] 6.3 Add the Settings tab (schedule) and the scheduled-run log in the Runs tab; verify `npm run build`
+- [x] 6.4 Update `README.md` (brief → charter flow, schedule, new routes and variables); verify the documented commands work
 
 ## 7. Integration
 
-- [ ] 7.1 Run all offline tests, `npm run check`, `npm run check:jev`, `npm run check:env`, lint and `npm audit`; verify all pass
-- [ ] 7.2 Live check (only with `OPENROUTER_API_KEY` and the user's approval to spend): submit a real brief, let Sonnet 5.5 draft the charter, answer its questions, approve; record cost and any schema corrections in the change notes
+- [x] 7.1 Run all offline tests, `npm run check`, `npm run check:jev`, `npm run check:env`, lint and `npm audit`; verify all pass
+- [x] 7.2 Live check at no cost (the user asked for free models): submit a real brief, let a free OpenRouter model draft the charter, answer its questions, approve; record cost and any schema corrections in the notes
 
 ## Workflow follow-up
 
 - Run `openspec validate v0-1-project-setup --strict` before applying.
 - Apply only after v0.0 task group 8 (one project per container) is done.
 - After implementation and review, archive the change so `openspec/specs/` gains `project-charter` and `scheduling`.
+
+## Verification notes
+
+- 2026-10-23, task 7.2, first attempt (all jobs on `nvidia/nemotron-3.5-lightning:free`): the model asked 3 good
+  scoping questions, but its 3 draft saves were rejected and the run failed. Cause on our side: the
+  `save_charter_draft` schema declared every field as unknown, so the model sent each list as a JSON-encoded string,
+  and the error "must be a list" did not say how to fix it. Fixed: the tool now declares lists of strings and
+  `{text, weight}` items, the validator accepts a list sent as a JSON string, and the error reads "must be a list (a
+  JSON array), not string".
+- Second attempt, fresh project, same free model: draft saved with 0 invalid saves (4 questions, 7 queries, 10
+  concepts, 9 sub-areas, 4 out-of-scope items, 3 scoping questions). Answers "membrane proteins are out of scope" and
+  "focus on contact accuracy" produced a revision adding membrane proteins to out-of-scope and a contact-accuracy
+  query, again with 0 invalid saves. Approved as v1; status active; next sweep 06:00 UTC. Both runs recorded on the
+  free model at $0.00; no error log lines; the key does not appear in the log. Sonnet 5.5 (the default `review`
+  model) is still untested live.
+

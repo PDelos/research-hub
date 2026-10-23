@@ -10,7 +10,6 @@ import {
   ProjectState,
   ScopingQuestions,
   validateCharter,
-  type Charter,
 } from "../src/charter.ts";
 import { openProjectDb, Settings } from "../src/db.ts";
 import { sampleCharter } from "./fixtures/charter.ts";
@@ -52,7 +51,7 @@ test("3.1 every bound is enforced with an exact message", () => {
     ["questions[1].text: 301 characters, at most 300 allowed"],
   );
   assert.deepEqual(problems(sampleCharter({ concepts: ["ok", ""] })), ["concepts[2]: must be nonblank text"]);
-  assert.deepEqual(problems("nope").slice(0, 2), ["charter: must be an object", "questions: must be a list"]);
+  assert.deepEqual(problems("nope").slice(0, 2), ["charter: must be an object", "questions: must be a list (a JSON array), not missing"]);
 });
 
 function store() {
@@ -136,4 +135,15 @@ test("brief: ≤ 50,000 characters of nonblank text, nothing stored on failure",
     s.db.close();
     s.t.cleanup();
   }
+});
+
+test("lists sent as JSON-encoded strings are accepted; other non-lists name the expected type", () => {
+  const c = validateCharter({
+    ...sampleCharter(),
+    concepts: JSON.stringify(["protein language model", "ESM"]),
+    queries: JSON.stringify(["a b", "c d", "e f", "g h", "i j"]),
+  });
+  assert.deepEqual(c.concepts, ["protein language model", "ESM"]);
+  assert.equal(c.queries.length, 5);
+  assert.deepEqual(problems(sampleCharter({ concepts: "just text" })), ["concepts: must be a list (a JSON array), not string"]);
 });

@@ -5,8 +5,9 @@ durable agent (built on [pi-durable](https://github.com/earendil-works/pi)) that
 [Jev](https://openrouter.ai/docs/guides/community/jev) make the bulk decisions, present a few paper cards a day,
 learn from your 👎/👍/⭐ and grow an Obsidian-compatible knowledge base. A new theme is a new container.
 
-**Status: v0.0 skeleton.** The durable agent, Jev client, live stream, browser UI and container setup work; paper
-features arrive layer by layer (see `PLAN.md` §17 and `openspec/changes/`).
+**Status: v0.1.** Durable agent, Jev client, live stream, browser UI and container setup (v0.0), plus the
+project's brief, charter and schedule (v0.1). Paper search, cards and the knowledge base arrive layer by layer (see
+`PLAN.md` §17 and `openspec/changes/`).
 
 ## Quick start (offline, no keys)
 
@@ -20,6 +21,19 @@ RH_MODE=offline npm start -w rh-server
 
 Open <http://localhost:4850>. Offline mode uses a fake model that echoes you and a mock Jev; nothing leaves your
 machine. Data goes to `./data`.
+
+## Starting a project
+
+1. **Brief.** Open the UI: a new project asks for a brief (paste it or upload a `.md`, up to 50,000 characters).
+2. **Charter.** The research desk drafts a charter in its own conversation on the `review` model: 3 to 7 research
+   questions with weights, concepts, sub-areas, 5 to 20 search queries and what is out of scope. It may ask up to 5
+   scoping questions; answering them produces a revised draft.
+3. **Approve.** Edit anything in the Charter tab, then approve. Each approval is a numbered version; later edits or
+   a new brief make a new draft while the approved version stays in force.
+4. **Schedule.** Once approved, the daily sweep and weekly review run on schedule (Settings tab, or `RH_SWEEP_TIME`,
+   `RH_REVIEW_TIME`, `RH_TIMEZONE`). Each slot runs exactly once, even across restarts; after downtime only the latest
+   missed slot runs. Pause the project from the top bar to stop scheduled runs (chat keeps working). In v0.1 a due
+   sweep is only recorded as requested; the sweep itself arrives in v0.3.
 
 ## Live mode
 
@@ -84,6 +98,14 @@ curl -s -X POST -H "authorization: Bearer $RH_API_TOKEN" -H 'content-type: appli
 | `GET /v1/runs[/:id]` | Runs with model calls, tool calls, tokens and cost |
 | `GET /v1/usage` | Cost totals (models, Jev, this month) |
 | `POST /v1/jev/ping` | Jev smoke test |
+| `GET /v1/project` | Overview: name, status, charter version, next sweep and review, cost this month |
+| `POST /v1/project/pause` · `/resume` | Stop or restart scheduled runs |
+| `GET/PUT /v1/brief` | Read or replace the brief (a new brief starts a charter draft) |
+| `GET/PUT /v1/charter` | Draft, approved version, versions, scoping questions · edit the draft |
+| `POST /v1/charter/answers` · `/approve` · `/retry` | Answer scoping questions · approve the draft · retry a failed draft |
+| `GET /v1/charter/versions/:n` | An approved version |
+| `GET/PUT /v1/schedule` | Sweep time and on/off, review weekday, time and on/off |
+| `GET /v1/scheduled-runs` · `POST /v1/runs/{sweep,review}` | Run log (requested, skipped with reason) · run now |
 
 ## Development
 

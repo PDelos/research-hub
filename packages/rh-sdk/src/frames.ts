@@ -98,3 +98,82 @@ export type Frame =
   | { type: "agent.batch"; conversationId: number; events: WireAgentEvent[] }
   | { type: "agent.state"; state: AgentState }
   | { type: "usage"; totals: CostTotals };
+
+// ---------------------------------------------------------------- project, charter, schedule (v0.1)
+
+export type ProjectStatus = "needs-brief" | "charter-review" | "active" | "paused";
+
+export interface ProjectOverview {
+  name: string;
+  status: ProjectStatus;
+  charterVersion: number | null;
+  hasDraft: boolean;
+  charterRun: "running" | "done" | "failed" | null;
+  paused: { since: string } | null;
+  next: { sweep: string | null; review: string | null; timeZone: string };
+  monthCostUsd: number;
+}
+
+export interface CharterBody {
+  questions: { id: string; text: string; weight: number }[];
+  concepts: string[];
+  subAreas: string[];
+  queries: { text: string; weight: number }[];
+  outOfScope: string[];
+}
+
+export interface CharterRecord {
+  id: number;
+  status: "draft" | "approved" | "superseded";
+  version: number | null;
+  charter: CharterBody;
+  source: "agent" | "user";
+  createdAt: string;
+  approvedAt: string | null;
+}
+
+export interface ScopingQuestion {
+  id: number;
+  round: number;
+  text: string;
+  answer: string | null;
+  askedAt: string;
+  answeredAt: string | null;
+}
+
+export interface CharterView {
+  status: ProjectStatus;
+  draft: CharterRecord | null;
+  approved: CharterRecord | null;
+  versions: { version: number; approvedAt: string; source: string }[];
+  questions: ScopingQuestion[];
+  questionsLeft: number;
+  run: {
+    id: number;
+    kind: "draft" | "revision";
+    status: "running" | "done" | "failed";
+    reason?: string;
+    invalidSaves: number;
+    startedAt: string;
+    endedAt?: string;
+  } | null;
+}
+
+export type Weekday = "sun" | "mon" | "tue" | "wed" | "thu" | "fri" | "sat";
+
+export interface ScheduleSettings {
+  timeZone: string;
+  sweep: { enabled: boolean; time: string };
+  review: { enabled: boolean; weekday: Weekday; time: string };
+}
+
+export interface ScheduledRun {
+  id: number;
+  kind: "sweep" | "review";
+  slot: string;
+  slotAt: number | null;
+  trigger: "scheduled" | "manual";
+  status: "requested" | "running" | "done" | "failed" | "skipped";
+  reason: string | null;
+  createdAt: string;
+}
