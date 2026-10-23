@@ -193,28 +193,26 @@ export class Telemetry implements TelemetryStore {
   }
 
   toolResult(rec: ToolResultTelemetry): void {
-    const params = bind({
+    // node:sqlite rejects named parameters a statement does not use, so each statement gets exactly its own.
+    const values = {
       is_error: rec.isError,
       text: rec.text.slice(0, TEXT_CAP),
       entry: rec.entryId,
       dur: rec.durationMs,
       status: rec.isError ? "error" : "done",
-      task: rec.taskId,
-      conv: rec.conversationId,
-      call: rec.callId,
-    });
+    };
     const set =
       "is_error = :is_error, result_text = :text, result_entry_id = :entry, duration_ms = :dur, status = :status";
     const byTask =
       rec.taskId !== undefined
-        ? this.db.prepare(`UPDATE tool_calls SET ${set} WHERE task_id = :task`).run(params)
+        ? this.db.prepare(`UPDATE tool_calls SET ${set} WHERE task_id = :task`).run(bind({ ...values, task: rec.taskId }))
         : undefined;
     if (!byTask || Number(byTask.changes) === 0)
       this.db
         .prepare(
           `UPDATE tool_calls SET ${set} WHERE id = (SELECT id FROM tool_calls WHERE conversation_id = :conv AND call_id = :call ORDER BY id DESC LIMIT 1)`,
         )
-        .run(params);
+        .run(bind({ ...values, conv: rec.conversationId, call: rec.callId }));
   }
 
   submission(rec: SubmissionTelemetry): void {

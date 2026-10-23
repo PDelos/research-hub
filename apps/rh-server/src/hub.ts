@@ -3,6 +3,7 @@
 import type { Extension } from "@earendil-works/pi-durable";
 import { createModelCatalog, installScriptedFaux, type FauxRule, type ModelCatalog } from "@rh/durable-agent";
 import { JevClient } from "@rh/jev";
+import { offlineRules } from "./faux-rules.ts";
 import type { Config } from "./config.ts";
 import type { Logger } from "./logger.ts";
 import { acquireOwner, type OwnerLock } from "./owner.ts";
@@ -36,7 +37,7 @@ export class Hub {
       provider: offline ? "faux" : "openrouter",
       jobs: config.models,
       installFaux: (models, modelIds) =>
-        installScriptedFaux(models, options.fauxRules ?? [], {
+        installScriptedFaux(models, options.fauxRules ?? offlineRules, {
           modelIds,
           tokensPerSecond: options.fauxTokensPerSecond,
         }),

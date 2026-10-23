@@ -111,3 +111,24 @@ test("a chat turn produces one run record with tokens, model and cost, and the p
     await server.stop();
   }
 });
+
+test("tool results are recorded on their tool call, including errors", async () => {
+  const server = await startTestServer({
+    hub: { fauxRules: [(t) => (t.results.length ? say("done") : call("missing_tool", {}))] },
+  });
+  try {
+    await server.client.send("call a missing tool", { waitMs: 10_000 });
+    await new Promise((r) => setTimeout(r, 200));
+    const [run] = await server.client.runs();
+    const detail = await server.client.run(run.id);
+    assert.equal(detail.toolCallList.length, 1);
+    const [c] = detail.toolCallList;
+    assert.equal(c.toolName, "missing_tool");
+    assert.equal(c.isError, true);
+    assert.equal(c.status, "error");
+    assert.match(c.result ?? "", /not available/);
+    assert.ok(!server.logs.some((l) => l.includes("telemetry.project_failed")), "no projection errors");
+  } finally {
+    await server.stop();
+  }
+});

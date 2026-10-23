@@ -17,6 +17,8 @@ import {
 } from "@rh/durable-agent";
 import { JevLedger, loadCommand, runCommand, type JevClient } from "@rh/jev";
 import { createAgents, type Agents } from "./agents.ts";
+import { Brief, Charters, ProjectState, ScopingQuestions } from "./charter.ts";
+import { CharterWriter } from "./charter-writer.ts";
 import { openProjectDb, Settings, type Db, type SelfCheck } from "./db.ts";
 import type { Logger } from "./logger.ts";
 import { Telemetry } from "./telemetry.ts";
@@ -59,6 +61,11 @@ export interface ProjectRuntime {
   readonly root: Conversation;
   readonly agents: Agents;
   readonly jevLedger: JevLedger;
+  readonly brief: Brief;
+  readonly charters: Charters;
+  readonly questions: ScopingQuestions;
+  readonly state: ProjectState;
+  readonly charterWriter: CharterWriter;
   model(): Promise<{ id: string; window: number }>;
   compaction(): CompactionSetting & { window: number };
   setCompaction(next: Partial<CompactionSetting>): CompactionSetting;
@@ -95,10 +102,25 @@ export async function openProject(options: {
   const observe = observability({
     event: (e) => plog[e.level === "debug" ? "debug" : e.level](`agent.${e.event}`, { conversationId: e.conversationId, taskId: e.taskId, ...e.data }),
   });
+  const brief = new Brief(dir);
+  const charters = new Charters(db);
+  const questions = new ScopingQuestions(db);
+  const state = new ProjectState(settings, brief, charters);
+  const charterWriter = new CharterWriter({
+    settings,
+    charters,
+    questions,
+    brief,
+    catalog,
+    promptsDir: options.promptsDir,
+    log: plog,
+    observe,
+  });
   const agents = createAgents({
     promptsDir: options.promptsDir,
     projectName: name,
     extra: [observe, ...(options.extensions ?? [])],
+    separate: [charterWriter.extension],
     deskTools: options.deskTools,
   });
   const compaction: CompactionSetting = settings.get("compaction", { points: DEFAULT_POINTS, enabled: true });
@@ -135,6 +157,7 @@ export async function openProject(options: {
   };
   window = (await model()).window;
   harness.harness.resume();
+  charterWriter.attach(harness.harness, ctx);
 
   const jevLedger = new JevLedger((record) => telemetry.jevCall(record));
   const jevDir = join(options.promptsDir, "jev");
@@ -153,6 +176,11 @@ export async function openProject(options: {
     root,
     agents,
     jevLedger,
+    brief,
+    charters,
+    questions,
+    state,
+    charterWriter,
     model,
     compaction: () => ({ ...compaction, window }),
     setCompaction(next) {

@@ -3,25 +3,25 @@
 ## 1. Storage and status
 
 - [x] 1.1 Add `project.sqlite` migration 2 (`charters`, `scoping_questions`, `scheduled_runs` with UNIQUE(kind, slot)); verify a migration test from version 1 keeps existing telemetry rows
-- [ ] 1.2 Implement derived project status (D1) with stored `paused`; verify unit tests for each status and that pausing remembers the status to return to
+- [x] 1.2 Implement derived project status (D1) with stored `paused`; verify unit tests for each status and that pausing remembers the status to return to
 
 ## 2. Brief (spec: project-charter)
 
-- [ ] 2.1 Add `GET/PUT /v1/brief` storing `brief.md` (UTF-8 markdown ≤ 50,000 characters); verify tests for a valid brief (status `charter-review` once a draft exists), a 60,000-character brief (400 naming the limit, nothing stored) and a fresh project reporting `needs-brief`
-- [ ] 2.2 Replacing the brief after approval starts a new draft while the approved charter stays in force; verify a test
+- [x] 2.1 Add `GET/PUT /v1/brief` storing `brief.md` (UTF-8 markdown ≤ 50,000 characters); verify tests for a valid brief (status `charter-review` once a draft exists), a 60,000-character brief (400 naming the limit, nothing stored) and a fresh project reporting `needs-brief`
+- [x] 2.2 Replacing the brief after approval starts a new draft while the approved charter stays in force; verify a test
 
 ## 3. Charter drafting (spec: project-charter)
 
-- [ ] 3.1 Define the charter schema and validator (D3) shared by the agent tool and the edit route; verify tests for every bound with exact messages, including "questions: 9 given, 3 to 7 allowed"
-- [ ] 3.2 Add the `charter-writer` extension, its system prompt and the tools `save_charter_draft` and `ask_scoping_questions` (`onceInCommit`, 5-question total cap); verify tool tests including a replay that records the draft once and a rejected sixth question
-- [ ] 3.3 Create the charter conversation on the first brief with the `review` model and submit the draft run; mark the run failed if it ends without a saved draft; verify a faux test where a brief yields a Q1..Qn draft plus questions, the chat transcript has no drafting messages, and telemetry shows the `review` model
-- [ ] 3.4 Prove the correction loop: a faux rule saves an invalid draft, gets the tool error, then saves a valid one; verify only the valid draft is stored, and 3 invalid saves mark the run failed with `POST /v1/charter/retry` working
-- [ ] 3.5 Add `POST /v1/charter/answers` storing answers and submitting one revision run; verify a faux test where answering "clinical applications are out of scope" yields a draft listing it under out-of-scope
-- [ ] 3.6 Add `GET/PUT /v1/charter` and `POST /v1/charter/approve` with versioning; verify tests that approval sets status `active`, an edit plus approval creates version 2, and version 1 stays readable
+- [x] 3.1 Define the charter schema and validator (D3) shared by the agent tool and the edit route; verify tests for every bound with exact messages, including "questions: 9 given, 3 to 7 allowed"
+- [x] 3.2 Add the `charter-writer` extension, its system prompt and the tools `save_charter_draft` and `ask_scoping_questions` (`onceInCommit`, 5-question total cap); verify tool tests including a replay that records the draft once and a rejected sixth question
+- [x] 3.3 Create the charter conversation on the first brief with the `review` model and submit the draft run; mark the run failed if it ends without a saved draft; verify a faux test where a brief yields a Q1..Qn draft plus questions, the chat transcript has no drafting messages, and telemetry shows the `review` model
+- [x] 3.4 Prove the correction loop: a faux rule saves an invalid draft, gets the tool error, then saves a valid one; verify only the valid draft is stored, and 3 invalid saves mark the run failed with `POST /v1/charter/retry` working
+- [x] 3.5 Add `POST /v1/charter/answers` storing answers and submitting one revision run; verify a faux test where answering "clinical applications are out of scope" yields a draft listing it under out-of-scope
+- [x] 3.6 Add `GET/PUT /v1/charter` and `POST /v1/charter/approve` with versioning; verify tests that approval sets status `active`, an edit plus approval creates version 2, and version 1 stays readable
 
 ## 4. Pause and overview (spec: project-charter)
 
-- [ ] 4.1 Add `POST /v1/project/pause` and `/resume`; verify tests that scheduled runs stop while paused and chat still works
+- [x] 4.1 Add `POST /v1/project/pause` and `/resume`; verify tests that scheduled runs stop while paused and chat still works
 - [ ] 4.2 Add `GET /v1/project` overview (name, status, charter version, next sweep and review, cost this month); verify a test for an active and a paused project
 
 ## 5. Scheduling (spec: scheduling)

@@ -6,6 +6,7 @@ import { identify, uiProxy } from "./auth.ts";
 import { errorMiddleware, notFound } from "./errors.ts";
 import type { Hub } from "./hub.ts";
 import { routes } from "./routes.ts";
+import { projectRoutes } from "./routes-project.ts";
 import { StreamHub } from "./sse.ts";
 
 export function createHttpApp(hub: Hub) {
@@ -17,6 +18,7 @@ export function createHttpApp(hub: Hub) {
   http.use(express.json({ limit: "256kb" }));
   http.use(identify({ api: config.apiToken, client: config.clientToken }));
   http.use(routes(hub, streams));
+  http.use(projectRoutes(hub));
   const indexFile = join(config.uiDir, "index.html");
   if (existsSync(indexFile)) {
     // The page title names the project, so several project tabs are easy to tell apart.

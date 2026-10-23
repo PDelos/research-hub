@@ -43,7 +43,18 @@ export async function startTestServer(
   });
   const server = await startServer(config, log, options.hub);
   const client = new HubClient({ base: `${server.url}/v1`, token: TOKEN });
-  return { ...server, client, logs, dataDir };
+  return {
+    ...server,
+    client,
+    logs,
+    dataDir,
+    async stop() {
+      await server.stop();
+      // Telemetry projection errors are caught and only logged; never let one pass silently in a test.
+      const failed = logs.filter((l) => l.includes("telemetry.project_failed"));
+      if (failed.length) throw new Error(`telemetry projection failed:\n${failed.join("\n")}`);
+    },
+  };
 }
 
 export const until = async (check: () => boolean | Promise<boolean>, ms = 10_000, label = "condition") => {
