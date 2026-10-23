@@ -19,6 +19,8 @@ import { JevLedger, loadCommand, runCommand, type JevClient } from "@rh/jev";
 import { createAgents, type Agents } from "./agents.ts";
 import { Brief, Charters, ProjectState, ScopingQuestions } from "./charter.ts";
 import { CharterWriter } from "./charter-writer.ts";
+import type { ScheduleDefaults } from "./config.ts";
+import { Scheduler } from "./schedule.ts";
 import { openProjectDb, Settings, type Db, type SelfCheck } from "./db.ts";
 import type { Logger } from "./logger.ts";
 import { Telemetry } from "./telemetry.ts";
@@ -66,6 +68,7 @@ export interface ProjectRuntime {
   readonly questions: ScopingQuestions;
   readonly state: ProjectState;
   readonly charterWriter: CharterWriter;
+  readonly scheduler: Scheduler;
   model(): Promise<{ id: string; window: number }>;
   compaction(): CompactionSetting & { window: number };
   setCompaction(next: Partial<CompactionSetting>): CompactionSetting;
@@ -90,6 +93,7 @@ export async function openProject(options: {
   /** Extra extensions (tests use this to add tools). */
   extensions?: Extension[];
   deskTools?: readonly string[];
+  schedule: ScheduleDefaults;
 }): Promise<ProjectRuntime> {
   const { name, catalog, log } = options;
   const dir = options.dataDir;
@@ -116,6 +120,7 @@ export async function openProject(options: {
     log: plog,
     observe,
   });
+  const scheduler = new Scheduler({ db, settings, state, charters, defaults: options.schedule, log: plog });
   const agents = createAgents({
     promptsDir: options.promptsDir,
     projectName: name,
@@ -181,6 +186,7 @@ export async function openProject(options: {
     questions,
     state,
     charterWriter,
+    scheduler,
     model,
     compaction: () => ({ ...compaction, window }),
     setCompaction(next) {
@@ -208,6 +214,7 @@ export async function openProject(options: {
       }
     },
     async close() {
+      scheduler.stop();
       stopProjector();
       await harness.close();
       db.close();

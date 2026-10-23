@@ -4,6 +4,7 @@ import { BriefInvalid, CharterInvalid, validateCharter } from "./charter.ts";
 import { requireAuth } from "./auth.ts";
 import { CharterBusy } from "./charter-writer.ts";
 import { ApiFault, int, invalid, notFound } from "./errors.ts";
+import { ScheduleInvalid } from "./schedule.ts";
 import type { Hub } from "./hub.ts";
 
 function bodyOf(req: Request): Record<string, unknown> {
@@ -113,6 +114,43 @@ export function projectRoutes(hub: Hub): Router {
       fault(error);
     }
     res.json(charterView());
+  });
+
+  r.get("/v1/project", (_req, res) => {
+    const project = p();
+    const approved = project.charters.approved();
+    res.json({
+      name: project.name,
+      status: project.state.status(),
+      charterVersion: approved?.version ?? null,
+      hasDraft: !!project.charters.draft(),
+      charterRun: project.charterWriter.run()?.status ?? null,
+      paused: project.state.paused() ?? null,
+      next: project.scheduler.next(),
+      monthCostUsd: project.telemetry.totals().monthUsd,
+    });
+  });
+
+  r.get("/v1/schedule", (_req, res) => void res.json(p().scheduler.schedule()));
+
+  r.put("/v1/schedule", (req, res) => {
+    try {
+      res.json(p().scheduler.setSchedule(bodyOf(req)));
+    } catch (error) {
+      if (error instanceof ScheduleInvalid) throw invalid(error.message);
+      throw error;
+    }
+  });
+
+  r.get("/v1/scheduled-runs", (req, res) => {
+    res.json(p().scheduler.runs(Math.min(int(req.query.limit, "limit", 100), 500)));
+  });
+
+  r.post("/v1/runs/:kind", (req, res) => {
+    const kind = req.params.kind;
+    if (kind !== "sweep" && kind !== "review") throw notFound(`No run kind ${kind}`);
+    const run = p().scheduler.trigger(kind);
+    res.status(run.status === "requested" ? 202 : 200).json(run);
   });
 
   r.post("/v1/project/pause", (_req, res) => {

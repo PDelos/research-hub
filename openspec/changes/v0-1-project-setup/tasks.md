@@ -22,16 +22,16 @@
 ## 4. Pause and overview (spec: project-charter)
 
 - [x] 4.1 Add `POST /v1/project/pause` and `/resume`; verify tests that scheduled runs stop while paused and chat still works
-- [ ] 4.2 Add `GET /v1/project` overview (name, status, charter version, next sweep and review, cost this month); verify a test for an active and a paused project
+- [x] 4.2 Add `GET /v1/project` overview (name, status, charter version, next sweep and review, cost this month); verify a test for an active and a paused project
 
 ## 5. Scheduling (spec: scheduling)
 
-- [ ] 5.1 Implement the time-zone slot helper with `RH_TIMEZONE`, `RH_SWEEP_TIME`, `RH_REVIEW_TIME`; verify fixed-clock tests including a DST change in Europe/Madrid, and add the variables to `.env.example` (`npm run check:env` passes)
-- [ ] 5.2 Add schedule settings with environment defaults and `GET/PUT /v1/schedule`; verify tests that `RH_SWEEP_TIME=06:20` shows "daily 06:20", turning the sweep off survives a restart, and saved settings override the environment
-- [ ] 5.3 Implement the ticker (every 60 s and at startup) recording requested runs with the unique slot key; verify tests for two ticks in one slot (one record) and a restart inside a slot (no second request)
-- [ ] 5.4 Implement catch-up and eligibility (D5); verify fixed-clock tests: two days down → one request plus a skipped record; charter not approved → skipped "charter not approved"; paused at slot time → skipped "project paused" and nothing caught up after resuming
-- [ ] 5.5 Add manual triggers (`POST /v1/runs/{sweep,review}`) and the one-active-run rule; verify a manual sweep at 05:30 does not block the 06:00 slot and a request while one is `running` is skipped "sweep already running"
-- [ ] 5.6 Add `GET /v1/scheduled-runs`; verify a test listing requested and skipped runs with reasons
+- [x] 5.1 Implement the time-zone slot helper with `RH_TIMEZONE`, `RH_SWEEP_TIME`, `RH_REVIEW_TIME`; verify fixed-clock tests including a DST change in Europe/Madrid, and add the variables to `.env.example` (`npm run check:env` passes)
+- [x] 5.2 Add schedule settings with environment defaults and `GET/PUT /v1/schedule`; verify tests that `RH_SWEEP_TIME=06:20` shows "daily 06:20", turning the sweep off survives a restart, and saved settings override the environment
+- [x] 5.3 Implement the ticker (every 60 s and at startup) recording requested runs with the unique slot key; verify tests for two ticks in one slot (one record) and a restart inside a slot (no second request)
+- [x] 5.4 Implement catch-up and eligibility (D5); verify fixed-clock tests: two days down → one request plus a skipped record; charter not approved → skipped "charter not approved"; paused at slot time → skipped "project paused" and nothing caught up after resuming
+- [x] 5.5 Add manual triggers (`POST /v1/runs/{sweep,review}`) and the one-active-run rule; verify a manual sweep at 05:30 does not block the 06:00 slot and a request while one is `running` is skipped "sweep already running"
+- [x] 5.6 Add `GET /v1/scheduled-runs`; verify a test listing requested and skipped runs with reasons
 
 ## 6. UI (spec: project-charter, scheduling)
 

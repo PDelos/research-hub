@@ -62,7 +62,7 @@ const MIGRATIONS: string[] = [
     asked_at TEXT NOT NULL, answered_at TEXT
   );
   CREATE TABLE scheduled_runs (
-    id INTEGER PRIMARY KEY, kind TEXT NOT NULL CHECK (kind IN ('sweep', 'review')), slot TEXT NOT NULL,
+    id INTEGER PRIMARY KEY, kind TEXT NOT NULL CHECK (kind IN ('sweep', 'review')), slot TEXT NOT NULL, slot_at INTEGER,
     trigger TEXT NOT NULL CHECK (trigger IN ('scheduled', 'manual')),
     status TEXT NOT NULL CHECK (status IN ('requested', 'running', 'done', 'failed', 'skipped')),
     reason TEXT, created_at TEXT NOT NULL, UNIQUE (kind, slot)

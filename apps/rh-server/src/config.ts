@@ -8,6 +8,16 @@ import { jevModelFromEnv } from "@rh/jev";
 export type Mode = "live" | "offline";
 export type LogLevel = "debug" | "info" | "warn" | "error";
 
+export type Weekday = "sun" | "mon" | "tue" | "wed" | "thu" | "fri" | "sat";
+export const WEEKDAYS: readonly Weekday[] = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
+const TIME = /^([01]\d|2[0-3]):([0-5]\d)$/;
+
+export interface ScheduleDefaults {
+  timeZone: string;
+  sweepTime: string;
+  review: { weekday: Weekday; time: string };
+}
+
 export interface Config {
   /** The one research project this container serves (RH_PROJECT_NAME). */
   projectName: string;
@@ -27,6 +37,8 @@ export interface Config {
   openrouterKey?: string;
   promptsDir: string;
   uiDir: string;
+  /** Schedule defaults from RH_TIMEZONE, RH_SWEEP_TIME, RH_REVIEW_TIME; saved settings override them. */
+  schedule: ScheduleDefaults;
   /** Host names (without port) the UI proxy answers (DNS-rebinding guard). */
   allowedHosts: Set<string>;
 }
@@ -69,6 +81,22 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const level = (env.RH_LOG_LEVEL?.trim() || "info") as LogLevel;
   if (!["debug", "info", "warn", "error"].includes(level))
     throw new ConfigError(`RH_LOG_LEVEL must be debug, info, warn or error`, "RH_LOG_LEVEL");
+  const timeZone = env.RH_TIMEZONE?.trim() || "UTC";
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone });
+  } catch {
+    throw new ConfigError(`RH_TIMEZONE must be an IANA time zone such as Europe/Madrid, got "${timeZone}"`, "RH_TIMEZONE");
+  }
+  const sweepTime = env.RH_SWEEP_TIME?.trim() || "06:00";
+  if (!TIME.test(sweepTime))
+    throw new ConfigError(`RH_SWEEP_TIME must be HH:MM (24 h), got "${sweepTime}"`, "RH_SWEEP_TIME");
+  const reviewRaw = (env.RH_REVIEW_TIME?.trim() || "sun 07:00").toLowerCase();
+  const [weekday, reviewTime] = reviewRaw.split(/\s+/);
+  if (!WEEKDAYS.includes(weekday as Weekday) || !TIME.test(reviewTime ?? ""))
+    throw new ConfigError(
+      `RH_REVIEW_TIME must be "<sun..sat> HH:MM", got "${env.RH_REVIEW_TIME}"`,
+      "RH_REVIEW_TIME",
+    );
   const generatedTokens: string[] = [];
   const token = (name: string) => {
     const value = env[name]?.trim();
@@ -105,6 +133,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     promptsDir: join(APP_DIR, "prompt_engineering"),
     uiDir: resolve(REPO_ROOT, env.RH_UI_DIR?.trim() || "apps/rh-client-browser/dist"),
     allowedHosts,
+    schedule: { timeZone, sweepTime, review: { weekday: weekday as Weekday, time: reviewTime } },
   };
 }
 

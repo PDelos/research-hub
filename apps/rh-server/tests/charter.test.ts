@@ -13,16 +13,8 @@ import {
   type Charter,
 } from "../src/charter.ts";
 import { openProjectDb, Settings } from "../src/db.ts";
+import { sampleCharter } from "./fixtures/charter.ts";
 import { tempDir } from "./helpers.ts";
-
-export const sampleCharter = (over: Partial<Record<keyof Charter, unknown>> = {}) => ({
-  questions: [{ text: "How do protein LMs transfer to structure?" }, { text: "Which tasks need fine-tuning?", weight: 1.5 }, { text: "What do embeddings miss?" }],
-  concepts: ["protein language models", "contact maps"],
-  subAreas: ["structure prediction"],
-  queries: ["protein language model", "ESM embeddings", "contact prediction", "protein fine-tuning", { text: "PLM benchmark", weight: 0.5 }],
-  outOfScope: [],
-  ...over,
-});
 
 const problems = (input: unknown): string[] => {
   try {

@@ -18,6 +18,8 @@ export interface HubOptions {
   deskTools?: readonly string[];
   /** Ownership heartbeat interval (tests). */
   heartbeatMs?: number;
+  /** Start the 60 s scheduler ticker (default true; tests drive scheduler.tick() with a fixed clock). */
+  ticker?: boolean;
 }
 
 export class Hub {
@@ -69,7 +71,9 @@ export class Hub {
         log: this.log,
         extensions: this.options.extensions,
         deskTools: this.options.deskTools,
+        schedule: this.config.schedule,
       });
+      if (this.options.ticker !== false) this.opened.scheduler.start();
     } catch (error) {
       this.owner.release();
       this.owner = undefined;
