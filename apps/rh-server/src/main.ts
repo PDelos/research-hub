@@ -1,0 +1,49 @@
+// rh-server entry: load .env if present, read configuration (fail closed), start, and stop cleanly on signals.
+import { existsSync } from "node:fs";
+import { resolve } from "node:path";
+import { ConfigError, loadConfig, secretsOf } from "./config.ts";
+import { createLogger } from "./logger.ts";
+import { startServer } from "./server.ts";
+import { packageVersion, VERSION } from "./version.ts";
+
+const envFile = process.env.RH_ENV_FILE ?? resolve(import.meta.dirname, "../../../.env");
+if (envFile !== "none" && existsSync(envFile)) process.loadEnvFile(envFile);
+
+let config;
+try {
+  config = loadConfig();
+} catch (error) {
+  const variable = error instanceof ConfigError ? error.variable : undefined;
+  createLogger().error("config.invalid", { variable, error: error instanceof Error ? error.message : String(error) });
+  process.exit(1);
+}
+const log = createLogger({ level: config.logLevel, secrets: secretsOf(config) });
+process.on("unhandledRejection", (reason) => log.error("process.unhandled_rejection", { error: reason }));
+if (config.generatedTokens.length)
+  log.warn("config.generated_tokens", {
+    variables: config.generatedTokens,
+    note: "random per process; set them in .env to call the API from outside the UI",
+  });
+
+const server = await startServer(config, log);
+log.info("server.listening", {
+  url: server.url,
+  version: VERSION,
+  mode: config.mode,
+  providers: server.hub.providers,
+  models: server.hub.catalog.jobs,
+  piDurable: packageVersion("@earendil-works/pi-durable"),
+  dataDir: config.dataDir,
+});
+
+let stopping = false;
+async function shutdown(signal: string) {
+  if (stopping) return;
+  stopping = true;
+  log.info("server.stopping", { signal });
+  await server.stop();
+  log.info("server.stopped", { signal });
+  process.exit(0);
+}
+process.on("SIGTERM", () => void shutdown("SIGTERM"));
+process.on("SIGINT", () => void shutdown("SIGINT"));

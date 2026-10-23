@@ -1,0 +1,136 @@
+// project.sqlite: the app's own database for one project (pi-durable keeps agent.sqlite separately).
+// Node's built-in SQLite with the sqlite-vec extension; FTS5 and vectors are proven at open time.
+import { DatabaseSync } from "node:sqlite";
+import * as sqliteVec from "sqlite-vec";
+
+export type Db = DatabaseSync;
+
+const MIGRATIONS: string[] = [
+  // 1: settings, idempotency, telemetry (adapted from disler/pi-durable-news-agent's schema).
+  `
+  CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TEXT NOT NULL);
+  CREATE TABLE requests (
+    key TEXT PRIMARY KEY, route TEXT NOT NULL, status INTEGER NOT NULL, body TEXT NOT NULL, created_at TEXT NOT NULL
+  );
+  CREATE TABLE agent_conversations (
+    conversation_id INTEGER PRIMARY KEY, agent TEXT, owner_conversation_id INTEGER, owner_task_id INTEGER,
+    parent_conversation_id INTEGER, created_at TEXT NOT NULL
+  );
+  CREATE TABLE agent_runs (
+    run_entry_id INTEGER PRIMARY KEY, conversation_id INTEGER NOT NULL, request_id TEXT, submission_id INTEGER,
+    text TEXT, status TEXT NOT NULL DEFAULT 'running', started_at INTEGER NOT NULL, ended_at INTEGER,
+    answer_entry_id INTEGER
+  );
+  CREATE INDEX agent_runs_conversation ON agent_runs (conversation_id, started_at);
+  CREATE TABLE generations (
+    entry_id INTEGER PRIMARY KEY, conversation_id INTEGER NOT NULL, run_entry_id INTEGER, task_id INTEGER,
+    provider TEXT, model TEXT, stop_reason TEXT, error TEXT,
+    input_tokens INTEGER NOT NULL DEFAULT 0, output_tokens INTEGER NOT NULL DEFAULT 0,
+    cache_read_tokens INTEGER NOT NULL DEFAULT 0, cache_write_tokens INTEGER NOT NULL DEFAULT 0,
+    total_tokens INTEGER NOT NULL DEFAULT 0, cost_usd REAL NOT NULL DEFAULT 0, context_tokens INTEGER NOT NULL DEFAULT 0,
+    duration_ms INTEGER, text TEXT, tool_calls INTEGER NOT NULL DEFAULT 0, started_at INTEGER NOT NULL, ended_at INTEGER
+  );
+  CREATE INDEX generations_run ON generations (run_entry_id);
+  CREATE TABLE tool_calls (
+    id INTEGER PRIMARY KEY, generation_entry_id INTEGER NOT NULL, call_id TEXT NOT NULL,
+    conversation_id INTEGER NOT NULL, run_entry_id INTEGER, task_id INTEGER UNIQUE, tool_name TEXT NOT NULL,
+    args_json TEXT, status TEXT NOT NULL DEFAULT 'pending', is_error INTEGER NOT NULL DEFAULT 0, result_text TEXT,
+    result_entry_id INTEGER, duration_ms INTEGER, started_at INTEGER, ended_at INTEGER,
+    UNIQUE (generation_entry_id, call_id)
+  );
+  CREATE INDEX tool_calls_run ON tool_calls (run_entry_id);
+  CREATE TABLE tasks (
+    task_id INTEGER PRIMARY KEY, conversation_id INTEGER NOT NULL, kind TEXT NOT NULL, owner_task_id INTEGER,
+    background INTEGER NOT NULL DEFAULT 0, status TEXT NOT NULL, outcome TEXT, error TEXT, started_at INTEGER,
+    ended_at INTEGER
+  );
+  CREATE TABLE jev_calls (
+    id INTEGER PRIMARY KEY, command TEXT, version INTEGER, provider TEXT, model TEXT,
+    questions INTEGER NOT NULL DEFAULT 0, answers_json TEXT, input_tokens INTEGER, output_tokens INTEGER,
+    cost_usd REAL, cost_source TEXT NOT NULL, elapsed_ms INTEGER, attempts INTEGER, error TEXT, created_at TEXT NOT NULL
+  );
+  `,
+];
+
+export interface SelfCheck {
+  fts5: boolean;
+  vec: string | null;
+}
+
+export function openProjectDb(path: string): { db: Db; check: SelfCheck } {
+  const db = new DatabaseSync(path, { allowExtension: true });
+  db.exec("PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;");
+  sqliteVec.load(db);
+  const version = (db.prepare("PRAGMA user_version").get() as { user_version: number }).user_version;
+  for (let v = version; v < MIGRATIONS.length; v++) {
+    db.exec("BEGIN");
+    try {
+      db.exec(MIGRATIONS[v]);
+      db.exec(`PRAGMA user_version = ${v + 1}`);
+      db.exec("COMMIT");
+    } catch (error) {
+      db.exec("ROLLBACK");
+      throw error;
+    }
+  }
+  return { db, check: selfCheck(db) };
+}
+
+/** Prove the features later layers depend on: FTS5 keyword search and sqlite-vec nearest neighbours. */
+export function selfCheck(db: Db): SelfCheck {
+  let fts5 = false;
+  try {
+    db.exec("CREATE VIRTUAL TABLE temp.fts_probe USING fts5(body)");
+    db.prepare("INSERT INTO temp.fts_probe VALUES (?)").run("contact map prediction");
+    fts5 = (db.prepare("SELECT count(*) n FROM temp.fts_probe WHERE fts_probe MATCH 'contact'").get() as any).n === 1;
+    db.exec("DROP TABLE temp.fts_probe");
+  } catch {
+    fts5 = false;
+  }
+  let vec: string | null = null;
+  try {
+    db.exec("CREATE VIRTUAL TABLE temp.vec_probe USING vec0(e float[2])");
+    db.prepare("INSERT INTO temp.vec_probe(rowid, e) VALUES (1, ?)").run(new Float32Array([1, 0]));
+    const hit = db
+      .prepare("SELECT rowid FROM temp.vec_probe WHERE e MATCH ? ORDER BY distance LIMIT 1")
+      .get(new Float32Array([0.9, 0.1])) as { rowid: number } | undefined;
+    db.exec("DROP TABLE temp.vec_probe");
+    if (hit?.rowid === 1) vec = (db.prepare("SELECT vec_version() v").get() as { v: string }).v;
+  } catch {
+    vec = null;
+  }
+  return { fts5, vec };
+}
+
+export const nowIso = () => new Date().toISOString();
+
+/** Bind named parameters: undefined → null, booleans → 0/1, objects → JSON. */
+export function bind(params: Record<string, unknown>): Record<string, string | number | bigint | null> {
+  const out: Record<string, string | number | bigint | null> = {};
+  for (const [k, v] of Object.entries(params)) {
+    out[k] =
+      v === undefined || v === null
+        ? null
+        : typeof v === "boolean"
+          ? v ? 1 : 0
+          : typeof v === "object"
+            ? JSON.stringify(v)
+            : (v as string | number | bigint);
+  }
+  return out;
+}
+
+export class Settings {
+  constructor(private readonly db: Db) {}
+  get<T>(key: string, fallback: T): T {
+    const row = this.db.prepare("SELECT value FROM settings WHERE key = ?").get(key) as { value: string } | undefined;
+    return row ? (JSON.parse(row.value) as T) : fallback;
+  }
+  set(key: string, value: unknown): void {
+    this.db
+      .prepare(
+        "INSERT INTO settings (key, value, updated_at) VALUES (?, ?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at",
+      )
+      .run(key, JSON.stringify(value), nowIso());
+  }
+}

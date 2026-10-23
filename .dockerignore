@@ -1,0 +1,12 @@
+**/node_modules
+**/dist
+data
+logs
+.env
+.git
+openspec
+.claude
+.pi
+test-results
+*.log
+data-offline

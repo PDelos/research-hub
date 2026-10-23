@@ -1,0 +1,19 @@
+{
+  "name": "@rh/durable-agent",
+  "private": true,
+  "description": "Durable agent foundation on pi-durable: harness, models, compaction, prompts, tools, subagents, observability",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./compaction": "./src/compaction.ts"
+  },
+  "scripts": {
+    "check": "tsc -p .",
+    "test": "tsx --test tests/*.test.ts"
+  },
+  "dependencies": {
+    "@earendil-works/chord": "1.1.0",
+    "@earendil-works/pi-ai": "1.1.0",
+    "@earendil-works/pi-durable": "1.1.0"
+  }
+}

@@ -1,0 +1,16 @@
+# Keyless demo: fake model + mock Jev, no network calls, no .env needed.
+#   docker compose -f compose.offline.yml up -d        then open http://localhost:4850
+services:
+  research-hub:
+    build: .
+    image: research-hub:latest
+    environment:
+      RH_MODE: offline
+      RH_HOST: 0.0.0.0
+      RH_DATA_DIR: /data
+      RH_ENV_FILE: none
+    ports:
+      - "127.0.0.1:${RH_PUBLISH_PORT:-4850}:4850"
+    volumes:
+      - ${RH_HOST_DATA_DIR:-./data-offline}:/data
+    restart: unless-stopped

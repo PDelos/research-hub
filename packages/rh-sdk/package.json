@@ -1,0 +1,13 @@
+{
+  "name": "@rh/sdk",
+  "private": true,
+  "description": "Research Hub wire types, API types, transcript builder, stream reducer and a small client, shared by server and browser",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "check": "tsc -p .",
+    "test": "tsx --test tests/*.test.ts"
+  }
+}

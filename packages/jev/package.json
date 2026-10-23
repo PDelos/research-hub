@@ -1,0 +1,13 @@
+{
+  "name": "@rh/jev",
+  "private": true,
+  "description": "Bare jev classifier: JSON in, decisions out, commands loaded from JSON",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "check": "tsc -p .",
+    "test": "tsx --test tests/*.test.ts"
+  }
+}

@@ -1,0 +1,9 @@
+node_modules/
+dist/
+data/
+logs/
+.env
+test-results/
+*.log
+.DS_Store
+data-offline/
