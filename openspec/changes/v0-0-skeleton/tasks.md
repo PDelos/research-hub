@@ -40,17 +40,18 @@
 
 ## 6. Docker (spec: deployment)
 
-- [ ] 6.1 Write a multi-stage `Dockerfile` (`node:24-slim`, non-root, `/data`, `HEALTHCHECK`); verify `docker build` succeeds and the sqlite self-check passes inside the image
-- [ ] 6.2 Write `docker-compose.yml` (4850, `./data:/data`, `env_file`, `restart: unless-stopped`) and `compose.offline.yml`; verify the offline stack is healthy within 60 s
-- [ ] 6.3 Verify persistence: chat offline, `docker compose down && up`, message still present
-- [ ] 6.4 Verify restart: kill the Node process inside the container, health returns within 60 s
-- [ ] 6.5 Verify two project containers on ports 4850 and 4860 with separate data dirs share no state
+- [x] 6.1 Write a multi-stage `Dockerfile` (`node:24-slim`, non-root, `/data`, `HEALTHCHECK`); verify `docker build` succeeds and the sqlite self-check passes inside the image
+- [x] 6.2 Write `docker-compose.yml` (4850, `./data:/data`, `env_file`, `restart: unless-stopped`) and `compose.offline.yml`; verify the offline stack is healthy within 60 s
+- [x] 6.3 Verify persistence: chat offline, `docker compose down && up`, message still present
+- [x] 6.4 Verify restart: kill the Node process inside the container, health returns within 60 s
+- [x] 6.5 Verify two project containers on ports 4850 and 4860 with separate data dirs share no state
 - [x] 6.6 Write `README.md` (npm and Docker quick start, offline and live modes, env vars); verify the offline quick start works as written
 
 ## 7. Integration
 
 - [x] 7.1 Run all offline tests, `npm run check`, `npm run check:jev` and lint; verify all pass
-- [ ] 7.2 Live smoke (only with `OPENROUTER_API_KEY` and the user's approval to spend): one chat turn and one Jev `ping`; record resolved model IDs and cost in the change notes
+- [x] 7.2 Live smoke of chat at no cost: one chat turn in live mode through OpenRouter on a free model (`RH_MODEL_*` set to a `:free` ID); verify the reply, the run record's model and a $0 cost (see notes)
+- [ ] 7.3 Live Jev `ping` (needs OpenRouter credit, about $0.000004 per call, and the user's approval to spend); record resolved model ID, latency and cost
 
 ## 8. One project per container (spec: deployment, agent-runtime; design D4, D11)
 
@@ -68,3 +69,20 @@
 
 - Run `openspec validate v0-0-skeleton --strict` before applying.
 - After implementation and review, archive the change so `openspec/specs/` gains `deployment`, `agent-runtime` and `jev-client`; the next layer (`v0-1-project-setup`) builds on them.
+
+## Verification notes
+
+- 2026-10-23, task 7.2: live mode, project `test-hub`, all jobs on `nvidia/nemotron-3.5-lightning:free`. Chat
+  "In one sentence: what is a protein language model?" answered correctly; run record status `done`, model
+  `nvidia/nemotron-3.5-lightning:free`, 178 input / 495 output tokens (reasoning included), cost $0.00; no error log
+  lines; the key does not appear in the log. Free models are rate-limited (about 50 requests/day without credit)
+  and their providers may log prompts: use them for tests, not for real projects.
+- 2026-10-23, tasks 6.1–6.5 (Docker 29.7.2): image `research-hub:latest` built (525 MB: Node base plus 162 MB of
+  production dependencies). Offline stack healthy after 8 s; inside the container FTS5 works and sqlite-vec
+  v0.1.9 loads; user `node`, restart `unless-stopped`, 2 GB / 2 CPUs. A chat survived `compose down && up`
+  (container and network removed). SIGKILL of the server process from the host: Docker restarted it and it was
+  healthy after 2 s with its data, the dead process's data-directory lock taken over at once. Two projects made
+  with `new-project.sh` (alpha on 4850 at 06:00, beta on 4860 at 06:20) ran side by side: alpha's chat never
+  appeared in beta, beta refused `Host: alpha.localhost` (421), and a third container on alpha's data directory
+  exited with code 1 and `startup.data_dir_owned` naming alpha's container while alpha kept running.
+
