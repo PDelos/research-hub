@@ -234,9 +234,9 @@ export class Telemetry implements TelemetryStore {
     this.db
       .prepare(
         `INSERT INTO jev_calls (command, version, provider, model, questions, answers_json, input_tokens, output_tokens,
-           cost_usd, cost_source, elapsed_ms, attempts, error, tag, created_at)
+           cost_usd, cost_source, elapsed_ms, attempts, error, tag, extra_json, created_at)
          VALUES (:command, :version, :provider, :model, :questions, :answers, :input, :output, :cost, :source, :elapsed,
-           :attempts, :error, :tag, :now)`,
+           :attempts, :error, :tag, :extra, :now)`,
       )
       .run(
         bind({
@@ -254,6 +254,7 @@ export class Telemetry implements TelemetryStore {
           attempts: rec.attempts,
           error: rec.error,
           tag: currentCostTag(),
+          extra: rec.extra ? JSON.stringify(rec.extra) : null,
           now: nowIso(),
         }),
       );

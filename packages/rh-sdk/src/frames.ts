@@ -101,7 +101,7 @@ export type Frame =
   | { type: "agent.batch"; conversationId: number; events: WireAgentEvent[] }
   | { type: "agent.state"; state: AgentState }
   | { type: "usage"; totals: CostTotals }
-  | { type: "cards"; count: number; latestCardId: number | null; sweep: SweepSummary | null };
+  | { type: "cards"; count: number; latestCardId: number | null; judged: number; sweep: SweepSummary | null };
 
 // ---------------------------------------------------------------- project, charter, schedule (v0.1)
 
@@ -270,9 +270,44 @@ export interface CardView {
   borderline: boolean;
   createdAt: string;
   paper: PaperMeta;
+  judgment: JudgmentView | null;
+}
+
+export type Verdict = "up" | "down" | "star";
+
+export interface JudgmentView {
+  verdict: Verdict;
+  reason?: string;
+  reasonKind?: string;
+  ruleStatus: "none" | "candidate" | "unclassified" | "pending";
+  updatedAt: string;
+}
+
+export interface WeightEffect {
+  kind: "question" | "query" | "source";
+  key: string;
+  before: number;
+  after: number;
+}
+
+export interface WeightView {
+  kind: "question" | "query" | "source";
+  key: string;
+  base: number;
+  value: number;
+}
+
+export interface PrecisionPoint {
+  sweepId: number;
+  startedAt: string;
+  top: number;
+  judged: number;
+  good: number;
+  precision: number | null;
 }
 
 export interface CardDetail extends CardView {
+  weightEffects: WeightEffect[];
   details: {
     decisions: Record<string, { version: number; answers: unknown }>;
     inputs: Record<string, unknown>;

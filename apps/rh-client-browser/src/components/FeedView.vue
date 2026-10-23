@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
-import { ago, usd, type CardDetail } from "@rh/sdk";
+import { computed, onMounted, ref } from "vue";
+import { ago, usd, type CardDetail, type CardView, type Verdict } from "@rh/sdk";
 import { client, refreshFeed, store } from "../store.ts";
 
 const open = ref<Record<number, CardDetail | undefined>>({});
@@ -33,6 +33,33 @@ const phaseLabel: Record<string, string> = {
   rank: "ranking",
   cards: "writing cards",
 };
+const reasons = ref<Record<number, string>>({});
+const busy = ref<Record<number, boolean>>({});
+const ICON: Record<Verdict, string> = { down: "👎", up: "👍", star: "⭐" };
+const LABEL: Record<Verdict, string> = { down: "Not useful", up: "Interesting", star: "Add to knowledge base" };
+
+async function judge(card: CardView, verdict: Verdict) {
+  busy.value = { ...busy.value, [card.id]: true };
+  try {
+    const reason = reasons.value[card.id] ?? card.judgment?.reason ?? "";
+    const detail = card.judgment?.verdict === verdict && !reasons.value[card.id] ? await client.clearJudgment(card.id) : await client.judge(card.id, verdict, reason || undefined);
+    if (open.value[card.id]) open.value = { ...open.value, [card.id]: detail };
+    await refreshFeed();
+  } catch (e) {
+    store.error = e instanceof Error ? e.message : String(e);
+  } finally {
+    busy.value = { ...busy.value, [card.id]: false };
+  }
+}
+
+async function saveReason(card: CardView) {
+  if (!card.judgment) return;
+  await judge(card, card.judgment.verdict);
+  reasons.value = { ...reasons.value, [card.id]: "" };
+}
+
+const trend = computed(() => [...store.precision].reverse().slice(-12));
+const latestPrecision = computed(() => store.precision.find((p) => p.judged > 0));
 const scoreClass = (n: number) => (n >= 70 ? "hi" : n >= 45 ? "mid" : "lo");
 const authors = (a: string[]) => (a.length > 3 ? `${a.slice(0, 3).join(", ")} et al.` : a.join(", "));
 </script>
@@ -44,6 +71,12 @@ const authors = (a: string[]) => (a.length > 3 ? `${a.slice(0, 3).join(", ")} et
       <span v-if="store.sweep?.status === 'running'" class="badge live">Sweep {{ store.sweep.id }}: {{ phaseLabel[store.sweep.phase] }}…</span>
       <span v-else-if="store.sweep?.status === 'failed'" class="badge offline" :title="store.sweep.error">Last sweep failed</span>
       <span class="grow" />
+      <div v-if="latestPrecision" class="precision" :title="`Share of each sweep's top 5 cards you liked or starred, among those you judged`">
+        <svg :width="trend.length * 9" height="22" aria-hidden="true">
+          <rect v-for="(p, i) in trend" :key="p.sweepId" :x="i * 9" :y="22 - 2 - (p.precision ?? 0) * 18" width="6" :height="2 + (p.precision ?? 0) * 18" :class="{ none: p.precision === null }" />
+        </svg>
+        <span class="muted">precision@5 {{ Math.round(latestPrecision.precision! * 100) }}% ({{ latestPrecision.judged }} of {{ latestPrecision.top }} judged)</span>
+      </div>
       <button
         class="ghost"
         :disabled="starting || store.sweep?.status === 'running' || store.project?.status !== 'active'"
@@ -87,8 +120,29 @@ const authors = (a: string[]) => (a.length > 3 ? `${a.slice(0, 3).join(", ")} et
           <div :class="['score', scoreClass(card.trust)]"><strong>Trust {{ card.trust }}</strong><span>{{ card.trustReason }}</span></div>
           <div :class="['score', scoreClass(card.value)]"><strong>Value {{ card.value }}</strong><span>{{ card.valueReason }}</span></div>
         </div>
+        <div class="judge">
+          <button
+            v-for="v in (['down', 'up', 'star'] as const)"
+            :key="v"
+            :class="['verdict', { on: card.judgment?.verdict === v }]"
+            :title="card.judgment?.verdict === v ? 'Click again to remove' : LABEL[v]"
+            :disabled="busy[card.id]"
+            @click="judge(card, v)"
+          >
+            {{ ICON[v] }}
+          </button>
+          <span v-if="card.judgment?.reason" class="muted reason-shown">“{{ card.judgment.reason }}”<span v-if="card.judgment.ruleStatus === 'candidate'" class="badge" title="Queued for the weekly review as a possible rule">rule?</span></span>
+        </div>
+        <div v-if="card.judgment" class="reason-box">
+          <textarea v-model="reasons[card.id]" maxlength="1000" rows="2" :placeholder="card.judgment.reason ? 'Change your reason…' : 'Why? (optional, helps the next sweeps)'" />
+          <button class="ghost" :disabled="!reasons[card.id] || busy[card.id]" @click="saveReason(card)">Save reason</button>
+        </div>
         <button class="link" @click="toggle(card.id)">{{ open[card.id] ? "Hide details" : "How these scores were computed" }}</button>
         <div v-if="open[card.id]" class="card-details">
+          <template v-if="open[card.id]!.weightEffects.length">
+            <h4>Your judgment changed these weights</h4>
+            <ul><li v-for="e in open[card.id]!.weightEffects" :key="e.kind + e.key">{{ e.kind }} “{{ e.key }}”: {{ e.before.toFixed(2) }} → {{ e.after.toFixed(2) }}</li></ul>
+          </template>
           <h4>Formulas</h4>
           <ul><li v-for="(f, name) in open[card.id]!.details.formulas" :key="name"><strong>{{ name }}</strong>: {{ f }}</li></ul>
           <h4>Inputs</h4>

@@ -27,6 +27,7 @@ import { SweepRunner } from "./sweep/sweep.ts";
 import { CardStore } from "./sweep/cards.ts";
 import { Feedback } from "./feedback/feedback.ts";
 import { ReasonParser } from "./feedback/reasons.ts";
+import { feedbackTools } from "./feedback/tools.ts";
 import { CardWriter } from "./sweep/card-writer.ts";
 import { paperTools } from "./papers/tool.ts";
 import { ensureVectorTables, openProjectDb, Settings, type Db, type SelfCheck } from "./db.ts";
@@ -189,7 +190,7 @@ export async function openProject(options: {
   const agents = createAgents({
     promptsDir: options.promptsDir,
     projectName: name,
-    extra: [observe, paperTools(() => papers), ...(options.extensions ?? [])],
+    extra: [observe, paperTools(() => papers), feedbackTools(() => ({ cards, feedback, store: papers.store })), ...(options.extensions ?? [])],
     separate: [charterWriter.extension, cardWriter.extension],
     deskTools: options.deskTools,
   });

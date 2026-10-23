@@ -178,6 +178,7 @@ const MIGRATIONS: string[] = [
     status TEXT NOT NULL CHECK (status IN ('pending', 'cancelled', 'done')), created_at TEXT NOT NULL, updated_at TEXT NOT NULL
   );
   ALTER TABLE sweep_papers ADD COLUMN queries_json TEXT;
+  ALTER TABLE jev_calls ADD COLUMN extra_json TEXT;
   `,
 ];
 

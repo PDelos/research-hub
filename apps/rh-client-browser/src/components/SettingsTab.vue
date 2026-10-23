@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from "vue";
-import type { Weekday } from "@rh/sdk";
+import type { WeightView, Weekday } from "@rh/sdk";
 import { client, refreshProject, refreshSchedule, store } from "../store.ts";
 
 const days: { id: Weekday; label: string }[] = [
@@ -25,10 +25,22 @@ const fill = () => {
     reviewTime: s.review.time,
   };
 };
+const weights = ref<WeightView[]>([]);
+const cardsPerSweep = ref(7);
 onMounted(async () => {
   await refreshSchedule();
   fill();
+  [weights.value, { cardsPerSweep: cardsPerSweep.value }] = await Promise.all([client.weights(), client.sweepSettings()]);
 });
+async function saveCards() {
+  try {
+    cardsPerSweep.value = (await client.setSweepSettings({ cardsPerSweep: Number(cardsPerSweep.value) })).cardsPerSweep;
+    saved.value = "Saved.";
+  } catch (e) {
+    store.error = e instanceof Error ? e.message : String(e);
+  }
+}
+const kindLabel = { question: "Research question", query: "Search query", source: "Source" } as const;
 watch(() => store.schedule, fill);
 
 async function save() {
@@ -75,6 +87,27 @@ async function runNow(kind: "sweep" | "review") {
       <button class="primary" @click="save">Save schedule</button>
       <span class="muted">{{ saved }}</span>
     </div>
-    <p class="muted small">Sweeps and reviews themselves arrive in later versions; for now a due run is recorded as requested.</p>
+    <p class="muted small">The weekly review arrives in a later version; for now a due review is recorded as requested.</p>
+
+    <h2>Cards</h2>
+    <fieldset>
+      <label>Cards per sweep <input v-model.number="cardsPerSweep" type="number" min="1" max="15" /></label>
+      <button class="ghost" @click="saveCards">Save</button>
+    </fieldset>
+
+    <h2>Weights</h2>
+    <p class="muted">Your judgments nudge these: 👍 +0.10, ⭐ +0.15, 👎 −0.15, kept between 0.1 and 2.</p>
+    <table>
+      <thead><tr><th>Kind</th><th>Name</th><th>Charter</th><th>Now</th></tr></thead>
+      <tbody>
+        <tr v-for="w in weights" :key="w.kind + w.key" class="static">
+          <td class="muted">{{ kindLabel[w.kind] }}</td>
+          <td>{{ w.key }}</td>
+          <td>{{ w.base.toFixed(2) }}</td>
+          <td :class="{ up: w.value > w.base, down: w.value < w.base }">{{ w.value.toFixed(2) }}</td>
+        </tr>
+        <tr v-if="!weights.length"><td colspan="4" class="muted center">No weights yet: approve the charter first.</td></tr>
+      </tbody>
+    </table>
   </div>
 </template>

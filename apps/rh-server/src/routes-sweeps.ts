@@ -1,7 +1,8 @@
 // Sweeps and cards (v0.3): the Feed (cards grouped by sweep, newest first), card details with score traceability,
 // sweep details with phases, counts and the cost split, and the cards-per-sweep setting.
 import express, { type Router } from "express";
-import type { CardDetail, CardGroup, CardView, PaperMeta, SweepDetail, SweepSummary } from "@rh/sdk";
+import type { CardDetail, CardGroup, CardView, JudgmentView, PaperMeta, SweepDetail, SweepSummary } from "@rh/sdk";
+import { JudgmentInvalid } from "./feedback/feedback.ts";
 import { requireAuth } from "./auth.ts";
 import { int, invalid, notFound } from "./errors.ts";
 import type { Hub } from "./hub.ts";
@@ -43,6 +44,21 @@ export function cardView(project: ProjectRuntime, card: Card): CardView {
     borderline: card.borderline,
     createdAt: card.createdAt,
     paper: paperMeta(project, card.paperId),
+    judgment: judgmentView(project, card.id),
+  };
+}
+
+function judgmentView(project: ProjectRuntime, cardId: number): JudgmentView | null {
+  const j = project.feedback.get(cardId);
+  return j ? { verdict: j.verdict, reason: j.reason, reasonKind: j.reasonKind, ruleStatus: j.ruleStatus, updatedAt: j.updatedAt } : null;
+}
+
+function cardDetail(project: ProjectRuntime, card: Card): CardDetail {
+  return {
+    ...cardView(project, card),
+    paper: paperMeta(project, card.paperId, true),
+    details: card.details,
+    weightEffects: project.feedback.effects(card.id),
   };
 }
 
@@ -87,9 +103,33 @@ export function sweepRoutes(hub: Hub): Router {
     const project = p();
     const card = project.cards.get(int(req.params.id, "id"));
     if (!card) throw notFound(`No card ${req.params.id}`);
-    const detail: CardDetail = { ...cardView(project, card), paper: paperMeta(project, card.paperId, true), details: card.details };
-    res.json(detail);
+    res.json(cardDetail(project, card));
   });
+
+  r.put("/v1/cards/:id/judgment", (req, res) => {
+    const project = p();
+    const card = project.cards.get(int(req.params.id, "id"));
+    if (!card) throw notFound(`No card ${req.params.id}`);
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    try {
+      project.feedback.judge(card.id, body.verdict, body.reason);
+    } catch (error) {
+      if (error instanceof JudgmentInvalid) throw invalid(error.message);
+      throw error;
+    }
+    res.json(cardDetail(project, card));
+  });
+
+  r.delete("/v1/cards/:id/judgment", (req, res) => {
+    const project = p();
+    const card = project.cards.get(int(req.params.id, "id"));
+    if (!card) throw notFound(`No card ${req.params.id}`);
+    project.feedback.clear(card.id);
+    res.json(cardDetail(project, card));
+  });
+
+  r.get("/v1/feedback/precision", (_req, res) => void res.json(p().feedback.precision()));
+  r.get("/v1/weights", (_req, res) => void res.json(p().feedback.weights()));
 
   r.get("/v1/sweeps", (req, res) => {
     const project = p();

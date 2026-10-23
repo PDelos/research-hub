@@ -84,6 +84,8 @@ test("the next sweep's gate input carries the latest judgments as taste examples
     const starred = taste.examples.find((e: any) => e.verdict === "star");
     assert.equal(starred.title, env.papers.store.get(cards[0].paperId)!.title);
     assert.equal(starred.reason.length, 200);
+    const recorded = env.db.prepare("SELECT extra_json FROM jev_calls WHERE command = 'on-theme+paper-kind+worth-reading' ORDER BY id DESC LIMIT 1").get() as any;
+    assert.equal(JSON.parse(recorded.extra_json).tasteExamples, 2, "the ledger records how many taste examples went in");
   } finally {
     await env.done();
   }

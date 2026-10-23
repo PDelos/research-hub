@@ -102,5 +102,19 @@ export const cardWriterRule: FauxRule = (turn) => {
   return call("complete_sweep", { skipped: skipped.map((b) => ({ paper_id: b.id, reason: "no abstract to summarize" })) });
 };
 
+const ORDINALS: Record<string, number> = { first: 1, second: 2, third: 3, fourth: 4, fifth: 5, sixth: 6, seventh: 7, last: -1 };
+
+/** The offline desk records judgments said in chat: "star the second card, great foundation". */
+export const deskJudgeRule: FauxRule = (turn) => {
+  if (turn.sections["charter-writer"] || turn.sections["card-writer"]) return undefined;
+  const result = turn.results.find((r) => r.name === "judge_card");
+  if (result) return say(result.text);
+  const m = turn.lastUser.match(/\b(star|upvote|like|downvote|dislike)\s+(?:the\s+)?(?:card\s+)?(first|second|third|fourth|fifth|sixth|seventh|\d+)(?:st|nd|rd|th)?\s*(?:card)?[,.:;-]?\s*(.*)$/i);
+  if (!m) return undefined;
+  const verdict = /star/i.test(m[1]) ? "star" : /down|dislike/i.test(m[1]) ? "down" : "up";
+  const position = ORDINALS[m[2].toLowerCase()] ?? Number(m[2]);
+  return call("judge_card", { verdict, position, ...(m[3].trim() ? { reason: m[3].trim() } : {}) });
+};
+
 /** Default scripted rules for offline mode. */
-export const offlineRules: FauxRule[] = [charterWriterRule, cardWriterRule, deskSearchRule];
+export const offlineRules: FauxRule[] = [charterWriterRule, cardWriterRule, deskJudgeRule, deskSearchRule];

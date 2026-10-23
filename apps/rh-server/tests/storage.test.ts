@@ -53,7 +53,7 @@ test("migration 2 upgrades a version-1 database and keeps its telemetry rows", a
     // A v0.0 database: migration 1 only, with one run recorded.
     const first = openProjectDb(path);
     first.db.prepare("INSERT INTO agent_runs (run_entry_id, conversation_id, text, started_at) VALUES (7, 1, 'old run', 1)").run();
-    first.db.exec("DROP TABLE judgments; DROP TABLE weight_effects; DROP TABLE weights; DROP TABLE rule_candidates; DROP TABLE kb_requests; ALTER TABLE sweep_papers DROP COLUMN queries_json; DROP TABLE sweep_papers; DROP TABLE paper_decisions; DROP TABLE cards; DROP TABLE sweeps; ALTER TABLE papers DROP COLUMN categories_json; ALTER TABLE jev_calls DROP COLUMN tag; ALTER TABLE embedding_calls DROP COLUMN tag; DROP TABLE papers; DROP TABLE paper_ids; DROP TABLE paper_sources; DROP TABLE metadata_cache; DROP TABLE citation_links; DROP TABLE facet_labels; DROP TABLE representations; DROP TABLE embedding_calls; DROP TABLE charters; DROP TABLE scoping_questions; DROP TABLE scheduled_runs; PRAGMA user_version = 1;");
+    first.db.exec("DROP TABLE judgments; DROP TABLE weight_effects; DROP TABLE weights; DROP TABLE rule_candidates; DROP TABLE kb_requests; ALTER TABLE sweep_papers DROP COLUMN queries_json; ALTER TABLE jev_calls DROP COLUMN extra_json; DROP TABLE sweep_papers; DROP TABLE paper_decisions; DROP TABLE cards; DROP TABLE sweeps; ALTER TABLE papers DROP COLUMN categories_json; ALTER TABLE jev_calls DROP COLUMN tag; ALTER TABLE embedding_calls DROP COLUMN tag; DROP TABLE papers; DROP TABLE paper_ids; DROP TABLE paper_sources; DROP TABLE metadata_cache; DROP TABLE citation_links; DROP TABLE facet_labels; DROP TABLE representations; DROP TABLE embedding_calls; DROP TABLE charters; DROP TABLE scoping_questions; DROP TABLE scheduled_runs; PRAGMA user_version = 1;");
     first.db.close();
     const raw = new DatabaseSync(path);
     assert.equal((raw.prepare("PRAGMA user_version").get() as any).user_version, 1);
@@ -76,7 +76,7 @@ test("migration 3 upgrades a version-2 database and keeps its settings", async (
     const path = join(t.dir, "project.sqlite");
     const first = openProjectDb(path);
     first.db.prepare("INSERT INTO settings (key, value, updated_at) VALUES ('kept', '\"yes\"', 'now')").run();
-    first.db.exec("DROP TABLE judgments; DROP TABLE weight_effects; DROP TABLE weights; DROP TABLE rule_candidates; DROP TABLE kb_requests; ALTER TABLE sweep_papers DROP COLUMN queries_json; DROP TABLE sweep_papers; DROP TABLE paper_decisions; DROP TABLE cards; DROP TABLE sweeps; ALTER TABLE papers DROP COLUMN categories_json; ALTER TABLE jev_calls DROP COLUMN tag; ALTER TABLE embedding_calls DROP COLUMN tag; DROP TABLE papers; DROP TABLE paper_ids; DROP TABLE paper_sources; DROP TABLE metadata_cache; DROP TABLE citation_links; DROP TABLE facet_labels; DROP TABLE representations; DROP TABLE embedding_calls; PRAGMA user_version = 2;");
+    first.db.exec("DROP TABLE judgments; DROP TABLE weight_effects; DROP TABLE weights; DROP TABLE rule_candidates; DROP TABLE kb_requests; ALTER TABLE sweep_papers DROP COLUMN queries_json; ALTER TABLE jev_calls DROP COLUMN extra_json; DROP TABLE sweep_papers; DROP TABLE paper_decisions; DROP TABLE cards; DROP TABLE sweeps; ALTER TABLE papers DROP COLUMN categories_json; ALTER TABLE jev_calls DROP COLUMN tag; ALTER TABLE embedding_calls DROP COLUMN tag; DROP TABLE papers; DROP TABLE paper_ids; DROP TABLE paper_sources; DROP TABLE metadata_cache; DROP TABLE citation_links; DROP TABLE facet_labels; DROP TABLE representations; DROP TABLE embedding_calls; PRAGMA user_version = 2;");
     first.db.close();
     const second = openProjectDb(path);
     assert.equal((second.db.prepare("PRAGMA user_version").get() as any).user_version, 5);
@@ -93,7 +93,7 @@ test("migration 5 upgrades a version-4 database: judgments, weights, rule candid
   try {
     const path = join(t.dir, "project.sqlite");
     const first = openProjectDb(path);
-    first.db.exec("DROP TABLE judgments; DROP TABLE weight_effects; DROP TABLE weights; DROP TABLE rule_candidates; DROP TABLE kb_requests; ALTER TABLE sweep_papers DROP COLUMN queries_json; PRAGMA user_version = 4;");
+    first.db.exec("DROP TABLE judgments; DROP TABLE weight_effects; DROP TABLE weights; DROP TABLE rule_candidates; DROP TABLE kb_requests; ALTER TABLE sweep_papers DROP COLUMN queries_json; ALTER TABLE jev_calls DROP COLUMN extra_json; PRAGMA user_version = 4;");
     first.db.close();
     const second = openProjectDb(path);
     assert.equal((second.db.prepare("PRAGMA user_version").get() as any).user_version, 5);
@@ -112,7 +112,7 @@ test("migration 4 upgrades a version-3 database: sweep tables, categories and co
     const path = join(t.dir, "project.sqlite");
     const first = openProjectDb(path);
     first.db.prepare("INSERT INTO papers (title, title_norm, created_at, updated_at) VALUES ('Kept', 'kept', 'now', 'now')").run();
-    first.db.exec("DROP TABLE judgments; DROP TABLE weight_effects; DROP TABLE weights; DROP TABLE rule_candidates; DROP TABLE kb_requests; ALTER TABLE sweep_papers DROP COLUMN queries_json; DROP TABLE sweep_papers; DROP TABLE paper_decisions; DROP TABLE cards; DROP TABLE sweeps; ALTER TABLE papers DROP COLUMN categories_json; ALTER TABLE jev_calls DROP COLUMN tag; ALTER TABLE embedding_calls DROP COLUMN tag; PRAGMA user_version = 3;");
+    first.db.exec("DROP TABLE judgments; DROP TABLE weight_effects; DROP TABLE weights; DROP TABLE rule_candidates; DROP TABLE kb_requests; ALTER TABLE sweep_papers DROP COLUMN queries_json; ALTER TABLE jev_calls DROP COLUMN extra_json; DROP TABLE sweep_papers; DROP TABLE paper_decisions; DROP TABLE cards; DROP TABLE sweeps; ALTER TABLE papers DROP COLUMN categories_json; ALTER TABLE jev_calls DROP COLUMN tag; ALTER TABLE embedding_calls DROP COLUMN tag; PRAGMA user_version = 3;");
     first.db.close();
     const second = openProjectDb(path);
     assert.equal((second.db.prepare("PRAGMA user_version").get() as any).user_version, 5);

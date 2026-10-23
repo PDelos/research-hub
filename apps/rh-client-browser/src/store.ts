@@ -6,6 +6,7 @@ import {
   HubClient,
   type AgentState,
   type CardGroup,
+  type PrecisionPoint,
   type CharterView,
   type CostTotals,
   type Info,
@@ -34,6 +35,7 @@ export const store = reactive({
   sweep: undefined as SweepSummary | undefined,
   sweeps: [] as SweepSummary[],
   sweepDetail: undefined as SweepDetail | undefined,
+  precision: [] as PrecisionPoint[],
   connected: false,
   error: "",
 });
@@ -61,7 +63,8 @@ export async function refreshProject() {
 
 export async function refreshFeed() {
   try {
-    const [{ groups }, sweeps] = await Promise.all([client.cards(), client.sweeps(20)]);
+    const [{ groups }, sweeps, precision] = await Promise.all([client.cards(), client.sweeps(20), client.precision()]);
+    store.precision = precision;
     store.feed = groups;
     store.sweeps = sweeps;
     store.sweep = sweeps[0];

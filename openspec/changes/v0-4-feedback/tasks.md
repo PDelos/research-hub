@@ -13,12 +13,12 @@
 
 ## 3. Channels and metrics
 
-- [ ] 3.1 Add the judgment routes, precision@5 (`GET /v1/feedback/precision`), weights (`GET /v1/weights`), card views with the verdict and weight effects, SDK methods; verify API tests including the precision example (2 ⭐, 1 👎, 2 unjudged → 67%, 3 of 5 judged)
-- [ ] 3.2 Add the desk tools `recent_cards` and `judge_card` and two desk-prompt lines; verify a faux-agent test for "star the second card, great foundation"
-- [ ] 3.3 Build the UI: judge buttons and reason box on cards, verdict shown, weight changes in details, precision trend in the Feed, weights table in Settings; verify `npm run build` and the UI test
+- [x] 3.1 Add the judgment routes, precision@5 (`GET /v1/feedback/precision`), weights (`GET /v1/weights`), card views with the verdict and weight effects, SDK methods; verify API tests including the precision example (2 ⭐, 1 👎, 2 unjudged → 67%, 3 of 5 judged)
+- [x] 3.2 Add the desk tools `recent_cards` and `judge_card` and two desk-prompt lines; verify a faux-agent test for "star the second card, great foundation"
+- [x] 3.3 Build the UI: judge buttons and reason box on cards, verdict shown, weight changes in details, precision trend in the Feed, weights table in Settings; verify `npm run build` and the UI test
 
 ## 4. Integration
 
-- [ ] 4.1 Run all tests, `npm run check`, `check:jev`, `check:env`, lint and `npm audit`; offline end to end: judge cards and see weights, precision and the next sweep change
+- [x] 4.1 Run all tests, `npm run check`, `check:jev`, `check:env`, lint and `npm audit`; offline end to end: judge cards and see weights, precision and the next sweep change
 - [ ] 4.2 Live check (Jev `reason-parse` and a sweep with taste examples; chat on a free model): judge a few live cards with reasons including one rule-like reason, ask the desk to star a card, run a second sweep; record classifications, weight changes, the taste examples in the gate input, precision and cost
 - [ ] 4.3 Update `README.md` (judging, weights, precision, rule candidates); verify the documented commands work

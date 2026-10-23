@@ -144,6 +144,7 @@ export class StreamHub {
           type: "cards",
           count: project.cards.count(),
           latestCardId: project.cards.list(1)[0]?.id ?? null,
+          judged: project.feedback.count(),
           sweep: latest ? sweepSummary(project, latest) : null,
         });
       },
@@ -153,6 +154,7 @@ export class StreamHub {
     sse.onClose(harness.subscribeCommits(() => state()));
     sse.onClose(project.cards.onChange(() => state()));
     sse.onClose(project.sweeps.onChange(() => state()));
+    sse.onClose(project.feedback.onChange(() => state()));
     sse.onClose(() => state.cancel());
     await state.now();
     void req;

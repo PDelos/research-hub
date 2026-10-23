@@ -5,6 +5,9 @@ import type {
   AgentState,
   CardDetail,
   CardGroup,
+  PrecisionPoint,
+  Verdict,
+  WeightView,
   CharterBody,
   CharterRecord,
   CharterView,
@@ -94,6 +97,13 @@ export class HubClient {
   sweep = (id: number) => this.call<SweepDetail>("GET", `/sweeps/${id}`);
   sweepSettings = () => this.call<SweepSettings>("GET", "/sweep-settings");
   setSweepSettings = (patch: Partial<SweepSettings>) => this.call<SweepSettings>("PUT", "/sweep-settings", patch);
+
+  // Feedback (v0.4)
+  judge = (cardId: number, verdict: Verdict, reason?: string) =>
+    this.call<CardDetail>("PUT", `/cards/${cardId}/judgment`, { verdict, ...(reason ? { reason } : {}) });
+  clearJudgment = (cardId: number) => this.call<CardDetail>("DELETE", `/cards/${cardId}/judgment`);
+  precision = () => this.call<PrecisionPoint[]>("GET", "/feedback/precision");
+  weights = () => this.call<WeightView[]>("GET", "/weights");
   triggerRun = (kind: "sweep" | "review") => this.call<ScheduledRun>("POST", `/runs/${kind}`, {});
 
   /** Follow the project's stream until the signal aborts. */
