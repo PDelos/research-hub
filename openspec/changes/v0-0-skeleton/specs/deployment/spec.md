@@ -43,6 +43,10 @@ A container SHALL take an ownership lock on its data directory at startup, renew
 - **WHEN** the previous owner died more than 60 seconds ago without releasing the lock
 - **THEN** the new container takes over the lock and starts normally
 
+#### Scenario: Restart after a crash
+- **WHEN** the owner process crashed and the hub restarts on the same host (for example the container's restart policy) within 60 seconds
+- **THEN** the lock is recognized as belonging to a dead process on this host and is taken over at once
+
 ### Requirement: Clear port conflicts
 If the configured port is already in use, the hub SHALL exit with a message naming the port and how to choose another, instead of a raw stack trace.
 

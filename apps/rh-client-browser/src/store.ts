@@ -3,7 +3,6 @@
 import { reactive, shallowRef } from "vue";
 import { AgentModel, HubClient, type AgentState, type CostTotals, type Info, type RunDetail, type RunSummary } from "@rh/sdk";
 
-export const PROJECT = "default";
 export const client = new HubClient({ base: "/ui/v1" });
 
 export const store = reactive({
@@ -26,8 +25,8 @@ function refreshRunsSoon() {
   refreshTimer = setTimeout(async () => {
     refreshTimer = undefined;
     try {
-      store.runs = await client.runs(PROJECT);
-      if (store.run) store.run = await client.run(PROJECT, store.run.id);
+      store.runs = await client.runs();
+      if (store.run) store.run = await client.run(store.run.id);
     } catch {}
   }, 400);
 }
@@ -35,13 +34,14 @@ function refreshRunsSoon() {
 export async function connect() {
   try {
     store.info = await client.info();
+    document.title = `${store.info.project} · Research Hub`;
   } catch (e) {
     store.error = String(e);
   }
   let delay = 500;
   for (;;) {
     try {
-      for await (const frame of client.stream(PROJECT)) {
+      for await (const frame of client.stream()) {
         store.connected = true;
         store.error = "";
         delay = 500;
@@ -64,9 +64,9 @@ export async function connect() {
 }
 
 export async function send(text: string) {
-  await client.send(PROJECT, text);
+  await client.send(text);
 }
 
 export async function openRun(id: number) {
-  store.run = await client.run(PROJECT, id);
+  store.run = await client.run(id);
 }

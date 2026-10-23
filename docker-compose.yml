@@ -1,6 +1,7 @@
-# Live hub: needs a .env with OPENROUTER_API_KEY (see .env.example).
-#   docker compose up -d        then open http://localhost:4850
-# Another hub on the same machine: copy this folder, change the published port and the data folder.
+# One research project = one container. This file runs the project configured in ./.env (see .env.example).
+#   docker compose up -d        then open http://<RH_PROJECT_NAME>.localhost:<RH_PUBLISH_PORT>
+# For another theme, run ./new-project.sh <name>: it creates its own folder, compose file and .env.
+name: rh-${RH_PROJECT_NAME:-research}
 services:
   research-hub:
     build: .
@@ -8,10 +9,13 @@ services:
     env_file: .env
     environment:
       RH_HOST: 0.0.0.0
+      RH_PORT: "4850"
       RH_DATA_DIR: /data
       RH_ENV_FILE: none
     ports:
       - "127.0.0.1:${RH_PUBLISH_PORT:-4850}:4850"
     volumes:
       - ${RH_HOST_DATA_DIR:-./data}:/data
+    mem_limit: ${RH_MEM_LIMIT:-2g}
+    cpus: ${RH_CPUS:-2}
     restart: unless-stopped

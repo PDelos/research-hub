@@ -3,7 +3,8 @@ import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { ConfigError, loadConfig, secretsOf } from "./config.ts";
 import { createLogger } from "./logger.ts";
-import { startServer } from "./server.ts";
+import { DataDirOwned } from "./owner.ts";
+import { PortInUse, startServer, type Server } from "./server.ts";
 import { packageVersion, VERSION } from "./version.ts";
 
 const envFile = process.env.RH_ENV_FILE ?? resolve(import.meta.dirname, "../../../.env");
@@ -17,7 +18,7 @@ try {
   createLogger().error("config.invalid", { variable, error: error instanceof Error ? error.message : String(error) });
   process.exit(1);
 }
-const log = createLogger({ level: config.logLevel, secrets: secretsOf(config) });
+const log = createLogger({ level: config.logLevel, secrets: secretsOf(config), bindings: { project: config.projectName } });
 process.on("unhandledRejection", (reason) => log.error("process.unhandled_rejection", { error: reason }));
 if (config.generatedTokens.length)
   log.warn("config.generated_tokens", {
@@ -25,7 +26,20 @@ if (config.generatedTokens.length)
     note: "random per process; set them in .env to call the API from outside the UI",
   });
 
-const server = await startServer(config, log);
+let server: Server;
+try {
+  server = await startServer(config, log);
+} catch (error) {
+  if (error instanceof DataDirOwned) {
+    log.error("startup.data_dir_owned", { dataDir: error.dir, owner: error.owner, message: error.message });
+    process.exit(1);
+  }
+  if (error instanceof PortInUse) {
+    log.error("startup.port_in_use", { port: error.port, message: error.message });
+    process.exit(1);
+  }
+  throw error;
+}
 log.info("server.listening", {
   url: server.url,
   version: VERSION,

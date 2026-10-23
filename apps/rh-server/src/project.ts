@@ -1,6 +1,6 @@
-// One project's runtime: its folder under <data>/projects/<slug>/, project.sqlite (app + telemetry), the pi-durable
+// The project runtime: the data directory, project.sqlite (app + telemetry), the pi-durable
 // harness on agent.sqlite with the research-desk root conversation, the telemetry projector and Jev recording.
-import { mkdirSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, renameSync, rmdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import type { Context } from "@earendil-works/chord";
 import type { Conversation, Extension } from "@earendil-works/pi-durable";
@@ -21,7 +21,26 @@ import { openProjectDb, Settings, type Db, type SelfCheck } from "./db.ts";
 import type { Logger } from "./logger.ts";
 import { Telemetry } from "./telemetry.ts";
 
-export const SLUG = /^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/;
+/**
+ * v0.0 first stored the project in <data>/projects/default/. Move those files to <data>/ once, so an existing
+ * conversation and its runs survive the switch to one project per container.
+ */
+export function migrateLegacyLayout(dataDir: string, log?: Logger): boolean {
+  const legacy = join(dataDir, "projects", "default");
+  if (!existsSync(join(legacy, "agent.sqlite")) || existsSync(join(dataDir, "agent.sqlite"))) return false;
+  for (const name of readdirSync(legacy)) {
+    if (name.endsWith(".lock")) continue;
+    renameSync(join(legacy, name), join(dataDir, name));
+  }
+  for (const dir of [legacy, join(dataDir, "projects")]) {
+    try {
+      for (const f of readdirSync(dir)) if (f.endsWith(".lock")) rmSync(join(dir, f));
+      rmdirSync(dir);
+    } catch {}
+  }
+  log?.info("storage.migrated", { from: legacy, to: dataDir });
+  return true;
+}
 
 export interface CompactionSetting {
   points: CompactionPoints;
@@ -29,7 +48,7 @@ export interface CompactionSetting {
 }
 
 export interface ProjectRuntime {
-  readonly slug: string;
+  readonly name: string;
   readonly dir: string;
   readonly db: Db;
   readonly check: SelfCheck;
@@ -55,7 +74,7 @@ export interface ProjectRuntime {
 }
 
 export async function openProject(options: {
-  slug: string;
+  name: string;
   dataDir: string;
   promptsDir: string;
   catalog: ModelCatalog;
@@ -65,20 +84,20 @@ export async function openProject(options: {
   extensions?: Extension[];
   deskTools?: readonly string[];
 }): Promise<ProjectRuntime> {
-  const { slug, catalog, log } = options;
-  if (!SLUG.test(slug)) throw new Error(`Invalid project slug "${slug}"`);
-  const dir = join(options.dataDir, "projects", slug);
+  const { name, catalog, log } = options;
+  const dir = options.dataDir;
   mkdirSync(dir, { recursive: true });
+  migrateLegacyLayout(dir, log);
   const { db, check } = openProjectDb(join(dir, "project.sqlite"));
   const settings = new Settings(db);
   const telemetry = new Telemetry(db);
-  const plog = log.child({ project: slug });
+  const plog = log;
   const observe = observability({
     event: (e) => plog[e.level === "debug" ? "debug" : e.level](`agent.${e.event}`, { conversationId: e.conversationId, taskId: e.taskId, ...e.data }),
   });
   const agents = createAgents({
     promptsDir: options.promptsDir,
-    projectSlug: slug,
+    projectName: name,
     extra: [observe, ...(options.extensions ?? [])],
     deskTools: options.deskTools,
   });
@@ -123,7 +142,7 @@ export async function openProject(options: {
   plog.info("project.opened", { dir, rootConversation: root.id, model: (await model()).id, check });
 
   return {
-    slug,
+    name,
     dir,
     db,
     check,

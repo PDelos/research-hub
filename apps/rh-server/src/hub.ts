@@ -1,30 +1,30 @@
-// The hub: one model catalog and one Jev client for the process, and the projects it serves. v0.0 knows only the
-// built-in `default` project; project creation arrives with v0-1-projects. Projects open lazily, once.
+// The hub: the model catalog, the Jev client and the one research project this container serves. Before the
+// project opens it takes ownership of the data directory, so two containers can never share one.
 import type { Extension } from "@earendil-works/pi-durable";
 import { createModelCatalog, installScriptedFaux, type FauxRule, type ModelCatalog } from "@rh/durable-agent";
 import { JevClient } from "@rh/jev";
 import type { Config } from "./config.ts";
-import { notFound } from "./errors.ts";
 import type { Logger } from "./logger.ts";
+import { acquireOwner, type OwnerLock } from "./owner.ts";
 import { openProject, type ProjectRuntime } from "./project.ts";
-
-export const DEFAULT_PROJECT = "default";
 
 export interface HubOptions {
   /** Scripted faux replies (offline mode and tests). */
   fauxRules?: FauxRule[];
   fauxTokensPerSecond?: number;
-  /** Extra extensions and allowed desk tools for every project (tests). */
+  /** Extra extensions and allowed desk tools (tests). */
   extensions?: Extension[];
   deskTools?: readonly string[];
+  /** Ownership heartbeat interval (tests). */
+  heartbeatMs?: number;
 }
 
 export class Hub {
   readonly catalog: ModelCatalog;
   readonly jev: JevClient;
   readonly startedAt = Date.now();
-  private readonly opening = new Map<string, Promise<ProjectRuntime>>();
-  private closed = false;
+  private opened?: ProjectRuntime;
+  private owner?: OwnerLock;
 
   constructor(
     readonly config: Config,
@@ -50,18 +50,17 @@ export class Hub {
     return { models: this.catalog.provider, jev: this.jev.provider };
   }
 
-  /** Slugs the hub serves. */
-  slugs(): string[] {
-    return [DEFAULT_PROJECT];
+  get name(): string {
+    return this.config.projectName;
   }
 
-  async project(slug: string): Promise<ProjectRuntime> {
-    if (this.closed) throw new Error("The hub is closing");
-    if (!this.slugs().includes(slug)) throw notFound(`No project "${slug}"`);
-    let opening = this.opening.get(slug);
-    if (!opening) {
-      opening = openProject({
-        slug,
+  /** Take ownership of the data directory and open the project. Throws DataDirOwned if another container owns it. */
+  async open(): Promise<ProjectRuntime> {
+    if (this.opened) return this.opened;
+    this.owner = acquireOwner(this.config.dataDir, this.name, { heartbeatMs: this.options.heartbeatMs });
+    try {
+      this.opened = await openProject({
+        name: this.name,
         dataDir: this.config.dataDir,
         promptsDir: this.config.promptsDir,
         catalog: this.catalog,
@@ -70,16 +69,28 @@ export class Hub {
         extensions: this.options.extensions,
         deskTools: this.options.deskTools,
       });
-      opening.catch(() => this.opening.delete(slug));
-      this.opening.set(slug, opening);
+    } catch (error) {
+      this.owner.release();
+      this.owner = undefined;
+      throw error;
     }
-    return opening;
+    return this.opened;
+  }
+
+  /** The open project; only valid after open(). */
+  get project(): ProjectRuntime {
+    if (!this.opened) throw new Error("The project is not open");
+    return this.opened;
   }
 
   async close(): Promise<void> {
-    this.closed = true;
-    const open = [...this.opening.values()];
-    this.opening.clear();
-    for (const p of open) await (await p.catch(() => undefined))?.close();
+    const project = this.opened;
+    this.opened = undefined;
+    try {
+      await project?.close();
+    } finally {
+      this.owner?.release();
+      this.owner = undefined;
+    }
   }
 }

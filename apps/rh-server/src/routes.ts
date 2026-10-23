@@ -22,7 +22,13 @@ function bodyOf(req: Request): Record<string, unknown> {
 
 export function routes(hub: Hub, streams: StreamHub): Router {
   const r = express.Router();
-  const health = (): Health => ({ ok: true, version: VERSION, mode: hub.config.mode, providers: hub.providers });
+  const health = (): Health => ({
+    ok: true,
+    project: hub.name,
+    version: VERSION,
+    mode: hub.config.mode,
+    providers: hub.providers,
+  });
 
   r.get("/v1/health", (_req, res) => void res.json(health()));
   r.use("/v1", requireAuth(hub.log));
@@ -32,17 +38,16 @@ export function routes(hub: Hub, streams: StreamHub): Router {
       piDurable: packageVersion("@earendil-works/pi-durable"),
       models: hub.catalog.jobs,
       jevModel: hub.config.mode === "offline" ? "mock" : hub.config.jevModel,
-      projects: hub.slugs(),
       uptimeMs: Date.now() - hub.startedAt,
     };
     res.json(info);
   });
 
-  const project = (req: Request): Promise<ProjectRuntime> => hub.project(String(req.params.slug));
+  const project = (_req?: Request): Promise<ProjectRuntime> => Promise.resolve(hub.project);
 
-  r.get("/v1/p/:slug/agent", async (req, res) => void res.json(await agentState(await project(req))));
+  r.get("/v1/agent", async (req, res) => void res.json(await agentState(await project(req))));
 
-  r.post("/v1/p/:slug/chat", async (req, res) => {
+  r.post("/v1/chat", async (req, res) => {
     const p = await project(req);
     const body = bodyOf(req);
     const content = body.content;
@@ -57,7 +62,7 @@ export function routes(hub: Hub, streams: StreamHub): Router {
       { type: "input", content, requestId: `chat:${requestId}`, whenBusy: "followUp" },
       ctx,
     );
-    hub.log.info("agent.message", { project: p.slug, submissionId: submission.id, chars: content.length });
+    hub.log.info("agent.message", { submissionId: submission.id, chars: content.length });
     let record = await submission.status(ctx);
     if (waitMs > 0 && record.status !== "done" && record.status !== "unanswered") {
       const closed = new AbortController();
@@ -79,14 +84,14 @@ export function routes(hub: Hub, streams: StreamHub): Router {
     res.status(result.status === "done" || result.status === "unanswered" ? 200 : 202).json(result);
   });
 
-  r.get("/v1/p/:slug/submissions/:id", async (req, res) => {
+  r.get("/v1/submissions/:id", async (req, res) => {
     const p = await project(req);
     const submission = await p.harness.harness.submission(int(req.params.id, "id") as unknown as SubmissionId, p.ctx);
     if (!submission) throw notFound(`No submission ${req.params.id}`);
     res.json(await submission.status(p.ctx));
   });
 
-  r.get("/v1/p/:slug/transcript", async (req, res) => {
+  r.get("/v1/transcript", async (req, res) => {
     const p = await project(req);
     const view = await p.root.viewState(p.ctx);
     let entries: WireEntry[];
@@ -98,7 +103,7 @@ export function routes(hub: Hub, streams: StreamHub): Router {
     res.json({ conversationId: p.root.id, items: toTranscript(entries) });
   });
 
-  r.get("/v1/p/:slug/runs", async (req, res) => {
+  r.get("/v1/runs", async (req, res) => {
     const p = await project(req);
     res.json(
       p.telemetry.runs({
@@ -108,22 +113,22 @@ export function routes(hub: Hub, streams: StreamHub): Router {
     );
   });
 
-  r.get("/v1/p/:slug/runs/:id", async (req, res) => {
+  r.get("/v1/runs/:id", async (req, res) => {
     const run = (await project(req)).telemetry.run(int(req.params.id, "id"));
     if (!run) throw notFound(`No run ${req.params.id}`);
     res.json(run);
   });
 
-  r.get("/v1/p/:slug/usage", async (req, res) => void res.json((await project(req)).telemetry.totals()));
+  r.get("/v1/usage", async (req, res) => void res.json((await project(req)).telemetry.totals()));
 
-  r.post("/v1/p/:slug/jev/ping", async (req, res) => {
+  r.post("/v1/jev/ping", async (req, res) => {
     const p = await project(req);
     const text = bodyOf(req).text;
     if (text !== undefined && (typeof text !== "string" || text.length > 1000)) throw invalid("text must be a string of at most 1000 characters");
     res.json(await p.jevPing(text as string | undefined));
   });
 
-  r.get("/v1/p/:slug/stream", async (req, res) => {
+  r.get("/v1/stream", async (req, res) => {
     if (streams.closing) throw new ApiFault("unavailable", "The server is shutting down");
     await streams.serve(await project(req), hub.log, req, res);
   });

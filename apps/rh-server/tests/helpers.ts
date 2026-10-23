@@ -35,7 +35,12 @@ export async function startTestServer(
   } as NodeJS.ProcessEnv);
   config.port = 0;
   const logs: string[] = [];
-  const log = createLogger({ level: "debug", write: (l) => logs.push(l), secrets: [TOKEN, options.env?.OPENROUTER_API_KEY ?? ""] });
+  const log = createLogger({
+    level: "debug",
+    write: (l) => logs.push(l),
+    secrets: [TOKEN, options.env?.OPENROUTER_API_KEY ?? ""],
+    bindings: { project: config.projectName },
+  });
   const server = await startServer(config, log, options.hub);
   const client = new HubClient({ base: `${server.url}/v1`, token: TOKEN });
   return { ...server, client, logs, dataDir };

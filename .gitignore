@@ -7,3 +7,4 @@ test-results/
 *.log
 .DS_Store
 data-offline/
+projects/

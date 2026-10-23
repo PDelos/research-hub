@@ -13,16 +13,16 @@ test("a faux chat round trip answers and the root conversation is reused after r
   const t = tempDir();
   try {
     const first = await startTestServer({ dataDir: t.dir, hub: { fauxRules: [(turn) => say(`hello ${turn.lastUser}`)] } });
-    const sent = await first.client.send("default", "world", { waitMs: 10_000 });
+    const sent = await first.client.send("world", { waitMs: 10_000 });
     assert.equal(sent.status, "done");
     assert.equal(sent.answer?.text, "hello world");
-    const before = (await first.client.agent("default")).conversationId;
+    const before = (await first.client.agent()).conversationId;
     await first.stop();
     const second = await startTestServer({ dataDir: t.dir });
     try {
-      const after = await second.client.agent("default");
+      const after = await second.client.agent();
       assert.equal(after.conversationId, before);
-      const transcript = (await fetch(`${second.url}/v1/p/default/transcript`, {
+      const transcript = (await fetch(`${second.url}/v1/transcript`, {
         headers: { authorization: "Bearer test-api-token-0123456789" },
       }).then((r) => r.json())) as { items: { kind: string; text?: string }[] };
       assert.ok(JSON.stringify(transcript.items).includes("hello world"), "history kept");
@@ -57,7 +57,7 @@ test("a tool outside the allow-list is rejected and never executed", async () =>
     },
   });
   try {
-    const sent = await server.client.send("default", "use the tool", { waitMs: 10_000 });
+    const sent = await server.client.send("use the tool", { waitMs: 10_000 });
     assert.equal(sent.status, "done");
     assert.match(sent.answer!.text, /not allowed for research-desk/);
     assert.match(sent.answer!.text, /error=true/);
@@ -72,14 +72,14 @@ test("changing RH_MODEL_CHAT changes the model recorded on the next run", async 
   const t = tempDir();
   try {
     const first = await startTestServer({ dataDir: t.dir });
-    await first.client.send("default", "one", { waitMs: 10_000 });
-    assert.deepEqual((await first.client.runs("default"))[0].models, ["anthropic/claude-haiku-5.5"]);
+    await first.client.send("one", { waitMs: 10_000 });
+    assert.deepEqual((await first.client.runs())[0].models, ["anthropic/claude-haiku-5.5"]);
     await first.stop();
     const second = await startTestServer({ dataDir: t.dir, env: { RH_MODEL_CHAT: "anthropic/claude-sonnet-5.5" } });
     try {
-      assert.equal((await second.client.agent("default")).model, "anthropic/claude-sonnet-5.5");
-      await second.client.send("default", "two", { waitMs: 10_000 });
-      const [latest] = await second.client.runs("default");
+      assert.equal((await second.client.agent()).model, "anthropic/claude-sonnet-5.5");
+      await second.client.send("two", { waitMs: 10_000 });
+      const [latest] = await second.client.runs();
       assert.equal(latest.text, "two");
       assert.deepEqual(latest.models, ["anthropic/claude-sonnet-5.5"]);
     } finally {
@@ -93,18 +93,18 @@ test("changing RH_MODEL_CHAT changes the model recorded on the next run", async 
 test("a chat turn produces one run record with tokens, model and cost, and the project total", async () => {
   const server = await startTestServer();
   try {
-    await server.client.send("default", "count me", { waitMs: 10_000 });
+    await server.client.send("count me", { waitMs: 10_000 });
     await new Promise((r) => setTimeout(r, 100));
-    const runs = await server.client.runs("default");
+    const runs = await server.client.runs();
     assert.equal(runs.length, 1);
     const run = runs[0];
     assert.equal(run.text, "count me");
     assert.equal(run.status, "done");
     assert.ok(run.inputTokens > 0 && run.outputTokens > 0);
     assert.equal(typeof run.costUsd, "number");
-    const detail = await server.client.run("default", run.id);
+    const detail = await server.client.run(run.id);
     assert.equal(detail.generationList.length, 1);
-    const totals = await server.client.usage("default");
+    const totals = await server.client.usage();
     assert.equal(totals.runs, 1);
     assert.equal(totals.totalUsd, totals.modelUsd + totals.jevUsd);
   } finally {

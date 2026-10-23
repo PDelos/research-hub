@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { onMounted } from "vue";
 import { ago, k, usd } from "@rh/sdk";
-import { client, openRun, PROJECT, store } from "../store.ts";
+import { client, openRun, store } from "../store.ts";
 
 onMounted(async () => {
-  store.runs = await client.runs(PROJECT);
+  store.runs = await client.runs();
 });
 </script>
 

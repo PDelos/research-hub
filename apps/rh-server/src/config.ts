@@ -9,6 +9,8 @@ export type Mode = "live" | "offline";
 export type LogLevel = "debug" | "info" | "warn" | "error";
 
 export interface Config {
+  /** The one research project this container serves (RH_PROJECT_NAME). */
+  projectName: string;
   mode: Mode;
   host: string;
   port: number;
@@ -39,11 +41,19 @@ export class ConfigError extends Error {
   }
 }
 
+export const PROJECT_NAME = /^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/;
+
 const APP_DIR = resolve(import.meta.dirname, "..");
 /** Relative paths in configuration resolve against the repository root, whatever directory npm runs in. */
 const REPO_ROOT = resolve(APP_DIR, "../..");
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
+  const projectName = env.RH_PROJECT_NAME?.trim() || "research";
+  if (!PROJECT_NAME.test(projectName))
+    throw new ConfigError(
+      `RH_PROJECT_NAME must be 1 to 40 lowercase letters, digits or dashes (no leading or trailing dash), got "${env.RH_PROJECT_NAME}"`,
+      "RH_PROJECT_NAME",
+    );
   const mode = (env.RH_MODE?.trim() || "live") as Mode;
   if (mode !== "live" && mode !== "offline")
     throw new ConfigError(`RH_MODE must be live or offline, got "${env.RH_MODE}"`, "RH_MODE");
@@ -68,12 +78,19 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   };
   const host = env.RH_HOST?.trim() || "127.0.0.1";
   const allowedHosts = new Set<string>();
-  for (const h of ["localhost", "127.0.0.1", host, ...(env.RH_ALLOWED_HOSTS ?? "").split(",")]) {
+  for (const h of [
+    "localhost",
+    "127.0.0.1",
+    `${projectName}.localhost`,
+    host,
+    ...(env.RH_ALLOWED_HOSTS ?? "").split(","),
+  ]) {
     const name = h.trim().toLowerCase();
     if (!name || name === "0.0.0.0") continue;
     allowedHosts.add(name);
   }
   return {
+    projectName,
     mode,
     host,
     port,

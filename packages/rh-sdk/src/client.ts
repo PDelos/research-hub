@@ -42,17 +42,17 @@ export class HubClient {
 
   health = () => this.call<Health>("GET", "/health");
   info = () => this.call<Info>("GET", "/info");
-  agent = (slug: string) => this.call<AgentState>("GET", `/p/${slug}/agent`);
-  send = (slug: string, content: string, opts: { requestId?: string; waitMs?: number } = {}) =>
-    this.call<SendResult>("POST", `/p/${slug}/chat`, { content, ...opts });
-  runs = (slug: string, limit = 50) => this.call<RunSummary[]>("GET", `/p/${slug}/runs?limit=${limit}`);
-  run = (slug: string, id: number) => this.call<RunDetail>("GET", `/p/${slug}/runs/${id}`);
-  usage = (slug: string) => this.call<CostTotals>("GET", `/p/${slug}/usage`);
-  jevPing = (slug: string) => this.call<JevPing>("POST", `/p/${slug}/jev/ping`, {});
+  agent = () => this.call<AgentState>("GET", "/agent");
+  send = (content: string, opts: { requestId?: string; waitMs?: number } = {}) =>
+    this.call<SendResult>("POST", "/chat", { content, ...opts });
+  runs = (limit = 50) => this.call<RunSummary[]>("GET", `/runs?limit=${limit}`);
+  run = (id: number) => this.call<RunDetail>("GET", `/runs/${id}`);
+  usage = () => this.call<CostTotals>("GET", "/usage");
+  jevPing = () => this.call<JevPing>("POST", "/jev/ping", {});
 
-  /** Follow a project's stream until the signal aborts. */
-  async *stream(slug: string, signal?: AbortSignal): AsyncGenerator<Frame> {
-    const res = await this.f(`${this.options.base}/p/${slug}/stream`, {
+  /** Follow the project's stream until the signal aborts. */
+  async *stream(signal?: AbortSignal): AsyncGenerator<Frame> {
+    const res = await this.f(`${this.options.base}/stream`, {
       headers: this.options.token ? { authorization: `Bearer ${this.options.token}` } : {},
       signal,
     });

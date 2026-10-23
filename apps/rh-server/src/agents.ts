@@ -15,12 +15,12 @@ export interface Agents {
 
 export function createAgents(options: {
   promptsDir: string;
-  projectSlug: string;
+  projectName: string;
   extra?: Extension[];
   deskTools?: readonly string[];
 }): Agents {
   const prompt = loadPrompt(join(options.promptsDir, "agents"), "research-desk", "SYSTEM_PROMPT.md", {
-    project_slug: options.projectSlug,
+    project_name: options.projectName,
   });
   const desk = defineExtension({
     name: "research-desk",

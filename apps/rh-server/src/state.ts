@@ -1,4 +1,4 @@
-// The project agent's state for GET /v1/p/:slug/agent and the agent.state frame.
+// The project agent's state for GET /v1/agent and the agent.state frame.
 import type { AgentState } from "@rh/sdk";
 import type { ProjectRuntime } from "./project.ts";
 
@@ -16,7 +16,7 @@ export async function agentState(project: ProjectRuntime): Promise<AgentState> {
   }
   const c = project.compaction();
   return {
-    project: project.slug,
+    project: project.name,
     conversationId: project.root.id as number,
     model: model.id,
     contextTokens: project.telemetry.contextTokens(project.root.id as number),

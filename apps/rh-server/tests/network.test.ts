@@ -50,9 +50,9 @@ test("offline mode with no keys makes zero outbound connections", async () => {
   try {
     const server = await startTestServer();
     try {
-      const sent = await server.client.send("default", "hello offline", { waitMs: 10_000 });
+      const sent = await server.client.send("hello offline", { waitMs: 10_000 });
       assert.equal(sent.status, "done");
-      const ping = await server.client.jevPing("default");
+      const ping = await server.client.jevPing();
       assert.equal(ping.provider, "mock");
       assert.equal(typeof ping.model, "string");
       assert.equal(ping.cost.source, "mock");

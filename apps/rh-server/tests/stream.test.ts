@@ -12,7 +12,7 @@ function follow(client: HubClient) {
   const abort = new AbortController();
   const done = (async () => {
     try {
-      for await (const frame of client.stream("default", abort.signal)) {
+      for await (const frame of client.stream(abort.signal)) {
         frames.push(frame);
         if (frame.type === "hello") model.conversationId = frame.mainConversationId;
         model.apply(frame);
@@ -34,7 +34,7 @@ test("a stream starts with hello and a snapshot, then two viewers see the same m
     await until(() => a.model.state.ready && b.model.state.ready, 10_000, "snapshots");
     assert.equal(a.frames[0].type, "hello");
     assert.equal(a.frames[1].type, "agent.snapshot");
-    await server.client.send("default", "sync me");
+    await server.client.send("sync me");
     await until(() => text(a.model).includes("echo sync me") && text(b.model).includes("echo sync me"), 10_000, "both replies");
     assert.ok(text(a.model).includes("sync me"));
     assert.ok(a.frames.some((f) => f.type === "agent.state"));
@@ -52,7 +52,7 @@ test("a viewer that connects mid-reply gets the partial reply in its snapshot, t
   const first = follow(server.client);
   try {
     await until(() => first.model.state.ready, 10_000, "first snapshot");
-    await server.client.send("default", "talk slowly");
+    await server.client.send("talk slowly");
     await until(() => first.model.state.generating, 10_000, "generation started");
     await first.stop();
     // The "refresh": a new viewer while the server keeps generating.
@@ -76,9 +76,9 @@ test("closing every viewer never aborts the agent's work", async () => {
   try {
     const viewer = follow(server.client);
     await until(() => viewer.model.state.ready, 10_000, "snapshot");
-    const sent = await server.client.send("default", "keep going");
+    const sent = await server.client.send("keep going");
     await viewer.stop();
-    await until(async () => (await server.client.runs("default"))[0]?.status === "done", 30_000, "run done");
+    await until(async () => (await server.client.runs())[0]?.status === "done", 30_000, "run done");
     assert.ok(sent.submissionId > 0);
   } finally {
     await server.stop();

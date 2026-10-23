@@ -19,7 +19,7 @@ test("/ serves the UI and its assets on the API port", async () => {
     const page = await fetch(`${server.url}/`);
     assert.equal(page.status, 200);
     const html = await page.text();
-    assert.match(html, /<title>Research Hub<\/title>/);
+    assert.match(html, /<title>research · Research Hub<\/title>/, "the title names the project");
     const asset = html.match(/src="(\/assets\/[^"]+\.js)"/)?.[1];
     assert.ok(asset, "a script asset");
     assert.equal((await fetch(`${server.url}${asset}`)).status, 200);
@@ -35,7 +35,7 @@ test("the proxy works without a token for same-origin requests and the token nev
     const host = new URL(server.url).host;
     const info = await fetch(`${server.url}/ui/v1/info`, { headers: { "sec-fetch-site": "same-origin" } });
     assert.equal(info.status, 200);
-    const chat = await fetch(`${server.url}/ui/v1/p/default/chat`, {
+    const chat = await fetch(`${server.url}/ui/v1/chat`, {
       method: "POST",
       headers: { "content-type": "application/json", origin: `http://${host}` },
       body: JSON.stringify({ content: "from the browser", waitMs: 10_000 }),
@@ -74,7 +74,7 @@ test("the proxy refuses foreign hosts, cross-origin pages and non-JSON writes", 
     assert.equal(crossOrigin.status, 403);
     const crossSite = await fetch(`${server.url}/ui/v1/info`, { headers: { "sec-fetch-site": "cross-site" } });
     assert.equal(crossSite.status, 403);
-    const form = await fetch(`${server.url}/ui/v1/p/default/chat`, {
+    const form = await fetch(`${server.url}/ui/v1/chat`, {
       method: "POST",
       headers: { "content-type": "text/plain" },
       body: "content=hi",

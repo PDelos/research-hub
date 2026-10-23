@@ -63,6 +63,8 @@ export interface RunDetail extends RunSummary {
 
 export interface Health {
   ok: boolean;
+  /** The research project this container serves. */
+  project: string;
   version: string;
   mode: "live" | "offline";
   providers: { models: string; jev: string };
@@ -72,7 +74,6 @@ export interface Info extends Health {
   piDurable: string;
   models: Record<string, string>;
   jevModel: string;
-  projects: string[];
   uptimeMs: number;
 }
 

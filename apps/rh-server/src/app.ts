@@ -1,5 +1,5 @@
 // The Express app: UI proxy, auth identification, API routes, the built UI, then errors.
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import express from "express";
 import { identify, uiProxy } from "./auth.ts";
@@ -17,9 +17,17 @@ export function createHttpApp(hub: Hub) {
   http.use(express.json({ limit: "256kb" }));
   http.use(identify({ api: config.apiToken, client: config.clientToken }));
   http.use(routes(hub, streams));
-  if (existsSync(join(config.uiDir, "index.html"))) {
-    http.use(express.static(config.uiDir, { index: "index.html", maxAge: "1h" }));
-    http.get(/^\/(?!v1\/|ui\/).*/, (_req, res) => res.sendFile(join(config.uiDir, "index.html")));
+  const indexFile = join(config.uiDir, "index.html");
+  if (existsSync(indexFile)) {
+    // The page title names the project, so several project tabs are easy to tell apart.
+    const title = `${config.projectName} · Research Hub`;
+    const page = readFileSync(indexFile, "utf8").replace(/<title>[^<]*<\/title>/, `<title>${title}</title>`);
+    const sendPage = (_req: express.Request, res: express.Response) =>
+      void res.type("html").set("cache-control", "no-cache").send(page);
+    http.get("/", sendPage);
+    http.get("/index.html", sendPage);
+    http.use(express.static(config.uiDir, { index: false, maxAge: "1h" }));
+    http.get(/^\/(?!v1\/|ui\/).*/, sendPage);
   } else {
     log.warn("ui.missing", { uiDir: config.uiDir, hint: "npm run build -w rh-client-browser" });
   }

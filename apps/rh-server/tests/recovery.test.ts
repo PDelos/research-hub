@@ -31,9 +31,9 @@ test("SIGKILL mid-turn: after restart the turn completes once with no duplicates
     // Slow faux model: the echo reply streams for several seconds, so the kill lands mid-generation.
     const first = host(t.dir, port, 3);
     const client = new HubClient({ base: `${await first.url}/v1`, token: TOKEN });
-    const sent = await client.send("default", "survive this crash please, it is a long message to echo back");
+    const sent = await client.send("survive this crash please, it is a long message to echo back");
     assert.notEqual(sent.status, "done");
-    await until(async () => (await client.agent("default")).busy, 10_000, "turn running");
+    await until(async () => (await client.agent()).busy, 10_000, "turn running");
     await new Promise((r) => setTimeout(r, 500));
     first.child.kill("SIGKILL");
     await first.exited;
@@ -41,8 +41,8 @@ test("SIGKILL mid-turn: after restart the turn completes once with no duplicates
     const second = host(t.dir, port, 2000);
     try {
       const client2 = new HubClient({ base: `${await second.url}/v1`, token: TOKEN });
-      await until(async () => (await client2.runs("default"))[0]?.status === "done", 60_000, "turn completed after restart");
-      const res = await fetch(`${await second.url}/v1/p/default/transcript`, {
+      await until(async () => (await client2.runs())[0]?.status === "done", 60_000, "turn completed after restart");
+      const res = await fetch(`${await second.url}/v1/transcript`, {
         headers: { authorization: `Bearer ${TOKEN}` },
       });
       const { items } = (await res.json()) as {
@@ -58,7 +58,7 @@ test("SIGKILL mid-turn: after restart the turn completes once with no duplicates
       assert.ok(interrupted.length <= 1, `at most one interrupted marker: ${all}`);
       assert.equal(assistants.length, complete.length + interrupted.length, `nothing else: ${all}`);
       for (const i of interrupted) assert.equal((i.blocks ?? []).length, 0, "the marker carries no duplicated text");
-      const runs = await client2.runs("default");
+      const runs = await client2.runs();
       assert.equal(runs.length, 1, "one run");
       assert.equal(runs[0].status, "done");
     } finally {

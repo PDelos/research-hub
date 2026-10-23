@@ -1,4 +1,4 @@
-// GET /v1/p/:slug/stream: one server-sent event stream per viewer. hello, then agent.snapshot and agent.batch for the
+// GET /v1/stream: one server-sent event stream per viewer. hello, then agent.snapshot and agent.batch for the
 // project's root conversation, plus agent.state and usage whenever a commit changes them. Pings every 15 s and ends
 // a stream buffering over 2 MB so a slow viewer reconnects to a fresh snapshot. Closing a stream never aborts work.
 // Adapted from disler/pi-durable-news-agent.
@@ -117,13 +117,13 @@ export class StreamHub {
     const sse = openSse(res);
     this.open.add(sse);
     sse.onClose(() => this.open.delete(sse));
-    const slog = log.child({ project: project.slug, stream: true });
+    const slog = log.child({ stream: true });
     slog.debug("stream.open", {});
     sse.send({
       type: "hello",
       apiVersion: API_VERSION,
       serverTime: Date.now(),
-      project: project.slug,
+      project: project.name,
       mainConversationId: id as number,
     });
     const stream = await watchEvents(harness, id, ctx);

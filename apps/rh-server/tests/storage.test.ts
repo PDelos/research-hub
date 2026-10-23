@@ -6,10 +6,10 @@ import { test } from "node:test";
 import { openProjectDb } from "../src/db.ts";
 import { startTestServer, tempDir } from "./helpers.ts";
 
-test("an empty data dir gets projects/default with agent.sqlite and project.sqlite", async () => {
+test("an empty data dir gets agent.sqlite and project.sqlite directly in it", async () => {
   const server = await startTestServer();
   try {
-    const dir = join(server.dataDir, "projects", "default");
+    const dir = server.dataDir;
     assert.ok(existsSync(join(dir, "agent.sqlite")), "agent.sqlite");
     assert.ok(existsSync(join(dir, "project.sqlite")), "project.sqlite");
   } finally {

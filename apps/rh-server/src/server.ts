@@ -1,8 +1,9 @@
-// Start and stop the whole server: hub + HTTP on one port. main.ts and the tests both use this.
+// Start and stop the whole server: data-directory ownership, the project, HTTP on one port.
+// main.ts and the tests both use this.
 import type { AddressInfo } from "node:net";
 import { createHttpApp } from "./app.ts";
 import type { Config } from "./config.ts";
-import { DEFAULT_PROJECT, Hub, type HubOptions } from "./hub.ts";
+import { Hub, type HubOptions } from "./hub.ts";
 import type { Logger } from "./logger.ts";
 
 export interface Server {
@@ -12,18 +13,33 @@ export interface Server {
   stop(): Promise<void>;
 }
 
+export class PortInUse extends Error {
+  constructor(readonly port: number) {
+    super(`port ${port} is in use; set RH_PUBLISH_PORT (compose) or RH_PORT to a free port`);
+    this.name = "PortInUse";
+  }
+}
+
 export async function startServer(config: Config, log: Logger, options: HubOptions = {}): Promise<Server> {
   const hub = new Hub(config, log, options);
-  // Open the default project at startup so a broken storage or model fails before we accept traffic.
-  const project = await hub.project(DEFAULT_PROJECT);
-  if (!project.check.fts5 || !project.check.vec)
+  // Own the data directory and open the project before accepting traffic, so a broken storage or model fails early.
+  const project = await hub.open();
+  if (!project.check.fts5 || !project.check.vec) {
+    await hub.close();
     throw new Error(`SQLite self-check failed: fts5=${project.check.fts5} vec=${project.check.vec}`);
+  }
   const { http, streams } = createHttpApp(hub);
   const server = http.listen(config.port, config.host);
-  await new Promise<void>((resolve, reject) => {
-    server.once("listening", resolve);
-    server.once("error", reject);
-  });
+  try {
+    await new Promise<void>((resolve, reject) => {
+      server.once("listening", resolve);
+      server.once("error", reject);
+    });
+  } catch (error) {
+    await hub.close();
+    if ((error as NodeJS.ErrnoException).code === "EADDRINUSE") throw new PortInUse(config.port);
+    throw error;
+  }
   server.keepAliveTimeout = 65_000;
   const port = (server.address() as AddressInfo).port;
   let stopping: Promise<void> | undefined;
