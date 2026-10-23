@@ -50,6 +50,24 @@ const MIGRATIONS: string[] = [
     cost_usd REAL, cost_source TEXT NOT NULL, elapsed_ms INTEGER, attempts INTEGER, error TEXT, created_at TEXT NOT NULL
   );
   `,
+  // 2 (v0-1-project-setup): charters and their versions, scoping questions, scheduled runs (one per kind and slot).
+  `
+  CREATE TABLE charters (
+    id INTEGER PRIMARY KEY, status TEXT NOT NULL CHECK (status IN ('draft', 'approved', 'superseded')),
+    version INTEGER UNIQUE, body_json TEXT NOT NULL, source TEXT NOT NULL CHECK (source IN ('agent', 'user')),
+    created_at TEXT NOT NULL, approved_at TEXT
+  );
+  CREATE TABLE scoping_questions (
+    id INTEGER PRIMARY KEY, round INTEGER NOT NULL, text TEXT NOT NULL, answer TEXT,
+    asked_at TEXT NOT NULL, answered_at TEXT
+  );
+  CREATE TABLE scheduled_runs (
+    id INTEGER PRIMARY KEY, kind TEXT NOT NULL CHECK (kind IN ('sweep', 'review')), slot TEXT NOT NULL,
+    trigger TEXT NOT NULL CHECK (trigger IN ('scheduled', 'manual')),
+    status TEXT NOT NULL CHECK (status IN ('requested', 'running', 'done', 'failed', 'skipped')),
+    reason TEXT, created_at TEXT NOT NULL, UNIQUE (kind, slot)
+  );
+  `,
 ];
 
 export interface SelfCheck {

@@ -2,7 +2,7 @@
 
 ## 1. Storage and status
 
-- [ ] 1.1 Add `project.sqlite` migration 2 (`charters`, `scoping_questions`, `scheduled_runs` with UNIQUE(kind, slot)); verify a migration test from version 1 keeps existing telemetry rows
+- [x] 1.1 Add `project.sqlite` migration 2 (`charters`, `scoping_questions`, `scheduled_runs` with UNIQUE(kind, slot)); verify a migration test from version 1 keeps existing telemetry rows
 - [ ] 1.2 Implement derived project status (D1) with stored `paused`; verify unit tests for each status and that pausing remembers the status to return to
 
 ## 2. Brief (spec: project-charter)
