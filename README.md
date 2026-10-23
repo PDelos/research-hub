@@ -5,9 +5,10 @@ durable agent (built on [pi-durable](https://github.com/earendil-works/pi)) that
 [Jev](https://openrouter.ai/docs/guides/community/jev) make the bulk decisions, present a few paper cards a day,
 learn from your 👎/👍/⭐ and grow an Obsidian-compatible knowledge base. A new theme is a new container.
 
-**Status: v0.3.** Durable agent, Jev client, live stream, browser UI and container setup (v0.0), the project's
-brief, charter and schedule (v0.1), paper search with paper representations (v0.2), and the daily sweep with paper
-cards (v0.3). Feedback and the knowledge base arrive next (see `PLAN.md` §17 and `openspec/changes/`).
+**Status: v0.4.** Durable agent, Jev client, live stream, browser UI and container setup (v0.0), the project's
+brief, charter and schedule (v0.1), paper search with paper representations (v0.2), the daily sweep with paper cards
+(v0.3), and judging with learning from your feedback (v0.4). The knowledge base arrives next (see `PLAN.md` §17 and
+`openspec/changes/`).
 
 ## Quick start (offline, no keys)
 
@@ -97,6 +98,24 @@ sweep never pays twice. A failing phase retries after 30 s, 2 min and 8 min, the
 Measured live (2026-10-23): a first sweep gathered 254 papers, 139 passed the gate, 7 cards, $0.041 (Jev $0.040,
 embeddings $0.0014, cards on a free model); a second sweep the same day reused every decision and cost $0.0023.
 
+## Judging cards
+
+Every card has 👎 (not useful), 👍 (interesting) and ⭐ (add to the knowledge base), and an optional reason (up to
+1,000 characters). Click a verdict again to remove it. You can also judge in chat: "star the second card, great
+foundation". Your judgments teach the next sweeps, without any extra model calls:
+
+- **Weights.** 👍 +0.10, ⭐ +0.15, 👎 −0.15 on the card's research question, the queries that found it and its
+  sources, kept between 0.1 and 2. They are recomputed from the charter each time, so changing a verdict counts only
+  once. The card's details show what changed; Settings lists every weight with its charter value.
+- **Taste examples.** Your 8 most recent judgments (title, verdict, reason) go with every Jev gate and ranking call.
+- **Reasons.** Jev `reason-parse` classifies each reason (off-topic, too-basic, great-method, …) and spots reasons
+  that state a general rule ("skip papers without code"); those are queued for the weekly review.
+- **Never again.** A judged paper is never presented again, and orientation mode (foundations first) ends after 10
+  judged papers.
+- **⭐** queues the paper for the knowledge base (v0.5); un-starring before it is added cancels that.
+- **Precision@5**, the share of a sweep's top 5 cards you liked or starred among those you judged, is shown as a
+  trend in the Feed.
+
 ## Projects with Docker
 
 Every research theme is its own container with its own data folder, port and name:
@@ -160,6 +179,8 @@ curl -s -X POST -H "authorization: Bearer $RH_API_TOKEN" -H 'content-type: appli
 | `GET /v1/cards` · `GET /v1/cards/:id` | The Feed (cards grouped by sweep, newest first) · one card with score details |
 | `GET /v1/sweeps[/:id]` | Sweeps with phases, counts, papers by status and the cost split |
 | `GET/PUT /v1/sweep-settings` | Cards per sweep (1 to 15, default 7) |
+| `PUT/DELETE /v1/cards/:id/judgment` | Judge a card (`verdict` up, down or star; optional `reason`) · remove the judgment |
+| `GET /v1/weights` · `GET /v1/feedback/precision` | Effective weights with charter values · precision@5 per sweep |
 
 ## Development
 

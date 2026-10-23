@@ -90,3 +90,21 @@ test("the next sweep's gate input carries the latest judgments as taste examples
     await env.done();
   }
 });
+
+test("judgments in quick succession never send a reason to Jev twice", async () => {
+  const { env, cards } = await withCards(4);
+  try {
+    const parses = Promise.all(
+      cards.map((c, i) => {
+        env.feedback.judge(c.id, "up", ["Skip any paper without released code", "Maybe prefer shorter papers", "Nice figure 3", "Nice figure 3"][i]);
+        return env.reasons.parsePending();
+      }),
+    );
+    await parses;
+    await env.reasons.parsePending();
+    assert.equal((env.db.prepare("SELECT COUNT(*) n FROM jev_calls WHERE command = 'reason-parse'").get() as any).n, 4);
+    assert.ok(cards.every((c) => env.feedback.get(c.id)!.ruleStatus !== "pending"));
+  } finally {
+    await env.done();
+  }
+});

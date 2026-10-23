@@ -12,8 +12,30 @@ export class ReasonParser {
     this.command = loadCommand("reason-parse", deps.jevDir);
   }
 
-  /** Classify every judgment whose reason is still pending; returns how many were classified. */
-  async parsePending(): Promise<number> {
+  private running?: Promise<number>;
+  private again = false;
+
+  /**
+   * Classify every judgment whose reason is still pending; returns how many were classified. Calls never overlap: a
+   * call made while one runs is folded into one more pass afterwards, so no reason is sent to Jev twice.
+   */
+  parsePending(): Promise<number> {
+    if (this.running) {
+      this.again = true;
+      return this.running;
+    }
+    this.running = (async () => {
+      let total = 0;
+      do {
+        this.again = false;
+        total += await this.pass();
+      } while (this.again);
+      return total;
+    })().finally(() => (this.running = undefined));
+    return this.running;
+  }
+
+  private async pass(): Promise<number> {
     const rows = this.deps.db
       .prepare("SELECT j.card_id, j.verdict, j.reason, p.title FROM judgments j JOIN papers p ON p.id = j.paper_id WHERE j.rule_status = 'pending' AND j.reason IS NOT NULL ORDER BY j.updated_at")
       .all() as { card_id: number; verdict: string; reason: string; title: string }[];
