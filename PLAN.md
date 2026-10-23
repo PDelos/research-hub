@@ -516,7 +516,7 @@ with proposals and behavior specs; design and tasks are written for each layer w
                      ┌─┴──────────────────────────────┴─┐
               v0-3   │ paper-sweep · paper-cards        │  durable sweep, Jev gates, ranked cards
                    ┌─┴──────────────────────────────────┴─┐
-              v0-2 │ paper-sources · paper-embeddings     │  keyless sources, one record per work, vectors
+              v0-2 │ paper-sources · representations     │  keyless sources, one record per work, 3 layers
                  ┌─┴──────────────────────────────────────┴─┐
               v0-1│ project-charter · scheduling            │  brief → charter, pause, exactly-once slots
                ┌─┴──────────────────────────────────────────┴─┐
@@ -528,7 +528,7 @@ with proposals and behavior specs; design and tasks are written for each layer w
 |---|---|---|---|---|
 | 0 | `v0-0-skeleton` | deployment, agent-runtime, jev-client | `ping` | One container per project that cannot interfere with another; faux agent chats; crash test passes; offline suite green |
 | 1 | `v0-1-project-setup` | project-charter, scheduling | — | Brief → approved charter; sweeps requested exactly once per slot |
-| 2 | `v0-2-paper-sources` | paper-sources, paper-embeddings | — | Queries return deduplicated, enriched, embedded records |
+| 2 | `v0-2-paper-sources` | paper-sources, paper-representations | `abstract-facets` | Queries return deduplicated, enriched records with whole-paper vectors, Jev-labeled facet vectors (background/method/result) and citation links; papers searchable from chat |
 | 3 | `v0-3-daily-sweep` | paper-sweep, paper-cards | `on-theme`, `paper-kind`, `worth-reading`, `level`, `importance` | ~7 useful, foundational-first cards per day |
 | 4 | `v0-4-feedback` | paper-feedback | `reason-parse` | Judgments change weights and Jev inputs; precision@5 shown |
 | 5 | `v0-5-knowledge-vault` | knowledge-vault, knowledge-viewer | — | ⭐ papers become connected notes, readable and editable in the embedded Obsidian tab |

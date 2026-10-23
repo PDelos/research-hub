@@ -2,42 +2,45 @@
 
 ## Why
 
-Sweeps, scoring, relations and the vault all need the same thing underneath: reliable, deduplicated
-paper records with metadata and a vector for similarity. Building this as its own layer lets it be
-tested against live APIs and fixtures before any agent or Jev logic depends on it. Layer 2 of the v0
-pyramid; depends on `v0-1-project-setup` (charter queries) and `v0-0-skeleton`.
+Sweeps, scoring, relations, missing links and the vault all need the same foundation: reliable, deduplicated paper
+records and representations that capture what a paper *means*, not only what it is about. Research and a live check
+(2026-10-23) showed a single vector per paper captures topic but misses a paper's agenda, method and citation
+community; multi-vector (facet) representations and citation links are needed for relation-aware discovery. Layer 2
+of the v0 pyramid; depends on `project-charter` and `scheduling` (archived v0.1) and the v0.0 baseline.
 
 ## What Changes
 
-- Paper search and fetch from **arXiv**, **OpenAlex**, **Europe PMC** and **bioRxiv/medRxiv**, all
-  keyless. **Semantic Scholar** is optional (used only when `S2_API_KEY` is set): live testing on
-  2026-10-22 showed the unauthenticated pool returns HTTP 429 on every request.
-- One normalized **paper record** per work, merging versions and sources by DOI, arXiv ID, PMID/PMCID,
-  OpenAlex ID.
-- **Metadata enrichment** from OpenAlex: venue, year, authors, citation count, references, citing works,
-  open-access PDF URL, retraction flag.
-- A **metadata cache** with time-to-live in the project's database, plus polite rate limiting per source.
-  Project containers on one machine share an IP address towards the paper APIs; their sweeps are spread apart by
-  staggered sweep times (`RH_SWEEP_TIME`), and every source backs off on HTTP 429.
-- **Embeddings** for every paper (title + abstract) from **one configured OpenRouter embedding model**
-  (default `qwen/qwen3-embedding-8b`), stored in the project's database and searchable by similarity. One model for all
-  papers keeps every vector comparable; SPECTER2 via Semantic Scholar was dropped because it requires the
-  S2 key and does not cover new preprints from every source.
+- **Paper sources**, all keyless: **arXiv**, **OpenAlex** and **Europe PMC**, which also covers bioRxiv and medRxiv
+  preprints with keyword search (bioRxiv's own API has no search: verified 2026-10-23). **Semantic Scholar** only
+  when `S2_API_KEY` is set (its keyless pool answered HTTP 429 to every request).
+- One normalized **paper record** per work, merging versions and sources by DOI, arXiv ID, PMID/PMCID, OpenAlex ID.
+- **Metadata enrichment** from OpenAlex (venue, citations, references, citing count, open-access URL, retraction),
+  a 7-day **metadata cache**, polite **rate limiting** with a contact email, backoff on HTTP 429 and source failures.
+- **Three layers of representation per paper:**
+  1. a **whole-paper vector** (title + abstract): topic;
+  2. **facet vectors** for **background**, **method** and **result**: Jev labels each abstract sentence with one
+     facet (`abstract-facets` command, a bounded choice), and each facet's sentences get their own vector, so the
+     hub can find "same method, different problem";
+  3. **citation links** from OpenAlex references: lineage, shared references, co-citation.
+- Vectors from **one configured OpenRouter embedding model** for all papers (default `qwen/qwen3-embedding-8b` at
+  1,024 dimensions, verified live), never mixed across models.
+- A **`search_papers` tool for the research desk**, so the user can already ask in chat for papers on a topic and get
+  real results with metadata.
 
-Out of scope: full-text extraction (v1), trust scoring, Jev decisions, sweeps.
+Out of scope: full-text extraction (v1), trust scoring, gate and ranking decisions (v0.3), typed relations such as
+extends or contradicts (v1), notes on starred papers (v0.5).
 
-Jev commands added: none. LLM calls added: none (embedding calls only).
-
-Design and tasks are written when this layer is next to implement.
+Jev commands added: `abstract-facets`. LLM calls added: none beyond the desk's normal chat turns when it uses
+`search_papers`. Embedding calls: about 4 per new paper (whole + up to 3 facets).
 
 ## Capabilities
 
 ### New Capabilities
 
-- `paper-sources`: Finding papers by query across sources, normalizing and deduplicating them into one
-  record per work, enriching metadata, caching, and isolating source failures.
-- `paper-embeddings`: Computing, storing and searching one vector per paper with a single configured
-  model, and re-embedding when that model changes.
+- `paper-sources`: Finding papers by query across sources, one clean record per work, metadata enrichment, caching,
+  politeness and failure isolation, and paper search from chat.
+- `paper-representations`: What the hub stores to understand a paper: the whole-paper vector, Jev-labeled facets
+  with their vectors, citation links, similarity search by topic or facet, and model changes.
 
 ### Modified Capabilities
 
@@ -45,7 +48,10 @@ Design and tasks are written when this layer is next to implement.
 
 ## Impact
 
-- New `paper-sources` module in `rh-server`; cache, `papers` and vector tables in `project.sqlite`
-  (sqlite-vec).
-- External: arXiv, OpenAlex, Europe PMC, bioRxiv APIs; OpenRouter embeddings; optional Semantic Scholar.
-- Config: `CONTACT_EMAIL` (OpenAlex/Crossref polite pool), `RH_MODEL_EMBED`, optional `S2_API_KEY`.
+- `rh-server`: `papers/` module (source clients, normalizer, merger, cache, enrichment), `representations/` module
+  (embedding client, facet labeling, vector tables, citation links), the `search_papers` desk tool, a migration for
+  papers, identifiers, sources, cache, citation links, facet labels and sqlite-vec tables.
+- External: arXiv, OpenAlex, Europe PMC APIs; OpenRouter embeddings and Jev; optional Semantic Scholar.
+- Config: `CONTACT_EMAIL` (polite pools), `RH_MODEL_EMBED`, `RH_EMBED_DIMS`, optional `S2_API_KEY`.
+- Cost: about $0.0000005 per embedding call and about $0.000014 per Jev facet call, so a few hundredths of a cent
+  per new paper.
