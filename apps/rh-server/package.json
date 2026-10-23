@@ -17,6 +17,7 @@
     "@rh/jev": "*",
     "@rh/sdk": "*",
     "express": "5.3.0",
+    "fast-xml-parser": "^5.11.2",
     "sqlite-vec": "0.1.9",
     "tsx": "4.23.15"
   },

@@ -1,0 +1,115 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<feed xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/" xmlns:arxiv="http://arxiv.org/schemas/atom" xmlns="http://www.w3.org/2005/Atom">
+  <id>https://arxiv.org/api/SkXgpI4uiRiAsjQ7NQNNBcIzYwI</id>
+  <title>arXiv Query: search_query=all:"protein language model" AND all:contact&amp;id_list=&amp;start=0&amp;max_results=3</title>
+  <updated>2026-10-23T14:20:16Z</updated>
+  <link href="https://arxiv.org/api/query?search_query=all:%22protein+language+model%22+AND+all:contact&amp;start=0&amp;max_results=3&amp;id_list=" type="application/atom+xml"/>
+  <opensearch:itemsPerPage>3</opensearch:itemsPerPage>
+  <opensearch:totalResults>23</opensearch:totalResults>
+  <opensearch:startIndex>0</opensearch:startIndex>
+  <entry>
+    <id>http://arxiv.org/abs/2610.26747v1</id>
+    <title>recAMPLIFY: Large-Scale Pretraining of Recursive Protein Language Models</title>
+    <updated>2026-10-19T17:12:55Z</updated>
+    <link href="https://arxiv.org/abs/2610.26747v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2610.26747v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Protein language models (pLMs) are powerful tools for protein annotation and mutation-effect prediction, but progress has largely depended on scaling model size and data, making them expensive and prone to memorization. Test-time scaling offers a complementary path, but methods developed for autoregressive LLMs do not transfer directly: masked encoders lack a generation loop, and amino acids do not verbalize in a reasoning language. Instead, we adapt recursive pretraining to masked pLMs, where a weight-tied Transformer core refines residue-aligned hidden states over an adjustable number of cycles. We instantiate this recipe as recAMPLIFY, a pLM with 155M unique parameters trained on the same 2T tokens as AMPLIFY-350M. Despite 56% fewer parameters, it improves CASP contact recovery and three out of four supervised tasks, notably raising fold accuracy by 22.5%. Because optimal depth for recAMPLIFY varies across tasks and assays, we then introduce Gated Mixture Recurrence (GMR), a framework that decodes each protein from a probability-weighted mixture of hidden states visited during recursion. GMR employs a learned residual gate at scalar, low-rank, or per-dimension resolution to control how much of each cycle's proposed update is accepted into the state. This unifies halting and gating into a single adaptive computation objective while recovering PonderNet-style halting as a special case without gates. Layered on top of recAMPLIFY, GMR further reduces expected layer depth by up to 37%, although the accuracy trade-off varies by task. Mechanistic analyses show that residual gating controls recurrence stability beyond the trained depth and that halt depth tracks biological properties.</summary>
+    <category term="cs.LG" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.AI" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.CL" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-10-19T17:12:55Z</published>
+    <arxiv:comment>Models: https://huggingface.co/chandar-lab/recamplify Code: https://github.com/chandar-lab/AMPLIFY/tree/recamplify</arxiv:comment>
+    <arxiv:primary_category term="cs.LG"/>
+    <author>
+      <name>Saurav Jha</name>
+    </author>
+    <author>
+      <name>Qianli Liao</name>
+    </author>
+    <author>
+      <name>Robert Vernon</name>
+    </author>
+    <author>
+      <name>Sarath Chandar</name>
+    </author>
+    <author>
+      <name>Quentin Fournier</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2610.26651v1</id>
+    <title>The Effectiveness and Durability of Pretraining Data Filtering in Protein Language Models</title>
+    <updated>2026-10-19T16:08:59Z</updated>
+    <link href="https://arxiv.org/abs/2610.26651v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2610.26651v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Pretraining filtering is one of the most common safeguards for open-weight language models. Here we study its effectiveness, durability and scalability using the ESM-2 family of protein language models. We find that filtering viral proteins from the pretraining data meaningfully degrades masked language modelling, mutation effect prediction and long-range contact prediction on viral proteins, while largely preserving performance on non-viral proteins. These effects are concentrated among proteins from human-infecting viruses, and grow as we scale models from 8M to 3B parameters. As models increase in size, we find that stringent filtering becomes more effective. However, fine-tuning on sequences from the removed viral families restores the lost performance. Although the cost to recover performance increases with model scale, even for the largest models it costs about 80 USD of H100 time. This work establishes pretraining filtering as moderately effective at selectively degrading performance on viral proteins, but not durable against fine-tuning with modest computational resources and access to relevant data.</summary>
+    <category term="cs.LG" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.AI" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-10-19T16:08:59Z</published>
+    <arxiv:primary_category term="cs.LG"/>
+    <author>
+      <name>Aaron Maiwald</name>
+    </author>
+    <author>
+      <name>Roderick McNeill</name>
+    </author>
+    <author>
+      <name>Jaeyoung Lee</name>
+    </author>
+    <author>
+      <name>Matthew A. Clarke</name>
+    </author>
+    <author>
+      <name>Lennart Justen</name>
+    </author>
+    <author>
+      <name>Alejandro Acelas</name>
+    </author>
+    <author>
+      <name>Ivo Andrews</name>
+    </author>
+    <author>
+      <name>Giles Harper-Donnelly</name>
+    </author>
+    <author>
+      <name>Adam Moore</name>
+    </author>
+    <author>
+      <name>Sophie Rose</name>
+    </author>
+    <author>
+      <name>Oliver M. Crook</name>
+    </author>
+    <author>
+      <name>Felix Jackson</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2610.01891v2</id>
+    <title>RipplePLM: Structural and Property Decoupling for Protein Mutation Effect Generation</title>
+    <updated>2026-10-03T11:41:28Z</updated>
+    <link href="https://arxiv.org/abs/2610.01891v2" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2610.01891v2" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Protein mutation effect generation asks a model to describe the functional consequence of a point mutation in natural language. Existing protein-to-text systems typically encode mutation information into undifferentiated representations, overlooking the organization of mutation-induced evidence across structural and biochemical factors. We propose RipplePLM, a mutation-aware generation framework centered on Direct-Distal Cross-Attention (DDCA). By constructing a residue-level Mutation Perturbation Field from pre-trained protein language models, DDCA leverages predicted contact maps to organize mutation representations into two pathways: the mutation site's immediate contact neighborhood and its multi-hop distal context. To complement this structural decomposition, we further introduce the Property Latent Chain (PLChain), which injects expert-guided supervision of biochemical property changes (e.g., thermostability and optimal pH) into the LLM hidden-state pathway through latent property tokens. On MutaDescribe, RipplePLM improves over mutation-specific baselines on temporal and structural splits; under a matched-backbone comparison, average structural-split ROUGE-L increases from 22.23 to 35.65. Expert evaluation further shows a higher proportion of biologically accurate or relevant descriptions than the mutation-specific baseline. Additional ablations, representation diagnostics, and low-$N$ fitness regression experiments further support the effectiveness of the learned mutation-aware representations. Code: https://github.com/Lyu6PosHao/RipplePLM.</summary>
+    <category term="cs.CE" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="q-bio.BM" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-10-01T15:41:24Z</published>
+    <arxiv:comment>Neurips 2026</arxiv:comment>
+    <arxiv:primary_category term="cs.CE"/>
+    <author>
+      <name>Liuzhenghao Lv</name>
+    </author>
+    <author>
+      <name>Yuyang Liu</name>
+    </author>
+    <author>
+      <name>Yuyang Gao</name>
+    </author>
+    <author>
+      <name>Li Yuan</name>
+    </author>
+    <author>
+      <name>Yonghong Tian</name>
+    </author>
+  </entry>
+</feed>

@@ -25,6 +25,10 @@ if (config.generatedTokens.length)
     variables: config.generatedTokens,
     note: "random per process; set them in .env to call the API from outside the UI",
   });
+if (!config.papers.contactEmail)
+  log.warn("config.contact_email_missing", {
+    note: "set CONTACT_EMAIL so OpenAlex and Europe PMC requests use their polite pools; searches still work without it",
+  });
 
 let server: Server;
 try {

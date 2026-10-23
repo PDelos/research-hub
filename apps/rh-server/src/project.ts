@@ -19,9 +19,9 @@ import { JevLedger, loadCommand, runCommand, type JevClient } from "@rh/jev";
 import { createAgents, type Agents } from "./agents.ts";
 import { Brief, Charters, ProjectState, ScopingQuestions } from "./charter.ts";
 import { CharterWriter } from "./charter-writer.ts";
-import type { ScheduleDefaults } from "./config.ts";
+import type { PapersConfig, ScheduleDefaults } from "./config.ts";
 import { Scheduler } from "./schedule.ts";
-import { openProjectDb, Settings, type Db, type SelfCheck } from "./db.ts";
+import { ensureVectorTables, openProjectDb, Settings, type Db, type SelfCheck } from "./db.ts";
 import type { Logger } from "./logger.ts";
 import { Telemetry } from "./telemetry.ts";
 
@@ -94,12 +94,14 @@ export async function openProject(options: {
   extensions?: Extension[];
   deskTools?: readonly string[];
   schedule: ScheduleDefaults;
+  papers: PapersConfig;
 }): Promise<ProjectRuntime> {
   const { name, catalog, log } = options;
   const dir = options.dataDir;
   mkdirSync(dir, { recursive: true });
   migrateLegacyLayout(dir, log);
   const { db, check } = openProjectDb(join(dir, "project.sqlite"));
+  ensureVectorTables(db, options.papers.embedDims);
   const settings = new Settings(db);
   const telemetry = new Telemetry(db);
   const plog = log;

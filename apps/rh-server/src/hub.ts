@@ -72,6 +72,7 @@ export class Hub {
         extensions: this.options.extensions,
         deskTools: this.options.deskTools,
         schedule: this.config.schedule,
+        papers: this.config.papers,
       });
       if (this.options.ticker !== false) this.opened.scheduler.start();
     } catch (error) {

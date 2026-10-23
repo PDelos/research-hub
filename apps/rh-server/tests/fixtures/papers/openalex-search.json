@@ -1,0 +1,1607 @@
+{
+ "meta": {
+  "notice": "No API key, so this request shares one free daily budget ($0.10) with everyone on your network's IP address. The mailto parameter doesn't raise this limit. Get a free key with its own $1/day at https://openalex.org/settings/api and add api_key=YOUR_KEY to your requests. An AI agent can get one for its user in one call: POST https://api.openalex.org/api-keys with {\"email\": \"<your user's email>\"}; we email them a link, and the key works once they click it. Docs for agents: https://help.openalex.org/llms.txt",
+  "count": 17774,
+  "db_response_time_ms": 155,
+  "page": 1,
+  "per_page": 3,
+  "groups_count": null,
+  "x_query": {
+   "oql": "get works where published since 2025-01-01\n  and full text has (protein language model contact prediction)",
+   "x_new_oql": "get works since 2025-01-01 with (protein language model contact prediction) in the full text",
+   "oqo": {
+    "get_rows": "works",
+    "filter_rows": [
+     {
+      "column_id": "from_publication_date",
+      "value": "2025-01-01"
+     },
+     {
+      "column_id": "fulltext.search",
+      "value": "protein language model contact prediction",
+      "operator": "has"
+     }
+    ]
+   },
+   "url": "/works?filter=from_publication_date:2025-01-01,fulltext.search:protein language model contact prediction&per_page=3"
+  },
+  "cost_usd": 0.001
+ },
+ "results": [
+  {
+   "id": "https://openalex.org/W7165124225",
+   "doi": "https://doi.org/10.1002/pro.70667",
+   "ids": {
+    "openalex": "https://openalex.org/W7165124225",
+    "doi": "https://doi.org/10.1002/pro.70667",
+    "pmid": "https://pubmed.ncbi.nlm.nih.gov/42316773"
+   },
+   "display_name": "DeepSSInter : Protein\u2013protein contact prediction with a structure\u2010aware protein language model",
+   "publication_date": "2026-06-18",
+   "publication_year": 2026,
+   "authorships": [
+    {
+     "author_position": "first",
+     "author": {
+      "id": "https://openalex.org/A5138907468",
+      "display_name": "Derek Huang",
+      "orcid": null,
+      "observed_orcids": []
+     },
+     "institutions": [
+      {
+       "id": "https://openalex.org/I47720641",
+       "display_name": "Huazhong University of Science and Technology",
+       "ror": "https://ror.org/00p991c53",
+       "country_code": "CN",
+       "type": "education",
+       "lineage": [
+        "https://openalex.org/I47720641"
+       ]
+      }
+     ],
+     "countries": [
+      "CN"
+     ],
+     "is_corresponding": false,
+     "raw_author_name": "Derek Huang",
+     "raw_affiliation_strings": [
+      "School of Physics Huazhong University of Science and Technology  Wuhan Hubei China"
+     ],
+     "raw_orcid": null,
+     "affiliations": [
+      {
+       "raw_affiliation_string": "School of Physics Huazhong University of Science and Technology  Wuhan Hubei China",
+       "institution_ids": [
+        "https://openalex.org/I47720641"
+       ]
+      }
+     ]
+    },
+    {
+     "author_position": "middle",
+     "author": {
+      "id": null,
+      "display_name": "Jiamin Lv",
+      "orcid": null,
+      "observed_orcids": []
+     },
+     "institutions": [
+      {
+       "id": "https://openalex.org/I47720641",
+       "display_name": "Huazhong University of Science and Technology",
+       "ror": "https://ror.org/00p991c53",
+       "country_code": "CN",
+       "type": "education",
+       "lineage": [
+        "https://openalex.org/I47720641"
+       ]
+      }
+     ],
+     "countries": [
+      "CN"
+     ],
+     "is_corresponding": false,
+     "raw_author_name": "Jiamin Lv",
+     "raw_affiliation_strings": [
+      "School of Physics Huazhong University of Science and Technology  Wuhan Hubei China"
+     ],
+     "raw_orcid": null,
+     "affiliations": [
+      {
+       "raw_affiliation_string": "School of Physics Huazhong University of Science and Technology  Wuhan Hubei China",
+       "institution_ids": [
+        "https://openalex.org/I47720641"
+       ]
+      }
+     ]
+    },
+    {
+     "author_position": "middle",
+     "author": {
+      "id": "https://openalex.org/A5138856145",
+      "display_name": "Xuan Yao",
+      "orcid": null,
+      "observed_orcids": []
+     },
+     "institutions": [
+      {
+       "id": "https://openalex.org/I47720641",
+       "display_name": "Huazhong University of Science and Technology",
+       "ror": "https://ror.org/00p991c53",
+       "country_code": "CN",
+       "type": "education",
+       "lineage": [
+        "https://openalex.org/I47720641"
+       ]
+      }
+     ],
+     "countries": [
+      "CN"
+     ],
+     "is_corresponding": false,
+     "raw_author_name": "Xuan Yao",
+     "raw_affiliation_strings": [
+      "School of Physics Huazhong University of Science and Technology  Wuhan Hubei China"
+     ],
+     "raw_orcid": null,
+     "affiliations": [
+      {
+       "raw_affiliation_string": "School of Physics Huazhong University of Science and Technology  Wuhan Hubei China",
+       "institution_ids": [
+        "https://openalex.org/I47720641"
+       ]
+      }
+     ]
+    }
+   ],
+   "primary_location": {
+    "id": "doi:10.1002/pro.70667",
+    "doi": "https://doi.org/10.1002/pro.70667",
+    "is_oa": false,
+    "landing_page_url": "https://doi.org/10.1002/pro.70667",
+    "pdf_url": null,
+    "source": {
+     "id": "https://openalex.org/S156919612",
+     "display_name": "Protein Science",
+     "issn_l": "0961-8368",
+     "issn": [
+      "0961-8368",
+      "1469-896X"
+     ],
+     "is_oa": false,
+     "is_in_doaj": false,
+     "is_core": true,
+     "listed_in": [
+      "cwts-core",
+      "dongbi-a",
+      "doyens",
+      "jufo-1",
+      "ki-jl-1",
+      "medline",
+      "norway-1",
+      "poland-100",
+      "russia-white-list-1"
+     ],
+     "host_organization": "https://openalex.org/P4310320595",
+     "host_organization_name": "Wiley",
+     "host_organization_lineage": [
+      "https://openalex.org/P4310320595"
+     ],
+     "host_organization_lineage_names": [
+      "Wiley"
+     ],
+     "type": "journal"
+    },
+    "license": null,
+    "license_id": null,
+    "version": "publishedVersion",
+    "is_accepted": true,
+    "is_published": true,
+    "raw_source_name": "Protein Science",
+    "raw_type": "journal-article"
+   },
+   "best_oa_location": {
+    "id": "pmh:oai:pubmedcentral.nih.gov:13279887",
+    "doi": null,
+    "is_oa": true,
+    "landing_page_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC13279887/",
+    "pdf_url": null,
+    "source": {
+     "id": "https://openalex.org/S2764455111",
+     "display_name": "PubMed Central",
+     "issn_l": null,
+     "issn": null,
+     "is_oa": true,
+     "is_in_doaj": false,
+     "is_core": false,
+     "listed_in": [],
+     "host_organization": "https://openalex.org/I1299303238",
+     "host_organization_name": "National Institutes of Health",
+     "host_organization_lineage": [
+      "https://openalex.org/I1299303238"
+     ],
+     "host_organization_lineage_names": [],
+     "type": "repository"
+    },
+    "license": null,
+    "license_id": null,
+    "version": "submittedVersion",
+    "is_accepted": false,
+    "is_published": false,
+    "raw_source_name": "Protein Sci",
+    "raw_type": "Text"
+   },
+   "cited_by_count": 0,
+   "referenced_works": [
+    "https://openalex.org/W2008708467",
+    "https://openalex.org/W2107867854",
+    "https://openalex.org/W2130479394",
+    "https://openalex.org/W2342766640",
+    "https://openalex.org/W2378867027",
+    "https://openalex.org/W2508425869",
+    "https://openalex.org/W2766246727",
+    "https://openalex.org/W2803604922",
+    "https://openalex.org/W2804651207",
+    "https://openalex.org/W2951621517",
+    "https://openalex.org/W2990594531",
+    "https://openalex.org/W3015438624",
+    "https://openalex.org/W3106340289",
+    "https://openalex.org/W3133540795",
+    "https://openalex.org/W3134169372",
+    "https://openalex.org/W3177828909",
+    "https://openalex.org/W3193795503",
+    "https://openalex.org/W3211403530",
+    "https://openalex.org/W3211795435",
+    "https://openalex.org/W4210646117",
+    "https://openalex.org/W4220824576",
+    "https://openalex.org/W4300861364",
+    "https://openalex.org/W4309190357",
+    "https://openalex.org/W4310154745",
+    "https://openalex.org/W4313430582",
+    "https://openalex.org/W4327550249",
+    "https://openalex.org/W4375858802",
+    "https://openalex.org/W4381046888",
+    "https://openalex.org/W4383957026",
+    "https://openalex.org/W4387451333",
+    "https://openalex.org/W4387772748",
+    "https://openalex.org/W4389235501",
+    "https://openalex.org/W4392135141",
+    "https://openalex.org/W4392983286",
+    "https://openalex.org/W4398243369",
+    "https://openalex.org/W4399511607",
+    "https://openalex.org/W4405646298",
+    "https://openalex.org/W4410496038",
+    "https://openalex.org/W4416386395"
+   ],
+   "referenced_works_count": 39,
+   "is_retracted": false,
+   "abstract_inverted_index": {
+    "Accurate": [
+     0
+    ],
+    "prediction": [
+     1,
+     52
+    ],
+    "of": [
+     2,
+     18,
+     30,
+     35
+    ],
+    "the": [
+     3,
+     14,
+     28,
+     32,
+     68,
+     83,
+     90,
+     100,
+     104,
+     116,
+     121,
+     127,
+     147,
+     164
+    ],
+    "interface": [
+     4,
+     33
+    ],
+    "residue-residue": [
+     5,
+     70
+    ],
+    "contacts": [
+     6,
+     34,
+     71,
+     161
+    ],
+    "between": [
+     7
+    ],
+    "interacting": [
+     8
+    ],
+    "proteins": [
+     9
+    ],
+    "is": [
+     10,
+     169
+    ],
+    "valuable": [
+     11
+    ],
+    "for": [
+     12,
+     103
+    ],
+    "determining": [
+     13
+    ],
+    "structure": [
+     15
+    ],
+    "and": [
+     16,
+     55,
+     74,
+     86,
+     89,
+     92,
+     108,
+     120,
+     137,
+     152
+    ],
+    "function": [
+     17
+    ],
+    "protein": [
+     19,
+     36,
+     76,
+     105
+    ],
+    "complexes.": [
+     20,
+     37
+    ],
+    "Recent": [
+     21
+    ],
+    "deep": [
+     22,
+     63
+    ],
+    "learning": [
+     23,
+     64
+    ],
+    "methods": [
+     24,
+     40
+    ],
+    "have": [
+     25
+    ],
+    "drastically": [
+     26
+    ],
+    "improved": [
+     27
+    ],
+    "accuracy": [
+     29,
+     151
+    ],
+    "predicting": [
+     31
+    ],
+    "However,": [
+     38
+    ],
+    "existing": [
+     39
+    ],
+    "rely": [
+     41
+    ],
+    "on": [
+     42,
+     51,
+     134
+    ],
+    "Multiple": [
+     43
+    ],
+    "Sequence": [
+     44
+    ],
+    "Alignments": [
+     45
+    ],
+    "(MSA)": [
+     46
+    ],
+    "features": [
+     47,
+     102,
+     112
+    ],
+    "which": [
+     48
+    ],
+    "pose": [
+     49
+    ],
+    "limitations": [
+     50
+    ],
+    "accuracy,": [
+     53
+    ],
+    "speed,": [
+     54
+    ],
+    "computational": [
+     56
+    ],
+    "efficiency.": [
+     57
+    ],
+    "Here,": [
+     58
+    ],
+    "we": [
+     59,
+     95
+    ],
+    "propose": [
+     60
+    ],
+    "a": [
+     61
+    ],
+    "transformer-powered": [
+     62
+    ],
+    "method": [
+     65
+    ],
+    "to": [
+     66,
+     98,
+     124
+    ],
+    "predict": [
+     67
+    ],
+    "inter-protein": [
+     69,
+     129
+    ],
+    "using": [
+     72
+    ],
+    "single-sequence": [
+     73
+    ],
+    "structure-aware": [
+     75,
+     101,
+     111
+    ],
+    "language": [
+     77
+    ],
+    "models": [
+     78
+    ],
+    "(PLM),": [
+     79
+    ],
+    "called": [
+     80
+    ],
+    "DeepSSInter.": [
+     81
+    ],
+    "Utilizing": [
+     82
+    ],
+    "intra-protein": [
+     84
+    ],
+    "distance": [
+     85
+    ],
+    "graph": [
+     87
+    ],
+    "representations": [
+     88
+    ],
+    "ESM2": [
+     91
+    ],
+    "SaProt": [
+     93
+    ],
+    "PLM,": [
+     94
+    ],
+    "are": [
+     96,
+     113
+    ],
+    "able": [
+     97
+    ],
+    "generate": [
+     99
+    ],
+    "receptor,": [
+     106
+    ],
+    "ligand,": [
+     107
+    ],
+    "complex.": [
+     109
+    ],
+    "These": [
+     110
+    ],
+    "passed": [
+     114
+    ],
+    "into": [
+     115
+    ],
+    "ResNet": [
+     117
+    ],
+    "Inception": [
+     118
+    ],
+    "module": [
+     119,
+     123
+    ],
+    "Triangle-aware": [
+     122
+    ],
+    "effectively": [
+     125
+    ],
+    "produce": [
+     126
+    ],
+    "predicted": [
+     128,
+     160
+    ],
+    "contact": [
+     130
+    ],
+    "map.": [
+     131
+    ],
+    "Extensive": [
+     132
+    ],
+    "experiments": [
+     133
+    ],
+    "both": [
+     135,
+     150
+    ],
+    "homo-": [
+     136
+    ],
+    "hetero-dimeric": [
+     138
+    ],
+    "complexes": [
+     139
+    ],
+    "show": [
+     140
+    ],
+    "that": [
+     141
+    ],
+    "our": [
+     142
+    ],
+    "DeepSSInter": [
+     143,
+     168
+    ],
+    "model": [
+     144
+    ],
+    "significantly": [
+     145,
+     162
+    ],
+    "improves": [
+     146,
+     163
+    ],
+    "performance": [
+     148
+    ],
+    "in": [
+     149
+    ],
+    "speed": [
+     153
+    ],
+    "compared": [
+     154
+    ],
+    "with": [
+     155
+    ],
+    "previous": [
+     156
+    ],
+    "state-of-the-art": [
+     157
+    ],
+    "methods.": [
+     158
+    ],
+    "Integrating": [
+     159
+    ],
+    "docking": [
+     165
+    ],
+    "performance.": [
+     166
+    ],
+    "The": [
+     167
+    ],
+    "available": [
+     170
+    ],
+    "at": [
+     171
+    ],
+    "https://github.com/huang-laboratory/DeepSSInter/.": [
+     172
+    ]
+   },
+   "type": "article"
+  },
+  {
+   "id": "https://openalex.org/W4413443835",
+   "doi": "https://doi.org/10.1007/978-981-96-9582-9_7",
+   "ids": {
+    "openalex": "https://openalex.org/W4413443835",
+    "doi": "https://doi.org/10.1007/978-981-96-9582-9_7"
+   },
+   "display_name": "Protein-Protein Contact Prediction Using Structure-Informed Sequences and Protein Language Models",
+   "publication_date": "2025-01-01",
+   "publication_year": 2025,
+   "authorships": [
+    {
+     "author_position": "first",
+     "author": {
+      "id": "https://openalex.org/A5011078286",
+      "display_name": "Qiyuan Huang",
+      "orcid": "https://orcid.org/0009-0000-4004-1892",
+      "observed_orcids": [
+       "https://orcid.org/0009-0000-4004-1892"
+      ]
+     },
+     "institutions": [
+      {
+       "id": "https://openalex.org/I47720641",
+       "display_name": "Huazhong University of Science and Technology",
+       "ror": "https://ror.org/00p991c53",
+       "country_code": "CN",
+       "type": "education",
+       "lineage": [
+        "https://openalex.org/I47720641"
+       ]
+      }
+     ],
+     "countries": [
+      "CN"
+     ],
+     "is_corresponding": false,
+     "raw_author_name": "Qiyuan Huang",
+     "raw_affiliation_strings": [
+      "School of Software Engineering, Huazhong University of Science and Technology, Wuhan, China"
+     ],
+     "raw_orcid": null,
+     "affiliations": [
+      {
+       "raw_affiliation_string": "School of Software Engineering, Huazhong University of Science and Technology, Wuhan, China",
+       "institution_ids": [
+        "https://openalex.org/I47720641"
+       ]
+      }
+     ]
+    },
+    {
+     "author_position": "middle",
+     "author": {
+      "id": null,
+      "display_name": "Lei Wang",
+      "orcid": null,
+      "observed_orcids": []
+     },
+     "institutions": [
+      {
+       "id": "https://openalex.org/I47720641",
+       "display_name": "Huazhong University of Science and Technology",
+       "ror": "https://ror.org/00p991c53",
+       "country_code": "CN",
+       "type": "education",
+       "lineage": [
+        "https://openalex.org/I47720641"
+       ]
+      }
+     ],
+     "countries": [
+      "CN"
+     ],
+     "is_corresponding": true,
+     "raw_author_name": "Lei Wang",
+     "raw_affiliation_strings": [
+      "School of Software Engineering, Huazhong University of Science and Technology, Wuhan, China"
+     ],
+     "raw_orcid": null,
+     "affiliations": [
+      {
+       "raw_affiliation_string": "School of Software Engineering, Huazhong University of Science and Technology, Wuhan, China",
+       "institution_ids": [
+        "https://openalex.org/I47720641"
+       ]
+      }
+     ]
+    },
+    {
+     "author_position": "middle",
+     "author": {
+      "id": "https://openalex.org/A5100419458",
+      "display_name": "Zhihong Zhang",
+      "orcid": "https://orcid.org/0000-0002-0542-0640",
+      "observed_orcids": [
+       "https://orcid.org/0000-0002-0542-0640",
+       "https://orcid.org/0009-0001-4006-1700"
+      ]
+     },
+     "institutions": [
+      {
+       "id": "https://openalex.org/I180662265",
+       "display_name": "China Mobile (China)",
+       "ror": "https://ror.org/05gftfe97",
+       "country_code": "CN",
+       "type": "company",
+       "lineage": [
+        "https://openalex.org/I180662265"
+       ]
+      }
+     ],
+     "countries": [
+      "CN"
+     ],
+     "is_corresponding": true,
+     "raw_author_name": "Zhihong Zhang",
+     "raw_affiliation_strings": [
+      "China Mobile (Suzhou) Software Technology Company Limited, Suzhou, China"
+     ],
+     "raw_orcid": null,
+     "affiliations": [
+      {
+       "raw_affiliation_string": "China Mobile (Suzhou) Software Technology Company Limited, Suzhou, China",
+       "institution_ids": [
+        "https://openalex.org/I180662265"
+       ]
+      }
+     ]
+    }
+   ],
+   "primary_location": {
+    "id": "doi:10.1007/978-981-96-9582-9_7",
+    "doi": "https://doi.org/10.1007/978-981-96-9582-9_7",
+    "is_oa": false,
+    "landing_page_url": "https://doi.org/10.1007/978-981-96-9582-9_7",
+    "pdf_url": null,
+    "source": {
+     "id": "https://openalex.org/S2764900261",
+     "display_name": "Communications in computer and information science",
+     "issn_l": "1865-0929",
+     "issn": [
+      "1865-0929",
+      "1865-0937"
+     ],
+     "is_oa": false,
+     "is_in_doaj": false,
+     "is_core": true,
+     "listed_in": [
+      "cwts-core",
+      "jufo-1",
+      "norway-1"
+     ],
+     "host_organization": "https://openalex.org/P4310319900",
+     "host_organization_name": "Springer Science+Business Media",
+     "host_organization_lineage": [
+      "https://openalex.org/P4310319900",
+      "https://openalex.org/P4310319965"
+     ],
+     "host_organization_lineage_names": [
+      "Springer Science+Business Media",
+      "Springer Nature"
+     ],
+     "type": "book series"
+    },
+    "license": null,
+    "license_id": null,
+    "version": "publishedVersion",
+    "is_accepted": true,
+    "is_published": true,
+    "raw_source_name": "Communications in Computer and Information Science",
+    "raw_type": "book-chapter"
+   },
+   "best_oa_location": null,
+   "cited_by_count": 0,
+   "referenced_works": [
+    "https://openalex.org/W2008545402",
+    "https://openalex.org/W2048310584",
+    "https://openalex.org/W2070161716",
+    "https://openalex.org/W2073094091",
+    "https://openalex.org/W2114340287",
+    "https://openalex.org/W2120836664",
+    "https://openalex.org/W2130479394",
+    "https://openalex.org/W2950334474",
+    "https://openalex.org/W2965351431",
+    "https://openalex.org/W3133540795",
+    "https://openalex.org/W3194835771",
+    "https://openalex.org/W3211403530",
+    "https://openalex.org/W4289995185",
+    "https://openalex.org/W4319826837",
+    "https://openalex.org/W4375858802",
+    "https://openalex.org/W4387303685",
+    "https://openalex.org/W6791955017"
+   ],
+   "referenced_works_count": 17,
+   "is_retracted": false,
+   "abstract_inverted_index": null,
+   "type": "conference-paper"
+  },
+  {
+   "id": "https://openalex.org/W4411075448",
+   "doi": "https://doi.org/10.1101/2025.06.02.657171",
+   "ids": {
+    "openalex": "https://openalex.org/W4411075448",
+    "doi": "https://doi.org/10.1101/2025.06.02.657171"
+   },
+   "display_name": "RPcontact: Improved prediction of RNA-protein contacts using RNA and protein language models",
+   "publication_date": "2025-06-04",
+   "publication_year": 2025,
+   "authorships": [
+    {
+     "author_position": "first",
+     "author": {
+      "id": "https://openalex.org/A5080533350",
+      "display_name": "Jiuhong Jiang",
+      "orcid": "https://orcid.org/0009-0004-4077-1667",
+      "observed_orcids": [
+       "https://orcid.org/0009-0004-4077-1667"
+      ]
+     },
+     "institutions": [
+      {
+       "id": "https://openalex.org/I30809798",
+       "display_name": "ShanghaiTech University",
+       "ror": "https://ror.org/030bhh786",
+       "country_code": "CN",
+       "type": "education",
+       "lineage": [
+        "https://openalex.org/I30809798"
+       ]
+      },
+      {
+       "id": "https://openalex.org/I4210102541",
+       "display_name": "Shenzhen Bay Laboratory",
+       "ror": "https://ror.org/00sdcjz77",
+       "country_code": "CN",
+       "type": "facility",
+       "lineage": [
+        "https://openalex.org/I4210102541"
+       ]
+      },
+      {
+       "id": "https://openalex.org/I4405252760",
+       "display_name": "Guangzhou Laboratory",
+       "ror": "https://ror.org/03ybmxt82",
+       "country_code": null,
+       "type": "government",
+       "lineage": [
+        "https://openalex.org/I4405252760"
+       ]
+      }
+     ],
+     "countries": [
+      "CN"
+     ],
+     "is_corresponding": false,
+     "raw_author_name": "Jiuhong Jiang",
+     "raw_affiliation_strings": [
+      "Guangzhou National Laboratory, No. 9 XingDaoHuanBei Road, Guangzhou International Bio Island, Guangzhou 510005, Guangdong Province, China",
+      "Institute of Systems and Physical Biology, Shenzhen Bay Laboratory, Shenzhen 518107, China",
+      "School of Life Science and Technology, ShanghaiTech University, Shanghai, 201210, China",
+      "Guangzhou National Laboratory, No. 9 XingDaoHuanBei Road, Guangzhou International Bio Island, Guangzhou 50005, Guangdong Province, China",
+      "School of Life Science and Technology, ShanghaiTech University, Shanghai, 0110, China"
+     ],
+     "raw_orcid": "https://orcid.org/0009-0004-4077-1667",
+     "affiliations": [
+      {
+       "raw_affiliation_string": "Guangzhou National Laboratory, No. 9 XingDaoHuanBei Road, Guangzhou International Bio Island, Guangzhou 510005, Guangdong Province, China",
+       "institution_ids": [
+        "https://openalex.org/I4405252760"
+       ]
+      },
+      {
+       "raw_affiliation_string": "Institute of Systems and Physical Biology, Shenzhen Bay Laboratory, Shenzhen 518107, China",
+       "institution_ids": [
+        "https://openalex.org/I4210102541"
+       ]
+      },
+      {
+       "raw_affiliation_string": "School of Life Science and Technology, ShanghaiTech University, Shanghai, 201210, China",
+       "institution_ids": [
+        "https://openalex.org/I30809798"
+       ]
+      },
+      {
+       "raw_affiliation_string": "Guangzhou National Laboratory, No. 9 XingDaoHuanBei Road, Guangzhou International Bio Island, Guangzhou 50005, Guangdong Province, China",
+       "institution_ids": [
+        "https://openalex.org/I4405252760"
+       ]
+      },
+      {
+       "raw_affiliation_string": "School of Life Science and Technology, ShanghaiTech University, Shanghai, 0110, China",
+       "institution_ids": [
+        "https://openalex.org/I30809798"
+       ]
+      }
+     ]
+    },
+    {
+     "author_position": "middle",
+     "author": {
+      "id": "https://openalex.org/A5067129527",
+      "display_name": "Xing Ming Zhang",
+      "orcid": "https://orcid.org/0000-0001-8902-0355",
+      "observed_orcids": [
+       "https://orcid.org/0000-0001-8902-0355"
+      ]
+     },
+     "institutions": [
+      {
+       "id": "https://openalex.org/I4210102541",
+       "display_name": "Shenzhen Bay Laboratory",
+       "ror": "https://ror.org/00sdcjz77",
+       "country_code": "CN",
+       "type": "facility",
+       "lineage": [
+        "https://openalex.org/I4210102541"
+       ]
+      }
+     ],
+     "countries": [
+      "CN"
+     ],
+     "is_corresponding": false,
+     "raw_author_name": "Xing Zhang",
+     "raw_affiliation_strings": [
+      "Institute of Systems and Physical Biology, Shenzhen Bay Laboratory, Shenzhen 518107, China"
+     ],
+     "raw_orcid": "https://orcid.org/0000-0001-8902-0355",
+     "affiliations": [
+      {
+       "raw_affiliation_string": "Institute of Systems and Physical Biology, Shenzhen Bay Laboratory, Shenzhen 518107, China",
+       "institution_ids": [
+        "https://openalex.org/I4210102541"
+       ]
+      }
+     ]
+    },
+    {
+     "author_position": "middle",
+     "author": {
+      "id": null,
+      "display_name": "Jian Zhan",
+      "orcid": null,
+      "observed_orcids": []
+     },
+     "institutions": [
+      {
+       "id": "https://openalex.org/I4210102541",
+       "display_name": "Shenzhen Bay Laboratory",
+       "ror": "https://ror.org/00sdcjz77",
+       "country_code": "CN",
+       "type": "facility",
+       "lineage": [
+        "https://openalex.org/I4210102541"
+       ]
+      }
+     ],
+     "countries": [
+      "CN"
+     ],
+     "is_corresponding": false,
+     "raw_author_name": "Jian Zhan",
+     "raw_affiliation_strings": [
+      "Institute of Systems and Physical Biology, Shenzhen Bay Laboratory, Shenzhen 518107, China",
+      "Ribopeutic Inc, Futian, Shenzhen 518000, China"
+     ],
+     "raw_orcid": null,
+     "affiliations": [
+      {
+       "raw_affiliation_string": "Institute of Systems and Physical Biology, Shenzhen Bay Laboratory, Shenzhen 518107, China",
+       "institution_ids": [
+        "https://openalex.org/I4210102541"
+       ]
+      },
+      {
+       "raw_affiliation_string": "Ribopeutic Inc, Futian, Shenzhen 518000, China",
+       "institution_ids": []
+      }
+     ]
+    }
+   ],
+   "primary_location": {
+    "id": "doi:10.1101/2025.06.02.657171",
+    "doi": "https://doi.org/10.1101/2025.06.02.657171",
+    "is_oa": true,
+    "landing_page_url": "https://doi.org/10.1101/2025.06.02.657171",
+    "pdf_url": "https://www.biorxiv.org/content/biorxiv/early/2025/06/04/2025.06.02.657171.full.pdf",
+    "source": {
+     "id": "https://openalex.org/S4306402567",
+     "display_name": "bioRxiv (Cold Spring Harbor Laboratory)",
+     "issn_l": null,
+     "issn": null,
+     "is_oa": false,
+     "is_in_doaj": false,
+     "is_core": false,
+     "listed_in": [],
+     "host_organization": "https://openalex.org/I2750212522",
+     "host_organization_name": "Cold Spring Harbor Laboratory",
+     "host_organization_lineage": [
+      "https://openalex.org/I2750212522"
+     ],
+     "host_organization_lineage_names": [],
+     "type": "repository"
+    },
+    "license": "cc-by-nc-nd",
+    "license_id": "https://openalex.org/licenses/cc-by-nc-nd",
+    "version": "acceptedVersion",
+    "is_accepted": true,
+    "is_published": false,
+    "raw_source_name": "bioRxiv",
+    "raw_type": "posted-content"
+   },
+   "best_oa_location": {
+    "id": "doi:10.1101/2025.06.02.657171",
+    "doi": "https://doi.org/10.1101/2025.06.02.657171",
+    "is_oa": true,
+    "landing_page_url": "https://doi.org/10.1101/2025.06.02.657171",
+    "pdf_url": "https://www.biorxiv.org/content/biorxiv/early/2025/06/04/2025.06.02.657171.full.pdf",
+    "source": {
+     "id": "https://openalex.org/S4306402567",
+     "display_name": "bioRxiv (Cold Spring Harbor Laboratory)",
+     "issn_l": null,
+     "issn": null,
+     "is_oa": false,
+     "is_in_doaj": false,
+     "is_core": false,
+     "listed_in": [],
+     "host_organization": "https://openalex.org/I2750212522",
+     "host_organization_name": "Cold Spring Harbor Laboratory",
+     "host_organization_lineage": [
+      "https://openalex.org/I2750212522"
+     ],
+     "host_organization_lineage_names": [],
+     "type": "repository"
+    },
+    "license": "cc-by-nc-nd",
+    "license_id": "https://openalex.org/licenses/cc-by-nc-nd",
+    "version": "acceptedVersion",
+    "is_accepted": true,
+    "is_published": false,
+    "raw_source_name": "bioRxiv",
+    "raw_type": "posted-content"
+   },
+   "cited_by_count": 2,
+   "referenced_works": [
+    "https://openalex.org/W1019830208",
+    "https://openalex.org/W1577278546",
+    "https://openalex.org/W1593880960",
+    "https://openalex.org/W1696917493",
+    "https://openalex.org/W1971894358",
+    "https://openalex.org/W1987114449",
+    "https://openalex.org/W2000261730",
+    "https://openalex.org/W2002855582",
+    "https://openalex.org/W2010468965",
+    "https://openalex.org/W2015175027",
+    "https://openalex.org/W2022199909",
+    "https://openalex.org/W2034937344",
+    "https://openalex.org/W2037779217",
+    "https://openalex.org/W2103375140",
+    "https://openalex.org/W2110423360",
+    "https://openalex.org/W2116498086",
+    "https://openalex.org/W2132863465",
+    "https://openalex.org/W2133666260",
+    "https://openalex.org/W2156125289",
+    "https://openalex.org/W2156558709",
+    "https://openalex.org/W2158714788",
+    "https://openalex.org/W2168055922",
+    "https://openalex.org/W2176135968",
+    "https://openalex.org/W2298663188",
+    "https://openalex.org/W2307041907",
+    "https://openalex.org/W2342307854",
+    "https://openalex.org/W2582176104",
+    "https://openalex.org/W2614995786",
+    "https://openalex.org/W2620998958",
+    "https://openalex.org/W2766234610",
+    "https://openalex.org/W2803694478",
+    "https://openalex.org/W2917724292",
+    "https://openalex.org/W2933225114",
+    "https://openalex.org/W2949867299",
+    "https://openalex.org/W2951937481",
+    "https://openalex.org/W2982552606",
+    "https://openalex.org/W3121281384",
+    "https://openalex.org/W3126876258",
+    "https://openalex.org/W3133178585",
+    "https://openalex.org/W3133540795",
+    "https://openalex.org/W3142241514",
+    "https://openalex.org/W3164382315",
+    "https://openalex.org/W3202105508",
+    "https://openalex.org/W3208650284",
+    "https://openalex.org/W4213072029",
+    "https://openalex.org/W4281564380",
+    "https://openalex.org/W4282931170",
+    "https://openalex.org/W4283011532",
+    "https://openalex.org/W4283523580",
+    "https://openalex.org/W4290546063",
+    "https://openalex.org/W4300861393",
+    "https://openalex.org/W4309190357",
+    "https://openalex.org/W4315620715",
+    "https://openalex.org/W4327550249",
+    "https://openalex.org/W4386479765",
+    "https://openalex.org/W4387056845",
+    "https://openalex.org/W4387966090",
+    "https://openalex.org/W4388946853",
+    "https://openalex.org/W4389614980",
+    "https://openalex.org/W4392135141",
+    "https://openalex.org/W4396721167",
+    "https://openalex.org/W4416334285"
+   ],
+   "referenced_works_count": 62,
+   "is_retracted": false,
+   "abstract_inverted_index": {
+    "Abstract": [
+     0
+    ],
+    "Determining": [
+     1
+    ],
+    "key": [
+     2
+    ],
+    "contacts": [
+     3,
+     93,
+     122,
+     142
+    ],
+    "between": [
+     4
+    ],
+    "RNA-protein": [
+     5,
+     35,
+     92,
+     111,
+     145,
+     158
+    ],
+    "interactions": [
+     6
+    ],
+    "is": [
+     7
+    ],
+    "essential": [
+     8
+    ],
+    "for": [
+     9,
+     99,
+     123
+    ],
+    "understanding": [
+     10
+    ],
+    "the": [
+     11,
+     32,
+     39,
+     45,
+     74,
+     140
+    ],
+    "molecular": [
+     12
+    ],
+    "mechanisms": [
+     13
+    ],
+    "of": [
+     14,
+     34,
+     76,
+     132
+    ],
+    "numerous": [
+     15
+    ],
+    "biological": [
+     16
+    ],
+    "processes,": [
+     17
+    ],
+    "including": [
+     18,
+     56
+    ],
+    "transcription,": [
+     19
+    ],
+    "splicing,": [
+     20
+    ],
+    "and": [
+     21,
+     44,
+     63,
+     79,
+     102,
+     117,
+     126,
+     152,
+     161
+    ],
+    "translation.": [
+     22
+    ],
+    "However,": [
+     23
+    ],
+    "progress": [
+     24
+    ],
+    "in": [
+     25,
+     38,
+     120,
+     157
+    ],
+    "this": [
+     26
+    ],
+    "area": [
+     27
+    ],
+    "has": [
+     28
+    ],
+    "been": [
+     29
+    ],
+    "impeded": [
+     30
+    ],
+    "by": [
+     31,
+     48,
+     73,
+     149
+    ],
+    "scarcity": [
+     33
+    ],
+    "complex": [
+     36,
+     146,
+     159
+    ],
+    "structures": [
+     37,
+     147
+    ],
+    "Protein": [
+     40
+    ],
+    "Data": [
+     41
+    ],
+    "Bank": [
+     42
+    ],
+    "(PDB)": [
+     43
+    ],
+    "challenges": [
+     46
+    ],
+    "posed": [
+     47
+    ],
+    "traditional": [
+     49
+    ],
+    "structural": [
+     50
+    ],
+    "determination": [
+     51
+    ],
+    "techniques.": [
+     52
+    ],
+    "Recent": [
+     53
+    ],
+    "computational": [
+     54,
+     87
+    ],
+    "advancements,": [
+     55
+    ],
+    "deep": [
+     57
+    ],
+    "learning": [
+     58
+    ],
+    "methods": [
+     59
+    ],
+    "like": [
+     60
+    ],
+    "AlphaFold": [
+     61,
+     150
+    ],
+    "3": [
+     62,
+     151
+    ],
+    "RoseTTAFoldNA,": [
+     64,
+     153
+    ],
+    "have": [
+     65
+    ],
+    "improved": [
+     66
+    ],
+    "contact": [
+     67,
+     135
+    ],
+    "prediction": [
+     68
+    ],
+    "but": [
+     69
+    ],
+    "are": [
+     70
+    ],
+    "still": [
+     71
+    ],
+    "limited": [
+     72
+    ],
+    "availability": [
+     75
+    ],
+    "homologous": [
+     77
+    ],
+    "sequences": [
+     78
+    ],
+    "templates.": [
+     80
+    ],
+    "Here,": [
+     81
+    ],
+    "we": [
+     82
+    ],
+    "introduce": [
+     83
+    ],
+    "RPcontact,": [
+     84
+    ],
+    "a": [
+     85
+    ],
+    "novel": [
+     86
+    ],
+    "method": [
+     88
+    ],
+    "designed": [
+     89
+    ],
+    "to": [
+     90
+    ],
+    "predict": [
+     91
+    ],
+    "using": [
+     94
+    ],
+    "large": [
+     95
+    ],
+    "language": [
+     96
+    ],
+    "models": [
+     97
+    ],
+    "tailored": [
+     98
+    ],
+    "RNA": [
+     100
+    ],
+    "(ERNIE-RNA)": [
+     101
+    ],
+    "proteins": [
+     103
+    ],
+    "(ESM-2).": [
+     104
+    ],
+    "Despite": [
+     105
+    ],
+    "being": [
+     106
+    ],
+    "trained": [
+     107
+    ],
+    "entirely": [
+     108
+    ],
+    "on": [
+     109,
+     134
+    ],
+    "ribosomal": [
+     110
+    ],
+    "(rRNA-protein)": [
+     112
+    ],
+    "complexes,": [
+     113
+    ],
+    "RPcontact": [
+     114,
+     133
+    ],
+    "demonstrates": [
+     115
+    ],
+    "robust": [
+     116
+    ],
+    "generalized": [
+     118
+    ],
+    "performance": [
+     119,
+     131
+    ],
+    "predicting": [
+     121
+    ],
+    "both": [
+     124
+    ],
+    "dimeric": [
+     125
+    ],
+    "multimeric": [
+     127
+    ],
+    "non-rRNA-protein": [
+     128
+    ],
+    "complexes.": [
+     129
+    ],
+    "The": [
+     130
+    ],
+    "predictions": [
+     136
+    ],
+    "significantly": [
+     137
+    ],
+    "improves": [
+     138
+    ],
+    "over": [
+     139
+    ],
+    "binary": [
+     141
+    ],
+    "inferred": [
+     143
+    ],
+    "from": [
+     144
+    ],
+    "predicted": [
+     148
+    ],
+    "highlighting": [
+     154
+    ],
+    "its": [
+     155
+    ],
+    "potential": [
+     156
+    ],
+    "structure": [
+     160
+    ],
+    "function": [
+     162
+    ],
+    "prediction.": [
+     163
+    ]
+   },
+   "type": "preprint"
+  }
+ ],
+ "group_by": []
+}

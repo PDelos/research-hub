@@ -1,0 +1,823 @@
+{
+ "id": "https://openalex.org/W4327550249",
+ "doi": "https://doi.org/10.1126/science.ade2574",
+ "ids": {
+  "openalex": "https://openalex.org/W4327550249",
+  "doi": "https://doi.org/10.1126/science.ade2574",
+  "pmid": "https://pubmed.ncbi.nlm.nih.gov/36927031"
+ },
+ "display_name": "Evolutionary-scale prediction of atomic-level protein structure with a language model",
+ "publication_date": "2023-03-16",
+ "publication_year": 2023,
+ "authorships": [
+  {
+   "author_position": "first",
+   "author": {
+    "id": "https://openalex.org/A5101484037",
+    "display_name": "Zeming Lin",
+    "orcid": "https://orcid.org/0000-0002-0883-1373",
+    "observed_orcids": [
+     "https://orcid.org/0000-0002-0883-1373"
+    ]
+   },
+   "institutions": [
+    {
+     "id": "https://openalex.org/I57206974",
+     "display_name": "New York University",
+     "ror": "https://ror.org/0190ak572",
+     "country_code": "US",
+     "type": "education",
+     "lineage": [
+      "https://openalex.org/I57206974"
+     ]
+    }
+   ],
+   "countries": [
+    "US"
+   ],
+   "is_corresponding": false,
+   "raw_author_name": "Zeming Lin",
+   "raw_affiliation_strings": [
+    "Meta AI, FAIR Team",
+    "New York University",
+    "FAIR, Meta AI, New York, NY, USA",
+    "New York University, New York, NY, USA"
+   ],
+   "raw_orcid": null,
+   "affiliations": [
+    {
+     "raw_affiliation_string": "Meta AI, FAIR Team",
+     "institution_ids": []
+    },
+    {
+     "raw_affiliation_string": "New York University",
+     "institution_ids": [
+      "https://openalex.org/I57206974"
+     ]
+    },
+    {
+     "raw_affiliation_string": "FAIR, Meta AI, New York, NY, USA",
+     "institution_ids": []
+    },
+    {
+     "raw_affiliation_string": "New York University, New York, NY, USA",
+     "institution_ids": [
+      "https://openalex.org/I57206974"
+     ]
+    }
+   ]
+  },
+  {
+   "author_position": "middle",
+   "author": {
+    "id": "https://openalex.org/A5001757327",
+    "display_name": "Halil Akin",
+    "orcid": "https://orcid.org/0000-0003-1666-3223",
+    "observed_orcids": [
+     "https://orcid.org/0000-0003-1666-3223"
+    ]
+   },
+   "institutions": [],
+   "countries": [],
+   "is_corresponding": false,
+   "raw_author_name": "Halil Akin",
+   "raw_affiliation_strings": [
+    "Meta AI, FAIR Team",
+    "FAIR, Meta AI, New York, NY, USA"
+   ],
+   "raw_orcid": null,
+   "affiliations": [
+    {
+     "raw_affiliation_string": "Meta AI, FAIR Team",
+     "institution_ids": []
+    },
+    {
+     "raw_affiliation_string": "FAIR, Meta AI, New York, NY, USA",
+     "institution_ids": []
+    }
+   ]
+  },
+  {
+   "author_position": "middle",
+   "author": {
+    "id": "https://openalex.org/A5035441206",
+    "display_name": "Roshan Rao",
+    "orcid": "https://orcid.org/0000-0003-4412-3742",
+    "observed_orcids": [
+     "https://orcid.org/0000-0003-4412-3742"
+    ]
+   },
+   "institutions": [],
+   "countries": [],
+   "is_corresponding": false,
+   "raw_author_name": "Roshan Rao",
+   "raw_affiliation_strings": [
+    "Meta AI, FAIR Team",
+    "FAIR, Meta AI, New York, NY, USA"
+   ],
+   "raw_orcid": null,
+   "affiliations": [
+    {
+     "raw_affiliation_string": "Meta AI, FAIR Team",
+     "institution_ids": []
+    },
+    {
+     "raw_affiliation_string": "FAIR, Meta AI, New York, NY, USA",
+     "institution_ids": []
+    }
+   ]
+  }
+ ],
+ "primary_location": {
+  "id": "doi:10.1126/science.ade2574",
+  "doi": "https://doi.org/10.1126/science.ade2574",
+  "is_oa": true,
+  "landing_page_url": "https://doi.org/10.1126/science.ade2574",
+  "pdf_url": null,
+  "source": {
+   "id": "https://openalex.org/S3880285",
+   "display_name": "Science",
+   "issn_l": "0036-8075",
+   "issn": [
+    "0036-8075",
+    "0193-4511",
+    "1095-9203"
+   ],
+   "is_oa": false,
+   "is_in_doaj": false,
+   "is_core": true,
+   "listed_in": [
+    "anvur-class-a",
+    "anvur-scientific",
+    "cwts-core",
+    "dongbi-a",
+    "doyens",
+    "erih-plus",
+    "jufo-3",
+    "ki-jl-3",
+    "medline",
+    "norway-2",
+    "poland-200",
+    "russia-white-list-1",
+    "vabb-shw"
+   ],
+   "host_organization": "https://openalex.org/P4310315823",
+   "host_organization_name": "American Association for the Advancement of Science",
+   "host_organization_lineage": [
+    "https://openalex.org/P4310315823"
+   ],
+   "host_organization_lineage_names": [
+    "American Association for the Advancement of Science"
+   ],
+   "type": "journal"
+  },
+  "license": "cc-by",
+  "license_id": "https://openalex.org/licenses/cc-by",
+  "version": "publishedVersion",
+  "is_accepted": true,
+  "is_published": true,
+  "raw_source_name": "Science",
+  "raw_type": "journal-article"
+ },
+ "best_oa_location": {
+  "id": "doi:10.1126/science.ade2574",
+  "doi": "https://doi.org/10.1126/science.ade2574",
+  "is_oa": true,
+  "landing_page_url": "https://doi.org/10.1126/science.ade2574",
+  "pdf_url": null,
+  "source": {
+   "id": "https://openalex.org/S3880285",
+   "display_name": "Science",
+   "issn_l": "0036-8075",
+   "issn": [
+    "0036-8075",
+    "0193-4511",
+    "1095-9203"
+   ],
+   "is_oa": false,
+   "is_in_doaj": false,
+   "is_core": true,
+   "listed_in": [
+    "anvur-class-a",
+    "anvur-scientific",
+    "cwts-core",
+    "dongbi-a",
+    "doyens",
+    "erih-plus",
+    "jufo-3",
+    "ki-jl-3",
+    "medline",
+    "norway-2",
+    "poland-200",
+    "russia-white-list-1",
+    "vabb-shw"
+   ],
+   "host_organization": "https://openalex.org/P4310315823",
+   "host_organization_name": "American Association for the Advancement of Science",
+   "host_organization_lineage": [
+    "https://openalex.org/P4310315823"
+   ],
+   "host_organization_lineage_names": [
+    "American Association for the Advancement of Science"
+   ],
+   "type": "journal"
+  },
+  "license": "cc-by",
+  "license_id": "https://openalex.org/licenses/cc-by",
+  "version": "publishedVersion",
+  "is_accepted": true,
+  "is_published": true,
+  "raw_source_name": "Science",
+  "raw_type": "journal-article"
+ },
+ "cited_by_count": 5531,
+ "referenced_works": [
+  "https://openalex.org/W1514077080",
+  "https://openalex.org/W1968426398",
+  "https://openalex.org/W1979762151",
+  "https://openalex.org/W2008545402",
+  "https://openalex.org/W2045435533",
+  "https://openalex.org/W2055043387",
+  "https://openalex.org/W2059117301",
+  "https://openalex.org/W2079145130",
+  "https://openalex.org/W2084312697",
+  "https://openalex.org/W2101234009",
+  "https://openalex.org/W2102461176",
+  "https://openalex.org/W2106694138",
+  "https://openalex.org/W2118756701",
+  "https://openalex.org/W2140564438",
+  "https://openalex.org/W2146891463",
+  "https://openalex.org/W2148312059",
+  "https://openalex.org/W2161151688",
+  "https://openalex.org/W2171641243",
+  "https://openalex.org/W2508425869",
+  "https://openalex.org/W2770647690",
+  "https://openalex.org/W2780845733",
+  "https://openalex.org/W2800392236",
+  "https://openalex.org/W2893348872",
+  "https://openalex.org/W2896457183",
+  "https://openalex.org/W2898364362",
+  "https://openalex.org/W2918063357",
+  "https://openalex.org/W2949342052",
+  "https://openalex.org/W2949867299",
+  "https://openalex.org/W2950954328",
+  "https://openalex.org/W2951433247",
+  "https://openalex.org/W2952317511",
+  "https://openalex.org/W2963341956",
+  "https://openalex.org/W2980789587",
+  "https://openalex.org/W2984894304",
+  "https://openalex.org/W2995514860",
+  "https://openalex.org/W2997234557",
+  "https://openalex.org/W2999044305",
+  "https://openalex.org/W3030163527",
+  "https://openalex.org/W3036737467",
+  "https://openalex.org/W3037620288",
+  "https://openalex.org/W3096951695",
+  "https://openalex.org/W3111174583",
+  "https://openalex.org/W3121000782",
+  "https://openalex.org/W3129831491",
+  "https://openalex.org/W3133458480",
+  "https://openalex.org/W3146944767",
+  "https://openalex.org/W3166142427",
+  "https://openalex.org/W3177500196",
+  "https://openalex.org/W3177828909",
+  "https://openalex.org/W3179485843",
+  "https://openalex.org/W3183475563",
+  "https://openalex.org/W3186179742",
+  "https://openalex.org/W3198923619",
+  "https://openalex.org/W3202105508",
+  "https://openalex.org/W3211795435",
+  "https://openalex.org/W4210494137",
+  "https://openalex.org/W4223581484",
+  "https://openalex.org/W4281291878",
+  "https://openalex.org/W4281790889",
+  "https://openalex.org/W4286488966",
+  "https://openalex.org/W4286669150",
+  "https://openalex.org/W4293530896",
+  "https://openalex.org/W4296031103",
+  "https://openalex.org/W4296032638",
+  "https://openalex.org/W4300861364",
+  "https://openalex.org/W4319029105",
+  "https://openalex.org/W4375858802",
+  "https://openalex.org/W4388024559",
+  "https://openalex.org/W4392302569",
+  "https://openalex.org/W4396895148",
+  "https://openalex.org/W4402902773"
+ ],
+ "referenced_works_count": 71,
+ "is_retracted": false,
+ "abstract_inverted_index": {
+  "Abstract": [
+   0
+  ],
+  "Artificial": [
+   1
+  ],
+  "intelligence": [
+   2
+  ],
+  "has": [
+   3,
+   20
+  ],
+  "the": [
+   4,
+   10,
+   15,
+   37,
+   40,
+   59,
+   91,
+   110,
+   119,
+   131,
+   138,
+   165,
+   171,
+   212,
+   218,
+   223
+  ],
+  "potential": [
+   5
+  ],
+  "to": [
+   6,
+   25,
+   30,
+   107,
+   116,
+   150
+  ],
+  "open": [
+   7
+  ],
+  "insight": [
+   8,
+   92
+  ],
+  "into": [
+   9,
+   211
+  ],
+  "structure": [
+   11,
+   28,
+   70,
+   88,
+   133
+  ],
+  "of": [
+   12,
+   17,
+   39,
+   44,
+   61,
+   69,
+   82,
+   101,
+   114,
+   130,
+   134,
+   140,
+   176,
+   217,
+   220,
+   222
+  ],
+  "proteins": [
+   13,
+   115,
+   226
+  ],
+  "at": [
+   14,
+   137
+  ],
+  "scale": [
+   16,
+   50
+  ],
+  "evolution.": [
+   18
+  ],
+  "It": [
+   19
+  ],
+  "only": [
+   21
+  ],
+  "recently": [
+   22
+  ],
+  "been": [
+   23
+  ],
+  "possible": [
+   24
+  ],
+  "extend": [
+   26
+  ],
+  "protein": [
+   27,
+   45,
+   136
+  ],
+  "prediction": [
+   29,
+   129,
+   146
+  ],
+  "two": [
+   31
+  ],
+  "hundred": [
+   32
+  ],
+  "million": [
+   33,
+   183,
+   191
+  ],
+  "cataloged": [
+   34
+  ],
+  "proteins.": [
+   35
+  ],
+  "Characterizing": [
+   36
+  ],
+  "structures": [
+   38,
+   198,
+   219
+  ],
+  "exponentially": [
+   41
+  ],
+  "growing": [
+   42
+  ],
+  "billions": [
+   43
+  ],
+  "sequences": [
+   46
+  ],
+  "revealed": [
+   47
+  ],
+  "by": [
+   48
+  ],
+  "large": [
+   49,
+   76
+  ],
+  "gene": [
+   51
+  ],
+  "sequencing": [
+   52
+  ],
+  "experiments": [
+   53
+  ],
+  "would": [
+   54
+  ],
+  "necessitate": [
+   55
+  ],
+  "a": [
+   56,
+   75,
+   135
+  ],
+  "break-through": [
+   57
+  ],
+  "in": [
+   58,
+   85,
+   145,
+   201
+  ],
+  "speed": [
+   60
+  ],
+  "folding.": [
+   62
+  ],
+  "Here": [
+   63
+  ],
+  "we": [
+   64,
+   103,
+   163
+  ],
+  "show": [
+   65
+  ],
+  "that": [
+   66,
+   93,
+   127,
+   147
+  ],
+  "direct": [
+   67
+  ],
+  "inference": [
+   68
+  ],
+  "from": [
+   71
+  ],
+  "primary": [
+   72
+  ],
+  "sequence": [
+   73
+  ],
+  "using": [
+   74
+  ],
+  "language": [
+   77,
+   94,
+   112,
+   120
+  ],
+  "model": [
+   78,
+   113
+  ],
+  "enables": [
+   79,
+   128
+  ],
+  "an": [
+   80,
+   208
+  ],
+  "order": [
+   81
+  ],
+  "magnitude": [
+   83
+  ],
+  "speed-up": [
+   84
+  ],
+  "high": [
+   86,
+   192
+  ],
+  "resolution": [
+   87,
+   139,
+   157
+  ],
+  "prediction.": [
+   89
+  ],
+  "Leveraging": [
+   90
+  ],
+  "models": [
+   95,
+   105,
+   121
+  ],
+  "learn": [
+   96,
+   125
+  ],
+  "evolutionary": [
+   97
+  ],
+  "patterns": [
+   98
+  ],
+  "across": [
+   99
+  ],
+  "millions": [
+   100,
+   196
+  ],
+  "sequences,": [
+   102
+  ],
+  "train": [
+   104
+  ],
+  "up": [
+   106,
+   149
+  ],
+  "15B": [
+   108
+  ],
+  "parameters,": [
+   109
+  ],
+  "largest": [
+   111
+  ],
+  "date.": [
+   117
+  ],
+  "As": [
+   118
+  ],
+  "are": [
+   122,
+   199
+  ],
+  "scaled": [
+   123
+  ],
+  "they": [
+   124
+  ],
+  "information": [
+   126
+  ],
+  "three-dimensional": [
+   132
+  ],
+  "individual": [
+   141
+  ],
+  "atoms.": [
+   142
+  ],
+  "This": [
+   143,
+   169
+  ],
+  "results": [
+   144
+  ],
+  "is": [
+   148,
+   170
+  ],
+  "60x": [
+   151
+  ],
+  "faster": [
+   152
+  ],
+  "than": [
+   153,
+   181,
+   189
+  ],
+  "state-of-the-art": [
+   154
+  ],
+  "while": [
+   155
+  ],
+  "maintaining": [
+   156
+  ],
+  "and": [
+   158,
+   215
+  ],
+  "accuracy.": [
+   159
+  ],
+  "Building": [
+   160
+  ],
+  "on": [
+   161,
+   227
+  ],
+  "this,": [
+   162
+  ],
+  "present": [
+   164
+  ],
+  "ESM": [
+   166
+  ],
+  "Metage-nomic": [
+   167
+  ],
+  "Atlas.": [
+   168
+  ],
+  "first": [
+   172
+  ],
+  "large-scale": [
+   173
+  ],
+  "structural": [
+   174
+  ],
+  "characterization": [
+   175
+  ],
+  "metagenomic": [
+   177
+  ],
+  "proteins,": [
+   178
+  ],
+  "with": [
+   179,
+   203
+  ],
+  "more": [
+   180,
+   188
+  ],
+  "617": [
+   182
+  ],
+  "structures.": [
+   184
+  ],
+  "The": [
+   185
+  ],
+  "atlas": [
+   186
+  ],
+  "reveals": [
+   187
+  ],
+  "225": [
+   190
+  ],
+  "confidence": [
+   193
+  ],
+  "predictions,": [
+   194
+  ],
+  "including": [
+   195
+  ],
+  "whose": [
+   197
+  ],
+  "novel": [
+   200
+  ],
+  "comparison": [
+   202
+  ],
+  "experimentally": [
+   204
+  ],
+  "determined": [
+   205
+  ],
+  "structures,": [
+   206
+  ],
+  "giving": [
+   207
+  ],
+  "unprecedented": [
+   209
+  ],
+  "view": [
+   210
+  ],
+  "vast": [
+   213
+  ],
+  "breadth": [
+   214
+  ],
+  "diversity": [
+   216
+  ],
+  "some": [
+   221
+  ],
+  "least": [
+   224
+  ],
+  "understood": [
+   225
+  ],
+  "earth.": [
+   228
+  ]
+ },
+ "type": "article"
+}

@@ -41,7 +41,22 @@ export interface Config {
   schedule: ScheduleDefaults;
   /** Host names (without port) the UI proxy answers (DNS-rebinding guard). */
   allowedHosts: Set<string>;
+  /** Paper sources and representations (v0.2). */
+  papers: PapersConfig;
 }
+
+export interface PapersConfig {
+  /** Sent to OpenAlex (mailto) and Europe PMC (email) for their polite pools; warned about once when missing. */
+  contactEmail?: string;
+  /** The one embedding model for every paper (OpenRouter ID) and its output dimension. */
+  embedModel: string;
+  embedDims: number;
+  /** Semantic Scholar is used only with a key (its keyless pool is rate limited). */
+  s2ApiKey?: string;
+}
+
+export const DEFAULT_EMBED_MODEL = "qwen/qwen3-embedding-8b";
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export class ConfigError extends Error {
   constructor(
@@ -97,6 +112,18 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
       `RH_REVIEW_TIME must be "<sun..sat> HH:MM", got "${env.RH_REVIEW_TIME}"`,
       "RH_REVIEW_TIME",
     );
+  const contactEmail = env.CONTACT_EMAIL?.trim() || undefined;
+  if (contactEmail && !EMAIL.test(contactEmail))
+    throw new ConfigError(`CONTACT_EMAIL must be an email address, got "${contactEmail}"`, "CONTACT_EMAIL");
+  const embedDims = Number(env.RH_EMBED_DIMS?.trim() || 1024);
+  if (!Number.isInteger(embedDims) || embedDims < 32 || embedDims > 4096)
+    throw new ConfigError(`RH_EMBED_DIMS must be a whole number from 32 to 4096, got "${env.RH_EMBED_DIMS}"`, "RH_EMBED_DIMS");
+  const papers: PapersConfig = {
+    contactEmail,
+    embedModel: env.RH_MODEL_EMBED?.trim() || DEFAULT_EMBED_MODEL,
+    embedDims,
+    s2ApiKey: env.S2_API_KEY?.trim() || undefined,
+  };
   const generatedTokens: string[] = [];
   const token = (name: string) => {
     const value = env[name]?.trim();
@@ -134,12 +161,13 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     uiDir: resolve(REPO_ROOT, env.RH_UI_DIR?.trim() || "apps/rh-client-browser/dist"),
     allowedHosts,
     schedule: { timeZone, sweepTime, review: { weekday: weekday as Weekday, time: reviewTime } },
+    papers,
   };
 }
 
 /** Values that must never appear in logs or responses. */
 export function secretsOf(config: Config): string[] {
-  return [config.openrouterKey, config.apiToken, config.clientToken].filter(
+  return [config.openrouterKey, config.apiToken, config.clientToken, config.papers.s2ApiKey].filter(
     (s): s is string => !!s && s.length >= 8,
   );
 }

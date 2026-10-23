@@ -2,23 +2,23 @@
 
 ## 1. Storage and configuration
 
-- [ ] 1.1 Add migration 3 (papers, paper_ids, paper_sources, metadata_cache, citation_links, facet_labels, representations, embedding_calls) and create the sqlite-vec tables for `RH_EMBED_DIMS`; verify a migration test from version 2 and a startup test that the four vector tables exist
-- [ ] 1.2 Add `CONTACT_EMAIL`, `RH_MODEL_EMBED`, `RH_EMBED_DIMS`, `S2_API_KEY` to config (validated) and `.env.example`, with a single startup warning when `CONTACT_EMAIL` is missing; verify config tests and `npm run check:env`
+- [x] 1.1 Add migration 3 (papers, paper_ids, paper_sources, metadata_cache, citation_links, facet_labels, representations, embedding_calls) and create the sqlite-vec tables for `RH_EMBED_DIMS`; verify a migration test from version 2 and a startup test that the four vector tables exist
+- [x] 1.2 Add `CONTACT_EMAIL`, `RH_MODEL_EMBED`, `RH_EMBED_DIMS`, `S2_API_KEY` to config (validated) and `.env.example`, with a single startup warning when `CONTACT_EMAIL` is missing; verify config tests and `npm run check:env`
 
 ## 2. Records, identity and cache (spec: paper-sources)
 
-- [ ] 2.1 Implement identifier and title normalization and the sentence splitter; verify unit tests (DOI forms, arXiv versions, PMC ids, decimals, "e.g.", "et al.")
-- [ ] 2.2 Implement the paper store: insert, merge by any strong identifier (including two-record merges), title-only duplicate flag, sources list; verify tests for the preprint + journal merge and the title-only scenario
-- [ ] 2.3 Implement the 7-day metadata cache; verify a test that the same DOI on the same day hits the network once
+- [x] 2.1 Implement identifier and title normalization and the sentence splitter; verify unit tests (DOI forms, arXiv versions, PMC ids, decimals, "e.g.", "et al.")
+- [x] 2.2 Implement the paper store: insert, merge by any strong identifier (including two-record merges), title-only duplicate flag, sources list; verify tests for the preprint + journal merge and the title-only scenario
+- [x] 2.3 Implement the 7-day metadata cache; verify a test that the same DOI on the same day hits the network once
 
 ## 3. Source clients (spec: paper-sources)
 
-- [ ] 3.1 Implement the HTTP helper (timeout, per-host pacing, retry on 429/5xx honoring Retry-After, mailto/email); verify tests for arXiv pacing (≥ 3 s apart, fake clock) and a 429 then success
-- [ ] 3.2 Implement the arXiv client (Atom via fast-xml-parser) with a recorded fixture; verify parsing of id, title, abstract, authors, date and the date window
-- [ ] 3.3 Implement the OpenAlex client (search, lookup by DOI/OpenAlex id, abstract from inverted index, references, retraction) with fixtures; verify fields and the retracted flag
-- [ ] 3.4 Implement the Europe PMC client (preprints with server name, HTML stripped) with fixtures; verify a bioRxiv preprint maps to server `bioRxiv` with DOI and abstract
-- [ ] 3.5 Implement the optional Semantic Scholar client used only with `S2_API_KEY`; verify a test that no request is made without the key
-- [ ] 3.6 Implement search fan-out, merge and enrichment (pending when not in OpenAlex, retried later) with failure isolation; verify tests for one source down (results plus the failure listed) and enrichment pending → done
+- [x] 3.1 Implement the HTTP helper (timeout, per-host pacing, retry on 429/5xx honoring Retry-After, mailto/email); verify tests for arXiv pacing (≥ 3 s apart, fake clock) and a 429 then success
+- [x] 3.2 Implement the arXiv client (Atom via fast-xml-parser) with a recorded fixture; verify parsing of id, title, abstract, authors, date and the date window
+- [x] 3.3 Implement the OpenAlex client (search, lookup by DOI/OpenAlex id, abstract from inverted index, references, retraction) with fixtures; verify fields and the retracted flag
+- [x] 3.4 Implement the Europe PMC client (preprints with server name, HTML stripped) with fixtures; verify a bioRxiv preprint maps to server `bioRxiv` with DOI and abstract
+- [x] 3.5 Implement the optional Semantic Scholar client used only with `S2_API_KEY`; verify a test that no request is made without the key
+- [x] 3.6 Implement search fan-out, merge and enrichment (pending when not in OpenAlex, retried later) with failure isolation; verify tests for one source down (results plus the failure listed) and enrichment pending → done
 
 ## 4. Representations (spec: paper-representations)
 

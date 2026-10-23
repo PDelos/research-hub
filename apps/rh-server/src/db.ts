@@ -68,7 +68,69 @@ const MIGRATIONS: string[] = [
     reason TEXT, created_at TEXT NOT NULL, UNIQUE (kind, slot)
   );
   `,
+  // 3 (v0-2-paper-sources): paper records, identifiers, sources, metadata cache, citation links, facet labels,
+  // representations and embedding calls. The sqlite-vec tables depend on the configured dimension and are created
+  // at startup by ensureVectorTables().
+  `
+  CREATE TABLE papers (
+    id INTEGER PRIMARY KEY, title TEXT NOT NULL, title_norm TEXT NOT NULL, abstract TEXT, authors_json TEXT NOT NULL DEFAULT '[]',
+    year INTEGER, published_at TEXT, venue TEXT, server TEXT, oa_url TEXT, url TEXT,
+    cited_by_count INTEGER, references_count INTEGER, retracted INTEGER NOT NULL DEFAULT 0,
+    enrichment TEXT NOT NULL DEFAULT 'pending' CHECK (enrichment IN ('pending', 'done', 'missing')),
+    enrichment_attempts INTEGER NOT NULL DEFAULT 0, possible_duplicate_of INTEGER,
+    created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+  );
+  CREATE INDEX papers_title_norm ON papers (title_norm);
+  CREATE TABLE paper_ids (
+    paper_id INTEGER NOT NULL REFERENCES papers (id) ON DELETE CASCADE,
+    kind TEXT NOT NULL CHECK (kind IN ('doi', 'arxiv', 'pmid', 'pmcid', 'openalex', 's2')),
+    value TEXT NOT NULL, UNIQUE (kind, value)
+  );
+  CREATE INDEX paper_ids_paper ON paper_ids (paper_id);
+  CREATE TABLE paper_sources (
+    paper_id INTEGER NOT NULL REFERENCES papers (id) ON DELETE CASCADE, source TEXT NOT NULL,
+    external_id TEXT, fetched_at TEXT NOT NULL, UNIQUE (paper_id, source)
+  );
+  CREATE TABLE metadata_cache (key TEXT PRIMARY KEY, body_json TEXT NOT NULL, expires_at INTEGER NOT NULL);
+  CREATE TABLE citation_links (
+    citing_paper_id INTEGER NOT NULL REFERENCES papers (id) ON DELETE CASCADE,
+    cited_kind TEXT NOT NULL, cited_value TEXT NOT NULL, cited_paper_id INTEGER,
+    UNIQUE (citing_paper_id, cited_kind, cited_value)
+  );
+  CREATE INDEX citation_links_cited ON citation_links (cited_kind, cited_value);
+  CREATE TABLE facet_labels (
+    paper_id INTEGER NOT NULL REFERENCES papers (id) ON DELETE CASCADE, sentence_index INTEGER NOT NULL,
+    sentence TEXT NOT NULL, facet TEXT NOT NULL CHECK (facet IN ('background', 'method', 'result', 'other')),
+    confidence REAL NOT NULL, command_version INTEGER NOT NULL, UNIQUE (paper_id, sentence_index)
+  );
+  CREATE TABLE representations (
+    paper_id INTEGER NOT NULL REFERENCES papers (id) ON DELETE CASCADE,
+    kind TEXT NOT NULL CHECK (kind IN ('whole', 'background', 'method', 'result')),
+    model TEXT NOT NULL, dims INTEGER NOT NULL, created_at TEXT NOT NULL, UNIQUE (paper_id, kind)
+  );
+  CREATE TABLE embedding_calls (
+    id INTEGER PRIMARY KEY, model TEXT NOT NULL, inputs INTEGER NOT NULL, tokens INTEGER,
+    cost_usd REAL, cost_source TEXT NOT NULL, elapsed_ms INTEGER, error TEXT, created_at TEXT NOT NULL
+  );
+  `,
 ];
+
+export const VECTOR_KINDS = ["whole", "background", "method", "result"] as const;
+export type VectorKind = (typeof VECTOR_KINDS)[number];
+
+/**
+ * Create the sqlite-vec tables (vec_whole, vec_background, vec_method, vec_result) for `dims`, rowid = paper id.
+ * Returns true when they were (re)created, which happens on first start and when the dimension changes.
+ */
+export function ensureVectorTables(db: Db, dims: number): boolean {
+  const current = db.prepare("SELECT sql FROM sqlite_master WHERE name = 'vec_whole'").get() as { sql: string } | undefined;
+  if (current && current.sql.includes(`float[${dims}]`)) return false;
+  for (const kind of VECTOR_KINDS) {
+    db.exec(`DROP TABLE IF EXISTS vec_${kind}`);
+    db.exec(`CREATE VIRTUAL TABLE vec_${kind} USING vec0(embedding float[${dims}] distance_metric=cosine)`);
+  }
+  return true;
+}
 
 export interface SelfCheck {
   fts5: boolean;
