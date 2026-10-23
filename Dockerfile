@@ -1,5 +1,10 @@
-# Research Hub: one container serving the API and the built UI on port 4850. Data lives in the /data volume.
+# Research Hub: one container serving the API, the built UI and the knowledge-base viewer (Ignis, a supervised
+# child process on loopback, reached through the hub at /kb/) on port 4850. Data lives in the /data volume.
 # syntax=docker/dockerfile:1
+
+# 0. The knowledge-base viewer: a pinned Ignis release (AGPL-3.0, run unmodified as a separate program). It contains
+#    no Obsidian code; the hub downloads the pinned Obsidian package from Obsidian's official release on first start.
+FROM nobbe/ignis:0.8.18 AS ignis
 
 # 1. Build: install everything, type-check and build the UI.
 FROM node:24-slim AS build
@@ -33,7 +38,8 @@ ENV NODE_ENV=production \
     RH_HOST=0.0.0.0 \
     RH_PORT=4850 \
     RH_DATA_DIR=/data \
-    RH_ENV_FILE=none
+    RH_ENV_FILE=none \
+    RH_KB_VIEWER_DIR=/opt/ignis
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/package.json ./package.json
@@ -42,6 +48,7 @@ COPY packages ./packages
 COPY apps/rh-server ./apps/rh-server
 COPY --from=build /app/apps/rh-client-browser/dist ./apps/rh-client-browser/dist
 COPY --from=build /app/apps/rh-client-browser/package.json ./apps/rh-client-browser/package.json
+COPY --from=ignis /app /opt/ignis
 RUN mkdir -p /data && chown node:node /data
 USER node
 VOLUME ["/data"]

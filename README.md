@@ -5,10 +5,10 @@ durable agent (built on [pi-durable](https://github.com/earendil-works/pi)) that
 [Jev](https://openrouter.ai/docs/guides/community/jev) make the bulk decisions, present a few paper cards a day,
 learn from your 👎/👍/⭐ and grow an Obsidian-compatible knowledge base. A new theme is a new container.
 
-**Status: v0.4.** Durable agent, Jev client, live stream, browser UI and container setup (v0.0), the project's
+**Status: v0.5 (v0 complete).** Durable agent, Jev client, live stream, browser UI and container setup (v0.0), the project's
 brief, charter and schedule (v0.1), paper search with paper representations (v0.2), the daily sweep with paper cards
-(v0.3), and judging with learning from your feedback (v0.4). The knowledge base arrives next (see `PLAN.md` §17 and
-`openspec/changes/`).
+(v0.3), judging with learning from your feedback (v0.4), and the knowledge base with the real Obsidian interface
+inside the hub (v0.5). What comes after v0 is in `PLAN.md` §17.
 
 ## Quick start (offline, no keys)
 
@@ -116,6 +116,26 @@ foundation". Your judgments teach the next sweeps, without any extra model calls
 - **Precision@5**, the share of a sweep's top 5 cards you liked or starred among those you judged, is shown as a
   trend in the Feed.
 
+## The knowledge base
+
+Every ⭐ becomes an evidence note in the project's Obsidian vault (`$RH_DATA_DIR/vault/`): the librarian (the
+`reader` model) writes Summary, Contributions, Method, Results, Limitations and Open questions from the title and
+abstract only ("Not stated in the abstract" where they say nothing), and links the note to concept and research
+question pages; the hub fills in the properties (identifiers, year, venue, level, scores, your reason) and adds a
+line to `index.md` and `log.md`. **Your edits win:** the hub only creates notes and pages and appends under
+`## Related papers` / `## Papers`, to the index and to the log; `charter.md` is refreshed only while you have not
+edited it.
+
+- **Library** tab: knowledge-base papers, keyword search over the vault, and each note rendered.
+- **Knowledge base** tab: the real Obsidian interface (Ignis) inside the hub, in the hub's colors, light and dark,
+  opening on the index; it stays loaded when you switch tabs, and "Open in knowledge base" in the Library jumps to a
+  note. Edits you make there are searchable within seconds, and notes the hub writes appear without a reload.
+- The research desk always sees `index.md` and opens notes on demand (`search_kb`, `query_kb`): ask "which papers in
+  my knowledge base cover Q2?".
+- Settings: `RH_KB_VIEWER` (on/off), `RH_KB_VIEWER_DIR`, `RH_KB_OBSIDIAN_VERSION` (see `.env.example`). Ignis is
+  AGPL-3.0 and runs unmodified; Obsidian is downloaded from its official release on first start and is not part of
+  this project or its image.
+
 ## Projects with Docker
 
 Every research theme is its own container with its own data folder, port and name:
@@ -181,6 +201,8 @@ curl -s -X POST -H "authorization: Bearer $RH_API_TOKEN" -H 'content-type: appli
 | `GET/PUT /v1/sweep-settings` | Cards per sweep (1 to 15, default 7) |
 | `PUT/DELETE /v1/cards/:id/judgment` | Judge a card (`verdict` up, down or star; optional `reason`) · remove the judgment |
 | `GET /v1/weights` · `GET /v1/feedback/precision` | Effective weights with charter values · precision@5 per sweep |
+| `GET /v1/kb/papers` · `/v1/kb/notes/:stem` · `/v1/kb/search?q=` | Knowledge-base papers · one note (properties and body) · vault search |
+| `/kb/` (browser, same origin) | The embedded Obsidian viewer, proxied to the bundled Ignis |
 
 ## Development
 
