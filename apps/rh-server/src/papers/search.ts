@@ -22,6 +22,10 @@ export interface SearchRequest {
   limit?: number;
   /** Per-source time budget (interactive default 60 s). */
   budgetMs?: number;
+  /** Enrich from OpenAlex before returning (default true); the sweep enriches only gate survivors. */
+  enrich?: boolean;
+  /** Results asked of each source (default: `limit`); the sweep asks 10 per source and keeps them all. */
+  perSource?: number;
 }
 
 export interface SourceReport {
@@ -70,7 +74,8 @@ export class PaperSearch {
       throw new RangeError(`limit must be 1 to ${SEARCH_LIMIT_MAX}, got ${request.limit}`);
     const query = request.query.trim();
     if (!query) throw new RangeError("query must not be empty");
-    const q = { query, since: request.since, until: request.until, limit, budgetMs: request.budgetMs ?? 60_000 };
+    const perSource = Math.min(request.perSource ?? limit, SEARCH_LIMIT_MAX);
+    const q = { query, since: request.since, until: request.until, limit: perSource, budgetMs: request.budgetMs ?? 60_000 };
 
     const settled = await Promise.all(
       this.sources.map(async (source) => {
@@ -111,7 +116,7 @@ export class PaperSearch {
       }
 
     const ids = [...rank.keys()];
-    const enrichment = await this.enrich(ids, q.budgetMs);
+    const enrichment = request.enrich === false ? { done: 0, pending: 0 } : await this.enrich(ids, q.budgetMs);
     const papers = ids
       .map((id) => this.options.store.get(id))
       .filter((p): p is Paper => !!p && inWindow(p.publishedAt, request.since, request.until))

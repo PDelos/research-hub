@@ -22,6 +22,8 @@ import { CharterWriter } from "./charter-writer.ts";
 import type { PapersConfig, ScheduleDefaults } from "./config.ts";
 import { Scheduler } from "./schedule.ts";
 import { PaperService } from "./papers/service.ts";
+import { PaperDecisions } from "./sweep/decisions.ts";
+import { SweepRunner } from "./sweep/sweep.ts";
 import { paperTools } from "./papers/tool.ts";
 import { ensureVectorTables, openProjectDb, Settings, type Db, type SelfCheck } from "./db.ts";
 import type { Logger } from "./logger.ts";
@@ -72,6 +74,8 @@ export interface ProjectRuntime {
   readonly charterWriter: CharterWriter;
   readonly scheduler: Scheduler;
   readonly papers: PaperService;
+  readonly decisions: PaperDecisions;
+  readonly sweeps: SweepRunner;
   model(): Promise<{ id: string; window: number }>;
   compaction(): CompactionSetting & { window: number };
   setCompaction(next: Partial<CompactionSetting>): CompactionSetting;
@@ -102,6 +106,8 @@ export async function openProject(options: {
   openrouterKey?: string;
   /** Tests: the fetch used for paper sources and embeddings. */
   paperFetch?: typeof fetch;
+  /** Pick up requested sweeps (default true). */
+  runSweeps?: boolean;
 }): Promise<ProjectRuntime> {
   const { name, catalog, log } = options;
   const dir = options.dataDir;
@@ -144,6 +150,12 @@ export async function openProject(options: {
     jevLedger,
     log: plog,
     fetch: options.paperFetch,
+  });
+  const decisions = new PaperDecisions({ db, jevDir, decide: (s, q, o) => options.jev.systemOne(s, q, o), ledger: jevLedger });
+  const sweeps = new SweepRunner({ db, settings, charters, papers, decisions, log: plog });
+  const runSweeps = options.runSweeps !== false;
+  const unsubscribeSweeps = scheduler.onRequested((run) => {
+    if (run.kind === "sweep" && runSweeps) sweeps.pickUp();
   });
   const agents = createAgents({
     promptsDir: options.promptsDir,
@@ -188,6 +200,7 @@ export async function openProject(options: {
   harness.harness.resume();
   charterWriter.attach(harness.harness, ctx);
   papers.start();
+  if (runSweeps) sweeps.pickUp();
 
   plog.info("project.opened", { dir, rootConversation: root.id, model: (await model()).id, check });
 
@@ -210,6 +223,8 @@ export async function openProject(options: {
     charterWriter,
     scheduler,
     papers,
+    decisions,
+    sweeps,
     model,
     compaction: () => ({ ...compaction, window }),
     setCompaction(next) {
@@ -238,6 +253,8 @@ export async function openProject(options: {
     },
     async close() {
       scheduler.stop();
+      unsubscribeSweeps();
+      await sweeps.close();
       await papers.close();
       stopProjector();
       await harness.close();

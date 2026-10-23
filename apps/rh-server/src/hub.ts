@@ -22,6 +22,8 @@ export interface HubOptions {
   ticker?: boolean;
   /** The fetch used for paper sources and embeddings (tests). Offline mode otherwise uses synthetic responses. */
   paperFetch?: typeof fetch;
+  /** Run requested sweeps (default true; scheduler-only tests turn it off). */
+  sweeps?: boolean;
 }
 
 export class Hub {
@@ -78,6 +80,7 @@ export class Hub {
         offline: this.config.mode === "offline",
         openrouterKey: this.config.openrouterKey,
         paperFetch: this.options.paperFetch,
+        runSweeps: this.options.sweeps !== false,
       });
       if (this.options.ticker !== false) this.opened.scheduler.start();
     } catch (error) {

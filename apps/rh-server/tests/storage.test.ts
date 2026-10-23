@@ -38,7 +38,7 @@ test("migrations run once: reopening keeps data and the schema version", () => {
     first.db.close();
     const second = openProjectDb(path);
     assert.equal((second.db.prepare("SELECT value FROM settings WHERE key = 'k'").get() as any).value, "1");
-    assert.equal((second.db.prepare("PRAGMA user_version").get() as any).user_version, 3);
+    assert.equal((second.db.prepare("PRAGMA user_version").get() as any).user_version, 4);
     second.db.close();
   } finally {
     t.cleanup();
@@ -53,13 +53,13 @@ test("migration 2 upgrades a version-1 database and keeps its telemetry rows", a
     // A v0.0 database: migration 1 only, with one run recorded.
     const first = openProjectDb(path);
     first.db.prepare("INSERT INTO agent_runs (run_entry_id, conversation_id, text, started_at) VALUES (7, 1, 'old run', 1)").run();
-    first.db.exec("DROP TABLE papers; DROP TABLE paper_ids; DROP TABLE paper_sources; DROP TABLE metadata_cache; DROP TABLE citation_links; DROP TABLE facet_labels; DROP TABLE representations; DROP TABLE embedding_calls; DROP TABLE charters; DROP TABLE scoping_questions; DROP TABLE scheduled_runs; PRAGMA user_version = 1;");
+    first.db.exec("DROP TABLE sweep_papers; DROP TABLE paper_decisions; DROP TABLE cards; DROP TABLE sweeps; ALTER TABLE papers DROP COLUMN categories_json; ALTER TABLE jev_calls DROP COLUMN tag; ALTER TABLE embedding_calls DROP COLUMN tag; DROP TABLE papers; DROP TABLE paper_ids; DROP TABLE paper_sources; DROP TABLE metadata_cache; DROP TABLE citation_links; DROP TABLE facet_labels; DROP TABLE representations; DROP TABLE embedding_calls; DROP TABLE charters; DROP TABLE scoping_questions; DROP TABLE scheduled_runs; PRAGMA user_version = 1;");
     first.db.close();
     const raw = new DatabaseSync(path);
     assert.equal((raw.prepare("PRAGMA user_version").get() as any).user_version, 1);
     raw.close();
     const second = openProjectDb(path);
-    assert.equal((second.db.prepare("PRAGMA user_version").get() as any).user_version, 3);
+    assert.equal((second.db.prepare("PRAGMA user_version").get() as any).user_version, 4);
     assert.equal((second.db.prepare("SELECT text FROM agent_runs WHERE run_entry_id = 7").get() as any).text, "old run");
     const insert = second.db.prepare("INSERT OR IGNORE INTO scheduled_runs (kind, slot, trigger, status, created_at) VALUES ('sweep', 'sweep:2026-10-23', 'scheduled', 'requested', 'now')");
     insert.run();
@@ -76,12 +76,35 @@ test("migration 3 upgrades a version-2 database and keeps its settings", async (
     const path = join(t.dir, "project.sqlite");
     const first = openProjectDb(path);
     first.db.prepare("INSERT INTO settings (key, value, updated_at) VALUES ('kept', '\"yes\"', 'now')").run();
-    first.db.exec("DROP TABLE papers; DROP TABLE paper_ids; DROP TABLE paper_sources; DROP TABLE metadata_cache; DROP TABLE citation_links; DROP TABLE facet_labels; DROP TABLE representations; DROP TABLE embedding_calls; PRAGMA user_version = 2;");
+    first.db.exec("DROP TABLE sweep_papers; DROP TABLE paper_decisions; DROP TABLE cards; DROP TABLE sweeps; ALTER TABLE papers DROP COLUMN categories_json; ALTER TABLE jev_calls DROP COLUMN tag; ALTER TABLE embedding_calls DROP COLUMN tag; DROP TABLE papers; DROP TABLE paper_ids; DROP TABLE paper_sources; DROP TABLE metadata_cache; DROP TABLE citation_links; DROP TABLE facet_labels; DROP TABLE representations; DROP TABLE embedding_calls; PRAGMA user_version = 2;");
     first.db.close();
     const second = openProjectDb(path);
-    assert.equal((second.db.prepare("PRAGMA user_version").get() as any).user_version, 3);
+    assert.equal((second.db.prepare("PRAGMA user_version").get() as any).user_version, 4);
     assert.ok(second.db.prepare("SELECT 1 FROM sqlite_master WHERE name = 'papers'").get());
     assert.equal((second.db.prepare("SELECT value FROM settings WHERE key = 'kept'").get() as any).value, '"yes"');
+    second.db.close();
+  } finally {
+    t.cleanup();
+  }
+});
+
+test("migration 4 upgrades a version-3 database: sweep tables, categories and cost tags", () => {
+  const t = tempDir();
+  try {
+    const path = join(t.dir, "project.sqlite");
+    const first = openProjectDb(path);
+    first.db.prepare("INSERT INTO papers (title, title_norm, created_at, updated_at) VALUES ('Kept', 'kept', 'now', 'now')").run();
+    first.db.exec("DROP TABLE sweep_papers; DROP TABLE paper_decisions; DROP TABLE cards; DROP TABLE sweeps; ALTER TABLE papers DROP COLUMN categories_json; ALTER TABLE jev_calls DROP COLUMN tag; ALTER TABLE embedding_calls DROP COLUMN tag; PRAGMA user_version = 3;");
+    first.db.close();
+    const second = openProjectDb(path);
+    assert.equal((second.db.prepare("PRAGMA user_version").get() as any).user_version, 4);
+    for (const table of ["sweeps", "sweep_papers", "paper_decisions", "cards"])
+      assert.ok(second.db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(table), table);
+    const columns = (table: string) => (second.db.prepare(`PRAGMA table_info(${table})`).all() as any[]).map((c) => c.name);
+    assert.ok(columns("papers").includes("categories_json"));
+    assert.ok(columns("jev_calls").includes("tag"));
+    assert.ok(columns("embedding_calls").includes("tag"));
+    assert.equal((second.db.prepare("SELECT title FROM papers").get() as any).title, "Kept");
     second.db.close();
   } finally {
     t.cleanup();

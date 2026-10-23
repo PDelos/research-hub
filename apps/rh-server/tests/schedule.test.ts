@@ -43,8 +43,9 @@ test("5.1 schedule configuration is validated", () => {
   assert.deepEqual(loadConfig({ ...base, RH_REVIEW_TIME: "Wed 08:30" }).schedule.review, { weekday: "wed", time: "08:30" });
 });
 
+// These tests check the schedule's records only; the sweep runner (v0.3) is off so requested slots stay requested.
 async function activeServer(env: Record<string, string> = {}, dataDir?: string): Promise<TestServer> {
-  const server = await startTestServer({ env, dataDir, hub: { ticker: false } });
+  const server = await startTestServer({ env, dataDir, hub: { ticker: false, sweeps: false } });
   const project = server.hub.project;
   if (!project.charters.approved()) {
     project.brief.write("# Protein LMs");

@@ -29,6 +29,7 @@ const arxivPreprint: SourcePaper = {
   publishedAt: "2024-01-03",
   server: "arXiv",
   url: "https://arxiv.org/abs/2401.01234",
+  categories: ["q-bio.BM", "cs.LG"],
 };
 
 test(
@@ -55,6 +56,7 @@ test(
     assert.deepEqual(paper.sources, ["arxiv", "openalex"]);
     assert.equal(paper.venue, "Nature Methods");
     assert.equal(paper.server, "arXiv");
+    assert.deepEqual(paper.categories, ["q-bio.BM", "cs.LG"], "arXiv categories are stored and kept through the merge");
     assert.equal(paper.publishedAt, "2024-01-03", "the earliest appearance is kept");
     assert.equal(paper.citedByCount, 42);
     assert.equal(paper.authors.length, 3);

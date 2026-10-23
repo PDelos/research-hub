@@ -29,6 +29,8 @@ export interface SourcePaper {
   retracted?: boolean;
   /** Referenced works (OpenAlex IDs) when the source lists them. */
   references?: string[];
+  /** arXiv categories ("cs.LG", "q-bio.BM"), primary first. */
+  categories?: string[];
 }
 
 export interface Paper {
@@ -51,6 +53,8 @@ export interface Paper {
   /** No abstract: represented from the title alone. */
   titleOnly: boolean;
   possibleDuplicateOf?: number;
+  /** arXiv categories, primary first (empty when not from arXiv). */
+  categories: string[];
   sources: SourceName[];
   createdAt: string;
   updatedAt: string;
@@ -166,9 +170,9 @@ export class PaperStore {
     const result = this.db
       .prepare(
         `INSERT INTO papers (title, title_norm, abstract, authors_json, year, published_at, venue, server, oa_url, url,
-           cited_by_count, references_count, retracted, created_at, updated_at)
+           cited_by_count, references_count, retracted, categories_json, created_at, updated_at)
          VALUES (:title, :title_norm, :abstract, :authors_json, :year, :published_at, :venue, :server, :oa_url, :url,
-           :cited_by_count, :references_count, :retracted, :now, :now)`,
+           :cited_by_count, :references_count, :retracted, :categories_json, :now, :now)`,
       )
       .run(
         bind({
@@ -185,6 +189,7 @@ export class PaperStore {
           cited_by_count: p.citedByCount,
           references_count: p.referencesCount,
           retracted: p.retracted ?? false,
+          categories_json: p.categories?.length ? JSON.stringify(p.categories) : null,
           now,
         }),
       );
@@ -213,6 +218,7 @@ export class PaperStore {
       next.year = Number(p.publishedAt.slice(0, 4));
     } else if (!row.year && p.year) next.year = p.year;
     if (p.abstract && p.abstract.length > (row.abstract?.length ?? 0)) next.abstract = p.abstract;
+    if (p.categories?.length && !row.categories_json) next.categories_json = JSON.stringify(p.categories);
     if (p.authors.length > (JSON.parse(row.authors_json) as string[]).length) next.authors_json = JSON.stringify(p.authors);
     if (!row.title && p.title) {
       next.title = p.title;
@@ -251,6 +257,7 @@ export class PaperStore {
       citedByCount: source.citedByCount,
       referencesCount: source.referencesCount,
       retracted: source.retracted || undefined,
+      categories: source.categories,
     });
     if (source.enrichment === "done") this.db.prepare("UPDATE papers SET enrichment = 'done' WHERE id = ?").run(into);
     this.clearRepresentations(from);
@@ -321,6 +328,7 @@ export class PaperStore {
       enrichmentAttempts: Number(row.enrichment_attempts),
       titleOnly: !row.abstract,
       possibleDuplicateOf: opt(row.possible_duplicate_of),
+      categories: row.categories_json ? (JSON.parse(row.categories_json) as string[]) : [],
       sources,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
@@ -346,6 +354,7 @@ interface PaperRow {
   enrichment: Enrichment;
   enrichment_attempts: number;
   possible_duplicate_of: number | null;
+  categories_json: string | null;
   created_at: string;
   updated_at: string;
 }

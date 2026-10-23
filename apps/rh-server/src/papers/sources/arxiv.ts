@@ -48,6 +48,10 @@ export function parseArxivFeed(xml: string): SourcePaper[] {
     const title = cleanText(text(entry.title));
     if (!title) continue;
     const pdf = (entry.link ?? []).find((l: any) => l.title === "pdf")?.href;
+    const primary = entry["arxiv:primary_category"]?.term as string | undefined;
+    const categories = [primary, ...(entry.category ?? []).map((c: any) => c.term as string)].filter(
+      (c, i, all): c is string => !!c && all.indexOf(c) === i,
+    );
     out.push({
       source: "arxiv",
       externalId: id,
@@ -59,6 +63,7 @@ export function parseArxivFeed(xml: string): SourcePaper[] {
       server: "arXiv",
       oaUrl: pdf,
       url: `https://arxiv.org/abs/${id}`,
+      categories,
     });
   }
   return out;

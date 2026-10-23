@@ -52,7 +52,8 @@ export class PaperService {
       fetch: options.fetch ?? (offline ? offlinePaperFetch() : undefined),
       contactEmail: config.contactEmail,
       log,
-      ...(offline && !options.fetch ? { pacing: { "export.arxiv.org": 0 } } : {}),
+      // Offline mode never reaches the real APIs, so there is nothing to pace.
+      ...(offline ? { pacing: { "export.arxiv.org": 0, "api.openalex.org": 0, "www.ebi.ac.uk": 0, "api.semanticscholar.org": 0 } } : {}),
     });
     this.search = new PaperSearch({ store: this.store, cache: this.cache, http, s2ApiKey: offline ? undefined : config.s2ApiKey, log });
     const embedder =

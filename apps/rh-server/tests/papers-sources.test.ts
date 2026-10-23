@@ -22,6 +22,7 @@ test("arXiv: id, title, abstract, authors and date from the Atom feed; the windo
   assert.equal(first.publishedAt, "2026-10-19");
   assert.equal(first.server, "arXiv");
   assert.equal(first.url, "https://arxiv.org/abs/2610.26747");
+  assert.deepEqual(first.categories, ["cs.LG", "cs.AI", "cs.CL"], "primary category first");
 
   const fake = fakeFetch(recorded);
   const arxiv = new ArxivSource({ http: new PoliteHttp({ fetch: fake.fetch, pacing: noPacing }) });

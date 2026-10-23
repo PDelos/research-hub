@@ -149,6 +149,7 @@ const CATCH_UP_LIMIT = 60;
 
 export class Scheduler {
   private timer?: ReturnType<typeof setInterval>;
+  private readonly requestedListeners = new Set<(run: ScheduledRun) => void>();
 
   constructor(
     private readonly deps: {
@@ -160,6 +161,12 @@ export class Scheduler {
       log: Logger;
     },
   ) {}
+
+  /** Called after a run is recorded as requested (the sweep runner picks sweeps up from here). */
+  onRequested(listener: (run: ScheduledRun) => void): () => void {
+    this.requestedListeners.add(listener);
+    return () => this.requestedListeners.delete(listener);
+  }
 
   schedule(): ScheduleSettings {
     const d = this.deps.defaults;
@@ -226,6 +233,16 @@ export class Scheduler {
     if (Number(res.changes) === 0) return undefined;
     const run = toRun(this.deps.db.prepare("SELECT * FROM scheduled_runs WHERE id = ?").get(Number(res.lastInsertRowid)));
     this.deps.log.info("schedule.recorded", { kind: run.kind, slot: run.slot, status: run.status, reason: run.reason });
+    if (run.status === "requested")
+      queueMicrotask(() => {
+        for (const listener of this.requestedListeners) {
+          try {
+            listener(run);
+          } catch (error) {
+            this.deps.log.error("schedule.listener_failed", { error: String(error) });
+          }
+        }
+      });
     return run;
   }
 

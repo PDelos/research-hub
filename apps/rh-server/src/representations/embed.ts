@@ -2,6 +2,7 @@
 // per call, each call recorded with tokens and cost in embedding_calls. Offline mode uses a deterministic fake whose
 // vectors overlap when texts share words, so tests can assert similarity ordering without the network.
 import { createHash } from "node:crypto";
+import { currentCostTag } from "../cost-tag.ts";
 import { nowIso, type Db } from "../db.ts";
 import { PoliteHttp } from "../papers/http.ts";
 
@@ -32,9 +33,9 @@ export class EmbeddingLedger {
   record(call: EmbeddingCall): void {
     this.db
       .prepare(
-        "INSERT INTO embedding_calls (model, inputs, tokens, cost_usd, cost_source, elapsed_ms, error, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO embedding_calls (model, inputs, tokens, cost_usd, cost_source, elapsed_ms, error, tag, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
       )
-      .run(call.model, call.inputs, call.tokens ?? null, call.costUsd ?? null, call.costSource, call.elapsedMs, call.error ?? null, nowIso());
+      .run(call.model, call.inputs, call.tokens ?? null, call.costUsd ?? null, call.costSource, call.elapsedMs, call.error ?? null, currentCostTag() ?? null, nowIso());
   }
 
   totals(sinceIso?: string): { calls: number; inputs: number; tokens: number; usd: number } {

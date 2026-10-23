@@ -3,8 +3,28 @@
     "version": 1,
     "sha256": "0b386dcda812f533ef3e6e87882261005da7d294dc7efa86ced26dc896fa0e2c"
   },
+  "importance": {
+    "version": 1,
+    "sha256": "b6d552cc2c2b36848651b8ea6e3377d37bd42dd0fbdf35f7247b5776056ceed0"
+  },
+  "level": {
+    "version": 1,
+    "sha256": "302b043441344f35489a52bcef82496dfafbbf400433a59157221da2e614a264"
+  },
+  "on-theme": {
+    "version": 1,
+    "sha256": "65570d8653f19c16670fa5f9cca8474c78e2b3872e98bf7a0a539bb89fb2ad2c"
+  },
+  "paper-kind": {
+    "version": 1,
+    "sha256": "b03935e6f9941e282d0a413c4b7ae84d9438da4e787bdb74a6b4f0c63a1a332e"
+  },
   "ping": {
     "version": 1,
     "sha256": "9b07a3e94434ce07d243c7f19b42b1ced6bce31e0a2edb640918865ad10f667d"
+  },
+  "worth-reading": {
+    "version": 1,
+    "sha256": "92c4564b48e55583507fbc2a77a959d9ac0c8e9873cbb5154fef6e2e753203cd"
   }
 }

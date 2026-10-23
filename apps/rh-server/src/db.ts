@@ -113,6 +113,42 @@ const MIGRATIONS: string[] = [
     cost_usd REAL, cost_source TEXT NOT NULL, elapsed_ms INTEGER, error TEXT, created_at TEXT NOT NULL
   );
   `,
+  // 4 (v0-3-daily-sweep): sweeps, per-paper sweep state, stored Jev decisions, cards, arXiv categories, cost tags.
+  `
+  CREATE TABLE sweeps (
+    id INTEGER PRIMARY KEY, scheduled_run_id INTEGER, trigger TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('running', 'completed', 'no_new_papers', 'failed')),
+    phase TEXT NOT NULL, orientation INTEGER NOT NULL DEFAULT 0, queries_json TEXT NOT NULL DEFAULT '[]',
+    window_since TEXT, counts_json TEXT NOT NULL DEFAULT '{}', phases_json TEXT NOT NULL DEFAULT '{}',
+    attempts INTEGER NOT NULL DEFAULT 0, next_retry_at INTEGER, error TEXT,
+    conversation_id INTEGER, submission_id INTEGER, completion_json TEXT, cost_json TEXT,
+    started_at TEXT NOT NULL, ended_at TEXT
+  );
+  CREATE TABLE sweep_papers (
+    sweep_id INTEGER NOT NULL REFERENCES sweeps (id) ON DELETE CASCADE,
+    paper_id INTEGER NOT NULL REFERENCES papers (id) ON DELETE CASCADE,
+    status TEXT NOT NULL CHECK (status IN ('new', 'rejected', 'gated', 'ranked_out', 'candidate', 'presented', 'skipped', 'blocked')),
+    reason TEXT, borderline INTEGER NOT NULL DEFAULT 0, relevance REAL, matched_question TEXT, kind TEXT,
+    worth REAL, novelty REAL, level TEXT, prereq_heavy REAL, importance REAL, rank_score REAL, rank INTEGER,
+    UNIQUE (sweep_id, paper_id)
+  );
+  CREATE INDEX sweep_papers_paper ON sweep_papers (paper_id, status);
+  CREATE TABLE paper_decisions (
+    paper_id INTEGER NOT NULL REFERENCES papers (id) ON DELETE CASCADE, command TEXT NOT NULL, version INTEGER NOT NULL,
+    answers_json TEXT NOT NULL, created_at TEXT NOT NULL, UNIQUE (paper_id, command, version)
+  );
+  CREATE TABLE cards (
+    id INTEGER PRIMARY KEY, paper_id INTEGER NOT NULL UNIQUE REFERENCES papers (id) ON DELETE CASCADE,
+    sweep_id INTEGER NOT NULL REFERENCES sweeps (id), rank INTEGER, summary TEXT NOT NULL,
+    relevance INTEGER NOT NULL, relevance_reason TEXT NOT NULL, trust INTEGER NOT NULL, trust_reason TEXT NOT NULL,
+    value INTEGER NOT NULL, value_reason TEXT NOT NULL, level TEXT NOT NULL, matched_question TEXT,
+    borderline INTEGER NOT NULL DEFAULT 0, details_json TEXT NOT NULL, created_at TEXT NOT NULL
+  );
+  CREATE INDEX cards_sweep ON cards (sweep_id);
+  ALTER TABLE papers ADD COLUMN categories_json TEXT;
+  ALTER TABLE jev_calls ADD COLUMN tag TEXT;
+  ALTER TABLE embedding_calls ADD COLUMN tag TEXT;
+  `,
 ];
 
 export const VECTOR_KINDS = ["whole", "background", "method", "result"] as const;

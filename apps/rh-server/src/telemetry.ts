@@ -2,6 +2,7 @@
 // view reads runs, their model calls, tool calls, tokens and cost. Jev calls are recorded alongside.
 // A run starts at a user input entry; generations and tool calls in that conversation belong to the latest run.
 // Adapted from disler/pi-durable-news-agent's telemetry repo, without its sweep bookkeeping.
+import { currentCostTag } from "./cost-tag.ts";
 import type {
   ConversationTelemetry,
   GenerationTelemetry,
@@ -233,9 +234,9 @@ export class Telemetry implements TelemetryStore {
     this.db
       .prepare(
         `INSERT INTO jev_calls (command, version, provider, model, questions, answers_json, input_tokens, output_tokens,
-           cost_usd, cost_source, elapsed_ms, attempts, error, created_at)
+           cost_usd, cost_source, elapsed_ms, attempts, error, tag, created_at)
          VALUES (:command, :version, :provider, :model, :questions, :answers, :input, :output, :cost, :source, :elapsed,
-           :attempts, :error, :now)`,
+           :attempts, :error, :tag, :now)`,
       )
       .run(
         bind({
@@ -252,6 +253,7 @@ export class Telemetry implements TelemetryStore {
           elapsed: rec.elapsedMs,
           attempts: rec.attempts,
           error: rec.error,
+          tag: currentCostTag(),
           now: nowIso(),
         }),
       );
