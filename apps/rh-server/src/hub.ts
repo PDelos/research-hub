@@ -26,6 +26,8 @@ export interface HubOptions {
   sweeps?: boolean;
   /** Answer Jev questions with this instead of the Jev client (tests). */
   jevDecide?: Decide;
+  /** Override the viewer settings (tests: a fake viewer directory, restart delays). */
+  kbViewer?: Partial<{ enabled: boolean; dir: string; obsidianVersion: string; restartDelays: number[] }>;
 }
 
 export class Hub {
@@ -84,6 +86,7 @@ export class Hub {
         paperFetch: this.options.paperFetch,
         runSweeps: this.options.sweeps !== false,
         decide: this.options.jevDecide,
+        kbViewer: { ...this.config.kbViewer, ...(this.options.kbViewer ?? {}) },
       });
       if (this.options.ticker !== false) this.opened.scheduler.start();
     } catch (error) {
@@ -91,6 +94,11 @@ export class Hub {
       this.owner = undefined;
       throw error;
     }
+    return this.opened;
+  }
+
+  /** The open project, or undefined before open() or after close(). */
+  get current(): ProjectRuntime | undefined {
     return this.opened;
   }
 

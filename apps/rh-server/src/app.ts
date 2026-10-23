@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import express from "express";
 import { identify, uiProxy } from "./auth.ts";
+import { kbProxy } from "./kb/proxy.ts";
 import { errorMiddleware, notFound } from "./errors.ts";
 import type { Hub } from "./hub.ts";
 import { routes } from "./routes.ts";
@@ -15,6 +16,9 @@ export function createHttpApp(hub: Hub) {
   const { config, log } = hub;
   const http = express();
   http.disable("x-powered-by");
+  // The knowledge-base viewer's paths go straight to it (streamed, before body parsing).
+  const viewer = () => hub.current?.kbViewer;
+  http.use(kbProxy(viewer, config.allowedHosts));
   http.use(uiProxy({ clientToken: config.clientToken, allowedHosts: config.allowedHosts }));
   http.use(express.json({ limit: "256kb" }));
   http.use(identify({ api: config.apiToken, client: config.clientToken }));
@@ -31,6 +35,8 @@ export function createHttpApp(hub: Hub) {
     http.get("/", sendPage);
     http.get("/index.html", sendPage);
     http.use(express.static(config.uiDir, { index: false, maxAge: "1h" }));
+    // /assets/ the hub does not have belong to the viewer.
+    http.use(kbProxy(viewer, config.allowedHosts, "assets"));
     http.get(/^\/(?!v1\/|ui\/).*/, sendPage);
   } else {
     log.warn("ui.missing", { uiDir: config.uiDir, hint: "npm run build -w rh-client-browser" });

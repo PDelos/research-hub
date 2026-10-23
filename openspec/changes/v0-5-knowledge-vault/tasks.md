@@ -12,7 +12,7 @@
 
 ## 3. Viewer
 
-- [ ] 3.1 Implement the viewer supervisor (Obsidian download, loopback preload, restart, status in `/v1/info`, `RH_KB_VIEWER`, `RH_KB_VIEWER_DIR`, `RH_KB_OBSIDIAN_VERSION`) and the same-origin proxy with the UI guard (HTTP and WebSocket); verify with a fake viewer: proxying, cross-site refused, loopback only, crash restart within 10 s, disabled and unavailable states
+- [x] 3.1 Implement the viewer supervisor (Obsidian download, loopback preload, restart, status in `/v1/info`, `RH_KB_VIEWER`, `RH_KB_VIEWER_DIR`, `RH_KB_OBSIDIAN_VERSION`) and the same-origin proxy with the UI guard (HTTP and WebSocket); verify with a fake viewer: proxying, cross-site refused, loopback only, crash restart within 10 s, disabled and unavailable states
 - [ ] 3.2 Add the Library API (`/v1/kb/papers`, `/v1/kb/notes/:stem`, `/v1/kb/search`) and SDK methods; verify API tests
 - [ ] 3.3 Build the Library tab and the Knowledge base tab (kept mounted, loading and off states, require hand-off, open a note) and the hub theme template; verify `npm run build` and the UI test
 

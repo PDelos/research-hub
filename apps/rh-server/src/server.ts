@@ -4,6 +4,7 @@ import type { AddressInfo } from "node:net";
 import { createHttpApp } from "./app.ts";
 import type { Config } from "./config.ts";
 import { Hub, type HubOptions } from "./hub.ts";
+import { kbUpgrade } from "./kb/proxy.ts";
 import type { Logger } from "./logger.ts";
 
 export interface Server {
@@ -41,6 +42,14 @@ export async function startServer(config: Config, log: Logger, options: HubOptio
     throw error;
   }
   server.keepAliveTimeout = 65_000;
+  // Upgraded (WebSocket) connections are not closed by server.close(); track them and end them on stop.
+  const upgraded = new Set<import("node:net").Socket>();
+  const upgrade = kbUpgrade(() => hub.current?.kbViewer, config.allowedHosts);
+  server.on("upgrade", (req, socket, head) => {
+    upgraded.add(socket as import("node:net").Socket);
+    socket.on("close", () => upgraded.delete(socket as import("node:net").Socket));
+    upgrade(req, socket as import("node:net").Socket, head);
+  });
   const port = (server.address() as AddressInfo).port;
   let stopping: Promise<void> | undefined;
   return {
@@ -51,6 +60,7 @@ export async function startServer(config: Config, log: Logger, options: HubOptio
       stopping ??= (async () => {
         streams.closeAll();
         server.closeIdleConnections();
+        for (const socket of upgraded) socket.destroy();
         await new Promise<void>((resolve) => server.close(() => resolve()));
         await hub.close();
       })();

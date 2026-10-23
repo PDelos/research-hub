@@ -31,6 +31,7 @@ import { feedbackTools } from "./feedback/tools.ts";
 import { Vault } from "./kb/vault.ts";
 import { Ingest } from "./kb/ingest.ts";
 import { KbIndex } from "./kb/search.ts";
+import { KbViewer } from "./kb/viewer.ts";
 import { kbTools } from "./kb/tools.ts";
 import { CardWriter } from "./sweep/card-writer.ts";
 import { paperTools } from "./papers/tool.ts";
@@ -91,6 +92,7 @@ export interface ProjectRuntime {
   readonly vault: Vault;
   readonly ingest: Ingest;
   readonly kbIndex: KbIndex;
+  readonly kbViewer: KbViewer;
   /** Create the vault and refresh charter.md after a charter approval. */
   syncVault(): void;
   readonly cardWriter: CardWriter;
@@ -128,6 +130,7 @@ export async function openProject(options: {
   runSweeps?: boolean;
   /** Tests: answer Jev questions with this instead of the Jev client. */
   decide?: Decide;
+  kbViewer?: { enabled: boolean; dir: string; obsidianVersion: string; restartDelays?: number[] };
 }): Promise<ProjectRuntime> {
   const { name, catalog, log } = options;
   const dir = options.dataDir;
@@ -202,6 +205,17 @@ export async function openProject(options: {
   });
   sweeps.setCardStage(cardWriter);
   const kbIndex = new KbIndex({ db, vault, log: plog });
+  const kbViewer = new KbViewer({
+    enabled: options.kbViewer?.enabled ?? false,
+    ignisDir: options.kbViewer?.dir ?? "/opt/ignis",
+    stateDir: join(dir, "kb-viewer"),
+    vaultDir: vault.dir,
+    projectName: name,
+    obsidianVersion: options.kbViewer?.obsidianVersion ?? "1.14.4",
+    offline: options.offline,
+    log: plog.child({ component: "kb-viewer" }),
+    restartDelays: options.kbViewer?.restartDelays,
+  });
   const ingest = new Ingest({
     db, vault, store: papers.store, cards, feedback, charters, catalog, promptsDir: options.promptsDir, log: plog, observe,
   });
@@ -257,6 +271,7 @@ export async function openProject(options: {
   ingest.attach(harness.harness, ctx);
   ingest.pickUp();
   kbIndex.start();
+  void kbViewer.start();
   papers.start();
   if (runSweeps) sweeps.pickUp();
   void reasons.parsePending();
@@ -290,10 +305,12 @@ export async function openProject(options: {
     vault,
     ingest,
     kbIndex,
+    kbViewer,
     syncVault() {
       syncVault();
       kbIndex.start();
       ingest.pickUp();
+      void kbViewer.start();
     },
     cardWriter,
     model,
@@ -326,6 +343,7 @@ export async function openProject(options: {
       scheduler.stop();
       await ingest.close();
       kbIndex.stop();
+      await kbViewer.stop();
       unsubscribeSweeps();
       await sweeps.close();
       await papers.close();

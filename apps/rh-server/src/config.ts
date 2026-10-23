@@ -43,6 +43,8 @@ export interface Config {
   allowedHosts: Set<string>;
   /** Paper sources and representations (v0.2). */
   papers: PapersConfig;
+  /** The embedded Obsidian viewer (v0.5). */
+  kbViewer: { enabled: boolean; dir: string; obsidianVersion: string };
 }
 
 export interface PapersConfig {
@@ -124,6 +126,12 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     embedDims,
     s2ApiKey: env.S2_API_KEY?.trim() || undefined,
   };
+  const viewerFlag = (env.RH_KB_VIEWER?.trim() || "on").toLowerCase();
+  if (!["on", "off"].includes(viewerFlag)) throw new ConfigError(`RH_KB_VIEWER must be on or off, got "${env.RH_KB_VIEWER}"`, "RH_KB_VIEWER");
+  const obsidianVersion = env.RH_KB_OBSIDIAN_VERSION?.trim() || "1.14.4";
+  if (!/^\d+\.\d+\.\d+$/.test(obsidianVersion))
+    throw new ConfigError(`RH_KB_OBSIDIAN_VERSION must look like 1.14.4, got "${obsidianVersion}"`, "RH_KB_OBSIDIAN_VERSION");
+  const kbViewer = { enabled: viewerFlag === "on", dir: resolve(REPO_ROOT, env.RH_KB_VIEWER_DIR?.trim() || "/opt/ignis"), obsidianVersion };
   const generatedTokens: string[] = [];
   const token = (name: string) => {
     const value = env[name]?.trim();
@@ -162,6 +170,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     allowedHosts,
     schedule: { timeZone, sweepTime, review: { weekday: weekday as Weekday, time: reviewTime } },
     papers,
+    kbViewer,
   };
 }
 

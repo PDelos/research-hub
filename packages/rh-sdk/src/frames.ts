@@ -78,6 +78,15 @@ export interface Info extends Health {
   models: Record<string, string>;
   jevModel: string;
   uptimeMs: number;
+  kbViewer: KbViewerStatus;
+}
+
+export interface KbViewerStatus {
+  state: "disabled" | "unavailable" | "starting" | "running" | "crashed";
+  reason?: string;
+  ignisVersion?: string;
+  obsidianVersion: string;
+  restarts: number;
 }
 
 export interface SendResult {

@@ -4,14 +4,12 @@
 const net = require("node:net");
 const listen = net.Server.prototype.listen;
 net.Server.prototype.listen = function (...args) {
-  if (typeof args[0] === "number" || (typeof args[0] === "string" && /^\d+$/.test(args[0]))) {
-    const port = Number(args[0]);
-    const rest = args.slice(1).filter((a) => typeof a === "function" || (typeof a === "number" && false));
+  const first = args[0];
+  if (typeof first === "number" || (typeof first === "string" && /^\d+$/.test(first))) {
     const callback = args.find((a) => typeof a === "function");
-    return listen.call(this, { port, host: "127.0.0.1" }, callback);
+    return listen.call(this, { port: Number(first), host: "127.0.0.1" }, callback);
   }
-  if (args[0] && typeof args[0] === "object" && !Array.isArray(args[0]) && "port" in args[0]) {
-    return listen.call(this, { ...args[0], host: "127.0.0.1" }, ...args.slice(1));
-  }
+  if (first && typeof first === "object" && !Array.isArray(first) && "port" in first)
+    return listen.call(this, { ...first, host: "127.0.0.1" }, ...args.slice(1));
   return listen.apply(this, args);
 };
