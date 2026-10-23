@@ -16,8 +16,8 @@
 
 ## 3. Cards (spec: paper-cards)
 
-- [ ] 3.1 Implement score computation (Relevance, Trust with field-aware preprint penalty, Value) with reasons ≤ 120 characters and details; verify the AI-preprint test and traceability fields
-- [ ] 3.2 Implement the card writer (conversation, tools, grounding check, one card per paper, completion with skipped reasons, re-attach after restart) and its prompts; verify faux-agent tests for a complete card, no invented numbers, replay, a skipped candidate, and the retracted block
+- [x] 3.1 Implement score computation (Relevance, Trust with field-aware preprint penalty, Value) with reasons ≤ 120 characters and details; verify the AI-preprint test and traceability fields
+- [x] 3.2 Implement the card writer (conversation, tools, grounding check, one card per paper, completion with skipped reasons, re-attach after restart) and its prompts; verify faux-agent tests for a complete card, no invented numbers, replay, a skipped candidate, and the retracted block
 - [ ] 3.3 Add the API routes, the SSE `cards` frame and SDK methods; verify API tests (cards grouped newest first, card details, sweep detail with cost split)
 - [ ] 3.4 Build the Feed view (card groups, borderline badge, scores with reasons, details toggle, live updates) and sweep details in Runs; verify `npm run build` and a UI test that the page serves
 

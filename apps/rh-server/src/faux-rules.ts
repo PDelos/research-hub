@@ -71,7 +71,7 @@ export const charterWriterRule: FauxRule = (turn) => {
 
 /** The offline desk searches when asked for papers ("find papers on X", "search for X") and reports the result. */
 export const deskSearchRule: FauxRule = (turn) => {
-  if (turn.sections["charter-writer"]) return undefined;
+  if (turn.sections["charter-writer"] || turn.sections["card-writer"]) return undefined;
   const result = turn.results.find((r) => r.name === "search_papers");
   if (result) return say(result.text);
   const m = turn.lastUser.match(/\b(?:find|search(?: for)?|look for)\b(?:\s+(?:recent|new))?(?:\s+papers?)?(?:\s+(?:on|about|for))?\s+(.+)/i);
@@ -79,5 +79,28 @@ export const deskSearchRule: FauxRule = (turn) => {
   return call("search_papers", { query: m[1].replace(/[?.!]+$/, "").slice(0, 200), limit: 5 });
 };
 
+/**
+ * The offline card writer: lists the candidates, presents each with the first sentence of its abstract (grounded by
+ * construction), then completes the sweep. Candidates without an abstract are skipped with a reason.
+ */
+export const cardWriterRule: FauxRule = (turn) => {
+  if (!turn.sections["card-writer"]) return undefined;
+  if (turn.results.some((r) => r.name === "complete_sweep" && !r.isError)) return say("Cards written.");
+  const listed = turn.results.find((r) => r.name === "list_candidates");
+  if (!listed) return call("list_candidates", {});
+  const blocks = listed.text.split("\n\n").map((b) => ({
+    id: Number(b.match(/^#(\d+)/)?.[1]),
+    abstract: b.match(/abstract: (.*)$/m)?.[1] ?? "",
+  })).filter((b) => b.id);
+  const presented = new Set(turn.calls.filter((c) => c.name === "present_paper").map((c) => Number(c.arguments.paper_id)));
+  const skipped = blocks.filter((b) => b.abstract === "(no abstract)" || !b.abstract);
+  const next = blocks.find((b) => !presented.has(b.id) && !skipped.includes(b));
+  if (next) {
+    const first = next.abstract.split(/(?<=[.!?])\s+/)[0].split(/\s+/).slice(0, 60).join(" ");
+    return call("present_paper", { paper_id: next.id, summary: first });
+  }
+  return call("complete_sweep", { skipped: skipped.map((b) => ({ paper_id: b.id, reason: "no abstract to summarize" })) });
+};
+
 /** Default scripted rules for offline mode. */
-export const offlineRules: FauxRule[] = [charterWriterRule, deskSearchRule];
+export const offlineRules: FauxRule[] = [charterWriterRule, cardWriterRule, deskSearchRule];

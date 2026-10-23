@@ -2,7 +2,7 @@
 // project opens it takes ownership of the data directory, so two containers can never share one.
 import type { Extension } from "@earendil-works/pi-durable";
 import { createModelCatalog, installScriptedFaux, type FauxRule, type ModelCatalog } from "@rh/durable-agent";
-import { JevClient } from "@rh/jev";
+import { JevClient, type Decide } from "@rh/jev";
 import { offlineRules } from "./faux-rules.ts";
 import type { Config } from "./config.ts";
 import type { Logger } from "./logger.ts";
@@ -24,6 +24,8 @@ export interface HubOptions {
   paperFetch?: typeof fetch;
   /** Run requested sweeps (default true; scheduler-only tests turn it off). */
   sweeps?: boolean;
+  /** Answer Jev questions with this instead of the Jev client (tests). */
+  jevDecide?: Decide;
 }
 
 export class Hub {
@@ -81,6 +83,7 @@ export class Hub {
         openrouterKey: this.config.openrouterKey,
         paperFetch: this.options.paperFetch,
         runSweeps: this.options.sweeps !== false,
+        decide: this.options.jevDecide,
       });
       if (this.options.ticker !== false) this.opened.scheduler.start();
     } catch (error) {

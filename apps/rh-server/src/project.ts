@@ -15,7 +15,7 @@ import {
   type DurableHarness,
   type ModelCatalog,
 } from "@rh/durable-agent";
-import { JevLedger, loadCommand, runCommand, type JevClient } from "@rh/jev";
+import { JevLedger, loadCommand, runCommand, type Decide, type JevClient } from "@rh/jev";
 import { createAgents, type Agents } from "./agents.ts";
 import { Brief, Charters, ProjectState, ScopingQuestions } from "./charter.ts";
 import { CharterWriter } from "./charter-writer.ts";
@@ -24,6 +24,8 @@ import { Scheduler } from "./schedule.ts";
 import { PaperService } from "./papers/service.ts";
 import { PaperDecisions } from "./sweep/decisions.ts";
 import { SweepRunner } from "./sweep/sweep.ts";
+import { CardStore } from "./sweep/cards.ts";
+import { CardWriter } from "./sweep/card-writer.ts";
 import { paperTools } from "./papers/tool.ts";
 import { ensureVectorTables, openProjectDb, Settings, type Db, type SelfCheck } from "./db.ts";
 import type { Logger } from "./logger.ts";
@@ -76,6 +78,8 @@ export interface ProjectRuntime {
   readonly papers: PaperService;
   readonly decisions: PaperDecisions;
   readonly sweeps: SweepRunner;
+  readonly cards: CardStore;
+  readonly cardWriter: CardWriter;
   model(): Promise<{ id: string; window: number }>;
   compaction(): CompactionSetting & { window: number };
   setCompaction(next: Partial<CompactionSetting>): CompactionSetting;
@@ -108,6 +112,8 @@ export async function openProject(options: {
   paperFetch?: typeof fetch;
   /** Pick up requested sweeps (default true). */
   runSweeps?: boolean;
+  /** Tests: answer Jev questions with this instead of the Jev client. */
+  decide?: Decide;
 }): Promise<ProjectRuntime> {
   const { name, catalog, log } = options;
   const dir = options.dataDir;
@@ -137,6 +143,7 @@ export async function openProject(options: {
   });
   const scheduler = new Scheduler({ db, settings, state, charters, defaults: options.schedule, log: plog });
   const jevLedger = new JevLedger((record) => telemetry.jevCall(record));
+  const decide: Decide = options.decide ?? ((s, q, o) => options.jev.systemOne(s, q, o));
   const jevDir = join(options.promptsDir, "jev");
   // Before the harness opens: a resumed search_papers call may need it during replay.
   const papers = new PaperService({
@@ -146,13 +153,18 @@ export async function openProject(options: {
     offline: options.offline,
     openrouterKey: options.openrouterKey,
     jevDir,
-    decide: (s, q, o) => options.jev.systemOne(s, q, o),
+    decide: decide,
     jevLedger,
     log: plog,
     fetch: options.paperFetch,
   });
-  const decisions = new PaperDecisions({ db, jevDir, decide: (s, q, o) => options.jev.systemOne(s, q, o), ledger: jevLedger });
+  const decisions = new PaperDecisions({ db, jevDir, decide: decide, ledger: jevLedger });
   const sweeps = new SweepRunner({ db, settings, charters, papers, decisions, log: plog });
+  const cards = new CardStore(db);
+  const cardWriter = new CardWriter({
+    db, cards, runner: sweeps, papers, decisions, charters, catalog, promptsDir: options.promptsDir, log: plog, observe,
+  });
+  sweeps.setCardStage(cardWriter);
   const runSweeps = options.runSweeps !== false;
   const unsubscribeSweeps = scheduler.onRequested((run) => {
     if (run.kind === "sweep" && runSweeps) sweeps.pickUp();
@@ -161,7 +173,7 @@ export async function openProject(options: {
     promptsDir: options.promptsDir,
     projectName: name,
     extra: [observe, paperTools(() => papers), ...(options.extensions ?? [])],
-    separate: [charterWriter.extension],
+    separate: [charterWriter.extension, cardWriter.extension],
     deskTools: options.deskTools,
   });
   const compaction: CompactionSetting = settings.get("compaction", { points: DEFAULT_POINTS, enabled: true });
@@ -199,6 +211,7 @@ export async function openProject(options: {
   window = (await model()).window;
   harness.harness.resume();
   charterWriter.attach(harness.harness, ctx);
+  cardWriter.attach(harness.harness, ctx);
   papers.start();
   if (runSweeps) sweeps.pickUp();
 
@@ -225,6 +238,8 @@ export async function openProject(options: {
     papers,
     decisions,
     sweeps,
+    cards,
+    cardWriter,
     model,
     compaction: () => ({ ...compaction, window }),
     setCompaction(next) {
@@ -236,7 +251,7 @@ export async function openProject(options: {
     async jevPing(text = "Good morning, research desk!") {
       const cmd = loadCommand("ping", jevDir);
       try {
-        const { result } = await runCommand(cmd, { text }, (s, q, o) => options.jev.systemOne(s, q, o));
+        const { result } = await runCommand(cmd, { text }, decide);
         jevLedger.record(result, { command: cmd.name, version: cmd.version });
         const answer = result.answers.greeting as { noul: number };
         return {
