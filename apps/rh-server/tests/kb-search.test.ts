@@ -86,3 +86,26 @@ test("the desk always sees the index and opens only the notes it cites", async (
     await server.stop();
   }
 });
+
+test("Library API: knowledge-base papers with status, a parsed note, and search", async () => {
+  const { parseNote } = await import("../src/routes-kb.ts");
+  assert.deepEqual(parseNote('---\ntitle: "A: b"\nyear: 2023\nauthors: ["X"]\nraw: plain text\n---\n\n## Summary\n\nHi\n'), {
+    properties: { title: "A: b", year: 2023, authors: ["X"], raw: "plain text" },
+    body: "\n## Summary\n\nHi\n",
+  });
+  const { server } = await withVault();
+  try {
+    const note = await server.client.kbNote("lin-2023-evolutionary-scale");
+    assert.equal(note.path, "sources/lin-2023-evolutionary-scale.md");
+    assert.equal(note.properties.title, "Evolutionary-scale prediction");
+    assert.match(note.body, /## Summary/);
+    assert.equal((await server.client.kbNote("protein-language-models")).path, "concepts/protein-language-models.md");
+    await assert.rejects(server.client.kbNote("missing-note"), /No note missing-note/);
+    await assert.rejects(server.client.kbNote("../charter"), /stem must be/);
+    const hits = await server.client.kbSearch("contact map");
+    assert.equal(hits[0].stem, "lin-2023-evolutionary-scale");
+    assert.deepEqual(await server.client.kbPapers(), [], "no starred papers yet");
+  } finally {
+    await server.stop();
+  }
+});

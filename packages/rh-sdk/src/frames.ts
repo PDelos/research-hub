@@ -332,3 +332,33 @@ export interface CardGroup {
 export interface SweepSettings {
   cardsPerSweep: number;
 }
+
+// ---------------------------------------------------------------- knowledge base (v0.5)
+
+export interface KbPaper {
+  paperId: number;
+  cardId: number;
+  stem: string | null;
+  title: string;
+  year?: number;
+  venue?: string;
+  level?: string;
+  reason?: string;
+  status: "pending" | "cancelled" | "done" | "failed";
+  statusReason?: string;
+  addedAt: string;
+}
+
+export interface KbNote {
+  stem: string;
+  path: string;
+  properties: Record<string, unknown>;
+  body: string;
+}
+
+export interface KbSearchHit {
+  path: string;
+  stem: string;
+  title: string;
+  excerpt: string;
+}

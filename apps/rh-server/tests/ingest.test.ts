@@ -72,6 +72,10 @@ test("a starred paper becomes one connected evidence note with all properties an
     const plain = p.vault.read(`sources/${p.ingest.note(noResults.paperId)}.md`)!;
     assert.match(plain, /## Results\n\nNot stated in the abstract/);
     assert.equal((p.db.prepare("SELECT COUNT(*) n FROM kb_notes").get() as any).n, 3);
+    const library = await server.client.kbPapers();
+    assert.equal(library.length, 3);
+    assert.ok(library.every((x) => x.status === "done" && x.stem && x.level));
+    assert.equal(library.find((x) => x.paperId === cards[0].paperId)!.reason, "Exactly the foundation I need");
   } finally {
     await server.stop();
   }

@@ -5,6 +5,9 @@ import type {
   AgentState,
   CardDetail,
   CardGroup,
+  KbNote,
+  KbPaper,
+  KbSearchHit,
   PrecisionPoint,
   Verdict,
   WeightView,
@@ -104,6 +107,11 @@ export class HubClient {
   clearJudgment = (cardId: number) => this.call<CardDetail>("DELETE", `/cards/${cardId}/judgment`);
   precision = () => this.call<PrecisionPoint[]>("GET", "/feedback/precision");
   weights = () => this.call<WeightView[]>("GET", "/weights");
+
+  // Knowledge base (v0.5)
+  kbPapers = () => this.call<KbPaper[]>("GET", "/kb/papers");
+  kbNote = (stem: string) => this.call<KbNote>("GET", `/kb/notes/${encodeURIComponent(stem)}`);
+  kbSearch = (query: string, limit = 8) => this.call<KbSearchHit[]>("GET", `/kb/search?q=${encodeURIComponent(query)}&limit=${limit}`);
   triggerRun = (kind: "sweep" | "review") => this.call<ScheduledRun>("POST", `/runs/${kind}`, {});
 
   /** Follow the project's stream until the signal aborts. */
