@@ -342,7 +342,8 @@ export class Ingest {
     const front = props.filter(([, v]) => v !== null && v !== undefined).map(([k, v]) => `${k}: ${yaml(v)}`).join("\n");
     const body = SECTIONS.map(([key, heading]) => `## ${heading}\n\n${sections[key].trim()}\n`).join("\n");
     this.deps.vault.create(`sources/${stem}.md`, `---\n${front}\n---\n\n${body}\n## Related papers\n`);
-    const summary = sections.summary.trim().split(/(?<=[.!?])\s+/)[0].slice(0, 200);
+    const first = sections.summary.trim().split(/(?<=[.!?])\s+/)[0];
+    const summary = first.length <= 200 ? first : `${first.slice(0, 200).replace(/\s+\S*$/, "")}…`;
     this.deps.db.prepare("INSERT OR IGNORE INTO kb_notes (paper_id, stem, summary, created_at) VALUES (?, ?, ?, ?)").run(paper.id, stem, summary, nowIso());
     return this.note(paper.id)!;
   }

@@ -19,7 +19,8 @@ const win = () => frame.value?.contentWindow as ObsidianWindow | null | undefine
   return r(name);
 };
 
-const initial = store.kbOpen ? `/kb/?file=${encodeURIComponent(store.kbOpen)}` : "/kb/";
+// The vault index is the first note shown, unless "Open in knowledge base" asked for another.
+const initial = `/kb/?file=${encodeURIComponent(store.kbOpen ?? "index.md")}`;
 store.kbOpen = undefined;
 
 onMounted(async () => {
