@@ -1,0 +1,8 @@
+{
+  "promptDelete": false,
+  "alwaysUpdateLinks": true,
+  "newFileLocation": "folder",
+  "newFileFolderPath": "concepts",
+  "showUnsupportedFiles": false,
+  "useMarkdownLinks": false
+}

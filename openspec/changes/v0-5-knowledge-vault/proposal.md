@@ -31,7 +31,18 @@ relations, curriculum and v2 missing links. Layer 5, the top of the v0 pyramid; 
   the embedded Obsidian looks like part of the hub.
 - **Open in knowledge base** from the Library (and from paper cards later) jumps to that note in the tab.
 
-**Pending a trial:** before this layer's design is written, run Ignis with a sample vault, the theme and the
+**Trial (done 2026-10-23, passed; screenshots in `trial/`):** Ignis 0.8.18 (Obsidian 1.14.4) ran from its pinned
+source with a sample vault in our note format, behind a proxy, embedded in a mock hub page; light and dark
+screenshots match the hub's colors, font and radius; `?file=` opens a note; a file written on disk appeared in the
+open viewer within 5 s (live sync over WebSocket through the proxy). Findings that shape the design: (1) Ignis has no
+sub-path setting and calls absolute paths (`/api/…`, `/ws`, `/vault-files/…`, `/assets/…`), and Obsidian reads the
+*top* window's `require` to find Electron, so a cross-origin frame (a separate host name) fails with a SecurityError;
+the viewer must be **same-origin**: the hub serves Ignis's page at `/kb/` (its assets are relative) and forwards
+Ignis's absolute prefixes, and the hub page lends the frame's own `require` to the top window. (2) Ignis listens on
+all interfaces; a `--require` preload binds it to 127.0.0.1 without modifying Ignis. (3) Obsidian is a 9 MB
+download (28 MB unpacked), not about 200 MB.
+
+**Original trial plan:** before this layer's design is written, run Ignis with a sample vault, the theme and the
 iframe tab for about 30 minutes to confirm embedding, theming, note links and serving under `/kb/` work (if Ignis
 cannot run under a sub-path, the tab uses its own host name, e.g. `kb.<name>.localhost`, still in the same
 container). The trial passes only if

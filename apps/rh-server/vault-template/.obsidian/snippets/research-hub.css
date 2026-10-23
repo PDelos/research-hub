@@ -1,0 +1,55 @@
+/* Research Hub theme for the embedded Obsidian: the hub's colors, font and radius, light and dark, and no window
+   chrome (status bar, vault switcher). Generated with every project vault; the user may switch it off or pick
+   another theme in Obsidian, and the hub never resets that choice. */
+body {
+  --font-interface-theme: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-text-theme: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --radius-s: 6px;
+  --radius-m: 10px;
+  --radius-l: 12px;
+}
+.theme-light {
+  --background-primary: #ffffff;
+  --background-primary-alt: #f7f7f5;
+  --background-secondary: #f7f7f5;
+  --background-secondary-alt: #f7f7f5;
+  --background-modifier-border: #e4e3df;
+  --background-modifier-hover: #eef3f1;
+  --text-normal: #1d1d1b;
+  --text-muted: #6b6b66;
+  --text-faint: #9b9a94;
+  --text-accent: #2f5d50;
+  --text-accent-hover: #24473d;
+  --interactive-accent: #2f5d50;
+  --interactive-accent-hover: #24473d;
+  --text-on-accent: #ffffff;
+  --color-accent: #2f5d50;
+  --tab-container-background: #f7f7f5;
+  --titlebar-background: #f7f7f5;
+  --titlebar-background-focused: #f7f7f5;
+}
+.theme-dark {
+  --background-primary: #1c1c1a;
+  --background-primary-alt: #141413;
+  --background-secondary: #141413;
+  --background-secondary-alt: #141413;
+  --background-modifier-border: #2d2c29;
+  --background-modifier-hover: #22302b;
+  --text-normal: #ecebe6;
+  --text-muted: #9b9a94;
+  --text-faint: #6b6b66;
+  --text-accent: #7fb8a6;
+  --text-accent-hover: #9fcbbd;
+  --interactive-accent: #7fb8a6;
+  --interactive-accent-hover: #9fcbbd;
+  --text-on-accent: #10201b;
+  --color-accent: #7fb8a6;
+  --tab-container-background: #141413;
+  --titlebar-background: #141413;
+  --titlebar-background-focused: #141413;
+}
+/* No window chrome inside the hub. */
+.status-bar,
+.workspace-sidedock-vault-profile,
+.titlebar,
+.mod-windows .titlebar-button-container { display: none !important; }

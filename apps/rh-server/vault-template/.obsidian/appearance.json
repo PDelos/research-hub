@@ -1,0 +1,8 @@
+{
+  "theme": "system",
+  "enabledCssSnippets": ["research-hub"],
+  "showRibbon": false,
+  "baseFontSize": 15,
+  "interfaceFontFamily": "",
+  "textFontFamily": ""
+}

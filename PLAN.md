@@ -571,7 +571,7 @@ After v0:
 - [ ] Contact email for OpenAlex/Crossref polite pools; optional Semantic Scholar API key
 - [ ] First project brief (markdown) to test with
 - [ ] v0.0 task group 8 (flatten to one project per container, lock, `new-project.sh`) before starting v0.1
-- [ ] Ignis trial (needs Docker) before writing v0.5's design
+- [x] Ignis trial (2026-10-23, from source): passed with a same-origin `/kb/` proxy and a loopback preload (see v0.5 proposal)
 
 ---
 

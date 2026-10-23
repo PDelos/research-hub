@@ -73,7 +73,7 @@ The Library view SHALL offer "Open in knowledge base" for each paper, which show
 - **THEN** the tab opens with that paper's evidence note visible within 5 seconds
 
 ### Requirement: Bundled viewer, reached only through the hub
-The viewer SHALL run as a separate process inside the project's container, supervised by the hub, listening only on the container's loopback interface, reached only through the hub at `/kb/` under the same browser protections as the rest of the hub UI, and configured to read and write only the vault and its own settings folder.
+The viewer SHALL run as a separate process inside the project's container, supervised by the hub, listening only on the container's loopback interface, reached only through the hub on the hub's own origin (its page at `/kb/` and the API paths it calls) under the same browser protections as the rest of the hub UI, and configured to read and write only the vault and its own settings folder.
 
 #### Scenario: No direct access
 - **WHEN** anything outside the container tries to connect to the viewer's port
