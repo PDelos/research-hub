@@ -428,15 +428,8 @@ export class SweepRunner {
         paper: paperId,
       });
     };
-    for (let i = 0; i < pending.length; i += GATE_CHUNK * GATE_PARALLEL) {
-      const batch = pending.slice(i, i + GATE_CHUNK * GATE_PARALLEL);
-      const lanes = Array.from({ length: GATE_PARALLEL }, (_, lane) => batch.filter((_, k) => k % GATE_PARALLEL === lane));
-      const results = await Promise.allSettled(lanes.map(async (lane) => {
-        for (const id of lane) await judge(id);
-      }));
-      const failure = results.find((r): r is PromiseRejectedResult => r.status === "rejected");
-      if (failure) throw failure.reason;
-    }
+    for (let i = 0; i < pending.length; i += GATE_CHUNK * GATE_PARALLEL)
+      await lanes(pending.slice(i, i + GATE_CHUNK * GATE_PARALLEL), GATE_PARALLEL, judge);
     return {
       gated: this.idsWith(sweep.id, "gated").length,
       rejected: this.idsWith(sweep.id, "rejected").length,
@@ -462,7 +455,7 @@ export class SweepRunner {
     const update = this.deps.db.prepare(
       "UPDATE sweep_papers SET level = ?, prereq_heavy = ?, importance = ? WHERE sweep_id = ? AND paper_id = ?",
     );
-    for (const id of ids) {
+    await lanes(ids, GATE_PARALLEL, async (id) => {
       const paper = this.deps.papers.store.get(id)!;
       const row = this.deps.db.prepare("SELECT kind FROM sweep_papers WHERE sweep_id = ? AND paper_id = ?").get(sweep.id, id) as { kind: string | null };
       const answers = await this.deps.decisions.decide(id, RANKING, {
@@ -474,7 +467,7 @@ export class SweepRunner {
         stage: sweep.orientation ? "new to the field: needs foundations and overviews first" : "familiar with the field: wants important new work",
       });
       update.run(levelFrom(answers.level.level), noulOf(answers.level.prereq_heavy), scoreOf(answers.importance.importance), sweep.id, id);
-    }
+    });
     return { leveled: this.idsWith(sweep.id, "gated").length };
   }
 
@@ -631,6 +624,17 @@ export class SweepRunner {
       }
     }
   }
+}
+
+/** Run `work` over items in `n` parallel lanes; every lane finishes its items, then the first failure is thrown. */
+async function lanes<T>(items: T[], n: number, work: (item: T) => Promise<void>): Promise<void> {
+  const results = await Promise.allSettled(
+    Array.from({ length: n }, async (_, lane) => {
+      for (let k = lane; k < items.length; k += n) await work(items[k]);
+    }),
+  );
+  const failure = results.find((r): r is PromiseRejectedResult => r.status === "rejected");
+  if (failure) throw failure.reason;
 }
 
 export function gateVars(paper: Paper, charter: Charter) {

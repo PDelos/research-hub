@@ -23,6 +23,6 @@
 
 ## 4. Integration
 
-- [ ] 4.1 Offline end-to-end: approve a charter, trigger a sweep, get cards through the UI proxy; run all tests, `npm run check`, `check:jev`, `check:env`, lint and `npm audit`; verify all pass
+- [x] 4.1 Offline end-to-end: approve a charter, trigger a sweep, get cards through the UI proxy; run all tests, `npm run check`, `check:jev`, `check:env`, lint and `npm audit`; verify all pass
 - [ ] 4.2 Live check (keyless sources, Jev and embeddings at a few cents at most; cards on a free model): one sweep on a real charter; record counts per phase, gate rejections with reasons, the cards, and the cost split
 - [ ] 4.3 Update `README.md` (daily sweep, cards, settings); verify the documented commands work

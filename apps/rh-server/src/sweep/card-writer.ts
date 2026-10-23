@@ -208,7 +208,7 @@ export class CardWriter implements CardStage {
       },
       ctx,
     );
-    const prompt = loadPrompt(join(this.deps.promptsDir, "agents"), "card-writer", "USER_PROMPT.md", {
+    const prompt = loadPrompt(join(this.deps.promptsDir, "agents"), "card-writer", "USER_PROMPT_cards.md", {
       sweep_id: String(sweep.id),
       candidates: String(this.candidates(sweep).length),
       stage: sweep.orientation ? "new to the field: foundations first" : "familiar with the field",
