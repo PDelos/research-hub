@@ -51,7 +51,7 @@
 
 - [x] 7.1 Run all offline tests, `npm run check`, `npm run check:jev` and lint; verify all pass
 - [x] 7.2 Live smoke of chat at no cost: one chat turn in live mode through OpenRouter on a free model (`RH_MODEL_*` set to a `:free` ID); verify the reply, the run record's model and a $0 cost (see notes)
-- [ ] 7.3 Live Jev `ping` (needs OpenRouter credit, about $0.000004 per call, and the user's approval to spend); record resolved model ID, latency and cost
+- [x] 7.3 Live Jev `ping` (needs OpenRouter credit, about $0.000014 per call, and the user's approval to spend); record resolved model ID, latency and cost (done after archiving, see notes)
 
 ## 8. One project per container (spec: deployment, agent-runtime; design D4, D11)
 
@@ -85,4 +85,9 @@
   with `new-project.sh` (alpha on 4850 at 06:00, beta on 4860 at 06:20) ran side by side: alpha's chat never
   appeared in beta, beta refused `Host: alpha.localhost` (421), and a third container on alpha's data directory
   exited with code 1 and `startup.data_dir_owned` naming alpha's container while alpha kept running.
+- 2026-10-23, task 7.3 (after archiving, once the user added OpenRouter credit): two live Jev pings through
+  OpenRouter resolved to `typesafe/jev-1.14-20261014`. "Good morning, research desk!" → greeting 0.99 in 643 ms;
+  "The ribosome translates mRNA into protein." → 0.01 in 201 ms. Reported cost $0.00001386 and $0.000014028 per
+  call (about 3× the input-token estimate, likely request overhead; about $0.014 per 1,000 calls). Ledger total
+  $0.000027888, no unknown-cost calls, no error log lines, key absent from the log.
 
