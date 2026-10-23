@@ -137,3 +137,32 @@ input[type="text"], input[type="number"], input[type="time"], select, .brief tex
   .agent { border-left: 0; border-top: 1px solid var(--line); }
   .runs .clip { max-width: 120px; }
 }
+
+/* Feed (v0.3) */
+.feed { max-width: 900px; }
+.feed-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+.feed-head h2 { margin: 0; font-weight: 600; }
+.feed-head .grow { flex: 1; }
+.sweep-group h3.section { margin-top: 18px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; margin: 10px 0; }
+.card-title { font-weight: 600; font-size: 16px; color: var(--ink); text-decoration: none; }
+a.card-title:hover { color: var(--accent); text-decoration: underline; }
+.card .meta { font-size: 13px; margin-top: 2px; }
+.card .tags { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0; }
+.card .tags .badge { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.badge.level { color: var(--accent); border-color: var(--accent); text-transform: capitalize; }
+.card .summary { margin: 6px 0 10px; line-height: 1.5; }
+.scores { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.score { border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; font-size: 13px; display: flex; flex-direction: column; gap: 2px; }
+.score span { color: var(--muted); font-size: 12px; }
+.score.hi strong { color: var(--accent); }
+.score.mid strong { color: var(--ink); }
+.score.lo strong { color: var(--warn); }
+button.link { border: 0; background: none; color: var(--accent); padding: 6px 0 0; font-size: 13px; }
+.card-details { border-top: 1px solid var(--line); margin-top: 8px; padding-top: 6px; font-size: 13px; }
+.card-details h4 { margin: 10px 0 4px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+.card-details ul { margin: 0; padding-left: 18px; }
+.card-details code { font-size: 11px; word-break: break-all; }
+@media (max-width: 700px) {
+  .scores { grid-template-columns: 1fr; }
+}

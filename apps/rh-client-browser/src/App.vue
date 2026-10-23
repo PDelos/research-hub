@@ -3,7 +3,7 @@ import { computed, onMounted, ref } from "vue";
 import AgentColumn from "./components/AgentColumn.vue";
 import BriefScreen from "./components/BriefScreen.vue";
 import CharterTab from "./components/CharterTab.vue";
-import FeedPlaceholder from "./components/FeedPlaceholder.vue";
+import FeedView from "./components/FeedView.vue";
 import RunsView from "./components/RunsView.vue";
 import SettingsTab from "./components/SettingsTab.vue";
 import TopBar from "./components/TopBar.vue";
@@ -51,7 +51,7 @@ onMounted(() => {
               {{ t.label }}<span v-if="t.id === 'charter' && store.project?.status === 'charter-review'" class="pip" />
             </button>
           </nav>
-          <FeedPlaceholder v-if="tab === 'feed'" />
+          <FeedView v-if="tab === 'feed'" />
           <CharterTab v-else-if="tab === 'charter'" />
           <RunsView v-else-if="tab === 'runs'" />
           <SettingsTab v-else />

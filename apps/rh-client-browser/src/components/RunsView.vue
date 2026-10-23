@@ -1,12 +1,15 @@
 <script setup lang="ts">
 import { onMounted } from "vue";
 import { ago, k, usd } from "@rh/sdk";
-import { client, openRun, refreshSchedule, store } from "../store.ts";
+import { client, openRun, openSweep, refreshFeed, refreshSchedule, store } from "../store.ts";
 
 onMounted(async () => {
   store.runs = await client.runs();
-  await refreshSchedule();
+  await Promise.all([refreshSchedule(), refreshFeed()]);
 });
+
+const PHASES = ["plan", "gather", "dedupe", "gate", "enrich", "level", "rank", "cards"] as const;
+const counts = (c?: Record<string, number>) => (c ? Object.entries(c).map(([k, v]) => `${k} ${v}`).join(", ") : "");
 </script>
 
 <template>
@@ -35,6 +38,48 @@ onMounted(async () => {
         <tr v-if="!store.runs.length"><td colspan="7" class="muted center">No runs yet.</td></tr>
       </tbody>
     </table>
+    <h3 class="section">Sweeps</h3>
+    <table>
+      <thead>
+        <tr><th>Sweep</th><th>Status</th><th>Phase</th><th>Gathered → gated → cards</th><th>Jev</th><th>Embeddings</th><th>Model</th><th>Total</th><th>When</th></tr>
+      </thead>
+      <tbody>
+        <tr v-for="s in store.sweeps" :key="s.id" :class="{ sel: store.sweepDetail?.id === s.id }" @click="openSweep(s.id)">
+          <td>{{ s.id }}<span v-if="s.orientation" class="muted"> · foundations</span></td>
+          <td :class="{ error: s.status === 'failed' }">{{ s.status.replace(/_/g, " ") }}</td>
+          <td class="muted">{{ s.status === "running" ? s.phase : "" }}</td>
+          <td>{{ s.counts.gathered ?? 0 }} → {{ s.counts.gated ?? 0 }} → {{ s.cards }}</td>
+          <td>{{ s.cost ? usd(s.cost.jevUsd) : "" }}</td>
+          <td>{{ s.cost ? usd(s.cost.embeddingUsd) : "" }}</td>
+          <td>{{ s.cost ? usd(s.cost.modelUsd) : "" }}</td>
+          <td>{{ s.cost ? usd(s.cost.totalUsd) : "" }}</td>
+          <td class="muted">{{ ago(s.startedAt) }}</td>
+        </tr>
+        <tr v-if="!store.sweeps.length"><td colspan="9" class="muted center">No sweeps yet.</td></tr>
+      </tbody>
+    </table>
+    <div v-if="store.sweepDetail" class="run-detail">
+      <h3>Sweep {{ store.sweepDetail.id }}</h3>
+      <p v-if="store.sweepDetail.error" class="error">{{ store.sweepDetail.error }}</p>
+      <h4>Phases</h4>
+      <ul>
+        <li v-for="name in PHASES" :key="name">
+          <strong>{{ name }}</strong> · {{ store.sweepDetail.phases[name]?.status ?? "not reached" }}
+          <span v-if="(store.sweepDetail.phases[name]?.attempts ?? 0) > 1"> · {{ store.sweepDetail.phases[name]?.attempts }} attempts</span>
+          <span class="muted"> {{ counts(store.sweepDetail.phases[name]?.counts) }}</span>
+          <span v-if="store.sweepDetail.phases[name]?.error" class="error"> · {{ store.sweepDetail.phases[name]?.error }}</span>
+        </li>
+      </ul>
+      <h4>Queries</h4>
+      <p class="muted">{{ store.sweepDetail.queries.map((q) => q.text).join(" · ") }}<span v-if="store.sweepDetail.windowSince"> (since {{ store.sweepDetail.windowSince }})</span></p>
+      <h4>Papers</h4>
+      <ul>
+        <li v-for="p in store.sweepDetail.papers" :key="p.paperId">
+          <span class="badge">{{ p.status.replace(/_/g, " ") }}</span> {{ p.title }}
+          <span class="muted"><span v-if="p.rank"> · rank {{ p.rank }}</span><span v-if="p.relevance !== undefined"> · relevance {{ p.relevance.toFixed(2) }}</span><span v-if="p.reason"> · {{ p.reason }}</span></span>
+        </li>
+      </ul>
+    </div>
     <h3 class="section">Scheduled sweeps and reviews</h3>
     <table>
       <thead>

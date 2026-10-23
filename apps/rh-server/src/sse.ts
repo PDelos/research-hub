@@ -5,6 +5,7 @@
 import type { Request, Response } from "express";
 import { watchEvents } from "@earendil-works/pi-durable";
 import { API_VERSION, type Frame } from "@rh/sdk";
+import { sweepSummary } from "./routes-sweeps.ts";
 import { agentState } from "./state.ts";
 import type { Logger } from "./logger.ts";
 import type { ProjectRuntime } from "./project.ts";
@@ -138,11 +139,20 @@ export class StreamHub {
         if (sse.closed) return;
         sse.sendIfChanged("state", { type: "agent.state", state: await agentState(project) });
         sse.sendIfChanged("usage", { type: "usage", totals: project.telemetry.totals() });
+        const latest = project.sweeps.list(1)[0];
+        sse.sendIfChanged("cards", {
+          type: "cards",
+          count: project.cards.count(),
+          latestCardId: project.cards.list(1)[0]?.id ?? null,
+          sweep: latest ? sweepSummary(project, latest) : null,
+        });
       },
       300,
       (e) => slog.warn("stream.update_failed", { error: String(e) }),
     );
     sse.onClose(harness.subscribeCommits(() => state()));
+    sse.onClose(project.cards.onChange(() => state()));
+    sse.onClose(project.sweeps.onChange(() => state()));
     sse.onClose(() => state.cancel());
     await state.now();
     void req;

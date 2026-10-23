@@ -22,7 +22,10 @@ test("/ serves the UI and its assets on the API port", async () => {
     assert.match(html, /<title>research · Research Hub<\/title>/, "the title names the project");
     const asset = html.match(/src="(\/assets\/[^"]+\.js)"/)?.[1];
     assert.ok(asset, "a script asset");
-    assert.equal((await fetch(`${server.url}${asset}`)).status, 200);
+    const script = await fetch(`${server.url}${asset}`);
+    assert.equal(script.status, 200);
+    const code = await script.text();
+    assert.ok(code.includes("Run sweep now") && code.includes("How these scores were computed"), "the bundle has the Feed (v0.3)");
     assert.equal((await fetch(`${server.url}/some/deep/link`)).status, 200, "SPA fallback");
   } finally {
     await server.stop();

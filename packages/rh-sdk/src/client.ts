@@ -3,6 +3,8 @@
 import { RhError, type ErrorCode } from "./errors.ts";
 import type {
   AgentState,
+  CardDetail,
+  CardGroup,
   CharterBody,
   CharterRecord,
   CharterView,
@@ -17,6 +19,9 @@ import type {
   ScheduledRun,
   ScheduleSettings,
   SendResult,
+  SweepDetail,
+  SweepSettings,
+  SweepSummary,
 } from "./frames.ts";
 import { readSse } from "./sse.ts";
 
@@ -81,6 +86,14 @@ export class HubClient {
   setSchedule = (patch: Partial<{ sweep: Partial<ScheduleSettings["sweep"]>; review: Partial<ScheduleSettings["review"]> }>) =>
     this.call<ScheduleSettings>("PUT", "/schedule", patch);
   scheduledRuns = (limit = 100) => this.call<ScheduledRun[]>("GET", `/scheduled-runs?limit=${limit}`);
+
+  // Sweeps and cards (v0.3)
+  cards = (limit = 100) => this.call<{ groups: CardGroup[] }>("GET", `/cards?limit=${limit}`);
+  card = (id: number) => this.call<CardDetail>("GET", `/cards/${id}`);
+  sweeps = (limit = 50) => this.call<SweepSummary[]>("GET", `/sweeps?limit=${limit}`);
+  sweep = (id: number) => this.call<SweepDetail>("GET", `/sweeps/${id}`);
+  sweepSettings = () => this.call<SweepSettings>("GET", "/sweep-settings");
+  setSweepSettings = (patch: Partial<SweepSettings>) => this.call<SweepSettings>("PUT", "/sweep-settings", patch);
   triggerRun = (kind: "sweep" | "review") => this.call<ScheduledRun>("POST", `/runs/${kind}`, {});
 
   /** Follow the project's stream until the signal aborts. */

@@ -100,7 +100,8 @@ export type Frame =
   | { type: "agent.snapshot"; conversationId: number; snapshot: WireSnapshotEvent }
   | { type: "agent.batch"; conversationId: number; events: WireAgentEvent[] }
   | { type: "agent.state"; state: AgentState }
-  | { type: "usage"; totals: CostTotals };
+  | { type: "usage"; totals: CostTotals }
+  | { type: "cards"; count: number; latestCardId: number | null; sweep: SweepSummary | null };
 
 // ---------------------------------------------------------------- project, charter, schedule (v0.1)
 
@@ -179,4 +180,111 @@ export interface ScheduledRun {
   status: "requested" | "running" | "done" | "failed" | "skipped";
   reason: string | null;
   createdAt: string;
+}
+
+// ---------------------------------------------------------------- sweeps and cards (v0.3)
+
+export type SweepPhase = "plan" | "gather" | "dedupe" | "gate" | "enrich" | "level" | "rank" | "cards";
+export type SweepStatus = "running" | "completed" | "no_new_papers" | "failed";
+
+export interface SweepCost {
+  jevUsd: number;
+  jevCalls: number;
+  embeddingUsd: number;
+  embeddingCalls: number;
+  modelUsd: number;
+  totalUsd: number;
+}
+
+export interface SweepPhaseRecord {
+  status: "running" | "done" | "failed";
+  startedAt: string;
+  endedAt?: string;
+  attempts: number;
+  counts?: Record<string, number>;
+  error?: string;
+  detail?: unknown;
+}
+
+export interface SweepSummary {
+  id: number;
+  trigger: string;
+  status: SweepStatus;
+  phase: SweepPhase;
+  orientation: boolean;
+  counts: Record<string, number>;
+  error?: string;
+  nextRetryAt?: number;
+  cost?: SweepCost;
+  cards: number;
+  startedAt: string;
+  endedAt?: string;
+}
+
+export interface SweepPaperView {
+  paperId: number;
+  title: string;
+  status: string;
+  reason?: string;
+  borderline: boolean;
+  relevance?: number;
+  level?: string;
+  kind?: string;
+  rank?: number;
+  rankScore?: number;
+}
+
+export interface SweepDetail extends SweepSummary {
+  queries: { text: string; weight: number; variant?: string }[];
+  windowSince?: string;
+  phases: Partial<Record<SweepPhase, SweepPhaseRecord>>;
+  completion?: { presented: number[]; skipped: { paperId: number; reason: string }[] };
+  papers: SweepPaperView[];
+}
+
+export interface PaperMeta {
+  id: number;
+  title: string;
+  authors: string[];
+  year?: number;
+  venue?: string;
+  server?: string;
+  link?: string;
+  citations?: number;
+  abstract?: string;
+}
+
+export interface CardView {
+  id: number;
+  sweepId: number;
+  rank?: number;
+  summary: string;
+  relevance: number;
+  relevanceReason: string;
+  trust: number;
+  trustReason: string;
+  value: number;
+  valueReason: string;
+  level: string;
+  matchedQuestion?: { id: string; text: string };
+  borderline: boolean;
+  createdAt: string;
+  paper: PaperMeta;
+}
+
+export interface CardDetail extends CardView {
+  details: {
+    decisions: Record<string, { version: number; answers: unknown }>;
+    inputs: Record<string, unknown>;
+    formulas: Record<string, string>;
+  };
+}
+
+export interface CardGroup {
+  sweep: SweepSummary;
+  cards: CardView[];
+}
+
+export interface SweepSettings {
+  cardsPerSweep: number;
 }

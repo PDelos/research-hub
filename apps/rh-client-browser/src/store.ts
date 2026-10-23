@@ -5,6 +5,7 @@ import {
   AgentModel,
   HubClient,
   type AgentState,
+  type CardGroup,
   type CharterView,
   type CostTotals,
   type Info,
@@ -13,6 +14,8 @@ import {
   type RunSummary,
   type ScheduledRun,
   type ScheduleSettings,
+  type SweepDetail,
+  type SweepSummary,
 } from "@rh/sdk";
 
 export const client = new HubClient({ base: "/ui/v1" });
@@ -27,6 +30,10 @@ export const store = reactive({
   charter: undefined as CharterView | undefined,
   schedule: undefined as ScheduleSettings | undefined,
   scheduledRuns: [] as ScheduledRun[],
+  feed: [] as CardGroup[],
+  sweep: undefined as SweepSummary | undefined,
+  sweeps: [] as SweepSummary[],
+  sweepDetail: undefined as SweepDetail | undefined,
   connected: false,
   error: "",
 });
@@ -50,6 +57,22 @@ export async function refreshProject() {
   } catch (e) {
     store.error = e instanceof Error ? e.message : String(e);
   }
+}
+
+export async function refreshFeed() {
+  try {
+    const [{ groups }, sweeps] = await Promise.all([client.cards(), client.sweeps(20)]);
+    store.feed = groups;
+    store.sweeps = sweeps;
+    store.sweep = sweeps[0];
+    if (store.sweepDetail) store.sweepDetail = await client.sweep(store.sweepDetail.id);
+  } catch (e) {
+    store.error = e instanceof Error ? e.message : String(e);
+  }
+}
+
+export async function openSweep(id: number) {
+  store.sweepDetail = store.sweepDetail?.id === id ? undefined : await client.sweep(id);
 }
 
 export async function refreshSchedule() {
@@ -102,6 +125,11 @@ export async function connect() {
           model.clear();
           model.conversationId = frame.mainConversationId;
         } else if (frame.type === "agent.state") store.agent = frame.state;
+        else if (frame.type === "cards") {
+          store.sweep = frame.sweep ?? undefined;
+          void refreshFeed();
+          void refreshSchedule();
+        }
         else if (frame.type === "usage") {
           store.totals = frame.totals;
           refreshRunsSoon();
