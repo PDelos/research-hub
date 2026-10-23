@@ -5,7 +5,7 @@
 This is the product's core loop: every day, without the user, the project agent finds new papers,
 lets Jev throw out what does not fit, ranks the rest, and presents a handful of explained paper cards.
 Jev makes the bulk decisions so the main model only writes the few cards that survive. Layer 3 of the
-v0 pyramid; depends on `v0-2-paper-sources` (records, embeddings), `v0-1-projects` (charter, schedule)
+v0 pyramid; depends on `v0-2-paper-sources` (records, embeddings), `v0-1-project-setup` (charter, schedule)
 and `v0-0-skeleton` (durable runtime, Jev client).
 
 ## What Changes

@@ -44,13 +44,25 @@
 - [ ] 6.2 Write `docker-compose.yml` (4850, `./data:/data`, `env_file`, `restart: unless-stopped`) and `compose.offline.yml`; verify the offline stack is healthy within 60 s
 - [ ] 6.3 Verify persistence: chat offline, `docker compose down && up`, message still present
 - [ ] 6.4 Verify restart: kill the Node process inside the container, health returns within 60 s
-- [ ] 6.5 Verify two hubs on ports 4850 and 4860 with separate data dirs share no state
+- [ ] 6.5 Verify two project containers on ports 4850 and 4860 with separate data dirs share no state
 - [x] 6.6 Write `README.md` (npm and Docker quick start, offline and live modes, env vars); verify the offline quick start works as written
 
 ## 7. Integration
 
 - [x] 7.1 Run all offline tests, `npm run check`, `npm run check:jev` and lint; verify all pass
 - [ ] 7.2 Live smoke (only with `OPENROUTER_API_KEY` and the user's approval to spend): one chat turn and one Jev `ping`; record resolved model IDs and cost in the change notes
+
+## 8. One project per container (spec: deployment, agent-runtime; design D4, D11)
+
+- [ ] 8.1 Flatten storage to `$RH_DATA_DIR/{agent,project}.sqlite` and move an existing `projects/default/` there on first start; verify a migration test that keeps the old conversation and runs
+- [ ] 8.2 Drop the project segment from routes (`/v1/chat`, `/v1/stream`, `/v1/runs`, …), the SDK client and the UI; verify the full server suite passes against the new routes
+- [ ] 8.3 Add `RH_PROJECT_NAME` (validated) to config, page title, `/v1/health`, every log line and `.env.example`; verify tests for each and `npm run check:env`
+- [ ] 8.4 Add the data-directory ownership lock with heartbeat and stale takeover; verify tests that a second server on the same directory exits naming the owner, and that a lock older than 60 s is taken over
+- [ ] 8.5 Turn `EADDRINUSE` into the one-line port message; verify a test that starts a second server on a taken port
+- [ ] 8.6 Add `<name>.localhost` to the allowed UI hosts; verify a proxy test with `Host: proteins.localhost:4850`
+- [ ] 8.7 Add compose `name: rh-${RH_PROJECT_NAME}`, `mem_limit`/`cpus` from `RH_MEM_LIMIT`/`RH_CPUS`; verify `docker compose config` shows them (with Docker)
+- [ ] 8.8 Write `new-project.sh` (folder, compose, `.env` with name, free port, staggered sweep time, tokens; prints URL); verify a test run creating two projects in a temp dir gets distinct ports, names and sweep times
+- [ ] 8.9 Update `README.md` (one container per project, `new-project.sh`, host names, one OpenRouter key per project) and rerun task 7.1's checks; verify all pass
 
 ## Workflow follow-up
 

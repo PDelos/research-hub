@@ -5,7 +5,7 @@
 Sweeps, scoring, relations and the vault all need the same thing underneath: reliable, deduplicated
 paper records with metadata and a vector for similarity. Building this as its own layer lets it be
 tested against live APIs and fixtures before any agent or Jev logic depends on it. Layer 2 of the v0
-pyramid; depends on `v0-1-projects` (charter queries) and `v0-0-skeleton`.
+pyramid; depends on `v0-1-project-setup` (charter queries) and `v0-0-skeleton`.
 
 ## What Changes
 
@@ -16,9 +16,11 @@ pyramid; depends on `v0-1-projects` (charter queries) and `v0-0-skeleton`.
   OpenAlex ID.
 - **Metadata enrichment** from OpenAlex: venue, year, authors, citation count, references, citing works,
   open-access PDF URL, retraction flag.
-- A shared **metadata cache** across projects with time-to-live, plus polite rate limiting per source.
+- A **metadata cache** with time-to-live in the project's database, plus polite rate limiting per source.
+  Project containers on one machine share an IP address towards the paper APIs; their sweeps are spread apart by
+  staggered sweep times (`RH_SWEEP_TIME`), and every source backs off on HTTP 429.
 - **Embeddings** for every paper (title + abstract) from **one configured OpenRouter embedding model**
-  (default `qwen/qwen3-embedding-8b`), stored per project and searchable by similarity. One model for all
+  (default `qwen/qwen3-embedding-8b`), stored in the project's database and searchable by similarity. One model for all
   papers keeps every vector comparable; SPECTER2 via Semantic Scholar was dropped because it requires the
   S2 key and does not cover new preprints from every source.
 
@@ -43,7 +45,7 @@ Design and tasks are written when this layer is next to implement.
 
 ## Impact
 
-- New `paper-sources` module in `rh-server`, `cache.sqlite` at hub level, `papers` and vector tables in
-  `project.sqlite` (sqlite-vec).
+- New `paper-sources` module in `rh-server`; cache, `papers` and vector tables in `project.sqlite`
+  (sqlite-vec).
 - External: arXiv, OpenAlex, Europe PMC, bioRxiv APIs; OpenRouter embeddings; optional Semantic Scholar.
 - Config: `CONTACT_EMAIL` (OpenAlex/Crossref polite pool), `RH_MODEL_EMBED`, optional `S2_API_KEY`.

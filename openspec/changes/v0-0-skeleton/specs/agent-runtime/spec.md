@@ -2,13 +2,13 @@
 
 ## Purpose
 
-Defines the durable project agent that every later feature runs on: how users talk to it, how it
+Defines the project's durable agent that every later feature runs on: how users talk to it, how it
 survives restarts without losing or repeating work, and how its activity and cost are recorded.
 
 ## ADDED Requirements
 
-### Requirement: One root agent per project
-Each project SHALL have exactly one long-lived root conversation, the research-desk agent, created on first start and reused afterwards.
+### Requirement: One root agent
+The project SHALL have exactly one long-lived root conversation, the research-desk agent, created on first start and reused afterwards.
 
 #### Scenario: Reuse after restart
 - **WHEN** the hub restarts
@@ -18,7 +18,7 @@ Each project SHALL have exactly one long-lived root conversation, the research-d
 The user SHALL be able to send a message to the project agent through the API and receive the reply.
 
 #### Scenario: Send a message
-- **WHEN** a client posts a chat message for the `default` project
+- **WHEN** a client posts a chat message
 - **THEN** the message is accepted with HTTP 202 and the agent's reply is appended to the conversation
 
 #### Scenario: Message while the agent is busy
@@ -29,7 +29,7 @@ The user SHALL be able to send a message to the project agent through the API an
 The hub SHALL push conversation and run updates to clients over one server-sent event stream: a snapshot on connect, then deltas.
 
 #### Scenario: Two clients stay in sync
-- **WHEN** two browser tabs are open on the same project and one sends a message
+- **WHEN** two browser tabs are open on the project and one sends a message
 - **THEN** both tabs show the message and the streamed reply
 
 #### Scenario: Refresh mid-reply

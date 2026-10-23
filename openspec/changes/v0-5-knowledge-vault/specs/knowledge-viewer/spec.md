@@ -2,17 +2,17 @@
 
 ## Purpose
 
-Lets the user read and edit a project's knowledge base with the real Obsidian interface inside the hub's web
-UI, running entirely on the hub machine, styled like the hub, and safe to leave running.
+Lets the user read and edit the project's knowledge base with the real Obsidian interface inside the hub's web
+UI, running entirely inside the project's container, styled like the hub, and safe to leave running.
 
 ## ADDED Requirements
 
 ### Requirement: Knowledge base tab
-The hub UI SHALL have a Knowledge base tab that shows the Obsidian interface for the current project's vault, served from the hub machine, so no Obsidian install is needed on the viewing device.
+The hub UI SHALL have a Knowledge base tab that shows the Obsidian interface for the project's vault, served from the project's own container, so no Obsidian install is needed on the viewing device.
 
 #### Scenario: Open the tab
-- **WHEN** the user opens the Knowledge base tab of a project with a vault
-- **THEN** the Obsidian interface loads inside the hub page with that project's vault open, within 10 seconds
+- **WHEN** the user opens the Knowledge base tab and the project has a vault
+- **THEN** the Obsidian interface loads inside the hub page with the project's vault open, within 10 seconds
 
 ### Requirement: Seamless embedding
 The Knowledge base tab SHALL embed the viewer inside the hub layout without a visible frame border, keeping the hub top bar, tabs and agent column visible, so the user never leaves the hub or sees another application's window chrome.
@@ -72,27 +72,27 @@ The Library view SHALL offer "Open in knowledge base" for each paper, which show
 - **WHEN** the user clicks "Open in knowledge base" on a paper in the Library
 - **THEN** the tab opens with that paper's evidence note visible within 5 seconds
 
-### Requirement: Separate container, reached only through the hub
-The viewer SHALL run in its own container with access to the vault folders only (no hub databases or keys), SHALL publish no port of its own, and SHALL be reached only through the hub at `/kb/` on the hub's port, under the same browser protections as the rest of the hub UI.
+### Requirement: Bundled viewer, reached only through the hub
+The viewer SHALL run as a separate process inside the project's container, supervised by the hub, listening only on the container's loopback interface, reached only through the hub at `/kb/` under the same browser protections as the rest of the hub UI, and configured to read and write only the vault and its own settings folder.
 
 #### Scenario: No direct access
-- **WHEN** any machine, including the hub machine, tries to connect to the viewer container's port from outside the compose network
-- **THEN** the connection is refused, and the viewer is only reachable at `http://<hub>/kb/`
+- **WHEN** anything outside the container tries to connect to the viewer's port
+- **THEN** the connection is refused, and the viewer is only reachable at `http://<name>.localhost:<port>/kb/`
 
 #### Scenario: Cross-site request
 - **WHEN** a page from another site requests `/kb/`
 - **THEN** the hub refuses it as it refuses other cross-site UI requests
 
-#### Scenario: Isolation
-- **WHEN** the viewer container's mounts are listed
-- **THEN** they contain the project vault folders and the viewer's own settings only
+#### Scenario: Viewer crash
+- **WHEN** the viewer process crashes
+- **THEN** the hub restarts it within 10 seconds, chat and sweeps are unaffected, and the tab reconnects
 
 ### Requirement: Viewer is optional at runtime
-The hub SHALL keep working when the viewer is not running: the tab SHALL show a short explanation and how to start it, and the Library view SHALL still list and open notes.
+The hub SHALL keep working when the viewer is disabled (`RH_KB_VIEWER=off`) or not running: the tab SHALL show a short explanation and how to enable it, and the Library view SHALL still list and open notes.
 
-#### Scenario: Viewer stopped
-- **WHEN** the viewer service is stopped and the user opens the Knowledge base tab
-- **THEN** the tab shows "The knowledge base viewer is not running" with the start command, and the Library still works
+#### Scenario: Viewer disabled
+- **WHEN** the project runs with `RH_KB_VIEWER=off` and the user opens the Knowledge base tab
+- **THEN** the tab shows "The knowledge base viewer is off" with how to turn it on, and the Library still works
 
 ### Requirement: Pinned viewer version
 The viewer SHALL run a pinned release, and the hub's health information SHALL report that version; upgrading SHALL be an explicit configuration change.

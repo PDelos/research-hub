@@ -54,11 +54,11 @@ For each record the hub SHALL fetch from OpenAlex, when the work is found there:
 - **WHEN** a fresh bioRxiv preprint is not yet in OpenAlex
 - **THEN** the record is kept with enrichment marked "pending" and is retried on a later sweep
 
-### Requirement: Shared cache
-Fetched metadata SHALL be cached at hub level for 7 days and reused across projects, so the same work is not fetched twice within that time.
+### Requirement: Metadata cache
+Fetched metadata SHALL be cached in the project's database for 7 days, so the same work is not fetched twice within that time.
 
-#### Scenario: Two projects
-- **WHEN** two projects find the same DOI on the same day
+#### Scenario: Found twice
+- **WHEN** the same DOI is found by two queries on the same day
 - **THEN** OpenAlex is queried for it once
 
 ### Requirement: Polite rate limiting
@@ -67,6 +67,10 @@ Requests SHALL respect each source's limits: at most 1 request per 3 seconds to 
 #### Scenario: arXiv pacing
 - **WHEN** 10 arXiv queries are issued at once
 - **THEN** they are sent at least 3 seconds apart
+
+#### Scenario: Rate limited by the source
+- **WHEN** a source answers HTTP 429 (for example because another project on the same machine was querying it)
+- **THEN** the request is retried after the source's Retry-After or the backoff, and the sweep continues with the other sources meanwhile
 
 ### Requirement: Source failure isolation
 A failing or rate-limited source SHALL NOT fail the whole search; it SHALL be retried with backoff (30 s, 2 min, 8 min) and reported in the run log.

@@ -15,18 +15,22 @@ PLAN.md §17).
   with their tests: `durable-agent` (pi-durable harness, compaction, subagents, idempotent tools,
   observability, faux model) and `jev` (client, versioned commands, policy, ledger, mock).
   Remove the Jev client's TypeSafe-direct provider: OpenRouter only.
-- **Write our own** server (`rh-server`, Express 5) and browser client (`rh-client-browser`, Vue 3),
-  multi-project from day one (`/v1/p/:slug/…`, one built-in project `default`). Individual infra files
+- **Write our own** server (`rh-server`, Express 5) and browser client (`rh-client-browser`, Vue 3) for
+  **one research project per container**: a new theme is a new container, never a second project inside one.
+  Individual infra files
   from the news agent (SSE stream, auth, idempotency, telemetry projector, crash-recovery test) are
   copied as starting points where they fit, never as a whole app.
-- A placeholder **research-desk** agent per project that can chat (no paper tools yet), with run
+- **Projects never interfere:** a data-directory ownership lock, clear port-conflict errors, a project name in
+  UI, health, logs and compose name, per-project host names (`<name>.localhost`) for separate browser state,
+  resource limits, and a `new-project` script that sets all of this up with a staggered sweep time.
+- A placeholder **research-desk** agent that can chat (no paper tools yet), with run
   telemetry, cost, compaction and a Runs view.
 - **All models and Jev through OpenRouter** (`OPENROUTER_API_KEY`), model IDs per job from configuration
   (`desk`, `reader`, `review`, `chat`, `jev`), pinned IDs rather than moving aliases.
 - **Offline mode** (`RH_MODE=offline`): faux model + mock Jev, no network, used by all tests.
 - **Docker**: one container (API + UI on port 4850), `/data` volume, health endpoint, restart policy.
 
-Out of scope: projects other than `default`, paper sources, embeddings, sweeps, cards, feedback, vault,
+Out of scope: paper sources, embeddings, sweeps, cards, feedback, vault,
 weekly review, TUI/CLI clients.
 
 Jev commands added: `ping` (smoke test only). LLM calls added: chat turns of the placeholder agent.
@@ -35,8 +39,9 @@ Jev commands added: `ping` (smoke test only). LLM calls added: chat turns of the
 
 ### New Capabilities
 
-- `deployment`: How the hub is packaged and run: single container, configuration through environment,
-  persistent data volume, health reporting, restart behavior, credential handling, offline mode.
+- `deployment`: How the hub is packaged and run: one container per project, configuration through
+  environment, persistent data volume, health reporting, restart behavior, credential handling, offline mode,
+  and the guarantees that keep several project containers on one machine from interfering.
 - `agent-runtime`: The durable project agent: chat over the API with a live event stream, survival of
   restarts without losing or duplicating work, restricted tools, configurable models, telemetry and cost,
   compaction.

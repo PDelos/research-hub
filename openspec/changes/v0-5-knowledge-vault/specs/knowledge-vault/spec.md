@@ -8,14 +8,14 @@ connected evidence notes, how user edits are protected, and how the vault is sea
 ## ADDED Requirements
 
 ### Requirement: Vault layout
-Each project SHALL have a vault folder containing `index.md`, `log.md`, `charter.md` and the folders `sources/`, `concepts/` and `questions/`, readable as an Obsidian vault.
+The project SHALL have a vault folder (`$RH_DATA_DIR/vault/`) containing `index.md`, `log.md`, `charter.md` and the folders `sources/`, `concepts/` and `questions/`, readable as an Obsidian vault.
 
 #### Scenario: New project vault
-- **WHEN** a project's charter is first approved
+- **WHEN** the project's charter is first approved
 - **THEN** its vault exists with the listed files and folders, and `charter.md` holds the approved charter
 
 #### Scenario: Existing project without a vault
-- **WHEN** the hub starts and a project with an approved charter has no vault folder
+- **WHEN** the hub starts, the charter is approved and there is no vault folder
 - **THEN** the vault is created with the latest charter and any already-starred papers are queued for ingest
 
 ### Requirement: Evidence note per starred paper

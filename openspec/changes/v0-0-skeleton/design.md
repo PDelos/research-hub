@@ -13,7 +13,7 @@ Requirements: `specs/deployment`, `specs/agent-runtime`, `specs/jev-client`.
 
 **Goals:**
 - Reuse the two hardest, best-tested packages unchanged in behavior; write everything else for our
-  domain (multi-project, papers, vault) so every line exists on purpose.
+  domain (one project per container, papers, vault) so every line exists on purpose.
 - A skeleton whose offline test suite passes and that runs in Docker with one chat-capable agent.
 
 **Non-Goals:**
@@ -42,10 +42,15 @@ Express 5 over Fastify/Hono: Fastify and Hono are 2–3× faster in benchmarks, 
 local service where throughput is irrelevant, and the copied SSE/auth/idempotency code is Express code.
 Revisit only if we need typed RPC across client and server.
 
-### D4. Project-scoped storage and routes from day one
-`$RH_DATA_DIR/projects/<slug>/agent.sqlite` (pi-durable) and `project.sqlite` (app), slug `default`.
-Routes under `/v1/p/:slug/…`. One pi-durable `Harness` per project, opened lazily, PID-locked
-(pi-durable allows one owning process per storage). Later layers add projects without API or path breaks.
+### D4. One project per container
+A container serves exactly one research project. Storage lives directly in `$RH_DATA_DIR`: `agent.sqlite`
+(pi-durable) and `project.sqlite` (app), later `brief.md` and `vault/`. Routes have no project segment
+(`/v1/chat`, `/v1/stream`, …). One pi-durable `Harness` per process. A new theme is a new container with its own
+data directory and port (D11). Alternative (several projects inside one hub) rejected by the user: it adds a
+registry, slugs and in-process isolation for no benefit over containers.
+
+*Implementation note:* tasks 1–7 first built a project-scoped layout (`projects/default/`, `/v1/p/:slug/…`);
+task group 8 flattens it to this design and migrates an existing `projects/default/` folder.
 
 ### D5. Models from configuration via OpenRouter
 Env `RH_MODEL_DESK|READER|REVIEW|CHAT|JEV`. Defaults (verified on OpenRouter 2026-10-22):
@@ -77,6 +82,23 @@ answers KNN queries. Both are needed from v0.2 on; v0.0 only proves the extensio
 
 ### D10. Offline mode
 `RH_MODE=offline` → faux model provider + mock Jev; a network guard in tests fails on any outbound fetch.
+
+### D11. Projects never interfere
+- **Data lock:** `$RH_DATA_DIR/.owner` holds `{project, container hostname, pid, heartbeat}`, renewed every 15 s
+  and removed on clean shutdown; a fresh lock (< 60 s) makes a second container exit. The pi-durable PID lock alone
+  is not enough: PIDs repeat across containers.
+- **Ports:** `EADDRINUSE` is turned into a one-line error naming the port and `RH_PUBLISH_PORT`.
+- **Identity:** `RH_PROJECT_NAME` (lowercase, `[a-z0-9-]`, ≤ 40 chars) in the page title, health, every log
+  line, and the compose project name `rh-<name>`.
+- **Browser state:** access via `<name>.localhost:<port>`; browsers resolve `*.localhost` to loopback and keep
+  cookies per host name. `RH_ALLOWED_HOSTS` gets the name automatically.
+- **Resources:** compose `mem_limit`/`cpus` from `RH_MEM_LIMIT` (2g) and `RH_CPUS` (2).
+- **Shared outside world:** one IP for all projects (arXiv, OpenAlex pacing) → the `new-project` script
+  staggers sweep times by 20 minutes; one OpenRouter balance → README recommends one key per project with
+  OpenRouter's per-key credit limit.
+- **`new-project.sh <name>`** creates `projects/<name>/` next to the repo with `docker-compose.yml` (image
+  `research-hub:latest`), `.env` from `.env.example` with name, port (first free from 4850 in steps of 10),
+  sweep time and tokens, and prints the URL.
 
 ## Risks / Trade-offs
 

@@ -2,13 +2,13 @@
 
 ## Purpose
 
-Defines how the Research Hub is packaged, configured and run on a single machine, so that a hub can be
-started, restarted and duplicated without losing data or leaking credentials.
+Defines how the Research Hub is packaged, configured and run: one container per research project, started,
+restarted and duplicated without losing data, leaking credentials, or letting projects interfere.
 
 ## ADDED Requirements
 
 ### Requirement: Single-container deployment
-The hub SHALL run as one container that serves both the API and the browser UI on one port (default `4850`).
+Each research project SHALL run as exactly one container that serves the API, the browser UI and every helper process on one port (default `4850`); a second theme is a second container.
 
 #### Scenario: Start with compose
 - **WHEN** the user runs `docker compose up -d` in the hub folder with a valid `.env`
@@ -21,16 +21,62 @@ The hub SHALL store all state under one data directory (`/data` in the container
 - **WHEN** the container is removed and recreated with the same data directory
 - **THEN** every conversation, run record and setting from before is still present
 
-#### Scenario: Per-project layout
+#### Scenario: Data layout
 - **WHEN** the hub starts with an empty data directory
-- **THEN** it creates `projects/default/` containing the project's agent database and app database
+- **THEN** it creates the project's agent database and app database directly in that directory
 
-### Requirement: Separate hubs on one machine
-Two hubs SHALL run side by side when given different ports and data directories, without sharing any state.
+### Requirement: Projects never share state
+Two project containers on one machine SHALL share no data, conversations, settings, credentials or browser state; the only shared things are the machine, its image and, if the user chooses, an OpenRouter key.
 
-#### Scenario: Two hubs
-- **WHEN** a second compose folder uses port `4860` and its own data directory
-- **THEN** both hubs run, and a chat message in one never appears in the other
+#### Scenario: Two projects
+- **WHEN** a second project runs on port `4860` with its own data directory
+- **THEN** both run, and a chat message, setting or cost in one never appears in the other
+
+### Requirement: Data directory ownership
+A container SHALL take an ownership lock on its data directory at startup, renewed every 15 seconds, and a second container pointed at the same directory SHALL refuse to start while the lock is fresh (younger than 60 seconds).
+
+#### Scenario: Same folder twice
+- **WHEN** a second container starts with a data directory already owned by a running container
+- **THEN** it exits with a non-zero status and a log line naming the directory and the owning project and container
+
+#### Scenario: Stale lock
+- **WHEN** the previous owner died more than 60 seconds ago without releasing the lock
+- **THEN** the new container takes over the lock and starts normally
+
+### Requirement: Clear port conflicts
+If the configured port is already in use, the hub SHALL exit with a message naming the port and how to choose another, instead of a raw stack trace.
+
+#### Scenario: Port taken
+- **WHEN** the hub starts on a port another process already uses
+- **THEN** it exits non-zero and logs `port 4850 is in use; set RH_PUBLISH_PORT (compose) or RH_PORT to a free port`
+
+### Requirement: Project identity
+Each container SHALL be configured with a project name (`RH_PROJECT_NAME`) that appears in the UI title, `/v1/health`, every log line and the compose project name (`rh-<name>`).
+
+#### Scenario: Identity everywhere
+- **WHEN** a project named `proteins` is running
+- **THEN** the page title, health response and log lines name `proteins`, and `docker ps` shows its container under `rh-proteins`
+
+### Requirement: Separate browser state per project
+Each project SHALL be reachable under its own host name (`<name>.localhost:<port>`) so two projects open in one browser keep separate cookies and storage.
+
+#### Scenario: Two tabs
+- **WHEN** `proteins.localhost:4850` and `genomics.localhost:4860` are open in one browser
+- **THEN** using one never logs out, resets or changes the other, including the knowledge base view
+
+### Requirement: Resource limits
+Each project's compose file SHALL set memory and CPU limits (default 2 GB and 2 CPUs, configurable) so one project cannot starve the others.
+
+#### Scenario: Limits applied
+- **WHEN** a project container is inspected
+- **THEN** it shows the configured memory and CPU limits
+
+### Requirement: New project setup
+A `new-project` script SHALL create a project folder with its compose file and `.env`, a free port, a unique compose project name, the project name, and a sweep time staggered from existing projects, and print the URL.
+
+#### Scenario: Second project
+- **WHEN** the user runs `./new-project.sh genomics` while `proteins` uses port 4850 and sweeps at 06:00
+- **THEN** `genomics` gets a free port such as 4860, compose name `rh-genomics`, a sweep time 20 minutes later, and the script prints `http://genomics.localhost:4860`
 
 ### Requirement: Health reporting
 The hub SHALL expose an unauthenticated health endpoint that reports readiness without revealing secrets.

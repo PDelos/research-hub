@@ -1,14 +1,15 @@
 # Research Hub — Detailed Design & Build Plan
 
-> A self-hosted hub of research **projects**. Each project follows one theme and has its own
-> **proactive durable agent** that sweeps for papers every day, uses **Jev to make almost every
+> A self-hosted research assistant. **One container = one research project (one theme)**; a new theme is a
+> new container. Each has its own **proactive durable agent** that sweeps for papers every day, uses **Jev to make almost every
 > decision**, presents a few paper cards, learns from your 👎/👍/⭐ + reasons, and grows an
 > Obsidian-compatible **knowledge base** from the papers you approve. Every week it reviews its own
 > performance and **proposes improvements that you approve**.
 >
-> Field focus: **AI + bioinformatics (neural networks)**. Runs locally in **one Docker container**.
+> Field focus: **AI + bioinformatics (neural networks)**. Runs on your own machine or server, **one Docker
+> container per project**, everything (including the Obsidian knowledge-base viewer) inside it.
 
-Last updated: 2026-10-22 (technology review + v0 pyramid)
+Last updated: 2026-10-23 (one container per project, Ignis bundled, no interference between projects)
 
 ---
 
@@ -18,7 +19,7 @@ Last updated: 2026-10-22 (technology review + v0 pyramid)
 
 | Idea | How we apply it |
 |---|---|
-| **Proactive agent = durable agent + trigger + sandbox** | pi-durable agent per project + a scheduler tick + a Docker container |
+| **Proactive agent = durable agent + trigger + sandbox** | pi-durable agent + a scheduler tick + the project's Docker container |
 | "Doesn't wait for you to work. Works for you, then waits." | Daily sweep runs without you; cards wait for your review |
 | **In → near → out of the loop** | You stay *near* the loop: approve KB additions and proposals, never drive sweeps by hand |
 | **The agent decides, the task runs** | Deterministic, checkpointed durable task (gather/gate/dedupe/rank) + the agent for judgment (what to read, how to present) |
@@ -43,9 +44,9 @@ Last updated: 2026-10-22 (technology review + v0 pyramid)
 
 **Decision: fresh repo, vendor two packages.** Copy `durable-agent` and `jev` (≈2.6K lines, the
 hardest and best-tested parts) with their tests; copy single infra files (SSE, auth, idempotency,
-telemetry projector, recovery test) as starting points; write our own multi-project server, SDK, UI and
-schema. A full fork was rejected after measuring it: ~70% of its code (news domain 9.2K lines, news UI,
-TUI/CLI/cron 3.9K) would be deleted or rewritten, and it assumes one project and ssh-deployed devices.
+telemetry projector, recovery test) as starting points; write our own server, SDK, UI and schema for one project
+per container. A full fork was rejected after measuring it: ~70% of its code (news domain 9.2K lines, news UI,
+TUI/CLI/cron 3.9K) would be deleted or rewritten, and it assumes ssh-deployed devices.
 Pinned: `@earendil-works/pi-durable`, `pi-ai`, `chord` **1.1.0**; Express 5; Vue 3 + Vite.
 pi-durable is experimental — all direct usage stays inside `packages/durable-agent`.
 
@@ -55,8 +56,8 @@ pi-durable is experimental — all direct usage stays inside `packages/durable-a
 
 | Term | Meaning |
 |---|---|
-| **Hub** | The app. Lists projects; one container can hold many |
-| **Project** | One theme. Isolated agent, database, vault, schedule, weights, budget |
+| **Research Hub ("hub")** | The app. One running container serves exactly one project |
+| **Project** | One theme = one container: its own agent, data folder, vault, schedule, weights, port and name |
 | **Brief** | Your document describing the project idea (markdown upload) |
 | **Charter** | Agent-drafted, you-approved: research questions (Q1..Qn), concepts, sub-areas, search queries, out-of-scope |
 | **Level** | Curriculum stage: `foundational → core → advanced → frontier` |
@@ -73,42 +74,42 @@ pi-durable is experimental — all direct usage stays inside `packages/durable-a
 ## 2. Architecture
 
 ```
-┌──────────────────────────── Docker container: research-hub ─────────────────────────────┐
-│                                                                                          │
-│  Browser (Vue 3)  ◄── REST + SSE ──►  rh-server (Node 24, Express 5)                      │
-│                                        ├─ static UI + token-holding proxy (no key in page)│
-│                                        ├─ ticker: every 5 min → schedule.due()? → start   │
-│                                        ├─ ProjectManager                                  │
-│                                        │    └─ per project (lazy-opened, PID-locked):     │
-│                                        │        pi-durable Harness (agent.sqlite)         │
-│                                        │        ├─ agent: research-desk (root)            │
-│                                        │        ├─ subagents: paper-reader, librarian,    │
-│                                        │        │             reviewer                    │
-│                                        │        └─ tasks: rh.sweep, rh.review, rh.ingest  │
-│                                        ├─ Jev client (OpenRouter) + ledger                │
-│                                        ├─ Paper sources (arXiv, OpenAlex, EuropePMC, bioRxiv)│
-│                                        └─ Vault indexer (FTS5) + file watcher             │
-│                                                                                          │
-│  /data (volume)                                                                          │
-│   ├─ hub.sqlite                      projects, global settings, cost rollups              │
-│   ├─ cache.sqlite                    shared paper metadata cache (OpenAlex/Crossref)      │
-│   └─ projects/<slug>/                                                                    │
-│        ├─ brief.md                                                                       │
-│        ├─ agent.sqlite               pi-durable: conversations, tasks, checkpoints        │
-│        ├─ project.sqlite             app tables + sqlite-vec embeddings + FTS5 index      │
-│        ├─ fulltext/<paper-id>.md     extracted full texts (L2)                           │
-│        └─ vault/                     Obsidian vault (the KB, source of truth)            │
-└──────────────────────────────────────────────────────────────────────────────────────────┘
+┌──────────────── Docker container: rh-<name>  (one per project, own port, own /data) ─────────────────┐
+│                                                                                                      │
+│  Browser (Vue 3) at <name>.localhost:<port>  ◄── REST + SSE ──►  rh-server (Node 24, Express 5)       │
+│                                                ├─ static UI + token-holding proxy (no key in page)  │
+│                                                ├─ /kb/ proxy ──► Ignis (bundled child process,       │
+│                                                │                 loopback only, supervised)          │
+│                                                ├─ ticker: every 60 s → due slots → request runs      │
+│                                                ├─ pi-durable Harness (agent.sqlite)                  │
+│                                                │   ├─ agent: research-desk (root, chat)              │
+│                                                │   ├─ conversation: charter-writer                   │
+│                                                │   ├─ subagents: paper-reader, librarian, reviewer   │
+│                                                │   └─ tasks: rh.sweep, rh.review, rh.ingest          │
+│                                                ├─ Jev client (OpenRouter) + ledger                   │
+│                                                ├─ Paper sources (arXiv, OpenAlex, EuropePMC, bioRxiv)│
+│                                                └─ Vault indexer (FTS5) + file watcher                │
+│                                                                                                      │
+│  /data (volume, owned via .owner lock)                                                               │
+│   ├─ brief.md                                                                                        │
+│   ├─ agent.sqlite        pi-durable: conversations, tasks, checkpoints                               │
+│   ├─ project.sqlite      app tables, metadata cache, sqlite-vec embeddings, FTS5 index               │
+│   ├─ fulltext/<id>.md    extracted full texts (L2)                                                   │
+│   ├─ vault/              Obsidian vault (the KB, source of truth) + .obsidian/ hub theme             │
+│   └─ kb-viewer/          Ignis settings + the Obsidian app it downloads once (~200 MB)               │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+Another theme = another container (rh-genomics on :4860 with its own /data). Containers never talk to each other.
 ```
 
-Two SQLite files per project, as in the news agent: **`agent.sqlite` belongs to pi-durable**,
+Two SQLite files, as in the news agent: **`agent.sqlite` belongs to pi-durable**,
 **`project.sqlite` belongs to the app**. A projector copies agent telemetry (tool calls, tokens,
 costs) into `project.sqlite`. Clients only read through the API.
 
-**Scheduling** (the news agent's pattern, adapted): an in-process ticker fires every 5 minutes and asks
-each project's `Schedule.due()`. Due slots are idempotent (`requestId = project:kind:slot`), so a
-restart or a double tick never starts a second sweep. Defaults: **sweep daily at 06:00**,
-**review Sundays at 07:00**, both editable per project. Docker `restart: unless-stopped` +
+**Scheduling:** an in-process ticker runs every 60 seconds and records due slots in `scheduled_runs` with a
+unique `(kind, slot)` key, so a restart or a double tick never starts a second sweep. Defaults: **sweep daily
+at `RH_SWEEP_TIME`** (06:00; `new-project.sh` staggers projects 20 minutes apart), **review Sundays at
+07:00**, both editable. Docker `restart: unless-stopped` +
 pi-durable checkpoints mean an interrupted sweep resumes from its last phase.
 
 ---
@@ -116,13 +117,14 @@ pi-durable checkpoints mean an interrupted sweep resumes from its last phase.
 ## 3. Project lifecycle
 
 ```
-1. New project ──► upload brief.md
-2. research-desk drafts CHARTER  (LLM, once)            ──► you edit/approve  (proposal type: charter)
-3. Agent asks 3–5 scoping questions (ask_user cards)    ──► answers fold into charter
-4. Level = foundational. First sweep runs immediately in ORIENTATION mode.
-5. Daily: sweep → cards → you judge → ⭐ ingested into vault
-6. Weekly: review → proposals → you approve/reject
-7. Pause / archive any time (tasks stop, data kept)
+1. ./new-project.sh proteins  ──► folder, .env, free port, compose name rh-proteins, staggered sweep time
+2. docker compose up -d        ──► open http://proteins.localhost:4850
+3. Paste or upload brief.md    ──► charter-writer drafts the CHARTER + up to 5 scoping questions
+4. Answer, edit, approve       ──► charter v1; status active
+5. Level = foundational. First sweep runs in ORIENTATION mode.
+6. Daily: sweep → cards → you judge → ⭐ ingested into the vault (read/edit it in the Knowledge base tab)
+7. Weekly: review → proposals → you approve/reject
+8. Pause any time (no scheduled runs, data kept); stop or remove the container to end the project
 ```
 
 ---
@@ -139,7 +141,7 @@ already judged (results stored on the candidate row).
 | 2 | **gather** | code | arXiv (cs.LG, cs.AI, q-bio.*), OpenAlex search + citation graph, Europe PMC, bioRxiv (Semantic Scholar optional). Window: new since last sweep for frontier; any age for foundational/core |
 | 3 | **dedupe-id** | code | Normalize IDs (DOI, arXiv id, PMID/PMCID, OpenAlex id). Merge versions. Drop already-carded / judged / in-KB papers |
 | 4 | **gate** | **Jev** | `on-theme` + `paper-kind` + `worth-reading` on title + abstract. Chunks of 10, 5 in parallel. Below thresholds → rejected (kept for stats). Review band → kept but flagged |
-| 5 | **enrich** | code | For survivors: OpenAlex + Crossref metadata (venue, citations, year, authors, refs, OA PDF, retraction flag) and one embedding from the configured OpenRouter embedding model. Cached in `cache.sqlite` |
+| 5 | **enrich** | code | For survivors: OpenAlex + Crossref metadata (venue, citations, year, authors, refs, OA PDF, retraction flag) and one embedding from the configured OpenRouter embedding model. Cached for 7 days in `project.sqlite` |
 | 6 | **trust** | code + **Jev** | Deterministic signals (§7) + Jev `trust-read` on abstract (+ full text if available). Reference verification sample |
 | 7 | **level** | **Jev** | `level` score → foundational/core/advanced/frontier + `prereq-heavy` |
 | 8 | **relate** | sqlite-vec + **Jev** | Shortlist 8 nearest KB papers by embedding; Jev `relation` (one question per pair via `each`) → typed edges. Empty KB → relate to charter questions instead |
@@ -403,24 +405,28 @@ Rules:
 
 Full text (v1): prefer structured sources (arXiv HTML, Europe PMC OA XML) over PDFs. For PDFs, a
 **Docling** sidecar is the leading option for multi-column academic layouts, tables and formulas (it is
-Python, so it would be a second process or container; decide in v1). Record the extractor in note
+Python, so it would be bundled as a supervised helper process inside the project container, like Ignis;
+decide in v1). Record the extractor in note
 properties so notes can be re-extracted later.
 
 ---
 
 ## 13. API & UI
 
-**API** (Express 5, bearer tokens, idempotency keys, SSE — from the news agent):
-`/v1/hub/projects` · `/v1/p/:slug/{feed,cards/:id/judge,kb,graph,proposals/:id/decide,sweeps,reviews,settings,chat,stream}` ·
-`/v1/p/:slug/workflows/{sweep,review}` (ticker/manual).
+**API** (Express 5, bearer tokens, idempotency keys, SSE — from the news agent). One project per container,
+so routes have no project segment: `/v1/{health,info,project,brief,charter,schedule,chat,stream,transcript,runs,
+usage,feed,cards/:id/judge,kb,graph,proposals/:id/decide,scheduled-runs}`, `/v1/runs/{sweep,review}` (manual),
+and `/kb/` (the bundled Obsidian viewer).
 
 **UI** (Vue 3):
 
 | Screen | Content |
 |---|---|
-| **Hub** | Project tiles: theme, level, last sweep, unread cards, pending proposals, monthly cost, pause |
-| **Project · Feed** (left) + **Agent** (right) | Cards with scores/reasons/relations and 👎/👍/⭐ + reason box; agent chat with live tool calls |
-| **Library** | KB list from vault (filter by level/concept/question), open note, "open in Obsidian" link |
+| **Top bar / overview** | Project name, status, charter version, level, next sweep, unread cards, pending proposals, monthly cost, pause |
+| **Brief / Charter** | Brief (paste or upload), charter draft with scoping questions, versions, approve |
+| **Feed** (left) + **Agent** (right) | Cards with scores/reasons/relations and 👎/👍/⭐ + reason box; agent chat with live tool calls |
+| **Library** | KB list from vault (filter by level/concept/question), open note, "Open in knowledge base" |
+| **Knowledge base** | The real Obsidian interface for this project's vault (Ignis), hub-themed, no visible frame |
 | **Graph** | Cytoscape view of KB + typed edges; highlighted missing-link pairs |
 | **Directions** | Research-direction cards from reviews (approved → `questions/`) |
 | **Proposals** | Pending/decided proposals with diff + evidence, approve/reject + reason |
@@ -428,22 +434,43 @@ properties so notes can be re-extracted later.
 | **Settings** | Charter, queries & weights, sources, level, schedule, cards per sweep, models, budget cap |
 
 **Knowledge base tab (v0.5):** the real Obsidian interface embedded in the hub UI, served by
-[Ignis](https://github.com/Nystik-gh/ignis) (self-hosted Obsidian-as-a-web-app, AGPL, pinned) as a second
-compose service in its own container (vault folders only, no published port), proxied by the hub at `/kb/` so
-the iframe is same-origin on port 4850. Each vault ships a hub theme
-(`.obsidian/` CSS snippet + layout) so it looks like part of the hub. Fallback if Ignis fails its trial:
-linuxserver/obsidian (streamed desktop) behind the same tab. Everything runs on the hub machine.
+[Ignis](https://github.com/Nystik-gh/ignis) (self-hosted Obsidian-as-a-web-app, a Node.js server, AGPL, pinned)
+**bundled inside the project's container**: the image copies a pinned Ignis release, the hub starts it as a
+supervised child process on the container's loopback interface, and proxies it at `/kb/`, so the iframe is
+same-origin on the project's port. The tab stays loaded when switching tabs, shows no frame border, and Obsidian's
+own chrome is hidden. Each vault ships a hub theme (`.obsidian/` CSS snippet + layout) matching the hub's colors,
+fonts and light/dark mode. `RH_KB_VIEWER=off` disables it. Pending a 30-minute trial; if Ignis cannot run under
+`/kb/` it gets its own host name (`kb.<name>.localhost`) in the same container; if it fails entirely, the Library
+view is the only viewer.
 
 ---
 
-## 14. Docker
+## 14. Docker: one container per project
 
-- `Dockerfile`: `node:24-slim`, `npm ci`, build Vue, run `rh-server` as non-root user.
-- `docker-compose.yml`: one service, `restart: unless-stopped`, port `4850`, volume `./data:/data`,
-  `env_file: .env`, healthcheck on `/v1/health`.
-- `.env`: `OPENROUTER_API_KEY` (models + embeddings + Jev), `CONTACT_EMAIL`, `S2_API_KEY` (optional)
-  (OpenAlex/Crossref polite pool), `RH_CLIENT_TOKEN`, model IDs, budget caps. Never committed.
-- **Another hub** = copy the compose folder, change port and data dir.
+- `Dockerfile`: `node:24-slim`, `npm ci`, build Vue, copy a pinned Ignis release (v0.5), run `rh-server` as a
+  non-root user; `rh-server` supervises helper processes (Ignis, later Docling).
+- `docker-compose.yml` per project: `name: rh-<name>`, one service, `restart: unless-stopped`, port
+  `127.0.0.1:<port>:4850`, volume `./data:/data`, `env_file: .env`, `mem_limit`/`cpus` (2 GB / 2 CPUs default),
+  healthcheck on `/v1/health`.
+- `.env` per project: `RH_PROJECT_NAME`, `OPENROUTER_API_KEY` (models + embeddings + Jev; one key per project
+  recommended, with OpenRouter's per-key credit limit), `RH_SWEEP_TIME`, `CONTACT_EMAIL`, `S2_API_KEY`
+  (optional), tokens, model IDs, budget caps. Never committed.
+- **New theme:** `./new-project.sh genomics` creates `projects/genomics/` with its compose file and `.env`, the next
+  free port (4860, 4870, …), compose name `rh-genomics`, a sweep time 20 minutes after the last project's, and
+  prints `http://genomics.localhost:4860`.
+
+**Projects never interfere** (spec `deployment`):
+
+| Shared thing | Protection |
+|---|---|
+| Data folder | `.owner` lock with a 15 s heartbeat; a second container on the same folder refuses to start |
+| Port | each project its own; a taken port gives a one-line error, not a stack trace |
+| Browser cookies/storage | each project at `<name>.localhost:<port>` (browsers keep cookies per host name) |
+| Docker names | compose project `rh-<name>`; logs and health carry the project name |
+| CPU / memory | per-container limits |
+| Paper APIs (one IP) | staggered sweep times, per-source pacing, backoff on 429 |
+| OpenRouter balance | one key per project with its own credit limit (recommended) |
+
 - Host prerequisite: Docker daemon running + user in `docker` group (currently not set up).
 
 ---
@@ -483,7 +510,7 @@ with proposals and behavior specs; design and tasks are written for each layer w
 
 ```
                          ┌──────────────────────────┐
-              v0-5       │ knowledge-vault          │  ⭐ → connected evidence notes, search, Library
+              v0-5       │ knowledge-vault · viewer │  ⭐ → connected notes, search, Library, Obsidian tab
                        ┌─┴──────────────────────────┴─┐
               v0-4     │ paper-feedback               │  👎/👍/⭐ + reason, weights, few-shot, precision@5
                      ┌─┴──────────────────────────────┴─┐
@@ -491,20 +518,20 @@ with proposals and behavior specs; design and tasks are written for each layer w
                    ┌─┴──────────────────────────────────┴─┐
               v0-2 │ paper-sources · paper-embeddings     │  keyless sources, one record per work, vectors
                  ┌─┴──────────────────────────────────────┴─┐
-              v0-1│ project-lifecycle · scheduling          │  brief → charter, isolation, exactly-once slots
+              v0-1│ project-charter · scheduling            │  brief → charter, pause, exactly-once slots
                ┌─┴──────────────────────────────────────────┴─┐
-              v0-0 │ deployment · agent-runtime · jev-client   │  container, durable agent, Jev client
+              v0-0 │ deployment · agent-runtime · jev-client   │  one container per project, durable agent, Jev
                └──────────────────────────────────────────────┘
 ```
 
 | Layer | Change | Capabilities | Jev commands added | Done when |
 |---|---|---|---|---|
-| 0 | `v0-0-skeleton` | deployment, agent-runtime, jev-client | `ping` | Container runs, faux agent chats, crash test passes, offline suite green |
-| 1 | `v0-1-projects` | project-lifecycle, scheduling | — | Brief → approved charter; sweeps requested exactly once per slot |
+| 0 | `v0-0-skeleton` | deployment, agent-runtime, jev-client | `ping` | One container per project that cannot interfere with another; faux agent chats; crash test passes; offline suite green |
+| 1 | `v0-1-project-setup` | project-charter, scheduling | — | Brief → approved charter; sweeps requested exactly once per slot |
 | 2 | `v0-2-paper-sources` | paper-sources, paper-embeddings | — | Queries return deduplicated, enriched, embedded records |
 | 3 | `v0-3-daily-sweep` | paper-sweep, paper-cards | `on-theme`, `paper-kind`, `worth-reading`, `level`, `importance` | ~7 useful, foundational-first cards per day |
 | 4 | `v0-4-feedback` | paper-feedback | `reason-parse` | Judgments change weights and Jev inputs; precision@5 shown |
-| 5 | `v0-5-knowledge-vault` | knowledge-vault | — | ⭐ papers become connected notes that open in Obsidian |
+| 5 | `v0-5-knowledge-vault` | knowledge-vault, knowledge-viewer | — | ⭐ papers become connected notes, readable and editable in the embedded Obsidian tab |
 
 After v0:
 
@@ -523,7 +550,9 @@ After v0:
 | pi-durable is experimental, API changes | Pin 1.1.0; all usage behind `packages/durable-agent`; upgrade deliberately with recovery tests |
 | Jev outage | Gate is behind a `Judge` interface; an LLM-backed judge as config fallback (explicit, not automatic) |
 | Jev miscalibrated for scientific abstracts | Review bands, weekly calibration against your judgments, thresholds versioned |
-| API rate limits (arXiv, OpenAlex) | Shared cache, politeness delays, keyless sources by default, chunked gather with durable backoff |
+| API rate limits (arXiv, OpenAlex), shared by every project on one IP | 7-day metadata cache, politeness delays, staggered sweep times, keyless sources by default, durable backoff |
+| Two projects interfere on one machine | Data-folder lock, own port/name/host name, resource limits (§14) |
+| Ignis (young, unofficial) breaks on an Obsidian update | Pinned release; Library view still works; `RH_KB_VIEWER=off` |
 | OpenRouter Decisions API (Jev) is alpha | One client module, pinned Jev model, raw payloads in the ledger to diagnose shape changes |
 | Embedding model change | Vectors record their model; re-embed in background; never mix models in one comparison |
 | Prompt injection via paper text | "Treat text as data" in every Jev/LLM prompt; no bash/file tools; KB writes via schema-checked tools |
@@ -534,12 +563,14 @@ After v0:
 
 ---
 
-## 19. Open items before v0.0
+## 19. Open items
 
 - [ ] Docker: start daemon, add user to `docker` group (`sudo systemctl enable --now docker`, `sudo usermod -aG docker dlos`, re-login)
 - [ ] `OPENROUTER_API_KEY` (covers models + Jev); confirm current model IDs + prices
 - [ ] Contact email for OpenAlex/Crossref polite pools; optional Semantic Scholar API key
 - [ ] First project brief (markdown) to test with
+- [ ] v0.0 task group 8 (flatten to one project per container, lock, `new-project.sh`) before starting v0.1
+- [ ] Ignis trial (needs Docker) before writing v0.5's design
 
 ---
 
@@ -559,7 +590,8 @@ Each choice was checked against current alternatives; ✅ = kept, 🔄 = changed
 | UI | Vue 3 + Vite | React | ✅ Kept: reference UI patterns are Vue |
 | Database | `node:sqlite` + FTS5 + `sqlite-vec` | Postgres + pgvector, Qdrant, Neo4j | ✅ Kept; **tested locally**: FTS5 BM25 and sqlite-vec v0.1.9 KNN work on Node 26 with `allowExtension` |
 | Knowledge base | Obsidian-compatible markdown vault | Vector-DB RAG, graph DB | ✅ Kept: matches the 2026 "LLM wiki" pattern; BM25 over markdown benchmarked well |
-| Knowledge base viewer (v0.5) | Ignis: real Obsidian UI as a self-hosted web app, in an iframe tab, hub theme | linuxserver/obsidian (streamed desktop: laggy, heavy), Quartz (read-only), own Library view only | 🔄 New: user wants Obsidian in the browser, all on the server; pending a 30-minute trial |
+| Knowledge base viewer (v0.5) | Ignis: real Obsidian UI as a self-hosted web app, bundled in the project container, iframe tab, hub theme | linuxserver/obsidian (streamed desktop: laggy, heavy), Ignis as a separate container, Quartz (read-only), own Library view only | 🔄 New: user wants Obsidian in the browser, all on the server, one container per project; pending a 30-minute trial |
+| Deployment unit | One container per project | Several projects in one hub container | 🔄 Changed 2026-10-23 at the user's request: simpler, isolated by Docker; interference prevented by locks, ports, host names, limits, staggering |
 | Graph view (v1) | Cytoscape.js | sigma.js (WebGL, large graphs), G6 | ✅ Kept for hundreds of nodes; sigma.js if graphs grow to thousands |
 | PDF → markdown (v1) | Structured sources first; Docling for PDFs | Marker (GPU), MarkItDown (shallow), GROBID (no math) | 🔄 New: Docling as the leading option, decided in v1 |
 | Spec process | OpenSpec 1.14.3, layered changes | Plain PLAN.md | ✅ Kept; all six v0 changes pass `openspec validate --strict` |
