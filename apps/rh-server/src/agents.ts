@@ -1,11 +1,11 @@
-// The project's agents as pi-durable extensions. v0.0 has one: research-desk, the root agent each project chats
-// with. It has no tools yet; allowOnly blocks any tool call outside its (empty) list.
+// The project's agents as pi-durable extensions: research-desk, the root agent each project chats with.
+// allowOnly blocks any tool call outside its list.
 import { join } from "node:path";
 import { defineExtension, section, type Extension } from "@earendil-works/pi-durable";
 import { allowOnly, loadPrompt } from "@rh/durable-agent";
 
-/** Tools the research desk may call. Empty until the paper layers add theirs. */
-export const DESK_TOOLS: readonly string[] = [];
+/** Tools the research desk may call. */
+export const DESK_TOOLS: readonly string[] = ["search_papers"];
 
 export interface Agents {
   desk: Extension;

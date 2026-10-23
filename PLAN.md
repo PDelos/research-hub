@@ -480,7 +480,8 @@ view is the only viewer.
 | Item | Per day per project |
 |---|---|
 | Jev: ~300 candidates × 3 gate commands + level/importance for ~40 survivors | ~1,000 calls × ~$0.00004 ≈ **$0.04** |
-| Embeddings: ~300 abstracts × ~300 tokens with `qwen3-embedding-8b` | **< $0.001** |
+| Embeddings: ~300 abstracts × ~300 tokens with `qwen3-embedding-8b` (whole + 3 facet vectors) | **< $0.002** |
+| Jev `abstract-facets`: one call per new paper (~10 sentence questions; measured $0.0001 per paper on 2026-10-23) | ~300 × $0.0001 ≈ **$0.03** |
 | Desk agent sweep run + 7 cards (Haiku 5.5, ~200K in / 10K out incl. re-reading) | ~$0.03 |
 | ≤3 reader subagents with full text (v1, Haiku 5.5) | ~$0.01–0.03 |
 | Librarian per ⭐ (~2/day, Haiku 5.5) | ~$0.01 |

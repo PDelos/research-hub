@@ -54,4 +54,5 @@ Jev commands added: `abstract-facets`. LLM calls added: none beyond the desk's n
 - External: arXiv, OpenAlex, Europe PMC APIs; OpenRouter embeddings and Jev; optional Semantic Scholar.
 - Config: `CONTACT_EMAIL` (polite pools), `RH_MODEL_EMBED`, `RH_EMBED_DIMS`, optional `S2_API_KEY`.
 - Cost: about $0.0000005 per embedding call and about $0.000014 per Jev facet call, so a few hundredths of a cent
-  per new paper.
+  per new paper. (Measured live on 2026-10-23: a facet call carries one question per sentence, about $0.0001 per
+  paper; embeddings about $0.000006 per paper; 8 papers cost $0.00086 in all.)

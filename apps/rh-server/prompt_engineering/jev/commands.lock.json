@@ -1,4 +1,8 @@
 {
+  "abstract-facets": {
+    "version": 1,
+    "sha256": "0b386dcda812f533ef3e6e87882261005da7d294dc7efa86ced26dc896fa0e2c"
+  },
   "ping": {
     "version": 1,
     "sha256": "9b07a3e94434ce07d243c7f19b42b1ced6bce31e0a2edb640918865ad10f667d"

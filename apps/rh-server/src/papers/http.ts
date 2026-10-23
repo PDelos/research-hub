@@ -1,4 +1,4 @@
-// Polite HTTP for paper sources: per-host pacing (arXiv: 1 request per 3 s), a timeout per attempt, and retries on
+// Polite HTTP for paper sources (and the embeddings endpoint): per-host pacing (arXiv: 1 request per 3 s), a timeout per attempt, and retries on
 // HTTP 429/5xx or network errors honoring Retry-After, within a time budget (spec paper-sources: Polite rate
 // limiting, Source failure isolation).
 import { VERSION } from "../version.ts";
@@ -25,6 +25,8 @@ export interface RequestOptions {
   budgetMs?: number;
   /** Per-attempt timeout (default 20 s, never beyond the remaining budget). */
   timeoutMs?: number;
+  method?: "GET" | "POST";
+  body?: string;
 }
 
 export interface PoliteHttpOptions {
@@ -79,7 +81,7 @@ export class PoliteHttp {
     return (await this.request(url, options)).text();
   }
 
-  /** GET with pacing and retries; a 404 resolves to a Response with status 404 for the caller to read as "not found". */
+  /** A request with pacing and retries; a 404 resolves to a Response with status 404 for the caller to read as "not found". */
   async request(url: string, options: RequestOptions): Promise<Response> {
     const attempts = options.attempts ?? 3;
     const budget = options.budgetMs ?? 60_000;
@@ -93,6 +95,8 @@ export class PoliteHttp {
       let retryAfter: number | undefined;
       try {
         const response = await this.fetchImpl(url, {
+          method: options.method ?? "GET",
+          body: options.body,
           headers: { "user-agent": this.userAgent, ...options.headers },
           signal: AbortSignal.timeout(Math.min(options.timeoutMs ?? 20_000, remaining)),
         });

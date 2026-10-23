@@ -129,7 +129,7 @@ export function splitSentences(text: string): string[] {
   if (!clean) return [];
   const out: string[] = [];
   let start = 0;
-  const boundary = /([.!?])["')\]]*\s+(?=["'(\[]?[A-Z0-9])/g;
+  const boundary = /([.!?])["')\]]*\s+(?=["'([]?[A-Z0-9])/g;
   for (let m = boundary.exec(clean); m; m = boundary.exec(clean)) {
     if (m[1] === ".") {
       const before = clean.slice(start, m.index);
@@ -139,10 +139,11 @@ export function splitSentences(text: string): string[] {
         continue;
     }
     const sentence = clean.slice(start, m.index + m[0].trimEnd().length).trim();
-    if (sentence) out.push(sentence);
+    if (/\p{L}/u.test(sentence)) out.push(sentence);
     start = m.index + m[0].length;
   }
+  // Fragments without letters (a trailing footnote mark "1", a lone number) are not sentences.
   const rest = clean.slice(start).trim();
-  if (rest) out.push(rest);
+  if (/\p{L}/u.test(rest)) out.push(rest);
   return out;
 }

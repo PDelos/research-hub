@@ -21,6 +21,8 @@ import { Brief, Charters, ProjectState, ScopingQuestions } from "./charter.ts";
 import { CharterWriter } from "./charter-writer.ts";
 import type { PapersConfig, ScheduleDefaults } from "./config.ts";
 import { Scheduler } from "./schedule.ts";
+import { PaperService } from "./papers/service.ts";
+import { paperTools } from "./papers/tool.ts";
 import { ensureVectorTables, openProjectDb, Settings, type Db, type SelfCheck } from "./db.ts";
 import type { Logger } from "./logger.ts";
 import { Telemetry } from "./telemetry.ts";
@@ -69,6 +71,7 @@ export interface ProjectRuntime {
   readonly state: ProjectState;
   readonly charterWriter: CharterWriter;
   readonly scheduler: Scheduler;
+  readonly papers: PaperService;
   model(): Promise<{ id: string; window: number }>;
   compaction(): CompactionSetting & { window: number };
   setCompaction(next: Partial<CompactionSetting>): CompactionSetting;
@@ -95,6 +98,10 @@ export async function openProject(options: {
   deskTools?: readonly string[];
   schedule: ScheduleDefaults;
   papers: PapersConfig;
+  offline: boolean;
+  openrouterKey?: string;
+  /** Tests: the fetch used for paper sources and embeddings. */
+  paperFetch?: typeof fetch;
 }): Promise<ProjectRuntime> {
   const { name, catalog, log } = options;
   const dir = options.dataDir;
@@ -123,10 +130,25 @@ export async function openProject(options: {
     observe,
   });
   const scheduler = new Scheduler({ db, settings, state, charters, defaults: options.schedule, log: plog });
+  const jevLedger = new JevLedger((record) => telemetry.jevCall(record));
+  const jevDir = join(options.promptsDir, "jev");
+  // Before the harness opens: a resumed search_papers call may need it during replay.
+  const papers = new PaperService({
+    db,
+    settings,
+    config: options.papers,
+    offline: options.offline,
+    openrouterKey: options.openrouterKey,
+    jevDir,
+    decide: (s, q, o) => options.jev.systemOne(s, q, o),
+    jevLedger,
+    log: plog,
+    fetch: options.paperFetch,
+  });
   const agents = createAgents({
     promptsDir: options.promptsDir,
     projectName: name,
-    extra: [observe, ...(options.extensions ?? [])],
+    extra: [observe, paperTools(() => papers), ...(options.extensions ?? [])],
     separate: [charterWriter.extension],
     deskTools: options.deskTools,
   });
@@ -165,9 +187,7 @@ export async function openProject(options: {
   window = (await model()).window;
   harness.harness.resume();
   charterWriter.attach(harness.harness, ctx);
-
-  const jevLedger = new JevLedger((record) => telemetry.jevCall(record));
-  const jevDir = join(options.promptsDir, "jev");
+  papers.start();
 
   plog.info("project.opened", { dir, rootConversation: root.id, model: (await model()).id, check });
 
@@ -189,6 +209,7 @@ export async function openProject(options: {
     state,
     charterWriter,
     scheduler,
+    papers,
     model,
     compaction: () => ({ ...compaction, window }),
     setCompaction(next) {
@@ -217,6 +238,7 @@ export async function openProject(options: {
     },
     async close() {
       scheduler.stop();
+      await papers.close();
       stopProjector();
       await harness.close();
       db.close();

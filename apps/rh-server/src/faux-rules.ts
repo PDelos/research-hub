@@ -69,5 +69,15 @@ export const charterWriterRule: FauxRule = (turn) => {
   return undefined;
 };
 
+/** The offline desk searches when asked for papers ("find papers on X", "search for X") and reports the result. */
+export const deskSearchRule: FauxRule = (turn) => {
+  if (turn.sections["charter-writer"]) return undefined;
+  const result = turn.results.find((r) => r.name === "search_papers");
+  if (result) return say(result.text);
+  const m = turn.lastUser.match(/\b(?:find|search(?: for)?|look for)\b(?:\s+(?:recent|new))?(?:\s+papers?)?(?:\s+(?:on|about|for))?\s+(.+)/i);
+  if (!m) return undefined;
+  return call("search_papers", { query: m[1].replace(/[?.!]+$/, "").slice(0, 200), limit: 5 });
+};
+
 /** Default scripted rules for offline mode. */
-export const offlineRules: FauxRule[] = [charterWriterRule];
+export const offlineRules: FauxRule[] = [charterWriterRule, deskSearchRule];

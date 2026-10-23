@@ -62,6 +62,7 @@ test("sentence splitting keeps decimals, e.g., et al. and initials intact", () =
     "Code is available.",
   ]);
   assert.deepEqual(splitSentences(""), []);
+  assert.deepEqual(splitSentences("We release the weights under the MIT License. 1"), ["We release the weights under the MIT License."], "a trailing footnote mark is dropped");
   assert.deepEqual(splitSentences("One sentence without a period"), ["One sentence without a period"]);
   assert.deepEqual(splitSentences("<p>First part.</p><p>Second part.</p>"), ["First part.", "Second part."]);
   assert.deepEqual(splitSentences("We test i.e. three settings. Results follow."), ["We test i.e. three settings.", "Results follow."]);

@@ -15,6 +15,7 @@ onMounted(async () => {
       <div><span class="label">Total</span>{{ usd(store.totals.totalUsd) }}</div>
       <div><span class="label">Models</span>{{ usd(store.totals.modelUsd) }}</div>
       <div><span class="label">Jev</span>{{ usd(store.totals.jevUsd) }} · {{ store.totals.jevCalls }} calls</div>
+      <div><span class="label">Embeddings</span>{{ usd(store.totals.embeddingUsd) }} · {{ store.totals.embeddingCalls }} calls</div>
       <div><span class="label">Runs</span>{{ store.totals.runs }}</div>
     </div>
     <table>

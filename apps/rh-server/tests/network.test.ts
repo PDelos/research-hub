@@ -1,4 +1,5 @@
-// Spec deployment: offline mode makes no outbound requests during startup, chat and a Jev ping (task 4.6).
+// Spec deployment: offline mode makes no outbound requests during startup, chat, a Jev ping and a paper search
+// (v0.0 task 4.6, v0.2 task 5.1).
 // Node's diagnostics channels report every fetch connection and every http.request; only loopback (our own test
 // server) is allowed.
 import assert from "node:assert/strict";
@@ -58,6 +59,10 @@ test("offline mode with no keys makes zero outbound connections", async () => {
       assert.equal(ping.cost.source, "mock");
       assert.ok(ping.greeting >= 0 && ping.greeting <= 1);
       assert.deepEqual((await server.client.info()).providers, { models: "faux", jev: "mock" });
+      // A paper search from chat (sources, enrichment, facets, embeddings) stays offline too.
+      const search = await server.client.send("find papers on protein language models", { waitMs: 20_000 });
+      assert.match(search.answer!.text, /papers for "protein language models"/);
+      assert.ok(server.hub.project.papers.store.count() > 0);
     } finally {
       await server.stop();
     }

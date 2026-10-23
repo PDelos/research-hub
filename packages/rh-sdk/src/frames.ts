@@ -22,6 +22,9 @@ export interface CostTotals {
   monthUsd: number;
   runs: number;
   jevCalls: number;
+  /** Paper embeddings (v0.2); facet labeling is counted under Jev. */
+  embeddingUsd: number;
+  embeddingCalls: number;
 }
 
 export interface RunSummary {

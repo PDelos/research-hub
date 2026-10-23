@@ -20,6 +20,8 @@ export interface HubOptions {
   heartbeatMs?: number;
   /** Start the 60 s scheduler ticker (default true; tests drive scheduler.tick() with a fixed clock). */
   ticker?: boolean;
+  /** The fetch used for paper sources and embeddings (tests). Offline mode otherwise uses synthetic responses. */
+  paperFetch?: typeof fetch;
 }
 
 export class Hub {
@@ -73,6 +75,9 @@ export class Hub {
         deskTools: this.options.deskTools,
         schedule: this.config.schedule,
         papers: this.config.papers,
+        offline: this.config.mode === "offline",
+        openrouterKey: this.config.openrouterKey,
+        paperFetch: this.options.paperFetch,
       });
       if (this.options.ticker !== false) this.opened.scheduler.start();
     } catch (error) {

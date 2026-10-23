@@ -63,6 +63,9 @@ export interface CostTotals {
   monthUsd: number;
   runs: number;
   jevCalls: number;
+  /** Paper embeddings (v0.2); facet labeling is counted under Jev. */
+  embeddingUsd: number;
+  embeddingCalls: number;
 }
 
 export class Telemetry implements TelemetryStore {
@@ -334,15 +337,23 @@ export class Telemetry implements TelemetryStore {
         "SELECT COALESCE(SUM(CASE WHEN cost_source IN ('reported','estimated') THEN cost_usd END), 0) c FROM jev_calls WHERE created_at >= ?",
       )
       .get(month) as any;
+    const embed = this.db
+      .prepare("SELECT COUNT(*) n, COALESCE(SUM(cost_usd), 0) c FROM embedding_calls WHERE error IS NULL")
+      .get() as any;
+    const embedMonth = this.db
+      .prepare("SELECT COALESCE(SUM(cost_usd), 0) c FROM embedding_calls WHERE error IS NULL AND created_at >= ?")
+      .get(month) as any;
     const runs = this.db.prepare("SELECT COUNT(*) n FROM agent_runs").get() as any;
     return {
       modelUsd: model.c,
       jevUsd: jev.c,
       jevUnknownCalls: jev.unknown,
-      totalUsd: model.c + jev.c,
-      monthUsd: modelMonth.c + jevMonth.c,
+      totalUsd: model.c + jev.c + embed.c,
+      monthUsd: modelMonth.c + jevMonth.c + embedMonth.c,
       runs: runs.n,
       jevCalls: jev.n,
+      embeddingUsd: embed.c,
+      embeddingCalls: embed.n,
     };
   }
 

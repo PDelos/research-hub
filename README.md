@@ -5,9 +5,9 @@ durable agent (built on [pi-durable](https://github.com/earendil-works/pi)) that
 [Jev](https://openrouter.ai/docs/guides/community/jev) make the bulk decisions, present a few paper cards a day,
 learn from your 👎/👍/⭐ and grow an Obsidian-compatible knowledge base. A new theme is a new container.
 
-**Status: v0.1.** Durable agent, Jev client, live stream, browser UI and container setup (v0.0), plus the
-project's brief, charter and schedule (v0.1). Paper search, cards and the knowledge base arrive layer by layer (see
-`PLAN.md` §17 and `openspec/changes/`).
+**Status: v0.2.** Durable agent, Jev client, live stream, browser UI and container setup (v0.0), the project's
+brief, charter and schedule (v0.1), and paper search with paper representations (v0.2). The daily sweep, cards and
+the knowledge base arrive layer by layer (see `PLAN.md` §17 and `openspec/changes/`).
 
 ## Quick start (offline, no keys)
 
@@ -19,8 +19,9 @@ npm run build -w rh-client-browser
 RH_MODE=offline npm start -w rh-server
 ```
 
-Open <http://localhost:4850>. Offline mode uses a fake model that echoes you and a mock Jev; nothing leaves your
-machine. Data goes to `./data`.
+Open <http://localhost:4850>. Offline mode uses a fake model that echoes you, a mock Jev, fake embeddings and
+synthetic paper-source answers (ask "find papers on protein folding" to see a search); nothing leaves your machine.
+Data goes to `./data`.
 
 ## Starting a project
 
@@ -45,6 +46,27 @@ npm start -w rh-server
 All models, embeddings and Jev go through OpenRouter. Each job's model is set in `.env` (`RH_MODEL_DESK`,
 `RH_MODEL_READER`, `RH_MODEL_REVIEW`, `RH_MODEL_CHAT`, `RH_MODEL_JEV`); change a line and restart to switch models.
 Without the key the server refuses to start and names the missing variable.
+
+## Finding papers
+
+Ask the research desk in chat, for example "find recent papers on ESM contact prediction since 2026-09-01". It calls
+`search_papers` (at most 10 results per call) and answers with title, year, venue or preprint server, citations,
+sources and a link. Behind it:
+
+- **Sources, all keyless:** arXiv, OpenAlex and Europe PMC (which also covers bioRxiv and medRxiv preprints).
+  Semantic Scholar is used only with `S2_API_KEY`. A failing source is retried (up to 3 attempts within 60 s) and
+  reported; the others still answer. arXiv is paced at one request per 3 seconds.
+- **One record per work:** results merge when any DOI, arXiv ID, PMID, PMCID or OpenAlex ID matches; a shared title
+  alone only flags a possible duplicate. OpenAlex adds venue, citations, references, open-access link and retraction
+  status (cached 7 days); a work not in OpenAlex yet stays pending and is retried on a later search.
+- **Three representations per paper:** a whole-paper vector (title + abstract), facet vectors for background,
+  method and result (Jev labels each abstract sentence with the `abstract-facets` command), and citation links
+  from OpenAlex references. Together they let later layers find "same method, different problem".
+- **Settings:** `CONTACT_EMAIL` is sent to OpenAlex and Europe PMC for their polite pools (the server warns once if
+  it is missing). `RH_MODEL_EMBED` (default `qwen/qwen3-embedding-8b`) and `RH_EMBED_DIMS` (default 1024) choose
+  the one embedding model; changing either re-embeds the project's papers in the background.
+- **Cost** (measured live, 2026-10-23): about $0.0001 of Jev and $0.000006 of embeddings per new paper; the Runs
+  tab shows Jev and embedding totals next to model costs.
 
 ## Projects with Docker
 

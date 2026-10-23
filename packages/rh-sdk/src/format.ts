@@ -9,7 +9,8 @@ export const k = (tokens: number) =>
 export function usd(amount: number | undefined): string {
   const n = amount ?? 0;
   if (n === 0) return "$0";
-  if (n < 0.01) return `$${n.toFixed(4)}`;
+  // Small amounts (Jev calls, embeddings) keep two significant digits: $0.000014, $0.00000050.
+  if (n < 0.01) return `$${n.toFixed(Math.min(8, 1 - Math.floor(Math.log10(n))))}`;
   return `$${n.toFixed(2)}`;
 }
 

@@ -106,7 +106,7 @@ test("a chat turn produces one run record with tokens, model and cost, and the p
     assert.equal(detail.generationList.length, 1);
     const totals = await server.client.usage();
     assert.equal(totals.runs, 1);
-    assert.equal(totals.totalUsd, totals.modelUsd + totals.jevUsd);
+    assert.equal(totals.totalUsd, totals.modelUsd + totals.jevUsd + totals.embeddingUsd);
   } finally {
     await server.stop();
   }
