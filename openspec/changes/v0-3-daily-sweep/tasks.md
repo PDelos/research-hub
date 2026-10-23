@@ -24,5 +24,28 @@
 ## 4. Integration
 
 - [x] 4.1 Offline end-to-end: approve a charter, trigger a sweep, get cards through the UI proxy; run all tests, `npm run check`, `check:jev`, `check:env`, lint and `npm audit`; verify all pass
-- [ ] 4.2 Live check (keyless sources, Jev and embeddings at a few cents at most; cards on a free model): one sweep on a real charter; record counts per phase, gate rejections with reasons, the cards, and the cost split
-- [ ] 4.3 Update `README.md` (daily sweep, cards, settings); verify the documented commands work
+- [x] 4.2 Live check (keyless sources, Jev and embeddings at a few cents at most; cards on a free model): one sweep on a real charter; record counts per phase, gate rejections with reasons, the cards, and the cost split
+- [x] 4.3 Update `README.md` (daily sweep, cards, settings); verify the documented commands work
+
+## Verification notes
+
+- 4.1 (2026-10-23): offline end to end through the UI proxy (brief → charter with 2 scoping questions answered →
+  approved v1 → manual sweep: 249 gathered, 7 cards, no errors). 132 server tests, 35 durable-agent, 24 SDK pass;
+  `npm run check`, `check:jev`, `check:env`, lint (no new warnings) and `npm audit` (0 vulnerabilities) pass.
+- 4.2 live check (2026-10-23), live sources, Jev and embeddings; charter, chat and cards on
+  `nvidia/nemotron-3.5-lightning:free`; no `CONTACT_EMAIL`. The free model drafted a charter (5 questions, 10 queries,
+  out of scope: clinical drug discovery) from a brief on protein language models; approved; manual sweep:
+  - plan 15 queries + 5 review variants (orientation); gather 254 (no failed query, 42 s); dedupe 0 dropped;
+    gate 139 passed, 115 rejected (98 "below relevance_min 0.45", e.g. pathology foundation models at 0.06;
+    17 "below worth_min 0.35"), 45 borderline; enrich: the first attempt timed out on an embedding batch and the
+    30 s retry succeeded without repeating any Jev call; level 139 (8 foundational, 9 core, 66 advanced, 56 frontier);
+    rank 7 candidates; cards: 7 presented, 0 skipped. Total 349 s.
+  - Cards (orientation): two PLM surveys, "Learning the protein language" (Cell Systems), "PLMs and structure
+    prediction", TAPE, "The language of proteins", ProtTrans; summaries grounded (numbers only from abstracts).
+  - Cost: Jev $0.0401 (529 calls), embeddings $0.0014 (28 calls), model $0; total $0.0415.
+  - Fixes from the check: facet labeling now runs in 5 parallel lanes and embedding requests allow 60 s per
+    attempt; reasons cut the last part with "…" instead of dropping it; ranking adds Jev relevance (borderline
+    foundational papers had outranked central ones; spec and design updated).
+  - A second sweep the same day: 257 gathered, 113 dropped as seen before, 33 new Jev calls, $0.0023, 81 s, 7 new
+    cards (e.g. "Transformer protein language models are unsupervised structure learners", PEER benchmark).
+- 4.3: README "The daily sweep and paper cards" section, routes table, status v0.3.

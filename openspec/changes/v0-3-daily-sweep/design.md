@@ -55,7 +55,9 @@ submission id is stored on the sweep and re-attached after a restart.
    band → `borderline`. Thresholds come from the command policies, never from paper text.
 5. **enrich** (code): OpenAlex enrichment and representation (whole + facets, D-v0.2) of the survivors only.
 6. **level** (Jev): one call per survivor bundling `level` and `importance`.
-7. **rank** (code): `rank_score = 0.5·importance + 0.2·question_weight/2 + 0.2·level_fit + 0.1·freshness`; level
+7. **rank** (code): `rank_score = 0.4·importance + 0.2·relevance + 0.15·min(1, question_weight/2) + 0.15·level_fit +
+   0.1·freshness` (relevance added after the live check, where borderline foundational papers outranked central
+   ones); level
    fit in orientation: foundational 1, core 0.8, advanced 0.4, frontier 0.2 (later: core 1, advanced 0.9, frontier
    0.8, foundational 0.6); freshness `exp(-age_days/365)`. Retracted survivors are `blocked` (logged); the top N
    (setting `cards_per_sweep`, default 7, 1–15) become `candidate`, the rest `ranked_out`.

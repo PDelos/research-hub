@@ -27,14 +27,20 @@ export interface ScoreDetails {
 export const PREPRINT_NORM = /^(cs|q-bio|stat\.ML)(\.|$)/;
 const PREPRINT_SERVERS = new Set(["arXiv", "bioRxiv", "medRxiv", "ChemRxiv"]);
 
+/** Join reason parts with " · " within 120 characters; a part that does not fit is cut with "…" when room allows. */
 export const reason = (parts: string[]): string => {
   let out = "";
   for (const part of parts) {
     const next = out ? `${out} · ${part}` : part;
-    if (next.length > 120) break;
-    out = next;
+    if (next.length <= 120) {
+      out = next;
+      continue;
+    }
+    const room = 120 - (out ? out.length + 3 : 0) - 1;
+    if (room >= 20) out = `${out ? `${out} · ` : ""}${part.slice(0, room).trimEnd()}…`;
+    break;
   }
-  return out.slice(0, 120);
+  return out;
 };
 
 const clamp = (n: number) => Math.max(0, Math.min(100, Math.round(n)));

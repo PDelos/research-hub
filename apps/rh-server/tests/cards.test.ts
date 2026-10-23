@@ -46,6 +46,8 @@ test("trust is field-aware: an arXiv cs.LG preprint is penalized less than a bio
     for (const r of [s.relevanceReason, s.trustReason, s.valueReason]) assert.ok(r.length > 0 && r.length <= 120, r);
     for (const n of [s.relevance, s.trust, s.value]) assert.ok(Number.isInteger(n) && n >= 0 && n <= 100);
   }
+  const long = computeScores(basePaper({}), { ...sp, matchedQuestion: "Q1" }, validateCharter(sampleCharter({ questions: [{ text: "How do protein language models transfer what they learn from sequences to structure and function, and where do they fail?" }, { text: "B?" }, { text: "C?" }] })), opts);
+  assert.ok(long.relevanceReason.length <= 120 && long.relevanceReason.endsWith("…") && long.relevanceReason.includes("Q1"), long.relevanceReason);
   // Relevance: 100 × (0.75 × 0.75 + 0.25 × min(1, 1.5 / 2)) = 75.
   assert.equal(ai.relevance, 75);
   assert.match(ai.relevanceReason, /^Jev relevance 0\.75 · Q2 \(weight 1\.5\): Which tasks need fine-tuning\?/);

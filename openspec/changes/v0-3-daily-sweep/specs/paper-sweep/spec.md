@@ -61,7 +61,7 @@ Papers that pass the gate SHALL be enriched (metadata, embedding) and given a le
 - **THEN** it is enriched and leveled, for example as foundational
 
 ### Requirement: Ranking
-Survivors SHALL be ranked by Jev `importance` combined with question weight, level fit (orientation favors foundational and core) and freshness, and the top N (default 7, range 1 to 15) SHALL become candidates.
+Survivors SHALL be ranked by Jev `importance` combined with Jev relevance, question weight, level fit (orientation favors foundational and core) and freshness, and the top N (default 7, range 1 to 15) SHALL become candidates.
 
 #### Scenario: Card cap
 - **WHEN** 30 papers survive the gate and N is 7

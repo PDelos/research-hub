@@ -10,6 +10,7 @@ import type { Embedder } from "./embed.ts";
 import { FacetLabeler, FACETS, type FacetLabel } from "./facets.ts";
 
 export const SIMILAR_K_DEFAULT = 8;
+const FACET_LANES = 5;
 const MODEL_SETTING = "embedding_model";
 
 export interface RepresentResult {
@@ -96,13 +97,16 @@ export class PaperVectors {
     const todo: { paper: Paper; labels: FacetLabel[] }[] = [];
     let skipped = 0;
     let facetFailures = 0;
+    const papers: Paper[] = [];
     for (const id of new Set(ids)) {
       const paper = store.get(id);
       if (!paper) continue;
-      if (this.isCurrent(paper)) {
-        skipped++;
-        continue;
-      }
+      if (this.isCurrent(paper)) skipped++;
+      else papers.push(paper);
+    }
+    // Facet labels: one Jev call per paper, five at a time; stored labels are reused.
+    const labeled = new Map<number, FacetLabel[]>();
+    const label = async (paper: Paper) => {
       let labels: FacetLabel[] = [];
       if (!paper.titleOnly) {
         try {
@@ -112,8 +116,12 @@ export class PaperVectors {
           this.options.log?.warn("representations.facets_failed", { paperId: paper.id, error: error instanceof Error ? error.message : String(error) });
         }
       }
-      todo.push({ paper, labels });
-    }
+      labeled.set(paper.id, labels);
+    };
+    await Promise.all(Array.from({ length: FACET_LANES }, async (_, lane) => {
+      for (let k = lane; k < papers.length; k += FACET_LANES) await label(papers[k]);
+    }));
+    for (const paper of papers) todo.push({ paper, labels: labeled.get(paper.id) ?? [] });
     if (!todo.length) return { represented: 0, skipped, facetFailures };
 
     const texts: string[] = [];

@@ -97,6 +97,9 @@ export class OpenRouterEmbedder implements Embedder {
       }>(this.options.url ?? OPENROUTER_EMBEDDINGS, {
         source: "embeddings",
         method: "POST",
+        // A batch of 32 abstracts can take a while; allow 60 s per attempt and 3 minutes in all.
+        timeoutMs: 60_000,
+        budgetMs: 180_000,
         body: JSON.stringify({ model: this.model, input, dimensions: this.dims, encoding_format: "float" }),
         headers: { authorization: `Bearer ${this.options.apiKey}`, "content-type": "application/json" },
       });

@@ -133,6 +133,11 @@ export function freshness(publishedAt: string | undefined, now: number): number 
   return Math.exp(-days / 365);
 }
 
+/** Rank score (design D3): importance first, then relevance, question weight, level fit and freshness. */
+export function rankScore(x: { importance: number; relevance: number; questionWeight: number; levelFit: number; freshness: number }): number {
+  return 0.4 * x.importance + 0.2 * x.relevance + 0.15 * Math.min(1, x.questionWeight / 2) + 0.15 * x.levelFit + 0.1 * x.freshness;
+}
+
 export function questionWeight(charter: Charter, matched: string | undefined): number {
   return charter.questions.find((q) => q.id === matched)?.weight ?? 0.5;
 }
@@ -475,19 +480,21 @@ export class SweepRunner {
     const charter = this.charter();
     const n = this.cardsPerSweep();
     const rows = this.deps.db
-      .prepare("SELECT paper_id, matched_question, level, importance FROM sweep_papers WHERE sweep_id = ? AND status = 'gated'")
-      .all(sweep.id) as { paper_id: number; matched_question: string | null; level: Level; importance: number }[];
+      .prepare("SELECT paper_id, matched_question, level, importance, relevance FROM sweep_papers WHERE sweep_id = ? AND status = 'gated'")
+      .all(sweep.id) as { paper_id: number; matched_question: string | null; level: Level; importance: number; relevance: number }[];
     const now = this.now();
     const scored: { id: number; score: number }[] = [];
     let blocked = 0;
     const set = this.deps.db.prepare("UPDATE sweep_papers SET status = ?, reason = ?, rank_score = ?, rank = ? WHERE sweep_id = ? AND paper_id = ?");
     for (const r of rows) {
       const paper = this.deps.papers.store.get(Number(r.paper_id))!;
-      const score =
-        0.5 * (r.importance ?? 0) +
-        0.2 * Math.min(1, questionWeight(charter, r.matched_question ?? undefined) / 2) +
-        0.2 * levelFit(r.level ?? "core", sweep.orientation) +
-        0.1 * (sweep.orientation ? 0.5 : freshness(paper.publishedAt, now));
+      const score = rankScore({
+        importance: r.importance ?? 0,
+        relevance: r.relevance ?? 0,
+        questionWeight: questionWeight(charter, r.matched_question ?? undefined),
+        levelFit: levelFit(r.level ?? "core", sweep.orientation),
+        freshness: sweep.orientation ? 0.5 : freshness(paper.publishedAt, now),
+      });
       if (paper.retracted) {
         set.run("blocked", "retracted", score, null, sweep.id, r.paper_id);
         this.deps.log.info("sweep.blocked_retracted", { sweep: sweep.id, paperId: r.paper_id, title: paper.title });

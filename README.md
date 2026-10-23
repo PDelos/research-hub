@@ -5,9 +5,9 @@ durable agent (built on [pi-durable](https://github.com/earendil-works/pi)) that
 [Jev](https://openrouter.ai/docs/guides/community/jev) make the bulk decisions, present a few paper cards a day,
 learn from your 👎/👍/⭐ and grow an Obsidian-compatible knowledge base. A new theme is a new container.
 
-**Status: v0.2.** Durable agent, Jev client, live stream, browser UI and container setup (v0.0), the project's
-brief, charter and schedule (v0.1), and paper search with paper representations (v0.2). The daily sweep, cards and
-the knowledge base arrive layer by layer (see `PLAN.md` §17 and `openspec/changes/`).
+**Status: v0.3.** Durable agent, Jev client, live stream, browser UI and container setup (v0.0), the project's
+brief, charter and schedule (v0.1), paper search with paper representations (v0.2), and the daily sweep with paper
+cards (v0.3). Feedback and the knowledge base arrive next (see `PLAN.md` §17 and `openspec/changes/`).
 
 ## Quick start (offline, no keys)
 
@@ -33,8 +33,8 @@ Data goes to `./data`.
    a new brief make a new draft while the approved version stays in force.
 4. **Schedule.** Once approved, the daily sweep and weekly review run on schedule (Settings tab, or `RH_SWEEP_TIME`,
    `RH_REVIEW_TIME`, `RH_TIMEZONE`). Each slot runs exactly once, even across restarts; after downtime only the latest
-   missed slot runs. Pause the project from the top bar to stop scheduled runs (chat keeps working). In v0.1 a due
-   sweep is only recorded as requested; the sweep itself arrives in v0.3.
+   missed slot runs. Pause the project from the top bar to stop scheduled runs (chat keeps working).
+5. **Feed.** Each sweep brings a few paper cards (default 7). "Run sweep now" in the Feed starts one at once.
 
 ## Live mode
 
@@ -67,6 +67,35 @@ sources and a link. Behind it:
   the one embedding model; changing either re-embeds the project's papers in the background.
 - **Cost** (measured live, 2026-10-23): about $0.0001 of Jev and $0.000006 of embeddings per new paper; the Runs
   tab shows Jev and embedding totals next to model costs.
+
+## The daily sweep and paper cards
+
+A sweep runs on its own at the scheduled time (or from "Run sweep now") and goes through seven phases, all visible
+in the Runs tab:
+
+1. **plan:** a weighted draw of up to 15 charter queries. Until you have judged 10 papers the project is in
+   *orientation mode*: 5 queries also get a "review" variant and there is no date window, so early cards favor
+   surveys, reviews and foundational work. Later sweeps search only since the previous sweep.
+2. **gather:** each query on every source (10 results per source).
+3. **dedupe:** papers that already have a card or were rejected before are dropped without asking Jev again.
+4. **gate:** one Jev call per paper (`on-theme`, `paper-kind`, `worth-reading`): rejected below relevance 0.45 or
+   worth 0.35 with the reason stored; relevance 0.45–0.55 passes as *borderline*.
+5. **enrich:** OpenAlex metadata and the paper's vectors, for survivors only.
+6. **level:** one Jev call per survivor (`level`, `importance`): foundational, core, advanced or frontier.
+7. **rank:** importance, relevance, question weight, level fit and freshness; retracted papers are blocked; the top
+   N become candidates (`cards_per_sweep`, 1 to 15, `PUT /v1/sweep-settings`).
+
+Then the research desk writes the cards on the `desk` model: a summary of at most 80 words from the title and
+abstract only (a summary with numbers that are not in the abstract is refused), and it must present or explain every
+candidate. **Scores are computed by code, never by the model:** Relevance (Jev relevance and question weight),
+Trust (peer review with a smaller preprint penalty in cs.* and q-bio.*, citations per year, open access, a described
+method) and Value (novelty, worth reading, kind of paper), each with a one-line reason. "How these scores were
+computed" on a card shows the formulas, inputs and Jev decisions with their versions.
+
+A sweep survives restarts: every Jev decision is stored per paper and command version, so a resumed or repeated
+sweep never pays twice. A failing phase retries after 30 s, 2 min and 8 min, then the sweep fails with the error.
+Measured live (2026-10-23): a first sweep gathered 254 papers, 139 passed the gate, 7 cards, $0.041 (Jev $0.040,
+embeddings $0.0014, cards on a free model); a second sweep the same day reused every decision and cost $0.0023.
 
 ## Projects with Docker
 
@@ -128,6 +157,9 @@ curl -s -X POST -H "authorization: Bearer $RH_API_TOKEN" -H 'content-type: appli
 | `GET /v1/charter/versions/:n` | An approved version |
 | `GET/PUT /v1/schedule` | Sweep time and on/off, review weekday, time and on/off |
 | `GET /v1/scheduled-runs` · `POST /v1/runs/{sweep,review}` | Run log (requested, skipped with reason) · run now |
+| `GET /v1/cards` · `GET /v1/cards/:id` | The Feed (cards grouped by sweep, newest first) · one card with score details |
+| `GET /v1/sweeps[/:id]` | Sweeps with phases, counts, papers by status and the cost split |
+| `GET/PUT /v1/sweep-settings` | Cards per sweep (1 to 15, default 7) |
 
 ## Development
 
