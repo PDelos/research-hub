@@ -180,6 +180,26 @@ const MIGRATIONS: string[] = [
   ALTER TABLE sweep_papers ADD COLUMN queries_json TEXT;
   ALTER TABLE jev_calls ADD COLUMN extra_json TEXT;
   `,
+  // 6 (v0-5-knowledge-vault): evidence notes per paper, the vault search index (rebuildable from the files), and
+  // ingest attempts on knowledge-base requests (status 'failed' added).
+  `
+  CREATE TABLE kb_notes (
+    paper_id INTEGER NOT NULL UNIQUE REFERENCES papers (id) ON DELETE CASCADE, stem TEXT NOT NULL UNIQUE,
+    summary TEXT, created_at TEXT NOT NULL
+  );
+  CREATE VIRTUAL TABLE kb_fts USING fts5(path UNINDEXED, title, body, tokenize = 'porter unicode61');
+  CREATE TABLE kb_files (path TEXT PRIMARY KEY, mtime_ms REAL NOT NULL, size INTEGER NOT NULL);
+  CREATE TABLE kb_requests_v6 (
+    paper_id INTEGER NOT NULL UNIQUE REFERENCES papers (id) ON DELETE CASCADE, card_id INTEGER NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('pending', 'cancelled', 'done', 'failed')),
+    attempts INTEGER NOT NULL DEFAULT 0, next_attempt_at INTEGER, reason TEXT, conversation_id INTEGER, submission_id INTEGER,
+    created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+  );
+  INSERT INTO kb_requests_v6 (paper_id, card_id, status, created_at, updated_at)
+    SELECT paper_id, card_id, status, created_at, updated_at FROM kb_requests;
+  DROP TABLE kb_requests;
+  ALTER TABLE kb_requests_v6 RENAME TO kb_requests;
+  `,
 ];
 
 export const VECTOR_KINDS = ["whole", "background", "method", "result"] as const;

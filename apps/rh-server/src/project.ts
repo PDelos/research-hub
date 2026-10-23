@@ -1,7 +1,7 @@
 // The project runtime: the data directory, project.sqlite (app + telemetry), the pi-durable
 // harness on agent.sqlite with the research-desk root conversation, the telemetry projector and Jev recording.
 import { existsSync, mkdirSync, readdirSync, renameSync, rmdirSync, rmSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import type { Context } from "@earendil-works/chord";
 import type { Conversation, Extension } from "@earendil-works/pi-durable";
 import {
@@ -28,6 +28,7 @@ import { CardStore } from "./sweep/cards.ts";
 import { Feedback } from "./feedback/feedback.ts";
 import { ReasonParser } from "./feedback/reasons.ts";
 import { feedbackTools } from "./feedback/tools.ts";
+import { Vault } from "./kb/vault.ts";
 import { CardWriter } from "./sweep/card-writer.ts";
 import { paperTools } from "./papers/tool.ts";
 import { ensureVectorTables, openProjectDb, Settings, type Db, type SelfCheck } from "./db.ts";
@@ -84,6 +85,9 @@ export interface ProjectRuntime {
   readonly cards: CardStore;
   readonly feedback: Feedback;
   readonly reasons: ReasonParser;
+  readonly vault: Vault;
+  /** Create the vault and refresh charter.md after a charter approval. */
+  syncVault(): void;
   readonly cardWriter: CardWriter;
   model(): Promise<{ id: string; window: number }>;
   compaction(): CompactionSetting & { window: number };
@@ -165,6 +169,15 @@ export async function openProject(options: {
   });
   const feedback = new Feedback({ db, charters, log: plog });
   feedback.replay();
+  const vault = new Vault(join(dir, "vault"), { templateDir: join(dirname(options.promptsDir), "vault-template"), settings, log: plog });
+  /** Create the vault and refresh charter.md once a charter is approved (user edits to charter.md win). */
+  const syncVault = () => {
+    const approved = charters.approved();
+    if (!approved) return;
+    vault.ensure();
+    vault.writeCharter(approved.charter, approved.version!);
+  };
+  syncVault();
   const decisions = new PaperDecisions({
     db, jevDir, decide, ledger: jevLedger,
     taste: () => feedback.recent(8).map((j) => ({ title: j.title, verdict: j.verdict, ...(j.reason ? { reason: j.reason.slice(0, 200) } : {}) })),
@@ -260,6 +273,8 @@ export async function openProject(options: {
     cards,
     feedback,
     reasons,
+    vault,
+    syncVault,
     cardWriter,
     model,
     compaction: () => ({ ...compaction, window }),

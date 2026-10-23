@@ -104,6 +104,7 @@ export function projectRoutes(hub: Hub): Router {
     hub.log.info("charter.approved", { version: approved.version });
     // Weights replay onto the new version's base weights.
     p().feedback.replay();
+    p().syncVault();
     res.json(charterView());
   });
 

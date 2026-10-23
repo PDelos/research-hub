@@ -2,8 +2,8 @@
 
 ## 1. Vault
 
-- [ ] 1.1 Add migration 6 (kb_notes, kb_fts, kb_requests attempts/reason); create the vault (layout, `.obsidian` template only when absent, charter.md with the hash rule) on approval and at startup; verify new-vault, existing-project (pending ⭐ queued) and user-edited-charter tests
-- [ ] 1.2 Implement note names, section-safe appends, index and log appends; verify name, collision, append-under-heading (user text untouched) and index/log tests
+- [x] 1.1 Add migration 6 (kb_notes, kb_fts, kb_requests attempts/reason); create the vault (layout, `.obsidian` template only when absent, charter.md with the hash rule) on approval and at startup; verify new-vault, existing-project (pending ⭐ queued) and user-edited-charter tests
+- [x] 1.2 Implement note names, section-safe appends, index and log appends; verify name, collision, append-under-heading (user text untouched) and index/log tests
 
 ## 2. Ingest
 
