@@ -71,7 +71,7 @@ export const charterWriterRule: FauxRule = (turn) => {
 
 /** The offline desk searches when asked for papers ("find papers on X", "search for X") and reports the result. */
 export const deskSearchRule: FauxRule = (turn) => {
-  if (turn.sections["charter-writer"] || turn.sections["card-writer"]) return undefined;
+  if (turn.sections["charter-writer"] || turn.sections["card-writer"] || turn.sections["librarian"]) return undefined;
   const result = turn.results.find((r) => r.name === "search_papers");
   if (result) return say(result.text);
   const m = turn.lastUser.match(/\b(?:find|search(?: for)?|look for)\b(?:\s+(?:recent|new))?(?:\s+papers?)?(?:\s+(?:on|about|for))?\s+(.+)/i);
@@ -106,7 +106,7 @@ const ORDINALS: Record<string, number> = { first: 1, second: 2, third: 3, fourth
 
 /** The offline desk records judgments said in chat: "star the second card, great foundation". */
 export const deskJudgeRule: FauxRule = (turn) => {
-  if (turn.sections["charter-writer"] || turn.sections["card-writer"]) return undefined;
+  if (turn.sections["charter-writer"] || turn.sections["card-writer"] || turn.sections["librarian"]) return undefined;
   const result = turn.results.find((r) => r.name === "judge_card");
   if (result) return say(result.text);
   const m = turn.lastUser.match(/\b(star|upvote|like|downvote|dislike)\s+(?:the\s+)?(?:card\s+)?(first|second|third|fourth|fifth|sixth|seventh|\d+)(?:st|nd|rd|th)?\s*(?:card)?[,.:;-]?\s*(.*)$/i);
@@ -116,5 +116,33 @@ export const deskJudgeRule: FauxRule = (turn) => {
   return call("judge_card", { verdict, position, ...(m[3].trim() ? { reason: m[3].trim() } : {}) });
 };
 
+/**
+ * The offline librarian: sections from the abstract (first sentence as summary, a "we propose/use" sentence as
+ * method, a sentence with a number or "improves" as results, the rest "Not stated in the abstract"), then links the
+ * first charter concept and the matched question.
+ */
+export const librarianRule: FauxRule = (turn) => {
+  if (!turn.sections["librarian"]) return undefined;
+  const prompt = turn.lastUser;
+  if (turn.results.some((r) => r.name === "link_note" && !r.isError)) return say("Done.");
+  if (!turn.results.some((r) => r.name === "write_evidence_note" && !r.isError)) {
+    const abstract = prompt.split("ABSTRACT:\n")[1]?.split("\n\nRESEARCH_QUESTIONS:")[0]?.trim() ?? "";
+    const sentences = abstract === "(no abstract)" ? [] : abstract.split(/(?<=[.!?])\s+/).filter(Boolean);
+    const find = (re: RegExp) => sentences.find((x) => re.test(x));
+    const none = "Not stated in the abstract";
+    return call("write_evidence_note", {
+      summary: sentences[0] ?? none,
+      contributions: find(/\b(we (propose|introduce|present)|novel|first)\b/i) ?? none,
+      method: find(/\b(we (propose|use|train|fine-tune|develop|apply)|our (model|method|approach))\b/i) ?? none,
+      results: find(/\b(improv|outperform|achiev|\d)/i) ?? none,
+      limitations: none,
+      open_questions: none,
+    });
+  }
+  const concept = prompt.match(/^CHARTER_CONCEPTS: ([^;\n]+)/m)?.[1]?.trim();
+  const question = prompt.match(/^MATCHED_QUESTION: (Q\d+)/m)?.[1];
+  return call("link_note", { concepts: concept ? [concept] : ["research"], questions: question ? [question] : [] });
+};
+
 /** Default scripted rules for offline mode. */
-export const offlineRules: FauxRule[] = [charterWriterRule, cardWriterRule, deskJudgeRule, deskSearchRule];
+export const offlineRules: FauxRule[] = [charterWriterRule, cardWriterRule, librarianRule, deskJudgeRule, deskSearchRule];

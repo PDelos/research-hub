@@ -29,6 +29,7 @@ import { Feedback } from "./feedback/feedback.ts";
 import { ReasonParser } from "./feedback/reasons.ts";
 import { feedbackTools } from "./feedback/tools.ts";
 import { Vault } from "./kb/vault.ts";
+import { Ingest } from "./kb/ingest.ts";
 import { CardWriter } from "./sweep/card-writer.ts";
 import { paperTools } from "./papers/tool.ts";
 import { ensureVectorTables, openProjectDb, Settings, type Db, type SelfCheck } from "./db.ts";
@@ -86,6 +87,7 @@ export interface ProjectRuntime {
   readonly feedback: Feedback;
   readonly reasons: ReasonParser;
   readonly vault: Vault;
+  readonly ingest: Ingest;
   /** Create the vault and refresh charter.md after a charter approval. */
   syncVault(): void;
   readonly cardWriter: CardWriter;
@@ -196,6 +198,11 @@ export async function openProject(options: {
     db, cards, runner: sweeps, papers, decisions, charters, catalog, promptsDir: options.promptsDir, log: plog, observe,
   });
   sweeps.setCardStage(cardWriter);
+  const ingest = new Ingest({
+    db, vault, store: papers.store, cards, feedback, charters, catalog, promptsDir: options.promptsDir, log: plog, observe,
+  });
+  // A new ⭐ (or any judgment change) may queue a knowledge-base request.
+  feedback.onChange(() => ingest.pickUp());
   const runSweeps = options.runSweeps !== false;
   const unsubscribeSweeps = scheduler.onRequested((run) => {
     if (run.kind === "sweep" && runSweeps) sweeps.pickUp();
@@ -204,7 +211,7 @@ export async function openProject(options: {
     promptsDir: options.promptsDir,
     projectName: name,
     extra: [observe, paperTools(() => papers), feedbackTools(() => ({ cards, feedback, store: papers.store })), ...(options.extensions ?? [])],
-    separate: [charterWriter.extension, cardWriter.extension],
+    separate: [charterWriter.extension, cardWriter.extension, ingest.extension],
     deskTools: options.deskTools,
   });
   const compaction: CompactionSetting = settings.get("compaction", { points: DEFAULT_POINTS, enabled: true });
@@ -243,6 +250,8 @@ export async function openProject(options: {
   harness.harness.resume();
   charterWriter.attach(harness.harness, ctx);
   cardWriter.attach(harness.harness, ctx);
+  ingest.attach(harness.harness, ctx);
+  ingest.pickUp();
   papers.start();
   if (runSweeps) sweeps.pickUp();
   void reasons.parsePending();
@@ -274,7 +283,11 @@ export async function openProject(options: {
     feedback,
     reasons,
     vault,
-    syncVault,
+    ingest,
+    syncVault() {
+      syncVault();
+      ingest.pickUp();
+    },
     cardWriter,
     model,
     compaction: () => ({ ...compaction, window }),
@@ -304,6 +317,7 @@ export async function openProject(options: {
     },
     async close() {
       scheduler.stop();
+      await ingest.close();
       unsubscribeSweeps();
       await sweeps.close();
       await papers.close();
