@@ -44,7 +44,7 @@ A paper judged 👎 SHALL never be presented again in that project.
 - **THEN** it is dropped in dedupe
 
 ### Requirement: Taste examples for Jev
-Every Jev command in a project SHALL receive the 8 most recent judgments as taste examples (title, verdict, reason truncated to 200 characters).
+Every Jev command that judges papers for the user (`on-theme`, `paper-kind`, `worth-reading`, `level`, `importance`) SHALL receive the 8 most recent judgments as taste examples (title, verdict, reason truncated to 200 characters); commands that do not depend on taste (`abstract-facets`, `ping`, `reason-parse`) do not.
 
 #### Scenario: Example included
 - **WHEN** the user judges a card and the next sweep's gate runs
