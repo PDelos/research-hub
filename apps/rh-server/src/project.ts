@@ -26,6 +26,7 @@ import { PaperDecisions } from "./sweep/decisions.ts";
 import { SweepRunner } from "./sweep/sweep.ts";
 import { CardStore } from "./sweep/cards.ts";
 import { Feedback } from "./feedback/feedback.ts";
+import { ReasonParser } from "./feedback/reasons.ts";
 import { CardWriter } from "./sweep/card-writer.ts";
 import { paperTools } from "./papers/tool.ts";
 import { ensureVectorTables, openProjectDb, Settings, type Db, type SelfCheck } from "./db.ts";
@@ -81,6 +82,7 @@ export interface ProjectRuntime {
   readonly sweeps: SweepRunner;
   readonly cards: CardStore;
   readonly feedback: Feedback;
+  readonly reasons: ReasonParser;
   readonly cardWriter: CardWriter;
   model(): Promise<{ id: string; window: number }>;
   compaction(): CompactionSetting & { window: number };
@@ -160,9 +162,15 @@ export async function openProject(options: {
     log: plog,
     fetch: options.paperFetch,
   });
-  const decisions = new PaperDecisions({ db, jevDir, decide: decide, ledger: jevLedger });
   const feedback = new Feedback({ db, charters, log: plog });
   feedback.replay();
+  const decisions = new PaperDecisions({
+    db, jevDir, decide, ledger: jevLedger,
+    taste: () => feedback.recent(8).map((j) => ({ title: j.title, verdict: j.verdict, ...(j.reason ? { reason: j.reason.slice(0, 200) } : {}) })),
+  });
+  const reasons = new ReasonParser({ db, jevDir, decide, ledger: jevLedger, log: plog });
+  // Classify reasons after each judgment (in the background; a Jev failure leaves them pending for the next one).
+  feedback.onChange(() => void reasons.parsePending());
   const sweeps = new SweepRunner({
     db, settings, charters, papers, decisions, log: plog,
     judged: () => feedback.count(),
@@ -223,6 +231,7 @@ export async function openProject(options: {
   cardWriter.attach(harness.harness, ctx);
   papers.start();
   if (runSweeps) sweeps.pickUp();
+  void reasons.parsePending();
 
   plog.info("project.opened", { dir, rootConversation: root.id, model: (await model()).id, check });
 
@@ -249,6 +258,7 @@ export async function openProject(options: {
     sweeps,
     cards,
     feedback,
+    reasons,
     cardWriter,
     model,
     compaction: () => ({ ...compaction, window }),

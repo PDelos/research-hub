@@ -8,8 +8,8 @@
 
 ## 2. Jev
 
-- [ ] 2.1 Add the `reason-parse` command and classification (candidate ≥ 0.7, unclassified 0.4–0.7, pending on failure, retried); verify rule-candidate, unclassified and Jev-down tests and `npm run check:jev`
-- [ ] 2.2 Add taste examples (8 most recent, reasons ≤ 200 characters) to the paper-decision commands; verify that the next gate's recorded Jev input contains a judgment made before it
+- [x] 2.1 Add the `reason-parse` command and classification (candidate ≥ 0.7, unclassified 0.4–0.7, pending on failure, retried); verify rule-candidate, unclassified and Jev-down tests and `npm run check:jev`
+- [x] 2.2 Add taste examples (8 most recent, reasons ≤ 200 characters) to the paper-decision commands; verify that the next gate's recorded Jev input contains a judgment made before it
 
 ## 3. Channels and metrics
 

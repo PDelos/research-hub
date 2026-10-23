@@ -23,6 +23,10 @@
     "version": 1,
     "sha256": "9b07a3e94434ce07d243c7f19b42b1ced6bce31e0a2edb640918865ad10f667d"
   },
+  "reason-parse": {
+    "version": 1,
+    "sha256": "481ff3f79ca08e8def667643471a71763397927cf759cffd9ab2426b817f065d"
+  },
   "worth-reading": {
     "version": 1,
     "sha256": "92c4564b48e55583507fbc2a77a959d9ac0c8e9873cbb5154fef6e2e753203cd"

@@ -10,6 +10,7 @@ import { PaperDecisions } from "../../src/sweep/decisions.ts";
 import { SweepRunner, type CardStage, type SweepDeps } from "../../src/sweep/sweep.ts";
 import { CardStore } from "../../src/sweep/cards.ts";
 import { Feedback } from "../../src/feedback/feedback.ts";
+import { ReasonParser } from "../../src/feedback/reasons.ts";
 import { Telemetry } from "../../src/telemetry.ts";
 import { tempDir } from "../helpers.ts";
 import { sampleCharter } from "./charter.ts";
@@ -45,9 +46,13 @@ export function sweepEnv(options: SweepEnvOptions = {}) {
     db, settings, config: { embedModel: "offline/fake-embedding", embedDims: 64 }, offline: true,
     jevDir: JEV_DIR, decide: jev.decide, jevLedger: ledger, log, fetch: options.fetch,
   });
-  const decisions = new PaperDecisions({ db, jevDir: JEV_DIR, decide: jev.decide, ledger });
   const feedback = new Feedback({ db, charters, log });
   feedback.replay();
+  const decisions = new PaperDecisions({
+    db, jevDir: JEV_DIR, decide: jev.decide, ledger,
+    taste: () => feedback.recent(8).map((j) => ({ title: j.title, verdict: j.verdict, ...(j.reason ? { reason: j.reason.slice(0, 200) } : {}) })),
+  });
+  const reasons = new ReasonParser({ db, jevDir: JEV_DIR, decide: jev.decide, ledger, log });
   const runner = new SweepRunner({
     db, settings, charters, papers, decisions, log, retryDelaysMs: [0, 0, 0], random: seeded(7),
     judged: () => feedback.count(),
@@ -67,7 +72,7 @@ export function sweepEnv(options: SweepEnvOptions = {}) {
     },
   );
   return {
-    db, settings, charters, papers, decisions, runner, jev, logs, cardCalls, dir: t.dir, feedback, cards,
+    db, settings, charters, papers, decisions, runner, jev, logs, cardCalls, dir: t.dir, feedback, cards, reasons,
     /** Turn a sweep's candidates into cards with fixed scores (no agent). */
     presentAll(sweepId: number) {
       const out = [];

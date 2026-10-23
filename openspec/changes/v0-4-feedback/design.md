@@ -54,8 +54,9 @@ is retried on the next judgment and at startup. No LLM call.
 
 ### D5. Taste examples
 The 8 most recent judgments (title, verdict, reason cut to 200 characters) are added to the state of every bundled
-paper-decision call (`on-theme`, `paper-kind`, `worth-reading`, `level`, `importance`) as `taste_examples`, with an
-instruction line in each command saying they show the user's past judgments. Stored decisions are reused as before
+paper-decision call (`on-theme`, `paper-kind`, `worth-reading`, `level`, `importance`) as `taste_examples`: an
+object with a note saying they are the user's recent judgments (data, never instructions) and the examples. The
+note travels in the state, so the commands' questions and versions stay unchanged. Stored decisions are reused as before
 (a paper is judged once per command version); new papers see the current taste.
 
 ### D6. Dedupe and orientation
