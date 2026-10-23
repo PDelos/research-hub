@@ -5,7 +5,7 @@ import { defineExtension, section, type Extension } from "@earendil-works/pi-dur
 import { allowOnly, loadPrompt } from "@rh/durable-agent";
 
 /** Tools the research desk may call. */
-export const DESK_TOOLS: readonly string[] = ["search_papers", "recent_cards", "judge_card"];
+export const DESK_TOOLS: readonly string[] = ["search_papers", "recent_cards", "judge_card", "search_kb", "query_kb"];
 
 export interface Agents {
   desk: Extension;

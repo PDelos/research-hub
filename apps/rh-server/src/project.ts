@@ -30,6 +30,8 @@ import { ReasonParser } from "./feedback/reasons.ts";
 import { feedbackTools } from "./feedback/tools.ts";
 import { Vault } from "./kb/vault.ts";
 import { Ingest } from "./kb/ingest.ts";
+import { KbIndex } from "./kb/search.ts";
+import { kbTools } from "./kb/tools.ts";
 import { CardWriter } from "./sweep/card-writer.ts";
 import { paperTools } from "./papers/tool.ts";
 import { ensureVectorTables, openProjectDb, Settings, type Db, type SelfCheck } from "./db.ts";
@@ -88,6 +90,7 @@ export interface ProjectRuntime {
   readonly reasons: ReasonParser;
   readonly vault: Vault;
   readonly ingest: Ingest;
+  readonly kbIndex: KbIndex;
   /** Create the vault and refresh charter.md after a charter approval. */
   syncVault(): void;
   readonly cardWriter: CardWriter;
@@ -198,6 +201,7 @@ export async function openProject(options: {
     db, cards, runner: sweeps, papers, decisions, charters, catalog, promptsDir: options.promptsDir, log: plog, observe,
   });
   sweeps.setCardStage(cardWriter);
+  const kbIndex = new KbIndex({ db, vault, log: plog });
   const ingest = new Ingest({
     db, vault, store: papers.store, cards, feedback, charters, catalog, promptsDir: options.promptsDir, log: plog, observe,
   });
@@ -210,7 +214,7 @@ export async function openProject(options: {
   const agents = createAgents({
     promptsDir: options.promptsDir,
     projectName: name,
-    extra: [observe, paperTools(() => papers), feedbackTools(() => ({ cards, feedback, store: papers.store })), ...(options.extensions ?? [])],
+    extra: [observe, paperTools(() => papers), feedbackTools(() => ({ cards, feedback, store: papers.store })), kbTools(() => ({ vault, index: kbIndex })), ...(options.extensions ?? [])],
     separate: [charterWriter.extension, cardWriter.extension, ingest.extension],
     deskTools: options.deskTools,
   });
@@ -252,6 +256,7 @@ export async function openProject(options: {
   cardWriter.attach(harness.harness, ctx);
   ingest.attach(harness.harness, ctx);
   ingest.pickUp();
+  kbIndex.start();
   papers.start();
   if (runSweeps) sweeps.pickUp();
   void reasons.parsePending();
@@ -284,8 +289,10 @@ export async function openProject(options: {
     reasons,
     vault,
     ingest,
+    kbIndex,
     syncVault() {
       syncVault();
+      kbIndex.start();
       ingest.pickUp();
     },
     cardWriter,
@@ -318,6 +325,7 @@ export async function openProject(options: {
     async close() {
       scheduler.stop();
       await ingest.close();
+      kbIndex.stop();
       unsubscribeSweeps();
       await sweeps.close();
       await papers.close();

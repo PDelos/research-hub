@@ -8,7 +8,7 @@
 ## 2. Ingest
 
 - [x] 2.1 Implement the ingest runner and librarian tools (properties by code, grounded sections, links with backlinks, done only when connected, retries) and prompts; verify faux tests: note created with all properties and sections, "Not stated in the abstract", first paper of a concept, replay gives one note, third paper → three index lines, edited note keeps the user's Summary
-- [ ] 2.2 Implement FTS search (rebuild, watcher, rescan) and the desk's index section and tools `search_kb`, `query_kb`; verify rebuild-equals-incremental, external edit found within 10 s, "contact map" search with excerpt, and a faux desk answer from the index
+- [x] 2.2 Implement FTS search (rebuild, watcher, rescan) and the desk's index section and tools `search_kb`, `query_kb`; verify rebuild-equals-incremental, external edit found within 10 s, "contact map" search with excerpt, and a faux desk answer from the index
 
 ## 3. Viewer
 
