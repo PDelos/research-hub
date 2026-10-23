@@ -36,6 +36,8 @@ export const store = reactive({
   sweeps: [] as SweepSummary[],
   sweepDetail: undefined as SweepDetail | undefined,
   precision: [] as PrecisionPoint[],
+  /** A vault path to show in the Knowledge base tab ("Open in knowledge base"). */
+  kbOpen: undefined as string | undefined,
   connected: false,
   error: "",
 });
@@ -72,6 +74,10 @@ export async function refreshFeed() {
   } catch (e) {
     store.error = e instanceof Error ? e.message : String(e);
   }
+}
+
+export function openInKb(path: string) {
+  store.kbOpen = path;
 }
 
 export async function openSweep(id: number) {
