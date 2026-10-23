@@ -102,6 +102,8 @@ export function projectRoutes(hub: Hub): Router {
     const approved = p().charters.approve();
     if (!approved) throw new ApiFault("conflict", "There is no draft to approve");
     hub.log.info("charter.approved", { version: approved.version });
+    // Weights replay onto the new version's base weights.
+    p().feedback.replay();
     res.json(charterView());
   });
 

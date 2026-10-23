@@ -149,6 +149,36 @@ const MIGRATIONS: string[] = [
   ALTER TABLE jev_calls ADD COLUMN tag TEXT;
   ALTER TABLE embedding_calls ADD COLUMN tag TEXT;
   `,
+  // 5 (v0-4-feedback): judgments, replayed weights and their effects, rule candidates, knowledge-base requests.
+  `
+  CREATE TABLE judgments (
+    card_id INTEGER NOT NULL UNIQUE REFERENCES cards (id) ON DELETE CASCADE,
+    paper_id INTEGER NOT NULL REFERENCES papers (id) ON DELETE CASCADE,
+    verdict TEXT NOT NULL CHECK (verdict IN ('up', 'down', 'star')), reason TEXT,
+    reason_kind TEXT, rule_probability REAL,
+    rule_status TEXT NOT NULL DEFAULT 'none' CHECK (rule_status IN ('none', 'candidate', 'unclassified', 'pending')),
+    created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+  );
+  CREATE TABLE weight_effects (
+    card_id INTEGER NOT NULL REFERENCES cards (id) ON DELETE CASCADE,
+    kind TEXT NOT NULL CHECK (kind IN ('question', 'query', 'source')), key TEXT NOT NULL,
+    before REAL NOT NULL, after REAL NOT NULL
+  );
+  CREATE INDEX weight_effects_card ON weight_effects (card_id);
+  CREATE TABLE weights (
+    kind TEXT NOT NULL CHECK (kind IN ('question', 'query', 'source')), key TEXT NOT NULL,
+    base REAL NOT NULL, value REAL NOT NULL, UNIQUE (kind, key)
+  );
+  CREATE TABLE rule_candidates (
+    card_id INTEGER NOT NULL UNIQUE REFERENCES cards (id) ON DELETE CASCADE, reason TEXT NOT NULL,
+    reason_kind TEXT, probability REAL NOT NULL, status TEXT NOT NULL DEFAULT 'open', created_at TEXT NOT NULL
+  );
+  CREATE TABLE kb_requests (
+    paper_id INTEGER NOT NULL UNIQUE REFERENCES papers (id) ON DELETE CASCADE, card_id INTEGER NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('pending', 'cancelled', 'done')), created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+  );
+  ALTER TABLE sweep_papers ADD COLUMN queries_json TEXT;
+  `,
 ];
 
 export const VECTOR_KINDS = ["whole", "background", "method", "result"] as const;

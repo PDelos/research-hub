@@ -2,9 +2,9 @@
 
 ## 1. Storage and judgments
 
-- [ ] 1.1 Add migration 5 (judgments, weight_effects, weights, rule_candidates, kb_requests, sweep_papers.queries_json) and record the queries that found each paper in gather; verify a migration test from version 4 and a gather test
-- [ ] 1.2 Implement judgments (set, change, clear; reason ≤ 1,000 characters), the ⭐ hand-off (one request, cancel on un-star) and dedupe of judged papers; verify star-with-reason, star-twice, un-star cancels, and found-again tests
-- [ ] 1.3 Implement weight replay (steps, clamping, charter base, sources) with weight_effects, and use effective weights in plan, rank and Relevance; verify the clamp, 👍-then-👎 and visible-change tests and that a judged query is drawn with its new weight
+- [x] 1.1 Add migration 5 (judgments, weight_effects, weights, rule_candidates, kb_requests, sweep_papers.queries_json) and record the queries that found each paper in gather; verify a migration test from version 4 and a gather test
+- [x] 1.2 Implement judgments (set, change, clear; reason ≤ 1,000 characters), the ⭐ hand-off (one request, cancel on un-star) and dedupe of judged papers; verify star-with-reason, star-twice, un-star cancels, and found-again tests
+- [x] 1.3 Implement weight replay (steps, clamping, charter base, sources) with weight_effects, and use effective weights in plan, rank and Relevance; verify the clamp, 👍-then-👎 and visible-change tests and that a judged query is drawn with its new weight
 
 ## 2. Jev
 

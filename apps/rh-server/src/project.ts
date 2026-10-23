@@ -25,6 +25,7 @@ import { PaperService } from "./papers/service.ts";
 import { PaperDecisions } from "./sweep/decisions.ts";
 import { SweepRunner } from "./sweep/sweep.ts";
 import { CardStore } from "./sweep/cards.ts";
+import { Feedback } from "./feedback/feedback.ts";
 import { CardWriter } from "./sweep/card-writer.ts";
 import { paperTools } from "./papers/tool.ts";
 import { ensureVectorTables, openProjectDb, Settings, type Db, type SelfCheck } from "./db.ts";
@@ -79,6 +80,7 @@ export interface ProjectRuntime {
   readonly decisions: PaperDecisions;
   readonly sweeps: SweepRunner;
   readonly cards: CardStore;
+  readonly feedback: Feedback;
   readonly cardWriter: CardWriter;
   model(): Promise<{ id: string; window: number }>;
   compaction(): CompactionSetting & { window: number };
@@ -159,7 +161,14 @@ export async function openProject(options: {
     fetch: options.paperFetch,
   });
   const decisions = new PaperDecisions({ db, jevDir, decide: decide, ledger: jevLedger });
-  const sweeps = new SweepRunner({ db, settings, charters, papers, decisions, log: plog });
+  const feedback = new Feedback({ db, charters, log: plog });
+  feedback.replay();
+  const sweeps = new SweepRunner({
+    db, settings, charters, papers, decisions, log: plog,
+    judged: () => feedback.count(),
+    judgedPaper: (paperId) => feedback.isJudged(paperId),
+    weight: (kind, key, fallback) => feedback.weight(kind, key, fallback),
+  });
   const cards = new CardStore(db);
   const cardWriter = new CardWriter({
     db, cards, runner: sweeps, papers, decisions, charters, catalog, promptsDir: options.promptsDir, log: plog, observe,
@@ -239,6 +248,7 @@ export async function openProject(options: {
     decisions,
     sweeps,
     cards,
+    feedback,
     cardWriter,
     model,
     compaction: () => ({ ...compaction, window }),

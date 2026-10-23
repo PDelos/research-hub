@@ -8,6 +8,8 @@ import { createLogger } from "../../src/logger.ts";
 import { PaperService } from "../../src/papers/service.ts";
 import { PaperDecisions } from "../../src/sweep/decisions.ts";
 import { SweepRunner, type CardStage, type SweepDeps } from "../../src/sweep/sweep.ts";
+import { CardStore } from "../../src/sweep/cards.ts";
+import { Feedback } from "../../src/feedback/feedback.ts";
 import { Telemetry } from "../../src/telemetry.ts";
 import { tempDir } from "../helpers.ts";
 import { sampleCharter } from "./charter.ts";
@@ -44,7 +46,16 @@ export function sweepEnv(options: SweepEnvOptions = {}) {
     jevDir: JEV_DIR, decide: jev.decide, jevLedger: ledger, log, fetch: options.fetch,
   });
   const decisions = new PaperDecisions({ db, jevDir: JEV_DIR, decide: jev.decide, ledger });
-  const runner = new SweepRunner({ db, settings, charters, papers, decisions, log, retryDelaysMs: [0, 0, 0], random: seeded(7), ...options.runner });
+  const feedback = new Feedback({ db, charters, log });
+  feedback.replay();
+  const runner = new SweepRunner({
+    db, settings, charters, papers, decisions, log, retryDelaysMs: [0, 0, 0], random: seeded(7),
+    judged: () => feedback.count(),
+    judgedPaper: (id) => feedback.isJudged(id),
+    weight: (kind, key, fallback) => feedback.weight(kind, key, fallback),
+    ...options.runner,
+  });
+  const cards = new CardStore(db);
   const cardCalls: number[] = [];
   runner.setCardStage(
     options.cards?.(runner) ?? {
@@ -56,7 +67,19 @@ export function sweepEnv(options: SweepEnvOptions = {}) {
     },
   );
   return {
-    db, settings, charters, papers, decisions, runner, jev, logs, cardCalls, dir: t.dir,
+    db, settings, charters, papers, decisions, runner, jev, logs, cardCalls, dir: t.dir, feedback, cards,
+    /** Turn a sweep's candidates into cards with fixed scores (no agent). */
+    presentAll(sweepId: number) {
+      const out = [];
+      for (const sp of runner.papers(sweepId).filter((p) => p.status === "candidate")) {
+        const { card } = cards.create({
+          paperId: sp.paperId, sweepId, rank: sp.rank, summary: "A summary.",
+          scores: { relevance: 70, relevanceReason: "r", trust: 60, trustReason: "t", value: 50, valueReason: "v", level: sp.level ?? "core", matchedQuestion: sp.matchedQuestion, borderline: sp.borderline, details: { decisions: {}, inputs: {}, formulas: {} } },
+        });
+        out.push(card);
+      }
+      return out;
+    },
     async done() {
       await runner.close();
       await papers.close();

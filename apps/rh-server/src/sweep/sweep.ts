@@ -83,6 +83,8 @@ export interface SweepDeps {
   judged?: () => number;
   /** Paper ids the user has judged (v0.4), dropped in dedupe. */
   judgedPaper?: (paperId: number) => boolean;
+  /** Effective weight after the user's judgments (v0.4); `fallback` is the charter weight (1 for a source). */
+  weight?: (kind: "question" | "query" | "source", key: string, fallback: number) => number;
   now?: () => number;
   random?: () => number;
   retryDelaysMs?: number[];
@@ -325,10 +327,24 @@ export class SweepRunner {
 
   // ---- phases
 
-  private charter(): Charter {
+  /** The approved charter with effective weights (the user's judgments nudge question and query weights). */
+  charter(): Charter {
     const approved = this.deps.charters.approved();
     if (!approved) throw new Error("the project has no approved charter");
-    return approved.charter;
+    const w = this.deps.weight;
+    if (!w) return approved.charter;
+    return {
+      ...approved.charter,
+      questions: approved.charter.questions.map((q) => ({ ...q, weight: w("question", q.id, q.weight) })),
+      queries: approved.charter.queries.map((q) => ({ ...q, weight: w("query", q.text, q.weight) })),
+    };
+  }
+
+  /** Average effective weight of a paper's sources (1 when untouched). */
+  private sourceWeight(paper: Paper): number {
+    const w = this.deps.weight;
+    if (!w || !paper.sources.length) return 1;
+    return paper.sources.reduce((sum, s) => sum + w("source", s, 1), 0) / paper.sources.length;
   }
 
   private plan(sweep: SweepRecord): Record<string, number> {
@@ -350,6 +366,7 @@ export class SweepRunner {
 
   private async gather(sweep: SweepRecord): Promise<Record<string, number>> {
     const insert = this.deps.db.prepare("INSERT OR IGNORE INTO sweep_papers (sweep_id, paper_id, status) VALUES (?, ?, 'new')");
+    const foundBy = new Map<number, Set<string>>();
     const detail: { query: string; found: number; failed: string[] }[] = [];
     let failedQueries = 0;
     for (const q of sweep.queries) {
@@ -363,13 +380,21 @@ export class SweepRunner {
         });
         const failed = result.sources.filter((s) => s.status === "failed").map((s) => `${s.source}: ${s.error}`);
         if (result.sources.every((s) => s.status !== "ok")) failedQueries++;
-        for (const p of result.papers) insert.run(sweep.id, p.id);
+        for (const p of result.papers) {
+          insert.run(sweep.id, p.id);
+          const base = q.variant ? q.text.replace(/ review$/, "") : q.text;
+          if (!foundBy.has(p.id)) foundBy.set(p.id, new Set());
+          foundBy.get(p.id)!.add(base);
+        }
         detail.push({ query: q.text, found: result.papers.length, failed });
       } catch (error) {
         failedQueries++;
         detail.push({ query: q.text, found: 0, failed: [error instanceof Error ? error.message : String(error)] });
       }
     }
+    // The charter queries that found each paper (review variants count for their base query), for weight nudges.
+    const setQueries = this.deps.db.prepare("UPDATE sweep_papers SET queries_json = ? WHERE sweep_id = ? AND paper_id = ?");
+    for (const [paperId, queries] of foundBy) setQueries.run(JSON.stringify([...queries]), sweep.id, paperId);
     this.setDetail(sweep.id, "gather", detail);
     if (sweep.queries.length && failedQueries === sweep.queries.length)
       throw new Error(`every query failed: ${detail[0]?.failed.join("; ") || "no source answered"}`);
@@ -494,7 +519,7 @@ export class SweepRunner {
         questionWeight: questionWeight(charter, r.matched_question ?? undefined),
         levelFit: levelFit(r.level ?? "core", sweep.orientation),
         freshness: sweep.orientation ? 0.5 : freshness(paper.publishedAt, now),
-      });
+      }) + 0.05 * (this.sourceWeight(paper) - 1);
       if (paper.retracted) {
         set.run("blocked", "retracted", score, null, sweep.id, r.paper_id);
         this.deps.log.info("sweep.blocked_retracted", { sweep: sweep.id, paperId: r.paper_id, title: paper.title });

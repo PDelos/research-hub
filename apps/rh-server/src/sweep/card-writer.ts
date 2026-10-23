@@ -185,7 +185,7 @@ export class CardWriter implements CardStage {
       const answers = this.deps.decisions.stored(paper.id, name);
       if (answers) decisions[name] = { version: this.deps.decisions.command(name).version, answers };
     }
-    return computeScores(paper, sp, this.deps.charters.approved()!.charter, {
+    return computeScores(paper, sp, this.deps.runner.charter(), {
       orientation: sweep.orientation,
       now: (this.deps.now ?? Date.now)(),
       decisions,
