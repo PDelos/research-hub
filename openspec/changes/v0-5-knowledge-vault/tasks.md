@@ -18,6 +18,6 @@
 
 ## 4. Integration
 
-- [ ] 4.1 All tests, check, check:jev, check:env, lint, audit; offline end to end: ⭐ a card → note, links, index, search, Library
+- [x] 4.1 All tests, check, check:jev, check:env, lint, audit; offline end to end: ⭐ a card → note, links, index, search, Library
 - [ ] 4.2 Live check with the real viewer (Ignis from its pinned source when Docker is unavailable): ⭐ two live cards with a free model as librarian; record the notes, links, search, the tab in light and dark (screenshots), tab switching without reload, an external edit found by search, and the cost
 - [ ] 4.3 Dockerfile and compose: copy the pinned Ignis, `RH_KB_VIEWER*` variables, `.env.example`, README; verify the image builds and the viewer runs in the container (needs Docker access)
