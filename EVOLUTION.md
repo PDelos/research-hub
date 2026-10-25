@@ -147,8 +147,8 @@ behind an MCP server).
 
 - **Registry:** built-in plugins in the image; others from a folder, a git URL or (later) a catalog.
 - **Lockfile per project** (`plugins.lock.json`: id, version, config, content hash), like the Jev commands lock.
-  One plugin is **active** per slot, others can be **installed but inactive**, or **in an experiment** (2 variants
-  splitting traffic).
+  One plugin is **active** per slot, others can be **installed but inactive**, or **under test** (run by the tester
+  beside the active one when the user asks, on a copy of the data; never serving the user).
 - **UI and CLI:** Plugins tab: list, install, enable, disable, uninstall, configure, see metrics and history.
 - **Every change is a commit** in the project's own plugin repo (`$RH_DATA_DIR/plugins/`, a git repo): an audit
   trail and one-click rollback to any previous lockfile.
