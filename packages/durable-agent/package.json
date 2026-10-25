@@ -8,8 +8,8 @@
     "./compaction": "./src/compaction.ts"
   },
   "scripts": {
-    "check": "tsc -p .",
-    "test": "tsx --test tests/*.test.ts"
+    "test": "tsx --test tests/*.test.ts",
+    "typecheck": "tsc -p ."
   },
   "dependencies": {
     "@earendil-works/chord": "1.1.0",

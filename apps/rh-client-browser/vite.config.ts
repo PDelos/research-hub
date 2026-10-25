@@ -1,6 +1,6 @@
 import { fileURLToPath } from "node:url";
 import vue from "@vitejs/plugin-vue";
-import { defineConfig } from "vite";
+import { defineConfig } from "vite-plus";
 
 // `npm run dev` proxies the API to a running rh-server on 4850; production builds are served by rh-server itself.
 export default defineConfig({

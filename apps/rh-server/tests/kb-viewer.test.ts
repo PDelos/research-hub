@@ -80,7 +80,10 @@ test("cross-site requests, foreign hosts and foreign WebSocket origins are refus
         let data = "";
         s.on("data", (d) => {
           data += d.toString("latin1");
-          if (data.includes("hello") || data.includes("403")) (s.end(), resolve(data));
+          if (data.includes("hello") || data.includes("403")) {
+            s.end();
+            resolve(data);
+          }
         });
         s.on("close", () => resolve(data));
       });

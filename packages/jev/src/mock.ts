@@ -16,7 +16,6 @@ import type {
   ChoiceQuestion,
   NoulQuestion,
   Question,
-  Questions,
   ScoreQuestion,
   State,
   SystemOneRequest,
@@ -152,7 +151,7 @@ function tokenize(text: string): Set<string> {
   return new Set(
     text
       .toLowerCase()
-      .replace(/[`_*#>/\[\]{}()"',.;:!?\\-]/g, " ")
+      .replace(/[`_*#>/[\]{}()"',.;:!?\\-]/g, " ")
       .split(/\s+/)
       .filter((t) => t.length > 1 && !STOPWORDS.has(t))
       .map(stem),

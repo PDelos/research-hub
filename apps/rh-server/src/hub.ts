@@ -86,7 +86,7 @@ export class Hub {
         paperFetch: this.options.paperFetch,
         runSweeps: this.options.sweeps !== false,
         decide: this.options.jevDecide,
-        kbViewer: { ...this.config.kbViewer, ...(this.options.kbViewer ?? {}) },
+        kbViewer: { ...this.config.kbViewer, ...this.options.kbViewer },
       });
       if (this.options.ticker !== false) this.opened.scheduler.start();
     } catch (error) {

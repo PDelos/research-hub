@@ -4,17 +4,17 @@
   "description": "Research Hub web client (Vue 3). Built into dist/ and served by rh-server on the same port.",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vue-tsc --noEmit -p tsconfig.json && vite build",
-    "check": "vue-tsc --noEmit -p tsconfig.json"
+    "dev": "vp dev",
+    "build": "vue-tsc --noEmit -p tsconfig.json && vp build",
+    "typecheck": "vue-tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
     "@rh/sdk": "*",
-    "vue": "3.5.43"
+    "vue": "3.5.44"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "6.0.10",
-    "vite": "8.3.5",
-    "vue-tsc": "3.3.13"
+    "vue-tsc": "3.3.13",
+    "vite-plus": "1.4.0"
   }
 }

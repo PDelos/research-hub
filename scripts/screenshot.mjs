@@ -34,7 +34,10 @@ try {
   const pending = new Map();
   ws.addEventListener("message", (e) => {
     const m = JSON.parse(e.data);
-    if (m.id && pending.has(m.id)) (pending.get(m.id)(m), pending.delete(m.id));
+    if (m.id && pending.has(m.id)) {
+      pending.get(m.id)(m);
+      pending.delete(m.id);
+    }
   });
   const send = (method, params = {}) => new Promise((r) => { const i = ++id; pending.set(i, r); ws.send(JSON.stringify({ id: i, method, params })); });
   await send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-color-scheme", value: scheme }] });

@@ -163,6 +163,7 @@ export class StreamHub {
   closeAll(): void {
     this.closing = true;
     // Copy first: closing a stream removes it from the set.
+    // oxlint-disable-next-line unicorn/no-useless-spread
     for (const sse of [...this.open]) sse.close();
   }
 

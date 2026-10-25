@@ -86,7 +86,7 @@ const results = page.items
 const answers = page.items
   .filter((e) => e.kind === "pi.assistant")
   .map((e) =>
-    (e.model?.[0] as any).content
+    (e.model?.[0] as any)?.content
       .filter((b: any) => b.type === "text")
       .map((b: any) => b.text)
       .join(""),

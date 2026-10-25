@@ -37,7 +37,7 @@ export async function runParallel<T, R>(
   limit: number,
   fn: (item: T, index: number) => Promise<R>,
 ): Promise<R[]> {
-  const out: R[] = new Array(items.length);
+  const out: R[] = Array.from({ length: items.length });
   let next = 0;
   const worker = async () => {
     while (next < items.length) {
