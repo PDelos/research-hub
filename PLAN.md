@@ -572,7 +572,9 @@ with proposals and behavior specs; design and tasks are written for each layer w
 | 4 | `v0-4-feedback` | paper-feedback | `reason-parse` | Judgments change weights and Jev inputs; precision@5 shown |
 | 5 | `v0-5-knowledge-vault` | knowledge-vault, knowledge-viewer | — | ⭐ papers become connected notes, readable and editable in the embedded Obsidian tab |
 
-After v0:
+After v0 (superseded in detail by **[EVOLUTION.md](EVOLUTION.md)**, 2026-10-25: the whole product becomes
+plugins, with a knowledge loop and a product loop of experiments, benchmarks and A/B tests; its plan of action
+replaces the phase list below):
 
 | Phase | Deliverables |
 |---|---|
