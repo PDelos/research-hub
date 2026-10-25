@@ -20,7 +20,7 @@
 
 - [x] 4.1 All tests, check, check:jev, check:env, lint, audit; offline end to end: ⭐ a card → note, links, index, search, Library
 - [x] 4.2 Live check with the real viewer (Ignis from its pinned source when Docker is unavailable): ⭐ two live cards with a free model as librarian; record the notes, links, search, the tab in light and dark (screenshots), tab switching without reload, an external edit found by search, and the cost
-- [ ] 4.3 Dockerfile and compose: copy the pinned Ignis, `RH_KB_VIEWER*` variables, `.env.example`, README; verify the image builds and the viewer runs in the container (needs Docker access)
+- [x] 4.3 Dockerfile and compose: copy the pinned Ignis, `RH_KB_VIEWER*` variables, `.env.example`, README; verify the image builds and the viewer runs in the container (needs Docker access)
 
 ## Verification notes
 
@@ -47,3 +47,12 @@
     appeared in Obsidian's vault in 602 ms.
   - Cost of the ingests: 9 librarian generations on the free model, $0; the project's totals (all live checks since
     v0.2): $0.0568 (Jev $0.0548, embeddings $0.0020, models $0).
+- 4.3 (2026-10-25): image `research-hub:v0.5` built in 71 s, 613 MB (525 MB before; Ignis copied from
+  `nobbe/ignis:0.8.18`). Test container (live mode, every model on the free one, no sweep, $0): healthy; viewer
+  `unavailable` until a charter was approved, then the hub downloaded Obsidian 1.14.4 into `/data/kb-viewer` and
+  Ignis 0.8.18 ran (`/v1/info` state running). Inside the container only two listeners: the hub on 0.0.0.0:4850
+  (published on the host's 127.0.0.1) and Ignis on 127.0.0.1 (random port). `/kb/` through the hub: 200; the
+  Knowledge base tab opened on `index.md` (`trial/docker-kb.png`). `docker restart`: viewer running again in 4 s
+  with no second download (1 download over 2 starts). Ignis killed with SIGKILL inside the container: state
+  `crashed`, restarted in 4.2 s, hub healthy throughout. (Passing the repo `.env` to `docker run` directly sets
+  `RH_DATA_DIR=./data`; compose overrides it with `/data`, so use compose or set it as compose does.)
