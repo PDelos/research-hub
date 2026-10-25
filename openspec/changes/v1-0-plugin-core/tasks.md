@@ -11,13 +11,13 @@
 
 - [x] 1.1 Define the manifest schema and loader (validation with field-level errors, engines check, dependency graph with cycle detection); verify tests for invalid manifests, incompatible engines, missing and cyclic dependencies
 - [x] 1.2 Implement the plugin state repository (`data/plugins`, lockfile, isomorphic-git commits, history, rollback, first-start lockfile from the environment); verify tests for history, rollback and the first start of an existing v0 project
-- [ ] 1.3 Implement activation and lifecycle (activation events, context with subscriptions and dependency exports, 10 s timeout, failed state, runtime enable/disable, SSE `plugins` frame); verify tests for lazy activation, disable, failure isolation and dependency ordering
+- [x] 1.3 Implement activation and lifecycle (activation events, context with subscriptions and dependency exports, 10 s timeout, failed state, runtime enable/disable, SSE `plugins` frame); verify tests for lazy activation, disable, failure isolation and dependency ordering (the `plugins` frame type and change notifications are in place; the stream sends it once the kernel runs in the project, task 2.1)
 - [ ] 1.4 Implement kernel contribution points (tabs, settings with JSON schema and environment defaults, commands, chat tools on the desk allow-list, Jev commands in the lock, prompts, processes) and plugin-offered extension points with cardinality; verify tests for each, the unknown-point report and `check:jev` across plugins
 - [ ] 1.5 Implement the `rh` API v1.0.0 (db with namespaced migrations, files, http with host allowlist and budgets, models, embeddings, decisions, agents, scheduler, events, processes, ui, proposals stub) and permission enforcement with logging; verify tests for an undeclared host, a budget limit and a forbidden file
 
 ## 2. Built-in plugins (v0 moved, behavior unchanged)
 
-- [ ] 2.1 Move models and Jev into `rh.provider-openrouter` and `rh.decision-jev`; verify the v0 agent, Jev and startup tests pass unchanged
+- [ ] 2.1 Start the plugin kernel in each project (state open, discovery, `onStartup`, stop at shutdown, the stream's `plugins` frame) and move models and Jev into `rh.provider-openrouter` and `rh.decision-jev`; verify the v0 agent, Jev and startup tests pass unchanged and the stream sends `plugins`
 - [ ] 2.2 Move papers, sources and representations into `rh.papers`, `rh.source-*`, `rh.representations`, `rh.embedder-openrouter`; verify the v0 paper and representation tests pass unchanged and a disabled Semantic Scholar plugin sends no request
 - [ ] 2.3 Move charter, schedule, sweep, cards, feedback and the desk into their plugins; verify the v0 charter, schedule, sweep, card and feedback tests pass unchanged
 - [ ] 2.4 Move the knowledge base into `rh.kb` (offers `kb.store`, `kb.viewer`), the viewer into `rh.viewer-obsidian`, and add `rh.viewer-library`; verify the v0 vault, ingest, search and viewer tests pass unchanged and the swap scenario (Obsidian ↔ Library, process stops and restarts)

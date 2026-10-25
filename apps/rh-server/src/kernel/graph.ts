@@ -35,8 +35,7 @@ export function resolve(nodes: Map<string, GraphNode>): Resolution {
         if (!target) reason = `needs ${dep} (not installed)`;
         else if (!semver.satisfies(target.manifest.version, range))
           reason = `needs ${dep} ${range} (installed ${target.manifest.version})`;
-        else if (blocked.has(dep))
-          reason = `needs ${dep} (${blocked.get(dep) === "disabled" ? "disabled" : "not active"})`;
+        else if (blocked.has(dep)) reason = `needs ${dep} (${dependencyState(blocked.get(dep)!)})`;
         if (reason) {
           blocked.set(id, reason);
           changed = true;
@@ -82,4 +81,10 @@ export function dependents(nodes: Map<string, GraphNode>, id: string): string[] 
   };
   visit(id);
   return [...out].toSorted();
+}
+
+function dependencyState(reason: string): string {
+  if (reason === "disabled") return "disabled";
+  if (reason.startsWith("failed:")) return "failed";
+  return "not active";
 }

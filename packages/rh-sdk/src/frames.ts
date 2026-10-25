@@ -110,7 +110,25 @@ export type Frame =
   | { type: "agent.batch"; conversationId: number; events: WireAgentEvent[] }
   | { type: "agent.state"; state: AgentState }
   | { type: "usage"; totals: CostTotals }
-  | { type: "cards"; count: number; latestCardId: number | null; judged: number; sweep: SweepSummary | null };
+  | { type: "cards"; count: number; latestCardId: number | null; judged: number; sweep: SweepSummary | null }
+  | { type: "plugins"; plugins: PluginSummary[] };
+
+// ---------------------------------------------------------------- plugins (v1.0)
+
+/** active: running; inactive: enabled, waiting for an activation event; blocked: a dependency is not available. */
+export type PluginRunState = "active" | "activating" | "inactive" | "disabled" | "failed" | "incompatible" | "blocked";
+
+export interface PluginSummary {
+  id: string;
+  version: string;
+  displayName: string;
+  description?: string;
+  builtin: boolean;
+  state: PluginRunState;
+  /** Why the plugin is not active (blocked, incompatible) or the error that made it fail. */
+  reason?: string;
+  activatedAt?: string;
+}
 
 // ---------------------------------------------------------------- project, charter, schedule (v0.1)
 
