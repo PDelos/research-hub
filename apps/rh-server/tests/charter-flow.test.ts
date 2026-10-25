@@ -111,7 +111,7 @@ test("3.2 a replayed tool call records the draft and the questions once; a sixth
     memo.clear();
     const sixth = await ask.execute({ questions: ["sixth?"] }, { memo: fakeApi.memo } as any, {} as any);
     assert.equal(sixth.isError, true);
-    assert.match(sixth.content[0].text, /only 0 more scoping questions allowed/);
+    assert.match((sixth.output as any)[0].text, /only 0 more scoping questions allowed/);
     assert.equal(project.questions.all().length, 5);
   } finally {
     await server.stop();

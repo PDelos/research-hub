@@ -74,13 +74,13 @@ export function defineAppTool<P extends TSchema, D extends JsonValue = JsonValue
 }
 
 export function toolText<D extends JsonValue = JsonValue>(text: string, details?: D): ToolExecutionResult<D> {
-  return { content: [{ type: "text", text }], ...(details === undefined ? {} : { details }) };
+  return { output: [{ type: "text", text }], ...(details === undefined ? {} : { details }) };
 }
 
 /** A failed call the model can fix: returned, not thrown, so work the call owns survives. */
 export function toolError(message: string, hints: string[] = []): ToolExecutionResult {
   const text = [message, ...hints.map((h) => `Fix: ${h}`)].join("\n");
-  return { isError: true, content: [{ type: "text", text }] };
+  return { isError: true, output: [{ type: "text", text }] };
 }
 
 /**
@@ -111,6 +111,8 @@ export const TaskReceipt = defineDoc<{ value: JsonValue }>({
   kind: "durable-agent.receipt",
   version: 1,
   scope: "task",
+  // Receipts are small and written once; keep ordinary changes as deltas (pi-durable 1.4 requires the choice).
+  checkpointWhen: () => false,
   initial: () => ({ value: null }),
 });
 
