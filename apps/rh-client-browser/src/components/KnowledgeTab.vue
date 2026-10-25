@@ -10,7 +10,11 @@ const failed = ref("");
 const viewer = ref(store.info?.kbViewer);
 let poll: ReturnType<typeof setInterval> | undefined;
 
-type ObsidianWindow = Window & { require?: (name: string) => unknown; app?: { workspace?: { layoutReady?: boolean; openLinkText(t: string, s: string): unknown } } };
+type Leaf = { setViewState(state: { type: string; active?: boolean }): Promise<void> };
+type ObsidianWindow = Window & {
+  require?: (name: string) => unknown;
+  app?: { workspace?: { layoutReady?: boolean; openLinkText(t: string, s: string): unknown; getLeaf(newLeaf?: boolean): Leaf } };
+};
 const win = () => frame.value?.contentWindow as ObsidianWindow | null | undefined;
 
 (window as ObsidianWindow).require = (name: string) => {
@@ -20,8 +24,34 @@ const win = () => frame.value?.contentWindow as ObsidianWindow | null | undefine
 };
 
 // The vault index is the first note shown, unless "Open in knowledge base" asked for another.
-const initial = `/kb/?file=${encodeURIComponent(store.kbOpen ?? "index.md")}`;
+// The knowledge base opens as a graph (papers, concepts and questions), unless a note was asked for.
+const askedFor = store.kbOpen;
+const initial = askedFor ? `/kb/?file=${encodeURIComponent(askedFor)}` : "/kb/";
 store.kbOpen = undefined;
+const view = ref<"graph" | "note">(askedFor ? "note" : "graph");
+
+async function showGraph() {
+  const ws = win()?.app?.workspace;
+  if (!ws) return;
+  await ws.getLeaf(false).setViewState({ type: "graph", active: true });
+  view.value = "graph";
+}
+
+/** On first load Obsidian may still restore its last note after it reports ready; make sure the graph wins. */
+async function graphOnLoad() {
+  for (let i = 0; i < 4 && view.value === "graph"; i++) {
+    const active = (win()?.app?.workspace as { activeLeaf?: { view?: { getViewType?(): string } } } | undefined)?.activeLeaf?.view?.getViewType?.();
+    if (active !== "graph") await showGraph();
+    await new Promise((r) => setTimeout(r, 600));
+  }
+}
+
+function showIndex() {
+  const ws = win()?.app?.workspace;
+  if (!ws) return;
+  void ws.openLinkText("index", "");
+  view.value = "note";
+}
 
 onMounted(async () => {
   viewer.value = (await client.info()).kbViewer;
@@ -31,6 +61,7 @@ onMounted(async () => {
     if (win()?.app?.workspace?.layoutReady) {
       ready.value = true;
       clearInterval(poll);
+      if (view.value === "graph") void graphOnLoad();
     } else if (Date.now() - started > 45_000) {
       failed.value = "Obsidian did not finish loading. Reload the page or check the Runs tab for viewer errors.";
       clearInterval(poll);
@@ -47,6 +78,7 @@ watch(
     const ws = win()?.app?.workspace;
     if (ready.value && ws) {
       void ws.openLinkText(path.replace(/\.md$/, ""), "");
+      view.value = "note";
       store.kbOpen = undefined;
     } else if (frame.value) {
       frame.value.src = `/kb/?file=${encodeURIComponent(path)}`;
@@ -67,6 +99,11 @@ watch(
       <p>{{ viewer.reason ?? viewer.state }}. The Library tab still lists and opens every note.</p>
     </div>
     <template v-else>
+      <div class="kb-bar">
+        <button :class="['ghost', { on: view === 'graph' }]" :disabled="!ready" @click="showGraph">Graph</button>
+        <button :class="['ghost', { on: view === 'note' }]" :disabled="!ready" @click="showIndex">Index</button>
+        <span class="muted small kb-legend"><i class="kb-dot kb-dot-papers" /> papers <i class="kb-dot kb-dot-concepts" /> concepts <i class="kb-dot kb-dot-questions" /> questions</span>
+      </div>
       <iframe ref="frame" class="kb-frame" :src="initial" title="Knowledge base" />
       <div v-if="!ready" class="kb-overlay">
         <p v-if="failed" class="error">{{ failed }}</p>

@@ -1,0 +1,44 @@
+{
+  "collapse-filter": true,
+  "search": "-file:index -file:log -file:charter",
+  "showTags": false,
+  "showAttachments": false,
+  "hideUnresolved": true,
+  "showOrphans": true,
+  "collapse-color-groups": false,
+  "colorGroups": [
+    {
+      "query": "path:sources",
+      "color": {
+        "a": 1,
+        "rgb": 3104080
+      }
+    },
+    {
+      "query": "path:concepts",
+      "color": {
+        "a": 1,
+        "rgb": 10115840
+      }
+    },
+    {
+      "query": "path:questions",
+      "color": {
+        "a": 1,
+        "rgb": 4878245
+      }
+    }
+  ],
+  "collapse-display": true,
+  "showArrow": false,
+  "textFadeMultiplier": 1.6,
+  "nodeSizeMultiplier": 1.5,
+  "lineSizeMultiplier": 1,
+  "collapse-forces": true,
+  "centerStrength": 0.35,
+  "repelStrength": 20,
+  "linkStrength": 1,
+  "linkDistance": 320,
+  "scale": 0.9,
+  "close": true
+}

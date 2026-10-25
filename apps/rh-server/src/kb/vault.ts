@@ -64,8 +64,10 @@ export class Vault {
   ensure(): boolean {
     const created = !this.exists();
     for (const folder of VAULT_FOLDERS) mkdirSync(join(this.dir, folder), { recursive: true });
-    if (!existsSync(join(this.dir, ".obsidian")) && existsSync(join(this.deps.templateDir, ".obsidian")))
-      cpSync(join(this.deps.templateDir, ".obsidian"), join(this.dir, ".obsidian"), { recursive: true });
+    // Obsidian settings from the template: only files that are missing (a new setting such as the graph colors
+    // reaches existing vaults), never overwriting what is there, so the user's own choices are kept.
+    const template = join(this.deps.templateDir, ".obsidian");
+    if (existsSync(template)) cpSync(template, join(this.dir, ".obsidian"), { recursive: true, force: false, errorOnExist: false });
     if (!existsSync(join(this.dir, "index.md"))) this.write("index.md", INDEX_HEADER);
     if (!existsSync(join(this.dir, "log.md"))) this.write("log.md", LOG_HEADER);
     if (created) this.deps.log.info("vault.created", { dir: this.dir });

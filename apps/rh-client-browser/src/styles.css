@@ -201,7 +201,14 @@ td.down { color: var(--warn); font-weight: 600; }
 .note-body { line-height: 1.55; }
 .note-body h3, .note-body h2 { font-size: 15px; margin: 16px 0 4px; }
 .note-body a.wikilink { color: var(--accent); cursor: pointer; text-decoration: underline; }
-.kb-tab { position: relative; flex: 1; min-height: 480px; display: flex; }
+.kb-tab { position: relative; flex: 1; min-height: 480px; display: flex; flex-direction: column; gap: 8px; }
+.kb-bar { display: flex; gap: 6px; align-items: center; }
+.kb-bar button.on { border-color: var(--accent); color: var(--accent); }
+.kb-legend { margin-left: auto; display: flex; gap: 6px; align-items: center; }
+.kb-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; }
+.kb-dot-papers { background: #2f5d50; }
+.kb-dot-concepts { background: #9a5b00; }
+.kb-dot-questions { background: #4a6fa5; }
 .kb-frame { flex: 1; width: 100%; border: 0; border-radius: var(--radius); background: var(--panel); }
-.kb-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: var(--panel); border-radius: var(--radius); }
+.kb-overlay { position: absolute; inset: 40px 0 0 0; display: flex; align-items: center; justify-content: center; background: var(--panel); border-radius: var(--radius); }
 @media (max-width: 900px) { .library { grid-template-columns: 1fr; } }
