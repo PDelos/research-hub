@@ -59,7 +59,9 @@ offering plugin under `contributes.extensionPoints` with a JSON schema and `card
 the active contribution is a setting of the offering plugin.
 
 ### D5. UI contributions
-The client asks `/v1/plugins/contributions` and builds the tab bar and Settings from it. Built-in tabs map to Vue
+The UI stays Vue 3 + Vite and gains **Vue Router** (each contributed tab is a route; replaces the hand-made hash
+router) and **Pinia** (shared stores that plugin views read). The client asks `/v1/plugins/contributions` and
+builds the tab bar and Settings from it. Built-in tabs map to Vue
 components bundled with the UI (by view id). External plugin views are ES modules served from the plugin's
 `browser` entry under `/plugins/<id>/…` and mounted as custom elements, with a small `rhClient` passed in (the
 same SDK the UI uses, through the UI proxy). The hub's design tokens are CSS variables they inherit.

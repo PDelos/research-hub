@@ -14,8 +14,8 @@
 > Field focus: **AI + bioinformatics (neural networks)**. Runs on your own machine or server, **one Docker
 > container per project**, everything (including the Obsidian knowledge-base viewer) inside it.
 
-Last updated: 2026-10-25 (v0 complete; the self-improvement review with an evolving charter and new research
-questions is now v1; trust, relations and curriculum move to v2)
+Last updated: 2026-10-25 (v0 complete; v1 = plugins like VS Code, the knowledge loop and the Upgrades tab, see
+EVOLUTION.md; trust, relations and curriculum move to v2)
 
 ---
 
@@ -207,6 +207,7 @@ through the ledger (cost, model, command version, raw payload) and is stored wit
 | `proposal-evidence` | review | `sufficient` (noul: the evidence supports this change) | drafts without evidence are dropped before you see them | LLM self-critique |
 | `level-ready` | review | `ready` (noul: your reasons show command of the current level) | triggers a level-up proposal | LLM judgment |
 | `interest-topic` (`each` over chat turns and reasons) | review | `topic` (choice over charter questions + `new`) · `strength` (score 3) | uncovered strong topics become charter-proposal candidates | LLM reading the chat history |
+| `idea-promise` (`each` over upgrade ideas) | upgrades (scout) | `concrete` (noul: names a specific model, method or tool with a source) · `testable` (noul: can be measured on this hub's data or a public benchmark) · `weak_spot` (score 3: targets a slot that measures poorly or costs much) · `already_rejected` (noul) | only the best few (default 5) per scout run become idea cards | LLM triage of everything found |
 | `question-promise` (`each` over candidate questions) | review | `specific` (noul) · `answerable` (noul: literature can address it) · `covered` (noul: an existing question already covers it) · `fit` (score 3: fits your level) | only the top 3–5 reach the review model | LLM brainstorming over everything |
 
 All commands receive `taste_examples` (your recent judgments: title, verdict, **short reason**) and
@@ -258,6 +259,14 @@ slower, less accurate long-context mode, so Jev only ever sees title/abstract-si
 | **paper-reader** (subagent) | Reads full text, extracts claims/method/results, checks claims with Jev | `read_paper`, `read_full_text`, `jev_classify`, `report_findings` |
 | **librarian** (subagent, on ⭐) | Writes the vault evidence note, connects it to ≥1 concept/question page | `read_paper`, `read_full_text`, `search_kb`, `kb_write_source`, `kb_upsert_concept`, `kb_upsert_question`, `kb_link` |
 | **reviewer** (subagent, weekly, read-only on settings) | Metrics, calibration, interests, charter proposals, new research questions, proposals | `review_metrics`, `interest_report`, `question_candidates`, `similar_papers`, `jev_classify`, `query_kb`, `search_kb`, `propose_change`, `propose_charter_change`, `propose_research_direction` |
+| **scout** (v1-4, weekly or on demand) | Finds upgrade ideas for the hub on the internet | `web_search` (OpenRouter), `search_papers`, `release_feeds`, `model_catalog`, `plugin_status`, `jev_classify`, `propose_idea` |
+| **tester** (v1-4, on your request) | Runs an idea's candidate beside the current plugin and writes the proof report | `install_variant`, `run_harness`, `judge_pairs`, `sample_examples`, `write_proof_report` |
+| **engineer** (v1-5, on your request) | Writes plugin code when an idea needs it, in a sandbox | `read_plugin`, `write_plugin_files`, `run_contract_tests` (sandboxed worktree only) |
+
+**Built in v0** (the names above are the full plan; v0 shipped a subset): research desk `search_papers`,
+`recent_cards`, `judge_card`, `search_kb`, `query_kb`; card writer `list_candidates`, `present_paper`,
+`complete_sweep`; librarian `write_evidence_note`, `link_note`; charter writer `save_charter_draft`,
+`ask_scoping_questions`. From v1-0 every agent and tool is contributed by a plugin.
 
 Tool rules (from the news agent): `replay: "safe"` where re-running is harmless; anything that
 creates a card, subagent, task or KB note runs **once per tool task** (`onceInCommit`), so a
@@ -475,24 +484,27 @@ properties so notes can be re-extracted later.
 ## 13. API & UI
 
 **API** (Express 5, bearer tokens, idempotency keys, SSE — from the news agent). One project per container,
-so routes have no project segment: `/v1/{health,info,project,brief,charter,schedule,chat,stream,transcript,runs,
-usage,feed,cards/:id/judge,kb,graph,proposals/:id/decide,scheduled-runs}`, `/v1/runs/{sweep,review}` (manual),
-and `/kb/` (the bundled Obsidian viewer).
+so routes have no project segment. Built in v0: `/v1/{health,info,agent,chat,stream,transcript,runs,usage,
+jev/ping,project,brief,charter,schedule,scheduled-runs,cards,sweeps,sweep-settings,weights,feedback/precision,
+kb/papers,kb/notes,kb/search}`, `/v1/runs/{sweep,review}` (manual), `/v1/cards/:id/judgment`, and `/kb/` (the
+bundled Obsidian viewer). Planned: `/v1/plugins…` (v1-0), `/v1/upgrades…` (v1-4), `/v1/proposals…` (v1-3).
 
 **UI** (Vue 3):
 
 | Screen | Content |
 |---|---|
-| **Top bar / overview** | Project name, status, charter version, level, next sweep, unread cards, pending proposals, monthly cost, pause |
-| **Brief / Charter** | Brief (paste or upload), charter draft with scoping questions, versions, approve |
-| **Feed** (left) + **Agent** (right) | Cards with scores/reasons/relations and 👎/👍/⭐ + reason box; agent chat with live tool calls |
-| **Library** | KB list from vault (filter by level/concept/question), open note, "Open in knowledge base" |
-| **Knowledge base** | The real Obsidian interface for this project's vault (Ignis), hub-themed, no visible frame |
-| **Graph** | Cytoscape view of KB + typed edges; highlighted missing-link pairs |
-| **Directions** | Research-direction cards from reviews (approved → `questions/`) |
-| **Proposals** | Pending/decided proposals with diff + evidence, approve/reject + reason |
-| **Runs** | Sweeps and reviews: phases, Jev calls, tool calls, tokens, cost (news-agent Executions view) |
-| **Settings** | Charter, queries & weights, sources, level, schedule, cards per sweep, models, budget cap |
+| Screen | Content | Status |
+|---|---|---|
+| **Top bar / overview** | Project name, status, charter version, next sweep, monthly cost, pause; later level, pending proposals and upgrades | v0 |
+| **Brief / Charter** | Brief (paste or upload), charter draft with scoping questions, versions, approve; later the review's charter proposals and research directions | v0; review v1-3 |
+| **Feed** (left) + **Agent** (right) | Cards with scores and reasons, 👎/👍/⭐ + reason box, precision trend; agent chat with live tool calls | v0 |
+| **Library** | Knowledge-base papers, keyword search, rendered notes, "Open in knowledge base" | v0 |
+| **Knowledge base** | The real Obsidian interface (Ignis), hub-themed, opening on the **graph view** (papers, concepts, questions in three colors), Graph/Index buttons | v0 (graph 2026-10-25) |
+| **Runs** | Chat runs, sweeps with phases, papers by status and the cost split, scheduled runs | v0 |
+| **Settings** | Schedule, cards per sweep, weights with their charter values | v0; plugin settings v1-0 |
+| **Plugins** | Every plugin: state, version, contributions, permissions, settings, history; enable, disable, install, uninstall, roll back | v1-0 |
+| **Upgrades** | Idea cards from the scout (and yours) → test → proof reports → implement → verification, with your decision at each gate; the product charter | v1-4 |
+| **Graph (typed relations)** | Typed edges between papers (extends, contradicts…), missing-link pairs | v2 |
 
 **Knowledge base tab (v0.5):** the real Obsidian interface embedded in the hub UI, served by
 [Ignis](https://github.com/Nystik-gh/ignis) (self-hosted Obsidian-as-a-web-app, a Node.js server, AGPL, pinned)
@@ -500,9 +512,16 @@ and `/kb/` (the bundled Obsidian viewer).
 supervised child process on the container's loopback interface, and proxies it at `/kb/`, so the iframe is
 same-origin on the project's port. The tab stays loaded when switching tabs, shows no frame border, and Obsidian's
 own chrome is hidden. Each vault ships a hub theme (`.obsidian/` CSS snippet + layout) matching the hub's colors,
-fonts and light/dark mode. `RH_KB_VIEWER=off` disables it. Pending a 30-minute trial; if Ignis cannot run under
-`/kb/` it gets its own host name (`kb.<name>.localhost`) in the same container; if it fails entirely, the Library
-view is the only viewer.
+fonts and light/dark mode. `RH_KB_VIEWER=off` disables it. The trial (2026-10-23) settled the details: the
+viewer must be same-origin (Ignis's absolute API paths are forwarded, and the hub page lends Obsidian the frame's
+`require`), and a preload binds Ignis to loopback. From v1-0 the viewer is a plugin (`rh.viewer-obsidian`) that can
+be disabled or swapped (for example for the Library viewer).
+
+**UI technology (decided 2026-10-25):** stay with **Vue 3 + Vite** (no switch, no meta-framework); add **Vue
+Router** (plugin tabs as routes, replacing the hand-made hash router) and **Pinia** (shared state as plugins add
+views) in v1-0; **plugin UIs mount as Web Components** (custom elements with the hub's CSS variables, like VS
+Code's webviews), so plugin authors and agents can use any framework or none; **Playwright** for UI tests and
+screenshots (replacing `scripts/screenshot.mjs`); no component library, the hub's own tokens keep one look.
 
 ---
 
@@ -634,12 +653,15 @@ replaces the phase list below):
 
 ## 19. Open items
 
-- [ ] Docker: start daemon, add user to `docker` group (`sudo systemctl enable --now docker`, `sudo usermod -aG docker dlos`, re-login)
-- [ ] `OPENROUTER_API_KEY` (covers models + Jev); confirm current model IDs + prices
-- [ ] Contact email for OpenAlex/Crossref polite pools; optional Semantic Scholar API key
-- [ ] First project brief (markdown) to test with
-- [ ] v0.0 task group 8 (flatten to one project per container, lock, `new-project.sh`) before starting v0.1
+- [x] Docker access (2026-10-25)
+- [x] `OPENROUTER_API_KEY` (covers models, embeddings and Jev)
+- [x] First project brief: the `proteins` project (multimodal document search for agents) runs in Docker
+- [x] One project per container, owner lock, `new-project.sh`
 - [x] Ignis trial (2026-10-23, from source): passed with a same-origin `/kb/` proxy and a loopback preload (see v0.5 proposal)
+- [ ] Contact email for OpenAlex and Europe PMC polite pools (`CONTACT_EMAIL`); optional Semantic Scholar API key
+- [ ] Python in the image for process plugins (Docling, fine-tuning), or optional sidecar images (decide before v1-2)
+- [ ] Where fine-tuning runs: this machine's Quadro P2000 (4 GB) or a rented GPU (decide before v1-6)
+- [ ] Autonomy policy defaults beyond "every upgrade needs your request" (decide in v1-4)
 
 ---
 
@@ -661,7 +683,7 @@ Each choice was checked against current alternatives; ✅ = kept, 🔄 = changed
 | Embeddings | One OpenRouter embedding model (`qwen/qwen3-embedding-8b`) | SPECTER2 via Semantic Scholar | 🔄 Changed: S2 keyless pool returned 429 on every request; one model gives comparable vectors for all sources |
 | Paper metadata & citations | OpenAlex (+ Crossref) | Semantic Scholar | 🔄 OpenAlex primary (keyless, verified live, has `is_retracted`); S2 optional |
 | HTTP server | Express 5 | Fastify, Hono (2–3× faster) | ✅ Kept: single-user local service, reused Express infra code |
-| UI | Vue 3 + Vite | React | ✅ Kept: reference UI patterns are Vue |
+| UI | Vue 3 + Vite; from v1-0 also Vue Router, Pinia, Web Components for plugin UIs, Playwright for UI tests | React, Svelte, Nuxt or another meta-framework, a component library | ✅ Kept (re-checked 2026-10-25): the app is small and works; a rewrite buys nothing; plugin UIs stay framework-agnostic through custom elements; SSR is not needed for a single-user local app |
 | Database | `node:sqlite` + FTS5 + `sqlite-vec` | Postgres + pgvector, Qdrant, Neo4j | ✅ Kept; **tested locally**: FTS5 BM25 and sqlite-vec v0.1.9 KNN work on Node 26 with `allowExtension` |
 | Knowledge base | Obsidian-compatible markdown vault | Vector-DB RAG, graph DB | ✅ Kept: matches the 2026 "LLM wiki" pattern; BM25 over markdown benchmarked well |
 | Knowledge base viewer (v0.5) | Ignis: real Obsidian UI as a self-hosted web app, bundled in the project container, iframe tab, hub theme | linuxserver/obsidian (streamed desktop: laggy, heavy), Ignis as a separate container, Quartz (read-only), own Library view only | 🔄 New: user wants Obsidian in the browser, all on the server, one container per project; pending a 30-minute trial |

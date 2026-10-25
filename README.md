@@ -137,7 +137,7 @@ edited it.
 
 - **Library** tab: knowledge-base papers, keyword search over the vault, and each note rendered.
 - **Knowledge base** tab: the real Obsidian interface (Ignis) inside the hub, in the hub's colors, light and dark,
-  opening on the index; it stays loaded when you switch tabs, and "Open in knowledge base" in the Library jumps to a
+  opening on the **graph view** (papers, concepts and research questions in three colors; Graph and Index buttons); it stays loaded when you switch tabs, and "Open in knowledge base" in the Library jumps to a
   note. Edits you make there are searchable within seconds, and notes the hub writes appear without a reload.
 - The research desk always sees `index.md` and opens notes on demand (`search_kb`, `query_kb`): ask "which papers in
   my knowledge base cover Q2?".
