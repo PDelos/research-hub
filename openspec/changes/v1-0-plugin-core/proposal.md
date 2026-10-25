@@ -30,8 +30,8 @@ plugins on top of it.
   enable, disable, install, uninstall, roll back.
 - **Knowledge base tab** opens on Obsidian's graph view (already shipped on the v0.5 branch; recorded here).
 
-Out of scope: the evaluation harness (v1-1), comparisons and adoption proposals (v1-4), the scout and engineer
-agents (v1-5, v1-6), a public plugin catalog, MCP exposure (v1-7), changing any v0 behavior beyond moving it.
+Out of scope: the evaluation harness (v1-1), the Upgrades tab with its scout, tests and proof reports (v1-4), the
+engineer agent (v1-5), fine-tuning (v1-6), a public plugin catalog, MCP exposure (v1-7), changing any v0 behavior beyond moving it.
 
 Jev commands added: none (the existing commands move into plugins as `jevCommands` contributions). LLM calls
 added: none.

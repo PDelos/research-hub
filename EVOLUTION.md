@@ -5,8 +5,8 @@
 > (embedders, extractors, prompts, rankers) through benchmarks, experiments and A/B tests. Humans verify; agents
 > do the work. Companion to `PLAN.md` (the v0 system as built) — this file plans everything after v0.
 
-Written 2026-10-25, after v0 was completed. Revised the same day: experiments use **open side-by-side comparisons
-the human verifies** (no hidden interleaving), and **the whole hub is plug-and-play**, not only the pipeline.
+Written 2026-10-25, after v0 was completed. Revised the same day: product upgrades run through an **Upgrades tab** where the human decides at every
+gate (idea → test → proof → implement), and **the whole hub is plug-and-play**, not only the pipeline.
 
 ---
 
@@ -19,15 +19,14 @@ the human verifies** (no hidden interleaving), and **the whole hub is plug-and-p
   (what to know)      ▲                                                              │
                       └──────── charter proposals · new research questions ◄─────────┘
 
-  PRODUCT LOOP     product charter ──► scout (web, arXiv, GitHub, HF) ──► ideas ──► experiments
-  (how to work)        ▲                                                                │
-                       │          plugin variants ──► contract tests ──► benchmarks ──► A/B
-                       └──────── adoption proposals with evidence ◄─────────────────────┘
+  PRODUCT LOOP     scout (web search: new models, methods, tools) ──► IDEA ──you──► TEST ──► PROOF
+  (Upgrades tab)                                                        ▲                        │
+                    rolled back ◄── VERIFIED ◄── IMPLEMENTED ◄──you──────┴──── you evaluate ◄─────┘
 ```
 
-Both loops end in the same place: a **proposal with evidence** that a human approves in one click (or that an
-auto-approve policy accepts, if the human allowed it for that kind of change), applied deterministically and
-reversible with one click.
+The knowledge loop ends in **proposals with evidence** that you approve in one click. The product loop is the
+**Upgrades tab**: a staged workflow where the agent does the work and **you decide at every gate** (which ideas to
+test, and whether the proof justifies the upgrade). Everything is reversible with one click.
 
 ---
 
@@ -154,95 +153,94 @@ behind an MCP server).
 
 ---
 
-## 3. The product loop: experiments, benchmarks, A/B tests
+## 3. The product loop: the Upgrades tab
 
-### 3.1 The product charter
+The hub upgrades itself through one tab and one workflow. Ideas come from the **internet** (new state-of-the-art
+models, methods, tools and architectures for what the hub does), because the hub is meant for any research
+theme; a project's own knowledge base is only an extra source when its theme happens to be about the hub's own
+techniques (as with the current multimodal-retrieval project). **You make every decision; the agent does the
+searching, testing and implementing.**
 
-Like the research charter, a page the human owns, describing **what "better" means for the product**:
+### 3.1 The workflow: four gates
 
-- **Goals and metrics:** precision@5 of sweeps, share of ⭐ among cards, note quality (grounding, completeness),
-  retrieval quality in the knowledge base, extraction accuracy on full texts, cost per day, latency.
-- **Constraints:** budget per day and per experiment, allowed providers and licenses, privacy (what may leave the
-  machine), resource limits (RAM, GPU).
-- **Autonomy policy:** per slot and per kind, what may be adopted automatically (for example: config plugins that
-  win significantly, cost within budget) and what always needs a human.
-- **Idea backlog:** ideas from the human, the scout and the review, each with status.
+| Stage | Who | What happens | Gate (you) |
+|---|---|---|---|
+| **1. Idea** | scout agent | An upgrade idea card: what to change, which part of the hub, why it might help (with links to the sources it found), expected benefit, effort, cost and risk | **Test it** · not now · reject (with a reason) |
+| **2. Testing** | test agent | Builds or installs the candidate as a plugin variant beside the current one (never replacing it), runs it on the same inputs, scores both | (you can stop it; it has a budget) |
+| **3. Proof** | test agent | A **proof report** (3.3) | **Implement** · test more (say what) · reject |
+| **4. Implemented** | kernel | The variant becomes the active plugin (a commit in the plugin history, re-computation in the background if needed) | — |
+| **5. Verified** | kernel | After a set time (default 7 days) the same metrics are re-measured on real use; a regression offers a one-click rollback | keep · roll back |
 
-### 3.2 The scout
+You can also write an idea yourself ("try Docling 3 for PDFs") or ask the research desk in chat; it lands at stage 1.
+Ideas you reject are remembered with your reason, so the scout does not suggest them again, and the reasons tell
+it what you value.
 
-A scheduled agent (weekly, configurable) that reads the product charter and searches for improvements: the web,
-arXiv (with the hub's own paper search), GitHub releases of used tools (Ignis, Docling, pi-durable), Hugging Face
-and MTEB leaderboards, OpenRouter's model lists. It writes **ideas**: what, why it might help which metric, effort,
-risk, cost. Jev ranks them cheaply (`idea-promise`); the top ones become **experiment plans** automatically: which
-plugin variant to build or install, which benchmark, how much budget. Examples it should find on its own:
-"Gemini Embedding 2 is GA on OpenRouter; test it as `embedder`", "Docling 3 released; test it as `fulltext`".
+### 3.2 Where ideas come from (the scout)
 
-### 3.3 Benchmarks (offline evaluation)
+A scheduled agent (weekly by default, or "find ideas now" in the tab) that reads the **product charter** (3.4)
+and the hub's current setup (which plugin fills each slot, its measured quality and cost), then searches:
 
-Every slot has a **harness**: datasets, metrics and a report. Datasets come from three places:
-
-| Source | Example datasets |
+| Source | For what |
 |---|---|
-| **The project's own history** (the most important) | gathered papers with Jev decisions and the user's judgments (gate and ranking quality); ⭐ papers' full texts (extraction and summary quality); questions → relevant notes (retrieval); method/problem pairs labeled by an LLM and Jev (facet quality) |
-| **LLM- and Jev-supervised labels** | pairs and queries generated and relabeled by a strong model (the Gecko recipe), spot-checked by a second model |
-| **Public benchmarks** | OfficeQA, UNIDOC-BENCH, SpanishGovernmentMultimodalQA for `fulltext` and `kb-search` (the research project's benchmarks), SciRepEval-style tasks for `embedder` |
+| **Web search** (through OpenRouter's web search, about $0.02 per search; another search provider can be a plugin) | new models and methods, release notes, benchmark leaderboards (MTEB, retrieval and document-understanding benchmarks), blog posts and comparisons |
+| arXiv and the hub's own paper search | recent papers on retrieval, embeddings, document understanding, ranking, summarization, agents |
+| GitHub and package releases | new versions of what the hub uses (Ignis, Docling, pi-durable, extractors) |
+| Model catalogs (OpenRouter, Hugging Face) | new or cheaper models for each job |
+| The project's knowledge base | only when its theme overlaps the hub's techniques |
 
-Results carry confidence intervals (bootstrap over items) and cost; a variant "wins" only with a minimum effect
-size and no guardrail regression (cost, errors, latency).
+For each slot it asks "is there something clearly better, cheaper or simpler now?", keeps only ideas with a
+concrete source and a testable claim, scores them cheaply with Jev (`idea-promise`: concrete, testable, relevant to
+a weak spot, not already rejected) and shows the best few (default 5) per run. Each idea cites its sources.
 
-### 3.4 Comparisons the human verifies (no hidden tests)
+### 3.3 Proof: what "solid" means
 
-Nothing is tested on the human behind their back: the live feed, cards and notes always come from the adopted
-plugins, and every alternative runs **beside** them, visibly, in a **Comparisons** view. This follows the
-side-by-side pairwise method used by arena-style evaluation (two outputs for the same input, one choice), which
-gives more consistent judgments than absolute scores, for humans and for model judges alike.
+A proof report answers one question: **is the candidate better than what runs now, for this hub, at acceptable
+cost?** It contains:
 
-1. **Run both on the same inputs.** The candidate plugin processes the same papers, queries or notes as the
-   adopted one (on today's sweep, a sample of the knowledge base, or a benchmark), at the experiment's budget.
-2. **Score automatically first.** The slot's harness metrics, plus a **judge model in pairwise mode with positions
-   swapped**: a comparison counts only if the judge picks the same side in both orders (this removes position
-   bias; agreement of such judges with humans on well-defined criteria is typically in the range of agreement
-   between two humans).
-3. **Show the human a short, labeled side-by-side.** A comparison page with A and B next to each other (two
-   rankings of the same candidates, two notes for the same paper, two search results for the same question),
-   the metrics, the judge's verdicts and where it disagreed with itself. The human can choose **open** (labels
-   visible, the default) or **blind** (labels hidden until they vote) for their own votes. A handful of votes is
-   enough: the human verifies the judge on the cases that matter, the judge does the volume.
-4. **Decide.** The human picks A, B or "keep testing"; their votes also calibrate the judge for next time.
+- **What was compared:** current plugin vs candidate, versions and settings, the inputs used (this project's
+  papers, notes and questions, plus public benchmarks for the slot), and the budget spent.
+- **Metrics with confidence intervals** (bootstrap over items) and a verdict per metric: better, same, worse.
+  The slot's harness defines the metrics (for example precision of the top cards against your judgments, note
+  grounding and completeness, retrieval recall, extraction accuracy on tables and charts), plus cost per day and
+  latency.
+- **Side-by-side examples:** a few of the clearest wins and losses, A and B next to each other (two rankings, two
+  notes, two search results, two extractions of the same table).
+- **Judge verdicts:** a judge model compares pairs with positions swapped; only consistent verdicts count; the
+  report shows how often it was inconsistent.
+- **Your spot check:** optional votes on a handful of pairs, open or blind, which also calibrate the judge.
+- **Risks and side effects:** new dependencies, licenses, data that must be re-computed, what leaves the machine.
+- **A recommendation** with the reasoning, which you can accept or ignore.
 
-| Slot type | What is shown side by side |
-|---|---|
-| ranking (sweep, cards) | the two top-7 lists for the same gathered papers, with the papers each one alone would show |
-| writing (card-writer, librarian, summarizer) | two cards or two notes for the same paper |
-| infrastructure (embedder, fulltext, kb-search) | two result lists for the same questions; two extractions of the same page or table |
-| knowledge base viewer, UI | both running at once (two tabs), the human tries them |
+"Test more" sends it back with your instructions (more items, another benchmark, a different setting).
 
-Experiments have budgets, a maximum duration and **guardrails** (stop automatically on errors or cost spikes).
+### 3.4 The product charter
 
-### 3.5 Adoption
+Like the research charter, a page you own, describing what "better" means for the hub: which metrics matter
+(card precision, note quality, retrieval quality, extraction accuracy, cost per day), constraints (budget per day
+and per test, allowed providers and licenses, what may leave the machine, RAM and GPU), and topics the scout should
+watch or ignore. The scout and the test agent read it; you edit it.
 
-An experiment ends with an **adoption proposal**: the metrics with intervals, cost difference, example
-differences (two notes side by side, rankings before and after), risks. The human approves, rejects or extends;
-the autonomy policy may adopt low-risk winners automatically and only notify. Adoption updates the lockfile
-(a commit), triggers background re-computation if needed, and keeps the previous version one click away.
-Regressions after adoption roll back automatically and are reported.
+### 3.5 Benchmarks (the harness)
 
-### 3.6 Agent-written plugins
+Every slot has a harness: datasets, metrics and a report generator, used by the test agent. Datasets come from
+the project's history (gathered papers with Jev decisions and your judgments, ⭐ full texts, questions and
+relevant notes), from labels written and relabeled by a strong model and Jev (the Gecko recipe, spot-checked), and
+from public benchmarks (OfficeQA, UNIDOC-BENCH and SpanishGovernmentMultimodalQA for full-text extraction and
+knowledge-base search; SciRepEval-style tasks for embedders).
 
-An **engineer** agent can create a new plugin version itself: a prompt variant, new config, a modified ranker, a
-new source client. It works in a sandbox copy (a git worktree of the plugin repo), must pass the slot's contract
-tests and its own tests, then the harness; only then can it become an experiment. Code written by an agent is
-never adopted without a human, whatever the autonomy policy says, unless the human explicitly allows it for
-that slot.
+### 3.6 Implementing upgrades
 
-### 3.7 Fine-tuning as a plugin
+Most upgrades are a **plugin swap or a setting** (a different embedder, a new extractor, another model for a job,
+a new Jev command version): implementing means activating the tested variant, as a commit in the plugin history.
+When an idea needs new code, the **engineer agent** writes it as a plugin in a sandbox (a git worktree of the
+plugin repository); it must pass the slot's contract tests before testing starts, and its code is shown in the
+proof report. Agent-written code is never implemented without your approval.
 
-The embedding fine-tune (an EmbeddingGemma or Qwen3-0.6B "student" trained on LLM- and Jev-supervised pairs over
-the project's facets, plus the user's judgments) is a **process plugin**: a training job that produces a new
-`embedder` version, which then goes through the same harness and A/B as anything else. It runs only when enough
-data exists and only if its harness predicts a gain worth the cost.
+### 3.7 Fine-tuning as an upgrade
 
----
+Fine-tuning an embedder (an EmbeddingGemma or Qwen3-0.6B student trained on LLM- and Jev-supervised pairs over
+the project's facets, plus your judgments) is one more idea type: testing it means running the training job (a
+process plugin), then the same proof report against the current embedder.
 
 ## 4. The knowledge loop (as planned in PLAN.md §8, now built from plugins)
 
@@ -251,8 +249,9 @@ proposes charter changes and new research questions, and the user approves. Two 
 
 - `question-finder` strategies are plugins, so new ways of finding questions can be added, A/B tested (which
   strategy's questions does the user accept, and which lead to ⭐ papers?) and improved like anything else.
-- The review and the scout share one **proposals inbox** in the UI: charter changes, research directions, taste
-  rules, plugin adoptions, all with evidence and the same approve / reject / roll back actions.
+- Knowledge proposals (charter changes, research directions, taste rules) appear in the Charter tab's review
+  section; product upgrades have their own **Upgrades** tab (§3). Both use the same approve / reject / roll back
+  actions and the same plugin history.
 
 ---
 
@@ -281,17 +280,18 @@ before the next). Order chosen so that each step makes the next one cheaper.
 | **2** | `v1-1-harness` | Evaluation harness per slot; datasets from project history; LLM/Jev-labeled datasets; reports with intervals and cost; CLI and UI | The current embedder and Gemini Embedding 2 are compared on this project's data with a report |
 | **3** | `v1-2-fulltext-and-facets` | ⭐ → full text (`fulltext` plugins: arXiv HTML, Europe PMC XML, PDF text, Docling as a process plugin, native multimodal pages); facet summaries; full-text notes; junk-abstract repair; Gemini Embedding 2 as an `embedder` plugin | Notes of ⭐ papers fill all sections from full text; the harness compares the `fulltext` variants on the research benchmarks |
 | **4** | `v1-3-knowledge-loop` | Review, interests, charter proposals, new research questions (`question-finder` plugins), proposals inbox | A review proposes charter changes and research directions with evidence; approving one creates a charter version the next sweep uses |
-| **5** | `v1-4-comparisons` | Side-by-side runs on the same inputs, pairwise judge with position swap, Comparisons view (open or blind votes), guardrails, adoption proposals, auto-rollback, autonomy policy | Two ranker configs are compared on the same sweep, the human verifies on the Comparisons page, and the winner is adopted by proposal |
-| **6** | `v1-5-product-charter-and-scout` | Product charter page, scout agent (web, arXiv, GitHub, HF), ideas → experiment plans automatically | The scout finds a real improvement idea and turns it into an experiment without help |
-| **7** | `v1-6-engineer-and-fine-tuning` | Engineer agent writing plugin variants in a sandbox; supervised fine-tuning job as a process plugin | An agent-written prompt variant and a fine-tuned embedder each go through tests, harness and A/B to a proposal |
+| **5** | `v1-4-upgrades` | The Upgrades tab and its workflow (idea → test → proof → implement → verify, your decision at each gate); the scout with web search through OpenRouter, arXiv, release feeds and model catalogs; the test agent running candidates beside the current plugins; proof reports (metrics with intervals, side-by-side examples, pairwise judge with swapped positions, your spot checks); implementing as a plugin swap; verification after 7 days with rollback; the product charter | The scout suggests a real upgrade from a web source, you ask for a test, the proof report compares it with the current plugin on this project's data, you implement it, and it can be rolled back |
+| **6** | `v1-5-engineer` | The engineer agent writing new plugin code for ideas that need it, in a sandbox, with contract tests, shown in the proof report | An idea that needs a new source or ranker is built by the agent, tested, proven and implemented on your approval |
+| **7** | `v1-6-fine-tuning` | Embedder fine-tuning with LLM and Jev supervision as an upgrade type (training as a process plugin) | A fine-tuned student goes through test and proof against the current embedder |
 | **8** | `v1-7-mcp` | Hub tools as an MCP server for outside agents; MCP servers installable as plugins | An outside agent searches the project's knowledge base through MCP |
 
 Steps 1–3 also make the research project's experiments runnable inside the hub; steps 4–8 add the autonomy.
 
 ## 7. Decisions to confirm
 
-0. **Settled:** no hidden A/B tests; open side-by-side comparisons the human verifies (3.4). Everything is a
-   plugin, including the knowledge-base viewer and the UI (2.0). The Knowledge base tab opens as a graph.
+0. **Settled:** product upgrades go through the Upgrades tab with your decision at every gate (idea → test →
+   proof → implement); ideas come from the internet first; no hidden A/B tests. Everything is a plugin, including
+   the knowledge-base viewer and the UI (2.0). The Knowledge base tab opens as a graph.
 1. **Order:** plugin core first (recommended, since everything after is a plugin) vs. the knowledge loop first.
 2. **Default autonomy:** everything waits for approval at first; later the human can allow auto-adoption per slot
    (suggested first candidates: config plugins with a significant win within budget).

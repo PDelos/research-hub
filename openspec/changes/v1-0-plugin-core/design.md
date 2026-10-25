@@ -17,8 +17,9 @@ target: a small kernel and VS Code-style plugins for everything else. Requiremen
 - Real swappability shown twice: a second `kb.viewer`, and installing an external plugin that adds a chat tool and
   a paper source.
 
-**Non-Goals:** harness, comparisons and proposals for plugin adoption (v1-1, v1-4); scout and engineer agents; a
-public catalog; MCP exposure; any new paper-pipeline behavior.
+**Non-Goals:** the harness (v1-1); the Upgrades tab, scout, tests and proof reports (v1-4); the engineer agent; a
+public catalog; MCP exposure; any new paper-pipeline behavior. The kernel's `proposals` API and the plugin history
+are what the Upgrades tab will build on.
 
 ## Decisions
 

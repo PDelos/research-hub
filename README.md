@@ -15,8 +15,9 @@ inside the hub (v0.5). What comes after v0 is in `PLAN.md` §17.
 v0 is one server with fixed features. Next (planned in [EVOLUTION.md](EVOLUTION.md), first step
 `v1-0-plugin-core`), the hub becomes **plugins, like VS Code**: a small kernel and a plugin for every feature
 (paper sources, embedders, agents, UI tabs, the Obsidian viewer), each with an `rh-plugin.json` manifest, lazy
-activation and declared permissions, so you (or the hub's own agents) can install, swap and remove them per project
-and compare alternatives side by side before adopting one.
+activation and declared permissions, so you can install, swap and remove them per project. An **Upgrades** tab then
+suggests improvements found on the internet (new models, methods, tools); you choose which to test, the agent
+tests them against what runs now and returns a proof report, and you decide whether to implement each one.
 
 ## Quick start (offline, no keys)
 

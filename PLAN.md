@@ -77,7 +77,7 @@ pi-durable is experimental — all direct usage stays inside `packages/durable-a
 | **Kernel** | The small core (from v1): plugin loading, lockfile, storage, secrets and budgets, agent runtime, scheduling, HTTP with its guard, proposals inbox |
 | **Plugin** | Everything else, VS Code style: an `rh-plugin.json` manifest (`engines`, `activationEvents`, declarative `contributes`, `dependencies`, `permissions`), `activate(context)`/`deactivate()`, an optional exported API |
 | **Extension point** | A named place where plugins contribute (e.g. `papers.source`, `kb.viewer`, `tabs`), owned by the plugin that offers it |
-| **Comparison** | Two plugin variants run on the same inputs and shown side by side; a judge model scores, you verify and choose |
+| **Upgrade** | A change to the hub itself, in the Upgrades tab: an idea (found on the internet) → you ask for a test → the agent tests it beside the current plugin → a proof report → you ask to implement → verified after 7 days, one-click rollback |
 
 ---
 
@@ -568,8 +568,8 @@ Budget caps per project (daily/monthly) stop new sweeps and notify when reached.
 
 **v0 is complete (2026-10-25)**: all six layers below are archived. **What comes next is planned in
 [EVOLUTION.md §6](EVOLUTION.md)**: `v1-0-plugin-core` (the kernel and all of v0 as VS Code-style plugins) →
-`v1-1-harness` → `v1-2-fulltext-and-facets` → `v1-3-knowledge-loop` → `v1-4-comparisons` →
-`v1-5-product-charter-and-scout` → `v1-6-engineer-and-fine-tuning` → `v1-7-mcp`.
+`v1-1-harness` → `v1-2-fulltext-and-facets` → `v1-3-knowledge-loop` → `v1-4-upgrades` (the Upgrades tab:
+idea → test → proof → implement, you decide at every gate) → `v1-5-engineer` → `v1-6-fine-tuning` → `v1-7-mcp`.
 
 v0 was built bottom-up; each layer is one OpenSpec change that depends only on the layers below it and
 is applied, tested and archived before the next starts. All six v0 changes exist in `openspec/changes/`
