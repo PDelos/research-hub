@@ -53,7 +53,15 @@ hardest and best-tested parts) with their tests; copy single infra files (SSE, a
 telemetry projector, recovery test) as starting points; write our own server, SDK, UI and schema for one project
 per container. A full fork was rejected after measuring it: ~70% of its code (news domain 9.2K lines, news UI,
 TUI/CLI/cron 3.9K) would be deleted or rewritten, and it assumes ssh-deployed devices.
-Pinned: `@earendil-works/pi-durable`, `pi-ai`, `chord` **1.1.0**; Express 5; Vue 3 + Vite.
+Pinned in v0: `@earendil-works/pi-durable`, `pi-ai`, `chord` **1.1.0**; Express 5; Vue 3 + Vite; Node 24.
+
+**Stack (re-checked 2026-10-25, applied in v1-0):** Node **26** LTS (LTS from 2026-10-28; Node 24 is in
+maintenance since 2026-10-20) · **Vite+ 1.x** (`vp`: one CLI and one config for the dev server and build (Vite 8),
+tests (Vitest 5), linting (Oxlint), formatting (Oxfmt) and task caching) · TypeScript **6.0** (TypeScript 7's native
+compiler has no API for Vue's type checker yet; move to 7.1 when it is stable and `vue-tsc` supports it, a first
+candidate for the Upgrades tab) · Vue **3.5** + Vue Router **5** + Pinia **4**, Web Components for plugin UIs ·
+Playwright **1.64** for UI tests · Express **5.3** · pi-durable, pi-ai, chord **1.4.0** (from 1.1.0, upgraded with
+the recovery tests) · sqlite-vec 0.1.9 · isomorphic-git and ajv for the plugin system.
 pi-durable is experimental — all direct usage stays inside `packages/durable-agent`.
 
 ---
@@ -86,7 +94,7 @@ pi-durable is experimental — all direct usage stays inside `packages/durable-a
 ```
 ┌──────────────── Docker container: rh-<name>  (one per project, own port, own /data) ─────────────────┐
 │                                                                                                      │
-│  Browser (Vue 3) at <name>.localhost:<port>  ◄── REST + SSE ──►  rh-server (Node 24, Express 5)       │
+│  Browser (Vue 3) at <name>.localhost:<port>  ◄── REST + SSE ──►  rh-server (Node 26, Express 5)       │
 │                                                ├─ static UI + token-holding proxy (no key in page)  │
 │                                                ├─ /kb/ proxy ──► Ignis (bundled child process,       │
 │                                                │                 loopback only, supervised)          │
@@ -517,7 +525,7 @@ viewer must be same-origin (Ignis's absolute API paths are forwarded, and the hu
 `require`), and a preload binds Ignis to loopback. From v1-0 the viewer is a plugin (`rh.viewer-obsidian`) that can
 be disabled or swapped (for example for the Library viewer).
 
-**UI technology (decided 2026-10-25):** stay with **Vue 3 + Vite** (no switch, no meta-framework); add **Vue
+**UI technology (decided 2026-10-25):** stay with **Vue 3**, built with **Vite+** (no switch, no meta-framework); add **Vue
 Router** (plugin tabs as routes, replacing the hand-made hash router) and **Pinia** (shared state as plugins add
 views) in v1-0; **plugin UIs mount as Web Components** (custom elements with the hub's CSS variables, like VS
 Code's webviews), so plugin authors and agents can use any framework or none; **Playwright** for UI tests and
@@ -527,7 +535,7 @@ screenshots (replacing `scripts/screenshot.mjs`); no component library, the hub'
 
 ## 14. Docker: one container per project
 
-- `Dockerfile`: `node:24-slim`, `npm ci`, build Vue, copy a pinned Ignis release (v0.5), run `rh-server` as a
+- `Dockerfile`: `node:26-slim` (from v1-0; v0 used `node:24-slim`), `npm ci`, build the UI with Vite+, copy a pinned Ignis release (v0.5), run `rh-server` as a
   non-root user; `rh-server` supervises helper processes (Ignis, later Docling).
 - `docker-compose.yml` per project: `name: rh-<name>`, one service, `restart: unless-stopped`, port
   `127.0.0.1:<port>:4850`, volume `./data:/data`, `env_file: .env`, `mem_limit`/`cpus` (2 GB / 2 CPUs default),
@@ -635,7 +643,7 @@ replaces the phase list below):
 
 | Risk | Mitigation |
 |---|---|
-| pi-durable is experimental, API changes | Pin 1.1.0; all usage behind `packages/durable-agent`; upgrade deliberately with recovery tests |
+| pi-durable is experimental, API changes | Pin an exact version (1.1.0 in v0, 1.4.0 from v1-0); all usage behind `packages/durable-agent`; upgrade deliberately with recovery tests |
 | Jev outage | Gate is behind a `Judge` interface; an LLM-backed judge as config fallback (explicit, not automatic) |
 | Jev miscalibrated for scientific abstracts | Review bands, weekly calibration against your judgments, thresholds versioned |
 | API rate limits (arXiv, OpenAlex), shared by every project on one IP | 7-day metadata cache, politeness delays, staggered sweep times, keyless sources by default, durable backoff |
@@ -676,14 +684,17 @@ Each choice was checked against current alternatives; ✅ = kept, 🔄 = changed
 
 | Job | Choice | Alternatives considered | Verdict |
 |---|---|---|---|
-| Durable agent runtime | pi-durable 1.1.0 (via vendored `durable-agent`) | Mastra (most complete TS stack; durable agents still beta), LangGraph.js (most production-proven), Inngest/Temporal (durability layers, need an agent loop on top) | ✅ Kept: the reference implementation and its Jev integration are proven on it; isolated so Mastra is a viable fallback |
+| Durable agent runtime | pi-durable 1.4.0 from v1-0 (1.1.0 in v0; via vendored `durable-agent`) | Mastra (most complete TS stack; durable agents still beta), LangGraph.js (most production-proven), Inngest/Temporal (durability layers, need an agent loop on top) | ✅ Kept: the reference implementation and its Jev integration are proven on it; isolated so Mastra is a viable fallback |
 | Codebase start | Fresh repo + vendored `durable-agent`, `jev` | Full fork of the news agent | 🔄 Changed: fork would delete/rewrite ~70% |
 | LLMs | OpenRouter: Haiku 5.5 / Sonnet 5.5 | Direct Anthropic API | ✅ Kept per user choice; Haiku 5.5 verified at $0.10/$0.50 per M; `:batch` variants available |
 | Bulk decisions | Jev `typesafe/jev-1.14` via OpenRouter | Local zero-shot (GLiClass, DeBERTa), Laya (needs fine-tuning) | ✅ Kept; 🔄 pinned version, 30 KB input cap (long-context mode above ~32 KB), alpha API noted |
 | Embeddings | One OpenRouter embedding model (`qwen/qwen3-embedding-8b`) | SPECTER2 via Semantic Scholar | 🔄 Changed: S2 keyless pool returned 429 on every request; one model gives comparable vectors for all sources |
 | Paper metadata & citations | OpenAlex (+ Crossref) | Semantic Scholar | 🔄 OpenAlex primary (keyless, verified live, has `is_retracted`); S2 optional |
 | HTTP server | Express 5 | Fastify, Hono (2–3× faster) | ✅ Kept: single-user local service, reused Express infra code |
-| UI | Vue 3 + Vite; from v1-0 also Vue Router, Pinia, Web Components for plugin UIs, Playwright for UI tests | React, Svelte, Nuxt or another meta-framework, a component library | ✅ Kept (re-checked 2026-10-25): the app is small and works; a rewrite buys nothing; plugin UIs stay framework-agnostic through custom elements; SSR is not needed for a single-user local app |
+| Toolchain | **Vite+ 1.x** (`vp`: Vite 8, Vitest 5, Oxlint, Oxfmt, task caching, one config) from v1-0 | separate Vite, ESLint, Prettier, Jest; Biome | 🔄 New (2026-10-25): stable since 2026-09-28 (MIT); we already used Oxlint and Oxfmt separately; formatting and linting become enforced checks |
+| Language | TypeScript 6.0 (from 5.9) | TypeScript 7.0 (native, 8–12× faster builds) | ⏳ 7.0 has no API for Vue's type checker; move at 7.1 when `vue-tsc` supports it |
+| Runtime | Node 26 LTS (from 24) | stay on 24 (maintenance) | 🔄 Node 26 is LTS from 2026-10-28 |
+| UI | Vue 3.5; from v1-0 also Vue Router 5, Pinia 4, Web Components for plugin UIs, Playwright 1.64 for UI tests | React, Svelte, Nuxt or another meta-framework, a component library | ✅ Kept (re-checked 2026-10-25): the app is small and works; a rewrite buys nothing; plugin UIs stay framework-agnostic through custom elements; SSR is not needed for a single-user local app |
 | Database | `node:sqlite` + FTS5 + `sqlite-vec` | Postgres + pgvector, Qdrant, Neo4j | ✅ Kept; **tested locally**: FTS5 BM25 and sqlite-vec v0.1.9 KNN work on Node 26 with `allowExtension` |
 | Knowledge base | Obsidian-compatible markdown vault | Vector-DB RAG, graph DB | ✅ Kept: matches the 2026 "LLM wiki" pattern; BM25 over markdown benchmarked well |
 | Knowledge base viewer (v0.5) | Ignis: real Obsidian UI as a self-hosted web app, bundled in the project container, iframe tab, hub theme | linuxserver/obsidian (streamed desktop: laggy, heavy), Ignis as a separate container, Quartz (read-only), own Library view only | 🔄 New: user wants Obsidian in the browser, all on the server, one container per project; pending a 30-minute trial |

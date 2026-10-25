@@ -122,7 +122,9 @@ than coded (`contributes`), which plugins it builds on (`dependencies`), and wha
   `rh.kb` offers `kb.viewer` and `kb.store`, `rh.sweep` offers `sweep.phase`; many small points rather than a few
   big ones; plugins talk only through extension points and exported APIs.
 - **Plugin UIs are Web Components** (custom elements inheriting the hub's CSS variables), so a plugin's tab can be
-  written in Vue, plain JavaScript or anything else; the hub itself stays Vue 3 + Vite with Vue Router and Pinia.
+  written in Vue, plain JavaScript or anything else; the hub itself stays Vue 3.5 with Vue Router 5 and Pinia 4,
+  built, tested, linted and formatted with **Vite+** (`vp`). A plugin template ships the same `vp` setup, so
+  agent-written plugins are formatted, linted and tested the same way.
 - **The kernel API** (`rh`, versioned like `vscode`): `db` (the plugin's own tables and migrations), `files` (its
   own folder; the vault through `rh.kb`), `settings`, `secrets` (only those declared), `http` (only declared hosts,
   paced, with budgets), `models`, `decisions` (Jev), `agents` (register agents and chat tools), `scheduler`,

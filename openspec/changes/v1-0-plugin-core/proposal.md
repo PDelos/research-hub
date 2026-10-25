@@ -28,6 +28,10 @@ plugins on top of it.
   the Obsidian viewer, and a second built-in `kb.viewer` (the Library) to prove swapping.
 - **A Plugins tab:** every plugin with its state, version, contributions, permissions, settings and history;
   enable, disable, install, uninstall, roll back.
+- **Stack upgrade first** (before the refactor, verified by the full v0 test suite): Node 26 LTS, **Vite+ 1.x** as
+  the single toolchain (build, dev server, Vitest, Oxlint, Oxfmt, task caching; formatting and linting enforced,
+  the codebase formatted once), TypeScript 6.0, Vue 3.5.44, pi-durable / pi-ai / chord 1.4.0, current Express,
+  Oxlint and Oxfmt; then Vue Router 5, Pinia 4 and Playwright 1.64 with the UI work.
 - **Knowledge base tab** opens on Obsidian's graph view (already shipped on the v0.5 branch; recorded here).
 
 Out of scope: the evaluation harness (v1-1), the Upgrades tab with its scout, tests and proof reports (v1-4), the
@@ -53,5 +57,7 @@ added: none.
 - `rh-server`: new `kernel/` and `plugins/` folders; v0 modules move into built-in plugins; routes `/v1/plugins…`.
 - `rh-client-browser`: the tab bar and Settings are built from contributions; a Plugins tab; plugin UI loading.
 - Data: `data/plugins/` (git repo, lockfile, plugin data folders); a `plugin_migrations` table.
-- Dependencies: `isomorphic-git` (pure JS, MIT) for the plugin repository, `ajv` for manifest and settings schemas.
+- Dependencies: `isomorphic-git` (pure JS, MIT) for the plugin repository, `ajv` for manifest and settings schemas;
+  `vite-plus`, `vue-router`, `pinia`, `@playwright/test`; upgrades listed above. The Docker image moves to
+  `node:26-slim`.
 - Configuration: existing environment variables keep working and map onto plugin settings.

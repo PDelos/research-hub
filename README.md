@@ -223,6 +223,10 @@ npm run check:env      # every env var read in code is documented in .env.exampl
 npm run lint
 ```
 
+From `v1-0-plugin-core` the toolchain becomes **Vite+** (`vp`): `vp check` (formatting, linting and type checks,
+all enforced), `vp test`, `vp build`, `vp dev`, with one config. The stack moves to Node 26 LTS, TypeScript 6.0,
+Vue Router 5, Pinia 4, Playwright 1.64 and pi-durable 1.4.0 (see PLAN.md §0).
+
 Changing a Jev command's questions or policy requires bumping its `version` and running `npm run lock:jev`.
 
 Layout: `packages/durable-agent` and `packages/jev` are vendored from

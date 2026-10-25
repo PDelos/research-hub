@@ -114,6 +114,19 @@ history), `POST /v1/plugins/install` (`{ source }`, returns what needs approval)
 (`?deleteData=true`), `GET /v1/plugins/history`, `POST /v1/plugins/rollback` (`{ commit }`),
 `GET /v1/plugins/contributions`; SSE `plugins` frame on change.
 
+### D11. Stack upgrade (task group 0, before the refactor)
+- **Node 26 LTS** (LTS from 2026-10-28) in the image and `engines`; Node 24 is in maintenance.
+- **Vite+ 1.x** replaces the separate `vite`, `oxlint` and `oxfmt` dev dependencies: one `vite.config.ts` with
+  `lint`, `fmt` and `test` sections; `vp check` runs formatting, linting and type checks and must pass; the whole
+  codebase is formatted once in its own commit (v0 never enforced formatting). Server tests stay on `node:test`
+  (run as a `vp` task); new UI unit tests use Vitest; Playwright covers the UI end to end.
+- **TypeScript 6.0.3**, not 7.0: TypeScript 7's native compiler has no API for Volar/vue-tsc yet (expected with
+  7.1). The 7.1 move is recorded as the first Upgrades-tab idea for v1-4.
+- **pi-durable, pi-ai, chord 1.1.0 → 1.4.0**: all usage is inside `packages/durable-agent`; the upgrade lands
+  only if the recovery (SIGKILL) tests, the agent tests and the offline end to end pass unchanged; otherwise
+  stay on 1.1.0 and record why.
+- Minor upgrades: Vue 3.5.44, Express 5.3.x, Oxlint 1.89, Oxfmt 0.74 (through Vite+), @types/node 26.
+
 ## Risks / Trade-offs
 
 - [A big refactor can change behavior] → move code without rewriting it; the v0 suite must pass unchanged at every

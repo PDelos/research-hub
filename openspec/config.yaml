@@ -41,9 +41,14 @@ context: |
   - Paper sources are keyless (arXiv, OpenAlex, Europe PMC, bioRxiv); Semantic Scholar only with
     S2_API_KEY. Embeddings come from one configured OpenRouter embedding model for all papers.
   - Jev input is title/abstract-sized text (max 30,000 bytes); never send full texts to Jev.
-  - TypeScript, Node 24, npm workspaces. Pin @earendil-works/pi-durable, pi-ai, chord at 1.1.0.
+  - Stack (from v1-0): Node 26 LTS, npm workspaces, TypeScript 6.0 (not 7.x until 7.1 is stable and vue-tsc
+    supports it), Vite+ 1.x as the single toolchain (vp: Vite 8 build and dev server, Vitest 5 tests, Oxlint
+    linting, Oxfmt formatting, task caching, one config); formatting and linting are enforced checks that must
+    pass. Vue 3.5 + Vue Router 5 + Pinia 4; plugin UIs as Web Components; Playwright 1.64 for UI tests. Pin
+    @earendil-works/pi-durable, pi-ai, chord at an exact version (1.4.0 from v1-0; v0 used 1.1.0). Server tests
+    may stay on node:test (run through vp tasks); new UI unit tests use Vitest.
     pi-durable is experimental: all direct usage stays inside packages/durable-agent.
-  - Express 5 API + SSE; Vue 3 + Vite UI. One Docker container per project, data in its own /data
+  - Express 5 API + SSE; Vue 3 UI built with Vite+. One Docker container per project, data in its own /data
     volume; every helper process (e.g. the Ignis viewer) runs inside that container, supervised by the
     hub, reachable only through the hub. Routes carry no project segment.
   - Project containers never interfere: data-directory ownership lock, own port, own compose name
