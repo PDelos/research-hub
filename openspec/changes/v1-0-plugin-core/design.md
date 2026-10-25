@@ -100,7 +100,11 @@ version and cannot be uninstalled, only disabled (unless required).
 | `rh.viewer-library` | new (reuses the Library view) | | `kb.viewer` (library) |
 | `rh.desk` | agents, desk prompt | | the root agent and chat |
 | `rh.settings-ui`, `rh.runs-ui` | Settings and Runs tabs | | tabs |
-Files move under `apps/rh-server/plugins/<id>/` with their tests; the v0 tests run unchanged against the kernel.
+Each built-in plugin is a folder `apps/rh-server/plugins/<id>/` with its `rh-plugin.json` and an activation module
+that wraps the existing v0 modules, which stay in `src/` for now (so every v0 test keeps its imports and assertions;
+moving the files physically is a later cleanup and changes nothing for plugins). Chat tools of lazily activated
+plugins are declared in the manifest with a JSON schema, so the desk offers them before the plugin's code is loaded;
+the first call activates the plugin (`onChatTool:<name>`) and runs its registered handler.
 
 ### D9. Compatibility
 Environment variables keep working (`RH_KB_VIEWER`, `RH_MODEL_*`, `CONTACT_EMAIL`, …) as defaults of the matching

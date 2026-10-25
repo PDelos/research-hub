@@ -9,7 +9,7 @@
 
 ## 1. Kernel
 
-- [ ] 1.1 Define the manifest schema and loader (validation with field-level errors, engines check, dependency graph with cycle detection); verify tests for invalid manifests, incompatible engines, missing and cyclic dependencies
+- [x] 1.1 Define the manifest schema and loader (validation with field-level errors, engines check, dependency graph with cycle detection); verify tests for invalid manifests, incompatible engines, missing and cyclic dependencies
 - [ ] 1.2 Implement the plugin state repository (`data/plugins`, lockfile, isomorphic-git commits, history, rollback, first-start lockfile from the environment); verify tests for history, rollback and the first start of an existing v0 project
 - [ ] 1.3 Implement activation and lifecycle (activation events, context with subscriptions and dependency exports, 10 s timeout, failed state, runtime enable/disable, SSE `plugins` frame); verify tests for lazy activation, disable, failure isolation and dependency ordering
 - [ ] 1.4 Implement kernel contribution points (tabs, settings with JSON schema and environment defaults, commands, chat tools on the desk allow-list, Jev commands in the lock, prompts, processes) and plugin-offered extension points with cardinality; verify tests for each, the unknown-point report and `check:jev` across plugins
