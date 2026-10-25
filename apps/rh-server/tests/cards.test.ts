@@ -83,7 +83,7 @@ test("a sweep's candidates become complete cards written by the card writer, and
   );
   try {
     const sweep = await sweepOnce(p);
-    assert.equal(sweep.status, "completed", sweep.error);
+    assert.equal(sweep.status, "completed", sweep.error ?? "");
     const cards = p.cards.list();
     assert.equal(cards.length, 7);
     for (const card of cards) {
@@ -132,7 +132,7 @@ test("an invented number is refused; presenting a paper twice keeps one card; a 
   const { server, p } = await activeServer(fakePapers(4), [tricky]);
   try {
     const sweep = await sweepOnce(p);
-    assert.equal(sweep.status, "completed", sweep.error);
+    assert.equal(sweep.status, "completed", sweep.error ?? "");
     // Tool results as recorded by telemetry.
     await new Promise((r) => setTimeout(r, 200));
     const view = JSON.stringify(p.db.prepare("SELECT tool_name, is_error, result_text FROM tool_calls ORDER BY id").all());
@@ -189,7 +189,7 @@ test("a restart during the card turn re-attaches and completes the sweep with on
     const second = await startTestServer({ ...opts, hub: { ...opts.hub, fauxTokensPerSecond: undefined } });
     try {
       const sweep = await second.hub.project.sweeps.settled(id, 30_000);
-      assert.equal(sweep.status, "completed", sweep.error);
+      assert.equal(sweep.status, "completed", sweep.error ?? "");
       assert.equal(second.hub.project.cards.count(), 3);
       assert.equal(new Set(second.hub.project.cards.list().map((c) => c.paperId)).size, 3);
     } finally {

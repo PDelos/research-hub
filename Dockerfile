@@ -7,7 +7,7 @@
 FROM nobbe/ignis:0.8.18 AS ignis
 
 # 1. Build: install everything, type-check and build the UI.
-FROM node:24-slim AS build
+FROM node:26-slim AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 COPY config ./config
@@ -22,7 +22,7 @@ COPY apps ./apps
 RUN npm run build -w rh-client-browser
 
 # 2. Production dependencies only.
-FROM node:24-slim AS deps
+FROM node:26-slim AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
 COPY packages/durable-agent/package.json packages/durable-agent/
@@ -33,7 +33,7 @@ COPY apps/rh-client-browser/package.json apps/rh-client-browser/
 RUN npm ci --omit=dev --no-audit --no-fund
 
 # 3. Runtime: sources run with tsx, the built UI, a non-root user, and /data.
-FROM node:24-slim
+FROM node:26-slim
 ENV NODE_ENV=production \
     RH_HOST=0.0.0.0 \
     RH_PORT=4850 \
