@@ -5,7 +5,8 @@
 > (embedders, extractors, prompts, rankers) through benchmarks, experiments and A/B tests. Humans verify; agents
 > do the work. Companion to `PLAN.md` (the v0 system as built) — this file plans everything after v0.
 
-Written 2026-10-25, after v0 was completed.
+Written 2026-10-25, after v0 was completed. Revised the same day: experiments use **open side-by-side comparisons
+the human verifies** (no hidden interleaving), and **the whole hub is plug-and-play**, not only the pipeline.
 
 ---
 
@@ -32,10 +33,37 @@ reversible with one click.
 
 ## 2. Everything is a plugin
 
-### 2.1 Slots (extension points)
+### 2.0 A small kernel, everything else plugged in
 
-The hub's pipeline becomes a fixed set of **slots**; every behavior that fills a slot is a **plugin**. The v0 code
-is refactored into the first (built-in) plugins without changing behavior.
+The hub becomes a **microkernel**: a small core that only knows how to load plugins, give them services and keep
+the project's state safe; every feature, from the paper sources to the knowledge-base viewer, the UI tabs and the
+agents, is a plugin that can be installed, swapped or removed. The design follows proven plugin systems:
+
+- **Extension points owned by the plugin that offers them** (Backstage): a plugin can open its own extension
+  points (the knowledge-base plugin offers `kb.viewer`, the sweep plugin offers `sweep.phase`), many small
+  extension points rather than a few big ones, and plugins talk to each other only through them.
+- **Contribution points declared in the manifest** (VS Code): UI tabs, settings panels, chat tools, commands and
+  status-bar items are declared, so the host can show, disable and audit them without running plugin code.
+- **The kernel** keeps only: plugin loading and the lockfile, the project database and file area per plugin,
+  secrets and budgets, the durable agent runtime, scheduling, the HTTP server with its security guard, and the
+  proposals inbox. Everything else is replaceable.
+
+| Area | Extension point | Built-in plugin (v0) | Alternatives to plug in |
+|---|---|---|---|
+| Knowledge base storage | `kb.store` | Markdown vault (Obsidian-compatible) | a Logseq graph, a Trilium database, a plain folder of notes |
+| Knowledge base viewer | `kb.viewer` | Obsidian through Ignis (graph view by default) | SilverBullet or Logseq (self-hosted web), Quartz (read-only site), the hub's own graph and Library views |
+| UI | `ui.tab`, `ui.panel`, `ui.card` | Feed, Library, Knowledge base, Charter, Runs, Settings | a reading-list tab, a proposals tab, a dashboard, a different card layout |
+| Agents | `agent` | research desk, charter writer, card writer, librarian | a reviewer, a scout, an engineer, a different desk persona |
+| Models | `model.provider` | OpenRouter (all jobs), faux (offline) | direct provider APIs, a local model server |
+| Decisions | `decision.engine` | Jev through OpenRouter, mock Jev | another small judge model, a local classifier |
+| Notifications | `notify` | none | email digest, Telegram or Slack message, desktop notification |
+| Import and export | `io` | none | Zotero, BibTeX, Notion, PDF upload |
+| Pipeline | the slots in 2.1 | | |
+
+### 2.1 Pipeline slots
+
+The paper pipeline's extension points (the v0 code is refactored into the first built-in plugins without
+changing behavior):
 
 | Slot | What it does | Built-in plugins (from v0) | Candidate plugins to try |
 |---|---|---|---|
@@ -133,16 +161,34 @@ Every slot has a **harness**: datasets, metrics and a report. Datasets come from
 Results carry confidence intervals (bootstrap over items) and cost; a variant "wins" only with a minimum effect
 size and no guardrail regression (cost, errors, latency).
 
-### 3.4 Online experiments (A/B with the human's real use)
+### 3.4 Comparisons the human verifies (no hidden tests)
 
-| Slot type | Method | Signal |
-|---|---|---|
-| ranking (sweep, cards) | **interleaving**: the feed mixes candidates from variant A and B, the user does not know which is which | judgments → precision per variant |
-| writing (card-writer, librarian, summarizer) | **shadow mode**: both run, the user sees one; a judge model compares blind; occasionally the user is asked "which note is better?" | pairwise preference |
-| infrastructure (embedder, fulltext, kb-search) | **shadow mode** on real traffic | harness metrics on live data |
+Nothing is tested on the human behind their back: the live feed, cards and notes always come from the adopted
+plugins, and every alternative runs **beside** them, visibly, in a **Comparisons** view. This follows the
+side-by-side pairwise method used by arena-style evaluation (two outputs for the same input, one choice), which
+gives more consistent judgments than absolute scores, for humans and for model judges alike.
 
-Experiments have budgets, a maximum duration and **guardrails** (stop automatically on errors, cost spikes or a
-precision drop).
+1. **Run both on the same inputs.** The candidate plugin processes the same papers, queries or notes as the
+   adopted one (on today's sweep, a sample of the knowledge base, or a benchmark), at the experiment's budget.
+2. **Score automatically first.** The slot's harness metrics, plus a **judge model in pairwise mode with positions
+   swapped**: a comparison counts only if the judge picks the same side in both orders (this removes position
+   bias; agreement of such judges with humans on well-defined criteria is typically in the range of agreement
+   between two humans).
+3. **Show the human a short, labeled side-by-side.** A comparison page with A and B next to each other (two
+   rankings of the same candidates, two notes for the same paper, two search results for the same question),
+   the metrics, the judge's verdicts and where it disagreed with itself. The human can choose **open** (labels
+   visible, the default) or **blind** (labels hidden until they vote) for their own votes. A handful of votes is
+   enough: the human verifies the judge on the cases that matter, the judge does the volume.
+4. **Decide.** The human picks A, B or "keep testing"; their votes also calibrate the judge for next time.
+
+| Slot type | What is shown side by side |
+|---|---|
+| ranking (sweep, cards) | the two top-7 lists for the same gathered papers, with the papers each one alone would show |
+| writing (card-writer, librarian, summarizer) | two cards or two notes for the same paper |
+| infrastructure (embedder, fulltext, kb-search) | two result lists for the same questions; two extractions of the same page or table |
+| knowledge base viewer, UI | both running at once (two tabs), the human tries them |
+
+Experiments have budgets, a maximum duration and **guardrails** (stop automatically on errors or cost spikes).
 
 ### 3.5 Adoption
 
@@ -202,11 +248,11 @@ before the next). Order chosen so that each step makes the next one cheaper.
 
 | Step | Change | Delivers | Done when |
 |---|---|---|---|
-| **1** | `v1-0-plugin-core` | Slots, manifests, registry, lockfile in a per-project git repo, Plugins tab, install / enable / disable / uninstall / rollback; **v0 refactored into built-in plugins** with no behavior change | All v0 tests pass unchanged; swapping the embedder plugin re-embeds in the background; rollback restores the previous lockfile |
+| **1** | `v1-0-plugin-core` | The kernel; extension and contribution points for every area in 2.0 and 2.1; manifests, registry, lockfile in a per-project git repo, Plugins tab, install / enable / disable / uninstall / rollback; **all of v0 refactored into built-in plugins** (including the Obsidian viewer and the UI tabs) with no behavior change | All v0 tests pass unchanged; swapping the embedder re-embeds in the background; disabling the Obsidian viewer plugin removes its tab and process; rollback restores the previous lockfile |
 | **2** | `v1-1-harness` | Evaluation harness per slot; datasets from project history; LLM/Jev-labeled datasets; reports with intervals and cost; CLI and UI | The current embedder and Gemini Embedding 2 are compared on this project's data with a report |
 | **3** | `v1-2-fulltext-and-facets` | ⭐ → full text (`fulltext` plugins: arXiv HTML, Europe PMC XML, PDF text, Docling as a process plugin, native multimodal pages); facet summaries; full-text notes; junk-abstract repair; Gemini Embedding 2 as an `embedder` plugin | Notes of ⭐ papers fill all sections from full text; the harness compares the `fulltext` variants on the research benchmarks |
 | **4** | `v1-3-knowledge-loop` | Review, interests, charter proposals, new research questions (`question-finder` plugins), proposals inbox | A review proposes charter changes and research directions with evidence; approving one creates a charter version the next sweep uses |
-| **5** | `v1-4-experiments` | Shadow mode, interleaving A/B, guardrails, adoption proposals, auto-rollback, autonomy policy | An A/B of two ranker configs runs on the real feed and ends in an adoption proposal |
+| **5** | `v1-4-comparisons` | Side-by-side runs on the same inputs, pairwise judge with position swap, Comparisons view (open or blind votes), guardrails, adoption proposals, auto-rollback, autonomy policy | Two ranker configs are compared on the same sweep, the human verifies on the Comparisons page, and the winner is adopted by proposal |
 | **6** | `v1-5-product-charter-and-scout` | Product charter page, scout agent (web, arXiv, GitHub, HF), ideas → experiment plans automatically | The scout finds a real improvement idea and turns it into an experiment without help |
 | **7** | `v1-6-engineer-and-fine-tuning` | Engineer agent writing plugin variants in a sandbox; supervised fine-tuning job as a process plugin | An agent-written prompt variant and a fine-tuned embedder each go through tests, harness and A/B to a proposal |
 | **8** | `v1-7-mcp` | Hub tools as an MCP server for outside agents; MCP servers installable as plugins | An outside agent searches the project's knowledge base through MCP |
@@ -215,6 +261,8 @@ Steps 1–3 also make the research project's experiments runnable inside the hub
 
 ## 7. Decisions to confirm
 
+0. **Settled:** no hidden A/B tests; open side-by-side comparisons the human verifies (3.4). Everything is a
+   plugin, including the knowledge-base viewer and the UI (2.0). The Knowledge base tab opens as a graph.
 1. **Order:** plugin core first (recommended, since everything after is a plugin) vs. the knowledge loop first.
 2. **Default autonomy:** everything waits for approval at first; later the human can allow auto-adoption per slot
    (suggested first candidates: config plugins with a significant win within budget).
