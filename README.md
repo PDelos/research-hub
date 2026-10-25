@@ -10,6 +10,14 @@ brief, charter and schedule (v0.1), paper search with paper representations (v0.
 (v0.3), judging with learning from your feedback (v0.4), and the knowledge base with the real Obsidian interface
 inside the hub (v0.5). What comes after v0 is in `PLAN.md` §17.
 
+## Architecture and what comes next
+
+v0 is one server with fixed features. Next (planned in [EVOLUTION.md](EVOLUTION.md), first step
+`v1-0-plugin-core`), the hub becomes **plugins, like VS Code**: a small kernel and a plugin for every feature
+(paper sources, embedders, agents, UI tabs, the Obsidian viewer), each with an `rh-plugin.json` manifest, lazy
+activation and declared permissions, so you (or the hub's own agents) can install, swap and remove them per project
+and compare alternatives side by side before adopting one.
+
 ## Quick start (offline, no keys)
 
 Needs Node 24 or newer.

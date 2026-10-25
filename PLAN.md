@@ -7,6 +7,10 @@
 > performance and what you have shown interest in, and **proposes improvements, charter updates and new
 > research questions that you approve**: the charter evolves with you and with the field.
 >
+> **Built from plugins, like VS Code** (from v1): a small kernel and plugins for everything else (paper sources,
+> embedders, agents, UI tabs, the knowledge-base viewer), each with a declarative manifest, lazy activation and
+> extension points, installable, swappable and removable per project. See **[EVOLUTION.md](EVOLUTION.md)**.
+>
 > Field focus: **AI + bioinformatics (neural networks)**. Runs on your own machine or server, **one Docker
 > container per project**, everything (including the Obsidian knowledge-base viewer) inside it.
 
@@ -70,6 +74,10 @@ pi-durable is experimental — all direct usage stays inside `packages/durable-a
 | **KB / Vault** | Obsidian-compatible markdown wiki of ⭐ papers + concepts + questions + directions |
 | **Proposal** | A change the agent wants (rule, query, weight, level, direction…). Needs your approval |
 | **Review** | Weekly self-improvement run that produces proposals |
+| **Kernel** | The small core (from v1): plugin loading, lockfile, storage, secrets and budgets, agent runtime, scheduling, HTTP with its guard, proposals inbox |
+| **Plugin** | Everything else, VS Code style: an `rh-plugin.json` manifest (`engines`, `activationEvents`, declarative `contributes`, `dependencies`, `permissions`), `activate(context)`/`deactivate()`, an optional exported API |
+| **Extension point** | A named place where plugins contribute (e.g. `papers.source`, `kb.viewer`, `tabs`), owned by the plugin that offers it |
+| **Comparison** | Two plugin variants run on the same inputs and shown side by side; a judge model scores, you verify and choose |
 
 ---
 
@@ -102,6 +110,21 @@ pi-durable is experimental — all direct usage stays inside `packages/durable-a
 └──────────────────────────────────────────────────────────────────────────────────────────────────────┘
 
 Another theme = another container (rh-genomics on :4860 with its own /data). Containers never talk to each other.
+```
+
+**From v1: kernel + plugins** (EVOLUTION.md §2). The boxes above become plugins around a small kernel:
+
+```
+ kernel ─ plugin loader + lockfile (data/plugins, git) · rh API (db, files, settings, secrets, http, models,
+          decisions, agents, scheduler, events, processes, ui, proposals) · HTTP + guard · pi-durable runtime
+   │
+   ├─ rh.provider-openrouter   models.provider        ├─ rh.papers        offers papers.source, papers.enricher
+   ├─ rh.decision-jev          decision.engine        │    ├─ rh.source-arxiv / -openalex / -europepmc / -s2
+   ├─ rh.desk                  agent + chat tools     ├─ rh.representations   offers papers.embedder
+   ├─ rh.charter               agent + Charter tab    │    └─ rh.embedder-openrouter (Qwen3 → Gemini Embedding 2)
+   ├─ rh.schedule              scheduler slots        ├─ rh.sweep         offers sweep.phase; Feed tab, Runs
+   ├─ rh.feedback              judgments, weights     └─ rh.kb            offers kb.store, kb.viewer; Library tab
+   └─ rh.settings-ui           Settings tab                └─ rh.viewer-obsidian   kb.viewer (Ignis) + Knowledge base tab
 ```
 
 Two SQLite files, as in the news agent: **`agent.sqlite` belongs to pi-durable**,
@@ -543,7 +566,12 @@ Budget caps per project (daily/monthly) stop new sweeps and notify when reached.
 
 ## 17. Build pyramid (OpenSpec changes)
 
-v0 is built bottom-up; each layer is one OpenSpec change that depends only on the layers below it and
+**v0 is complete (2026-10-25)**: all six layers below are archived. **What comes next is planned in
+[EVOLUTION.md §6](EVOLUTION.md)**: `v1-0-plugin-core` (the kernel and all of v0 as VS Code-style plugins) →
+`v1-1-harness` → `v1-2-fulltext-and-facets` → `v1-3-knowledge-loop` → `v1-4-comparisons` →
+`v1-5-product-charter-and-scout` → `v1-6-engineer-and-fine-tuning` → `v1-7-mcp`.
+
+v0 was built bottom-up; each layer is one OpenSpec change that depends only on the layers below it and
 is applied, tested and archived before the next starts. All six v0 changes exist in `openspec/changes/`
 with proposals and behavior specs; design and tasks are written for each layer when it is next.
 
@@ -615,7 +643,12 @@ replaces the phase list below):
 
 ---
 
-## 20. Technology review (2026-10-22)
+## 20. Technology review (2026-10-22; plugin design added 2026-10-25)
+
+**Plugin design (2026-10-25):** VS Code's extension model (declarative `contributes`, `activationEvents`, an
+extension host for third-party code, a versioned API namespace, extension exports) plus Backstage's extension
+points owned by plugins; process plugins speak MCP. Chosen over a monolith with feature flags (not swappable by
+users or agents) and over a microservice per feature (conflicts with one container per project).
 
 Each choice was checked against current alternatives; ✅ = kept, 🔄 = changed by this review.
 

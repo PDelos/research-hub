@@ -79,33 +79,62 @@ changing behavior):
 | `question-finder` | Propose new research questions (knowledge loop) | — | same-method-different-problem, missing links, recurring open questions, contradictions, citation gaps, rising topics |
 | `scout` | Look for product improvements (product loop) | — | web search, arXiv, GitHub releases, Hugging Face, MTEB leaderboards |
 
-### 2.2 What a plugin is
+### 2.2 What a plugin is (VS Code style)
 
-A plugin is a folder with a **manifest**:
+A plugin is a folder with an **`rh-plugin.json`** manifest, modeled on a VS Code extension's `package.json`: what
+it needs from the kernel (`engines`), **when** it wakes up (`activationEvents`), **what it adds**, declared rather
+than coded (`contributes`), which plugins it builds on (`dependencies`), and what it may touch (`permissions`):
 
-```yaml
-id: embedder.gemini-embedding-2          # slot.name
-version: 1.2.0
-slot: embedder
-kind: config | code | process            # see 2.3
-description: Gemini Embedding 2 through OpenRouter, 1024 dims, task instructions per facet
-config: { model: google/gemini-embedding-2, dims: 1024 }   # validated against the slot's config schema
-permissions:
-  network: [openrouter.ai]               # nothing else is reachable
-  llm_budget_usd_per_day: 0.10
-  files: [read: vault]                    # default: none
-provides: [embed(texts, task) -> vectors]
-tests: tests/                             # must pass the slot's contract tests + its own
-metrics: [retrieval@k, facet-agreement, cost, latency]   # what its slot's harness measures
+```jsonc
+{
+  "id": "rh.viewer-obsidian",                 // publisher.name, unique
+  "version": "1.0.0",
+  "displayName": "Obsidian viewer (Ignis)",
+  "engines": { "research-hub": "^1.0.0" },    // kernel API versions it works with
+  "main": "server/index.ts",                   // activate(context) / deactivate()
+  "browser": "ui/index.ts",                    // optional UI code (tabs, panels)
+  "dependencies": ["rh.kb"],                   // activated first; their exported APIs are available
+  "activationEvents": ["onStartup:vault", "onView:knowledge-base"],
+  "contributes": {
+    "kb.viewer": [{ "id": "obsidian", "title": "Obsidian", "proxyPath": "/kb/" }],   // another plugin's extension point
+    "tabs": [{ "id": "knowledge-base", "title": "Knowledge base", "order": 30 }],
+    "settings": {                              // JSON schema, shown in Settings, validated by the kernel
+      "rh.viewerObsidian.enabled": { "type": "boolean", "default": true },
+      "rh.viewerObsidian.obsidianVersion": { "type": "string", "default": "1.14.4" }
+    },
+    "commands": [{ "id": "rh.viewerObsidian.openGraph", "title": "Open the graph" }],
+    "processes": [{ "id": "ignis", "restart": "always", "network": "loopback" }]
+  },
+  "permissions": {
+    "network": ["github.com"],                 // only to download Obsidian
+    "files": ["vault:read-write", "own"],      // the vault and its own folder
+    "secrets": [],
+    "budgetUsdPerDay": 0
+  }
+}
 ```
 
-### 2.3 Three kinds of plugins, three levels of trust
+- **Activation is lazy**, as in VS Code: a plugin's code runs only when one of its events fires (startup, a view
+  opening, a sweep phase, a command, a chat tool call), so a disabled or unused plugin costs nothing.
+- **`contributes` is declarative**: the kernel builds the tab bar, Settings, the command list, the chat tools and
+  the Jev command lock from the manifests, and can show, disable and audit them without running plugin code.
+- **Plugins export APIs** from `activate()` for the plugins that depend on them (VS Code's extension exports).
+- **Extension points belong to the plugin that offers them** (Backstage): `rh.papers` offers `papers.source`,
+  `rh.kb` offers `kb.viewer` and `kb.store`, `rh.sweep` offers `sweep.phase`; many small points rather than a few
+  big ones; plugins talk only through extension points and exported APIs.
+- **The kernel API** (`rh`, versioned like `vscode`): `db` (the plugin's own tables and migrations), `files` (its
+  own folder; the vault through `rh.kb`), `settings`, `secrets` (only those declared), `http` (only declared hosts,
+  paced, with budgets), `models`, `decisions` (Jev), `agents` (register agents and chat tools), `scheduler`,
+  `events`, `processes` (supervised child processes), `ui`, `proposals`.
+
+### 2.3 Where plugins run: three levels of trust
 
 | Kind | Examples | Runs | Risk |
 |---|---|---|---|
-| **config** | prompts, Jev commands, thresholds, rank weights, model choices | data read by the host | low: no code |
-| **code** | a new ranker, a new source client | TypeScript module in a worker with Node's permission model (only its declared files and hosts; secrets never visible, LLM and HTTP calls through host clients that enforce budgets) | medium |
-| **process** | Docling (Python), a local embedder, a fine-tuning job, an MCP server | a child process speaking **MCP over stdio**, supervised like the Ignis viewer, with the same declared limits | medium–high |
+| **built-in** | the v0 features refactored | in the kernel's process, like VS Code's built-in extensions | trusted, shipped with the image |
+| **config** | prompts, Jev commands, thresholds, rank weights, model choices, `contributes`-only plugins | data read by the host, no code | low |
+| **code** (third-party or agent-written) | a new ranker, a source client, a UI tab | a separate **plugin host** process (like VS Code's extension host) with Node's permission model: only declared files and hosts, secrets never visible, LLM and HTTP calls through kernel clients that enforce budgets | medium |
+| **process** | Docling (Python), a local embedder, a fine-tuning job, Ignis, any MCP server | a supervised child process speaking **MCP over stdio** (or HTTP on loopback), with the same declared limits | medium–high |
 
 MCP as the process-plugin protocol means any MCP server can become a plugin, and every hub tool can be exposed
 to outside agents. It is the same architecture as the research project's deliverable (a multimodal search tool

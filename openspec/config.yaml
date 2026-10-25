@@ -16,10 +16,25 @@ context: |
     Keep its patterns (durable tasks with checkpointed phases, onceInCommit tools, Jev commands as
     versioned JSON, ledger, SSE snapshot+deltas, faux model + mock Jev tests) unless a change
     explicitly replaces them.
-  - v0 is built as a pyramid of changes, each depending only on the ones below it:
-    v0-0-skeleton -> v0-1-project-setup -> v0-2-paper-sources -> v0-3-daily-sweep -> v0-4-feedback
-    -> v0-5-knowledge-vault. Apply and archive them in that order. A change for a higher layer must not
-    add requirements to a capability owned by a lower layer except as MODIFIED deltas.
+  - v0 (complete) was built as a pyramid: v0-0-skeleton -> v0-1-project-setup -> v0-2-paper-sources ->
+    v0-3-daily-sweep -> v0-4-feedback -> v0-5-knowledge-vault. v1 follows EVOLUTION.md §6, in order:
+    v1-0-plugin-core -> v1-1-harness -> v1-2-fulltext-and-facets -> v1-3-knowledge-loop -> v1-4-comparisons
+    -> v1-5-product-charter-and-scout -> v1-6-engineer-and-fine-tuning -> v1-7-mcp. Apply and archive each
+    before the next. A change must not add requirements to a capability owned by an earlier change except as
+    MODIFIED deltas.
+  - Plugin architecture (from v1-0, EVOLUTION.md §2): a small kernel and plugins for every feature, modeled on
+    VS Code extensions. Each plugin has an rh-plugin.json manifest (id, version, engines.research-hub,
+    main/browser entries, activationEvents, declarative contributes, dependencies, permissions), is
+    activated lazily through activate(context) and stopped through deactivate(), may export an API to its
+    dependents, and reaches the system only through the versioned rh kernel API. Extension points are owned
+    by the plugin that offers them (Backstage style); prefer many small points. New features are plugins,
+    never kernel code, unless they are a kernel service. Built-in plugins run in-process; third-party and
+    agent-written code runs in a separate plugin host with declared permissions; process plugins (Python
+    tools, MCP servers, Ignis) are supervised child processes. Plugin state per project lives in
+    data/plugins (a git repo with plugins.lock.json); every change is a commit and can be rolled back.
+  - No hidden experiments: alternatives run beside the adopted plugins on the same inputs and are shown side
+    by side (Comparisons); a pairwise judge with swapped positions does the volume; the user verifies and
+    decides. Nothing is adopted without approval unless the user's autonomy policy allows it for that slot.
   - Paper sources are keyless (arXiv, OpenAlex, Europe PMC, bioRxiv); Semantic Scholar only with
     S2_API_KEY. Embeddings come from one configured OpenRouter embedding model for all papers.
   - Jev input is title/abstract-sized text (max 30,000 bytes); never send full texts to Jev.
