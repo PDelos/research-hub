@@ -8,7 +8,15 @@ import { EuropePmcSource } from "./sources/europepmc.ts";
 import { OpenAlexSource } from "./sources/openalex.ts";
 import { SemanticScholarSource } from "./sources/semanticscholar.ts";
 import { inWindow, type PaperSource } from "./sources/types.ts";
-import { CACHE_TTL_MS, MetadataCache, MISS_TTL_MS, PaperStore, type Paper, type SourceName, type SourcePaper } from "./store.ts";
+import {
+  CACHE_TTL_MS,
+  MetadataCache,
+  MISS_TTL_MS,
+  PaperStore,
+  type Paper,
+  type SourceName,
+  type SourcePaper,
+} from "./store.ts";
 
 export const SEARCH_LIMIT_DEFAULT = 25;
 export const SEARCH_LIMIT_MAX = 100;
@@ -75,14 +83,21 @@ export class PaperSearch {
     const query = request.query.trim();
     if (!query) throw new RangeError("query must not be empty");
     const perSource = Math.min(request.perSource ?? limit, SEARCH_LIMIT_MAX);
-    const q = { query, since: request.since, until: request.until, limit: perSource, budgetMs: request.budgetMs ?? 60_000 };
+    const q = {
+      query,
+      since: request.since,
+      until: request.until,
+      limit: perSource,
+      budgetMs: request.budgetMs ?? 60_000,
+    };
 
     const settled = await Promise.all(
       this.sources.map(async (source) => {
         try {
           return { source: source.name, results: await source.search(q) };
         } catch (error) {
-          const reason = error instanceof SourceError ? error.message : error instanceof Error ? error.message : String(error);
+          const reason =
+            error instanceof SourceError ? error.message : error instanceof Error ? error.message : String(error);
           this.options.log?.warn("papers.source_failed", { source: source.name, error: reason });
           return { source: source.name, results: [] as SourcePaper[], error: reason };
         }
@@ -174,7 +189,10 @@ export class PaperSearch {
       }
       try {
         const value = p.ids[kind]!;
-        found.set(p.id, await cache.through(`openalex:${kind}:${value}`, () => this.openalex.lookup(kind, value, budgetMs)));
+        found.set(
+          p.id,
+          await cache.through(`openalex:${kind}:${value}`, () => this.openalex.lookup(kind, value, budgetMs)),
+        );
       } catch (e) {
         error = e instanceof Error ? e.message : String(e);
       }

@@ -92,19 +92,25 @@ export class Ingest {
         if (existing) return toolText(`The note ${existing} already exists; now call link_note.`);
         const sections = args as Record<(typeof SECTIONS)[number][0], string>;
         const problems: string[] = [];
-        for (const [key] of SECTIONS) if (!sections[key]?.trim()) problems.push(`${key} is empty (write "${NOT_STATED}" if the abstract says nothing about it)`);
+        for (const [key] of SECTIONS)
+          if (!sections[key]?.trim())
+            problems.push(`${key} is empty (write "${NOT_STATED}" if the abstract says nothing about it)`);
         const reason = this.deps.feedback.get(request.cardId)?.reason ?? "";
         const source = `${paper.title} ${paper.abstract ?? ""} ${reason}`;
         const invented = ungroundedNumbers(SECTIONS.map(([k]) => sections[k] ?? "").join(" "), source);
         if (invented.length) problems.push(`numbers not in the title, abstract or reason: ${invented.join(", ")}`);
-        if (problems.length) return toolError(`The note was not written: ${problems.join("; ")}.`, ["Fix exactly these and call write_evidence_note again."]);
+        if (problems.length)
+          return toolError(`The note was not written: ${problems.join("; ")}.`, [
+            "Fix exactly these and call write_evidence_note again.",
+          ]);
         const stem = await once<string>(api, "note", ctx, async () => this.writeNote(paper, request, sections));
         return toolText(`Wrote sources/${stem}.md. Now call link_note with at least one concept or research question.`);
       },
     });
     const link = defineAppTool({
       name: "link_note",
-      description: "Connect the new note: concepts (short noun phrases), research question ids (Q1…), and optionally existing notes it relates to.",
+      description:
+        "Connect the new note: concepts (short noun phrases), research question ids (Q1…), and optionally existing notes it relates to.",
       returns: "Text: the pages linked, or what to fix.",
       parameters: Type.Object({
         concepts: Type.Optional(Type.Array(Type.String({ minLength: 2, maxLength: 80 }), { maxItems: 5 })),
@@ -117,11 +123,17 @@ export class Ingest {
         const stem = this.note(request.paperId);
         if (!stem) return toolError("There is no note yet.", ["Call write_evidence_note first."]);
         const charter = this.deps.charters.approved()?.charter;
-        const questions = (args.questions ?? []).map((q) => q.trim().toUpperCase()).filter((q) => charter?.questions.some((x) => x.id === q));
+        const questions = (args.questions ?? [])
+          .map((q) => q.trim().toUpperCase())
+          .filter((q) => charter?.questions.some((x) => x.id === q));
         const concepts = (args.concepts ?? []).map((c) => c.trim()).filter((c) => slug(c));
         if (!questions.length && !concepts.length)
-          return toolError("Nothing to link: give at least one concept or a research question id from the list.", ["Call link_note again."]);
-        const result = await once<string>(api, "link", ctx, async () => this.link(stem, concepts, questions, args.related ?? []));
+          return toolError("Nothing to link: give at least one concept or a research question id from the list.", [
+            "Call link_note again.",
+          ]);
+        const result = await once<string>(api, "link", ctx, async () =>
+          this.link(stem, concepts, questions, args.related ?? []),
+        );
         this.tryComplete(request.paperId);
         return toolText(result);
       },
@@ -154,12 +166,18 @@ export class Ingest {
 
   /** The request whose librarian turn is running (one at a time). */
   private active(): KbRequest | undefined {
-    const row = this.deps.db.prepare("SELECT * FROM kb_requests WHERE status = 'pending' AND submission_id IS NOT NULL ORDER BY created_at LIMIT 1").get();
+    const row = this.deps.db
+      .prepare(
+        "SELECT * FROM kb_requests WHERE status = 'pending' AND submission_id IS NOT NULL ORDER BY created_at LIMIT 1",
+      )
+      .get();
     return row ? toRequest(row) : undefined;
   }
 
   note(paperId: number): string | undefined {
-    return (this.deps.db.prepare("SELECT stem FROM kb_notes WHERE paper_id = ?").get(paperId) as { stem: string } | undefined)?.stem;
+    return (
+      this.deps.db.prepare("SELECT stem FROM kb_notes WHERE paper_id = ?").get(paperId) as { stem: string } | undefined
+    )?.stem;
   }
 
   /** Start or resume work: re-attach to a running turn, otherwise start the next due request. */
@@ -175,7 +193,9 @@ export class Ingest {
       return;
     }
     const next = this.deps.db
-      .prepare("SELECT * FROM kb_requests WHERE status = 'pending' AND (next_attempt_at IS NULL OR next_attempt_at <= ?) ORDER BY created_at LIMIT 1")
+      .prepare(
+        "SELECT * FROM kb_requests WHERE status = 'pending' AND (next_attempt_at IS NULL OR next_attempt_at <= ?) ORDER BY created_at LIMIT 1",
+      )
       .get(this.now());
     if (next) {
       this.starting = this.start(toRequest(next))
@@ -189,12 +209,17 @@ export class Ingest {
         });
       return;
     }
-    const later = this.deps.db.prepare("SELECT MIN(next_attempt_at) at FROM kb_requests WHERE status = 'pending'").get() as { at: number | null };
+    const later = this.deps.db
+      .prepare("SELECT MIN(next_attempt_at) at FROM kb_requests WHERE status = 'pending'")
+      .get() as { at: number | null };
     if (later.at !== null && !this.timer) {
-      this.timer = setTimeout(() => {
-        this.timer = undefined;
-        this.pickUp();
-      }, Math.max(0, Number(later.at) - this.now()));
+      this.timer = setTimeout(
+        () => {
+          this.timer = undefined;
+          this.pickUp();
+        },
+        Math.max(0, Number(later.at) - this.now()),
+      );
       this.timer.unref?.();
     }
   }
@@ -231,11 +256,18 @@ export class Ingest {
     const conversation = await this.harness.createConversation(
       {
         ownership: { kind: "ownerless" },
-        agent: { model: this.deps.catalog.forJob("reader"), thinkingLevel: "low", extensions: [this.extension, this.deps.observe] },
+        agent: {
+          model: this.deps.catalog.forJob("reader"),
+          thinkingLevel: "low",
+          extensions: [this.extension, this.deps.observe],
+        },
       },
       this.ctx,
     );
-    const submission = await conversation.submit({ type: "input", content: prompt, requestId: `ingest:${paper.id}:${request.attempts + 1}` }, this.ctx);
+    const submission = await conversation.submit(
+      { type: "input", content: prompt, requestId: `ingest:${paper.id}:${request.attempts + 1}` },
+      this.ctx,
+    );
     this.deps.db
       .prepare("UPDATE kb_requests SET conversation_id = ?, submission_id = ?, updated_at = ? WHERE paper_id = ?")
       .run(conversation.id as number, submission.id as number, nowIso(), paper.id);
@@ -269,11 +301,22 @@ export class Ingest {
     if (request.status !== "pending") return;
     if (this.tryComplete(paperId)) return;
     const attempts = request.attempts + 1;
-    const reason = this.note(paperId) ? "the note is not linked to a concept or question yet" : "the librarian did not write the note";
+    const reason = this.note(paperId)
+      ? "the note is not linked to a concept or question yet"
+      : "the librarian did not write the note";
     const failed = attempts >= MAX_ATTEMPTS;
     this.deps.db
-      .prepare("UPDATE kb_requests SET attempts = ?, status = ?, reason = ?, next_attempt_at = ?, submission_id = NULL, updated_at = ? WHERE paper_id = ?")
-      .run(attempts, failed ? "failed" : "pending", reason, failed ? null : this.now() + (this.deps.retryMs ?? RETRY_MS), nowIso(), paperId);
+      .prepare(
+        "UPDATE kb_requests SET attempts = ?, status = ?, reason = ?, next_attempt_at = ?, submission_id = NULL, updated_at = ? WHERE paper_id = ?",
+      )
+      .run(
+        attempts,
+        failed ? "failed" : "pending",
+        reason,
+        failed ? null : this.now() + (this.deps.retryMs ?? RETRY_MS),
+        nowIso(),
+        paperId,
+      );
     this.deps.log.warn("kb.ingest_incomplete", { paperId, attempts, failed, reason });
     this.emit();
   }
@@ -287,13 +330,22 @@ export class Ingest {
     if (!stem || !request || request.status === "done") return request?.status === "done";
     if (!this.connected(stem)) return false;
     const paper = this.deps.store.get(paperId)!;
-    const summary = (this.deps.db.prepare("SELECT summary FROM kb_notes WHERE paper_id = ?").get(paperId) as { summary: string | null }).summary ?? "";
+    const summary =
+      (
+        this.deps.db.prepare("SELECT summary FROM kb_notes WHERE paper_id = ?").get(paperId) as {
+          summary: string | null;
+        }
+      ).summary ?? "";
     const level = this.deps.cards.get(Number(request.card_id))?.level ?? "unknown";
     const reason = this.deps.feedback.get(Number(request.card_id))?.reason;
-    this.deps.vault.appendIndex(`- [[${stem}]] · ${summary} · ${level}${reason ? ` · "${reason.replace(/\s+/g, " ")}"` : ""}`);
+    this.deps.vault.appendIndex(
+      `- [[${stem}]] · ${summary} · ${level}${reason ? ` · "${reason.replace(/\s+/g, " ")}"` : ""}`,
+    );
     this.deps.vault.appendLog(`ingested [[${stem}]] (${paper.title})`);
     this.deps.db
-      .prepare("UPDATE kb_requests SET status = 'done', submission_id = NULL, reason = NULL, updated_at = ? WHERE paper_id = ?")
+      .prepare(
+        "UPDATE kb_requests SET status = 'done', submission_id = NULL, reason = NULL, updated_at = ? WHERE paper_id = ?",
+      )
       .run(nowIso(), paperId);
     this.deps.log.info("kb.ingested", { paperId, stem });
     this.emit();
@@ -331,7 +383,14 @@ export class Ingest {
       ["year", paper.year ?? null],
       ["venue", paper.venue ?? paper.server ?? null],
       ["level", card?.level ?? null],
-      ["kind", (this.deps.db.prepare("SELECT kind FROM sweep_papers WHERE paper_id = ? AND kind IS NOT NULL LIMIT 1").get(paper.id) as { kind: string } | undefined)?.kind ?? null],
+      [
+        "kind",
+        (
+          this.deps.db
+            .prepare("SELECT kind FROM sweep_papers WHERE paper_id = ? AND kind IS NOT NULL LIMIT 1")
+            .get(paper.id) as { kind: string } | undefined
+        )?.kind ?? null,
+      ],
       ["relevance", card?.relevance ?? null],
       ["trust", card?.trust ?? null],
       ["value", card?.value ?? null],
@@ -339,12 +398,17 @@ export class Ingest {
       ["why", judgment?.reason ?? ""],
       ["link", paper.ids.doi ? `https://doi.org/${paper.ids.doi}` : (paper.url ?? null)],
     ];
-    const front = props.filter(([, v]) => v !== null && v !== undefined).map(([k, v]) => `${k}: ${yaml(v)}`).join("\n");
+    const front = props
+      .filter(([, v]) => v !== null && v !== undefined)
+      .map(([k, v]) => `${k}: ${yaml(v)}`)
+      .join("\n");
     const body = SECTIONS.map(([key, heading]) => `## ${heading}\n\n${sections[key].trim()}\n`).join("\n");
     this.deps.vault.create(`sources/${stem}.md`, `---\n${front}\n---\n\n${body}\n## Related papers\n`);
     const first = sections.summary.trim().split(/(?<=[.!?])\s+/)[0];
     const summary = first.length <= 200 ? first : `${first.slice(0, 200).replace(/\s+\S*$/, "")}…`;
-    this.deps.db.prepare("INSERT OR IGNORE INTO kb_notes (paper_id, stem, summary, created_at) VALUES (?, ?, ?, ?)").run(paper.id, stem, summary, nowIso());
+    this.deps.db
+      .prepare("INSERT OR IGNORE INTO kb_notes (paper_id, stem, summary, created_at) VALUES (?, ?, ?, ?)")
+      .run(paper.id, stem, summary, nowIso());
     return this.note(paper.id)!;
   }
 
@@ -374,7 +438,8 @@ export class Ingest {
     for (const other of related) {
       const rel = `sources/${other.replace(/\.md$/, "")}.md`;
       if (other === stem || !vault.read(rel)) continue;
-      if (!(vault.read(rel) ?? "").includes(`[[${stem}]]`)) vault.appendUnderHeading(rel, "## Related papers", `- [[${stem}]]`);
+      if (!(vault.read(rel) ?? "").includes(`[[${stem}]]`))
+        vault.appendUnderHeading(rel, "## Related papers", `- [[${stem}]]`);
       vault.appendUnderHeading(`sources/${stem}.md`, "## Related papers", `- [[${other.replace(/\.md$/, "")}]]`);
       linked.push(rel.slice(0, -3));
     }
@@ -392,9 +457,11 @@ function toRequest(r: any): KbRequest {
     cardId: Number(r.card_id),
     status: r.status,
     attempts: Number(r.attempts ?? 0),
-    nextAttemptAt: r.next_attempt_at === null || r.next_attempt_at === undefined ? undefined : Number(r.next_attempt_at),
+    nextAttemptAt:
+      r.next_attempt_at === null || r.next_attempt_at === undefined ? undefined : Number(r.next_attempt_at),
     reason: r.reason ?? undefined,
-    conversationId: r.conversation_id === null || r.conversation_id === undefined ? undefined : Number(r.conversation_id),
+    conversationId:
+      r.conversation_id === null || r.conversation_id === undefined ? undefined : Number(r.conversation_id),
     submissionId: r.submission_id === null || r.submission_id === undefined ? undefined : Number(r.submission_id),
   };
 }

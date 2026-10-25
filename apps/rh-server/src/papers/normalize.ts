@@ -37,14 +37,21 @@ export function arxivIdFromDoi(doi: string | undefined): string | undefined {
 
 export function normalizePmid(raw: string | number | null | undefined): string | undefined {
   if (raw === null || raw === undefined) return undefined;
-  const value = String(raw).trim().replace(/^https?:\/\/pubmed\.ncbi\.nlm\.nih\.gov\//i, "").replace(/\/$/, "");
+  const value = String(raw)
+    .trim()
+    .replace(/^https?:\/\/pubmed\.ncbi\.nlm\.nih\.gov\//i, "")
+    .replace(/\/$/, "");
   return /^\d{1,9}$/.test(value) ? value : undefined;
 }
 
 /** PMCID with its "PMC" prefix kept (uppercase). */
 export function normalizePmcid(raw: string | null | undefined): string | undefined {
   if (!raw) return undefined;
-  const value = raw.trim().replace(/^https?:\/\/www\.ncbi\.nlm\.nih\.gov\/pmc\/articles\//i, "").replace(/\/$/, "").toUpperCase();
+  const value = raw
+    .trim()
+    .replace(/^https?:\/\/www\.ncbi\.nlm\.nih\.gov\/pmc\/articles\//i, "")
+    .replace(/\/$/, "")
+    .toUpperCase();
   if (/^PMC\d+$/.test(value)) return value;
   if (/^\d+$/.test(value)) return `PMC${value}`;
   return undefined;
@@ -53,7 +60,10 @@ export function normalizePmcid(raw: string | null | undefined): string | undefin
 /** OpenAlex work ID ("W2741809807"), from a bare ID or URL. */
 export function normalizeOpenAlexId(raw: string | null | undefined): string | undefined {
   if (!raw) return undefined;
-  const value = raw.trim().replace(/^https?:\/\/openalex\.org\//i, "").toUpperCase();
+  const value = raw
+    .trim()
+    .replace(/^https?:\/\/openalex\.org\//i, "")
+    .toUpperCase();
   return /^W\d+$/.test(value) ? value : undefined;
 }
 
@@ -114,9 +124,52 @@ export function normalizeDate(raw: string | null | undefined): string | undefine
 
 // Words after which a period does not end a sentence.
 const ABBREVIATIONS = new Set([
-  "e.g", "i.e", "et al", "al", "etc", "vs", "cf", "fig", "figs", "eq", "eqs", "ref", "refs", "approx", "ca", "resp",
-  "no", "nos", "vol", "dr", "prof", "mr", "mrs", "ms", "st", "sp", "spp", "var", "sect", "ch", "inc", "ltd", "co",
-  "u.s", "jan", "feb", "mar", "apr", "jun", "jul", "aug", "sep", "sept", "oct", "nov", "dec",
+  "e.g",
+  "i.e",
+  "et al",
+  "al",
+  "etc",
+  "vs",
+  "cf",
+  "fig",
+  "figs",
+  "eq",
+  "eqs",
+  "ref",
+  "refs",
+  "approx",
+  "ca",
+  "resp",
+  "no",
+  "nos",
+  "vol",
+  "dr",
+  "prof",
+  "mr",
+  "mrs",
+  "ms",
+  "st",
+  "sp",
+  "spp",
+  "var",
+  "sect",
+  "ch",
+  "inc",
+  "ltd",
+  "co",
+  "u.s",
+  "jan",
+  "feb",
+  "mar",
+  "apr",
+  "jun",
+  "jul",
+  "aug",
+  "sep",
+  "sept",
+  "oct",
+  "nov",
+  "dec",
 ]);
 
 /**
@@ -135,7 +188,11 @@ export function splitSentences(text: string): string[] {
       const before = clean.slice(start, m.index);
       const word = before.match(/([A-Za-z.]+)$/)?.[1]?.toLowerCase() ?? "";
       const phrase = before.match(/([A-Za-z]+ [A-Za-z]+)$/)?.[1]?.toLowerCase() ?? "";
-      if (ABBREVIATIONS.has(word) || ABBREVIATIONS.has(phrase) || /^[a-z]$/i.test(word) && /\s[A-Z]$|^[A-Z]$/.test(before))
+      if (
+        ABBREVIATIONS.has(word) ||
+        ABBREVIATIONS.has(phrase) ||
+        (/^[a-z]$/i.test(word) && /\s[A-Z]$|^[A-Z]$/.test(before))
+      )
         continue;
     }
     const sentence = clean.slice(start, m.index + m[0].trimEnd().length).trim();

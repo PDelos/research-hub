@@ -16,7 +16,8 @@ test("asking the desk for papers calls search_papers, stores and represents the 
     assert.match(answer, /^5 papers for "ESM contact prediction" \(stored in the project\):/);
     const lines = answer.split("\n").filter((l) => /^\d+\. /.test(l));
     assert.equal(lines.length, 5);
-    for (const line of lines) assert.match(line, /\(\d{4}\) · .+ · (\d+ citations|citations unknown) · sources: [a-z, ]+ · https:\/\//);
+    for (const line of lines)
+      assert.match(line, /\(\d{4}\) · .+ · (\d+ citations|citations unknown) · sources: [a-z, ]+ · https:\/\//);
     assert.match(answer, /Sources: arxiv 5, openalex 5, europepmc 5, semanticscholar skipped\./);
 
     const papers = server.hub.project.papers;
@@ -29,9 +30,19 @@ test("asking the desk for papers calls search_papers, stores and represents the 
     // Representation costs are counted: one Jev facet call per paper with an abstract, and the embedding calls.
     const after = await server.client.usage();
     assert.ok(after.jevCalls >= before.jevCalls + 5, `jev calls ${before.jevCalls} → ${after.jevCalls}`);
-    assert.ok(after.embeddingCalls > before.embeddingCalls, `embedding calls ${before.embeddingCalls} → ${after.embeddingCalls}`);
+    assert.ok(
+      after.embeddingCalls > before.embeddingCalls,
+      `embedding calls ${before.embeddingCalls} → ${after.embeddingCalls}`,
+    );
     // Priced calls (live mode) add to the dollar totals.
-    server.hub.project.papers.embeddingLedger.record({ model: "qwen/qwen3-embedding-8b", inputs: 20, tokens: 4000, costUsd: 0.00004, costSource: "reported", elapsedMs: 300 });
+    server.hub.project.papers.embeddingLedger.record({
+      model: "qwen/qwen3-embedding-8b",
+      inputs: 20,
+      tokens: 4000,
+      costUsd: 0.00004,
+      costSource: "reported",
+      elapsedMs: 300,
+    });
     const priced = await server.client.usage();
     assert.ok(Math.abs(priced.embeddingUsd - after.embeddingUsd - 0.00004) < 1e-12);
     assert.ok(Math.abs(priced.totalUsd - (priced.modelUsd + priced.jevUsd + priced.embeddingUsd)) < 1e-12);
@@ -45,7 +56,10 @@ test("search_papers rejects a limit of 50 with the maximum of 10 per call, and s
   const server = await startTestServer({
     hub: {
       fauxRules: [
-        (turn) => (turn.results.length ? say(`${turn.results[0].isError ? "ERROR" : "OK"}: ${turn.results[0].text}`) : call("search_papers", { query: "protein", limit: 50 })),
+        (turn) =>
+          turn.results.length
+            ? say(`${turn.results[0].isError ? "ERROR" : "OK"}: ${turn.results[0].text}`)
+            : call("search_papers", { query: "protein", limit: 50 }),
       ],
     },
   });

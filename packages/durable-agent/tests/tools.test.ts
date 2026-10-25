@@ -2,15 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { Type } from "@earendil-works/pi-ai";
 import { defineExtension } from "@earendil-works/pi-durable";
-import {
-  allowOnly,
-  call,
-  defineAppTool,
-  enumFeedback,
-  say,
-  toolError,
-  toolText,
-} from "../src/index.ts";
+import { allowOnly, call, defineAppTool, enumFeedback, say, toolError, toolText } from "../src/index.ts";
 import { ask, fauxHarness, tempDir } from "./helpers.ts";
 
 const COMPONENTS = ["headline", "brief"] as const;
@@ -32,18 +24,10 @@ const present = defineAppTool({
 
 test("enumFeedback lists every valid value and the example", () => {
   assert.throws(
-    () =>
-      enumFeedback(
-        "present",
-        { component: "poster" },
-        { component: COMPONENTS },
-        { component: "brief" },
-      ),
+    () => enumFeedback("present", { component: "poster" }, { component: COMPONENTS }, { component: "brief" }),
     /must be one of: headline, brief\. You sent "poster"\. Example call: \{"component":"brief"\}/,
   );
-  assert.doesNotThrow(() =>
-    enumFeedback("present", { component: "brief" }, { component: COMPONENTS }),
-  );
+  assert.doesNotThrow(() => enumFeedback("present", { component: "brief" }, { component: COMPONENTS }));
 });
 
 test("a bad enum comes back to the model with the fix, and the corrected call succeeds", async () => {
@@ -52,18 +36,9 @@ test("a bad enum comes back to the model with the fix, and the corrected call su
     const { ctx, root, close } = await fauxHarness(
       t.dir,
       [
-        (turn) =>
-          turn.results.length === 0
-            ? call("present", { component: "poster", title: "Hello" })
-            : undefined,
-        (turn) =>
-          turn.results.length === 1
-            ? call("present", { component: "brief", title: "x" })
-            : undefined,
-        (turn) =>
-          turn.results.length === 2
-            ? call("present", { component: "brief", title: "Hello" })
-            : undefined,
+        (turn) => (turn.results.length === 0 ? call("present", { component: "poster", title: "Hello" }) : undefined),
+        (turn) => (turn.results.length === 1 ? call("present", { component: "brief", title: "x" }) : undefined),
+        (turn) => (turn.results.length === 2 ? call("present", { component: "brief", title: "Hello" }) : undefined),
         (turn) => say(turn.results.map((r) => `${r.isError ? "ERR" : "OK"} ${r.text}`).join("\n")),
       ],
       [defineExtension({ name: "cards", tools: [present] })],
@@ -71,9 +46,7 @@ test("a bad enum comes back to the model with the fix, and the corrected call su
     const settled = await ask(root, ctx, "present something");
     assert.equal(settled.status, "done");
     const page = await root.entries({ order: "ascending" }, 50, undefined, ctx);
-    const results = page.items
-      .filter((e) => e.kind === "pi.tool-result")
-      .map((e) => e.model![0] as any);
+    const results = page.items.filter((e) => e.kind === "pi.tool-result").map((e) => e.model![0] as any);
     assert.equal(results.length, 3);
     assert.equal(results[0].isError, true);
     assert.match(results[0].content[0].text, /must be one of: headline, brief/);

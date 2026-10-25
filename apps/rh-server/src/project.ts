@@ -142,7 +142,12 @@ export async function openProject(options: {
   const telemetry = new Telemetry(db);
   const plog = log;
   const observe = observability({
-    event: (e) => plog[e.level === "debug" ? "debug" : e.level](`agent.${e.event}`, { conversationId: e.conversationId, taskId: e.taskId, ...e.data }),
+    event: (e) =>
+      plog[e.level === "debug" ? "debug" : e.level](`agent.${e.event}`, {
+        conversationId: e.conversationId,
+        taskId: e.taskId,
+        ...e.data,
+      }),
   });
   const brief = new Brief(dir);
   const charters = new Charters(db);
@@ -177,7 +182,11 @@ export async function openProject(options: {
   });
   const feedback = new Feedback({ db, charters, log: plog });
   feedback.replay();
-  const vault = new Vault(join(dir, "vault"), { templateDir: join(dirname(options.promptsDir), "vault-template"), settings, log: plog });
+  const vault = new Vault(join(dir, "vault"), {
+    templateDir: join(dirname(options.promptsDir), "vault-template"),
+    settings,
+    log: plog,
+  });
   /** Create the vault and refresh charter.md once a charter is approved (user edits to charter.md win). */
   const syncVault = () => {
     const approved = charters.approved();
@@ -187,21 +196,41 @@ export async function openProject(options: {
   };
   syncVault();
   const decisions = new PaperDecisions({
-    db, jevDir, decide, ledger: jevLedger,
-    taste: () => feedback.recent(8).map((j) => ({ title: j.title, verdict: j.verdict, ...(j.reason ? { reason: j.reason.slice(0, 200) } : {}) })),
+    db,
+    jevDir,
+    decide,
+    ledger: jevLedger,
+    taste: () =>
+      feedback
+        .recent(8)
+        .map((j) => ({ title: j.title, verdict: j.verdict, ...(j.reason ? { reason: j.reason.slice(0, 200) } : {}) })),
   });
   const reasons = new ReasonParser({ db, jevDir, decide, ledger: jevLedger, log: plog });
   // Classify reasons after each judgment (in the background; a Jev failure leaves them pending for the next one).
   feedback.onChange(() => void reasons.parsePending());
   const sweeps = new SweepRunner({
-    db, settings, charters, papers, decisions, log: plog,
+    db,
+    settings,
+    charters,
+    papers,
+    decisions,
+    log: plog,
     judged: () => feedback.count(),
     judgedPaper: (paperId) => feedback.isJudged(paperId),
     weight: (kind, key, fallback) => feedback.weight(kind, key, fallback),
   });
   const cards = new CardStore(db);
   const cardWriter = new CardWriter({
-    db, cards, runner: sweeps, papers, decisions, charters, catalog, promptsDir: options.promptsDir, log: plog, observe,
+    db,
+    cards,
+    runner: sweeps,
+    papers,
+    decisions,
+    charters,
+    catalog,
+    promptsDir: options.promptsDir,
+    log: plog,
+    observe,
   });
   sweeps.setCardStage(cardWriter);
   const kbIndex = new KbIndex({ db, vault, log: plog });
@@ -217,7 +246,16 @@ export async function openProject(options: {
     restartDelays: options.kbViewer?.restartDelays,
   });
   const ingest = new Ingest({
-    db, vault, store: papers.store, cards, feedback, charters, catalog, promptsDir: options.promptsDir, log: plog, observe,
+    db,
+    vault,
+    store: papers.store,
+    cards,
+    feedback,
+    charters,
+    catalog,
+    promptsDir: options.promptsDir,
+    log: plog,
+    observe,
   });
   // A new ⭐ (or any judgment change) may queue a knowledge-base request.
   feedback.onChange(() => ingest.pickUp());
@@ -228,7 +266,13 @@ export async function openProject(options: {
   const agents = createAgents({
     promptsDir: options.promptsDir,
     projectName: name,
-    extra: [observe, paperTools(() => papers), feedbackTools(() => ({ cards, feedback, store: papers.store })), kbTools(() => ({ vault, index: kbIndex })), ...(options.extensions ?? [])],
+    extra: [
+      observe,
+      paperTools(() => papers),
+      feedbackTools(() => ({ cards, feedback, store: papers.store })),
+      kbTools(() => ({ vault, index: kbIndex })),
+      ...(options.extensions ?? []),
+    ],
     separate: [charterWriter.extension, cardWriter.extension, ingest.extension],
     deskTools: options.deskTools,
   });

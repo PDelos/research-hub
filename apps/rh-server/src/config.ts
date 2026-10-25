@@ -102,7 +102,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   try {
     new Intl.DateTimeFormat("en-US", { timeZone });
   } catch {
-    throw new ConfigError(`RH_TIMEZONE must be an IANA time zone such as Europe/Madrid, got "${timeZone}"`, "RH_TIMEZONE");
+    throw new ConfigError(
+      `RH_TIMEZONE must be an IANA time zone such as Europe/Madrid, got "${timeZone}"`,
+      "RH_TIMEZONE",
+    );
   }
   const sweepTime = env.RH_SWEEP_TIME?.trim() || "06:00";
   if (!TIME.test(sweepTime))
@@ -110,16 +113,16 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const reviewRaw = (env.RH_REVIEW_TIME?.trim() || "sun 07:00").toLowerCase();
   const [weekday, reviewTime] = reviewRaw.split(/\s+/);
   if (!WEEKDAYS.includes(weekday as Weekday) || !TIME.test(reviewTime ?? ""))
-    throw new ConfigError(
-      `RH_REVIEW_TIME must be "<sun..sat> HH:MM", got "${env.RH_REVIEW_TIME}"`,
-      "RH_REVIEW_TIME",
-    );
+    throw new ConfigError(`RH_REVIEW_TIME must be "<sun..sat> HH:MM", got "${env.RH_REVIEW_TIME}"`, "RH_REVIEW_TIME");
   const contactEmail = env.CONTACT_EMAIL?.trim() || undefined;
   if (contactEmail && !EMAIL.test(contactEmail))
     throw new ConfigError(`CONTACT_EMAIL must be an email address, got "${contactEmail}"`, "CONTACT_EMAIL");
   const embedDims = Number(env.RH_EMBED_DIMS?.trim() || 1024);
   if (!Number.isInteger(embedDims) || embedDims < 32 || embedDims > 4096)
-    throw new ConfigError(`RH_EMBED_DIMS must be a whole number from 32 to 4096, got "${env.RH_EMBED_DIMS}"`, "RH_EMBED_DIMS");
+    throw new ConfigError(
+      `RH_EMBED_DIMS must be a whole number from 32 to 4096, got "${env.RH_EMBED_DIMS}"`,
+      "RH_EMBED_DIMS",
+    );
   const papers: PapersConfig = {
     contactEmail,
     embedModel: env.RH_MODEL_EMBED?.trim() || DEFAULT_EMBED_MODEL,
@@ -127,11 +130,19 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     s2ApiKey: env.S2_API_KEY?.trim() || undefined,
   };
   const viewerFlag = (env.RH_KB_VIEWER?.trim() || "on").toLowerCase();
-  if (!["on", "off"].includes(viewerFlag)) throw new ConfigError(`RH_KB_VIEWER must be on or off, got "${env.RH_KB_VIEWER}"`, "RH_KB_VIEWER");
+  if (!["on", "off"].includes(viewerFlag))
+    throw new ConfigError(`RH_KB_VIEWER must be on or off, got "${env.RH_KB_VIEWER}"`, "RH_KB_VIEWER");
   const obsidianVersion = env.RH_KB_OBSIDIAN_VERSION?.trim() || "1.14.4";
   if (!/^\d+\.\d+\.\d+$/.test(obsidianVersion))
-    throw new ConfigError(`RH_KB_OBSIDIAN_VERSION must look like 1.14.4, got "${obsidianVersion}"`, "RH_KB_OBSIDIAN_VERSION");
-  const kbViewer = { enabled: viewerFlag === "on", dir: resolve(REPO_ROOT, env.RH_KB_VIEWER_DIR?.trim() || "/opt/ignis"), obsidianVersion };
+    throw new ConfigError(
+      `RH_KB_OBSIDIAN_VERSION must look like 1.14.4, got "${obsidianVersion}"`,
+      "RH_KB_OBSIDIAN_VERSION",
+    );
+  const kbViewer = {
+    enabled: viewerFlag === "on",
+    dir: resolve(REPO_ROOT, env.RH_KB_VIEWER_DIR?.trim() || "/opt/ignis"),
+    obsidianVersion,
+  };
   const generatedTokens: string[] = [];
   const token = (name: string) => {
     const value = env[name]?.trim();

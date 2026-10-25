@@ -73,10 +73,7 @@ export function defineAppTool<P extends TSchema, D extends JsonValue = JsonValue
   });
 }
 
-export function toolText<D extends JsonValue = JsonValue>(
-  text: string,
-  details?: D,
-): ToolExecutionResult<D> {
+export function toolText<D extends JsonValue = JsonValue>(text: string, details?: D): ToolExecutionResult<D> {
   return { content: [{ type: "text", text }], ...(details === undefined ? {} : { details }) };
 }
 
@@ -105,9 +102,7 @@ export async function once<T extends JsonValue>(
 export function allowOnly(agent: string, names: readonly string[]): HookRegistration {
   return hook(ToolTask, {
     beforeTool: (call) =>
-      names.includes(call.name)
-        ? undefined
-        : { block: `Tool ${call.name} is not allowed for ${agent}` },
+      names.includes(call.name) ? undefined : { block: `Tool ${call.name} is not allowed for ${agent}` },
   });
 }
 

@@ -18,7 +18,11 @@ try {
   createLogger().error("config.invalid", { variable, error: error instanceof Error ? error.message : String(error) });
   process.exit(1);
 }
-const log = createLogger({ level: config.logLevel, secrets: secretsOf(config), bindings: { project: config.projectName } });
+const log = createLogger({
+  level: config.logLevel,
+  secrets: secretsOf(config),
+  bindings: { project: config.projectName },
+});
 process.on("unhandledRejection", (reason) => log.error("process.unhandled_rejection", { error: reason }));
 if (config.generatedTokens.length)
   log.warn("config.generated_tokens", {

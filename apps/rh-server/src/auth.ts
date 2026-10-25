@@ -44,7 +44,11 @@ export function uiProxy(options: { clientToken: string; allowedHosts: Set<string
   const fault = (res: any, status: number, code: string, message: string) =>
     void res.status(status).json({ error: { code, message } });
   // Compare host names only: a rebinding attack controls the name, and ports may be remapped (Docker, tests).
-  const hostname = (host: string) => host.toLowerCase().replace(/:\d+$/, "").replace(/^\[(.*)\]$/, "$1");
+  const hostname = (host: string) =>
+    host
+      .toLowerCase()
+      .replace(/:\d+$/, "")
+      .replace(/^\[(.*)\]$/, "$1");
   return (req, res, next) => {
     if (!req.url.startsWith("/ui/v1/")) return next();
     const host = hostname(req.headers.host ?? "");

@@ -30,7 +30,10 @@ test("arXiv: id, title, abstract, authors and date from the Atom feed; the windo
   assert.equal(results.length, 3);
   assert.ok(results.every((p) => p.publishedAt! >= "2026-10-01"));
   const q = fake.requests[0].url.searchParams;
-  assert.equal(q.get("search_query"), 'all:"protein language model" AND all:contact AND submittedDate:[202610010000 TO 299912312359]');
+  assert.equal(
+    q.get("search_query"),
+    'all:"protein language model" AND all:contact AND submittedDate:[202610010000 TO 299912312359]',
+  );
   assert.equal(q.get("max_results"), "3");
   // The date window is also applied to what comes back.
   const late = await arxiv.search({ query: "protein", since: "2026-10-19", until: "2026-10-19", limit: 3 });
@@ -65,8 +68,14 @@ test("OpenAlex: fields, abstract from the inverted index, references, server nam
   assert.equal(abstractFromInvertedIndex(null), undefined);
 
   const fake = fakeFetch(recorded);
-  const openalex = new OpenAlexSource({ http: new PoliteHttp({ fetch: fake.fetch, pacing: noPacing, contactEmail: "me@example.org" }) });
-  const results = await openalex.search({ query: "protein language model contact prediction", since: "2025-01-01", limit: 3 });
+  const openalex = new OpenAlexSource({
+    http: new PoliteHttp({ fetch: fake.fetch, pacing: noPacing, contactEmail: "me@example.org" }),
+  });
+  const results = await openalex.search({
+    query: "protein language model contact prediction",
+    since: "2025-01-01",
+    limit: 3,
+  });
   assert.equal(results.length, 3);
   const q = fake.requests[0].url.searchParams;
   assert.equal(q.get("mailto"), "me@example.org");
@@ -76,14 +85,18 @@ test("OpenAlex: fields, abstract from the inverted index, references, server nam
 
 test("OpenAlex lookups: DOIs in one batched request, 404 means not found", async () => {
   const fake = fakeFetch((url) => {
-    if (url.searchParams.get("filter")?.startsWith("doi:")) return Response.json({ results: [JSON.parse(fixture("openalex-work.json"))] });
+    if (url.searchParams.get("filter")?.startsWith("doi:"))
+      return Response.json({ results: [JSON.parse(fixture("openalex-work.json"))] });
     return undefined;
   });
   const openalex = new OpenAlexSource({ http: new PoliteHttp({ fetch: fake.fetch, pacing: noPacing }) });
   const found = await openalex.byDois(["10.1126/science.ade2574", "10.1101/9999.99.99.999999"]);
   assert.deepEqual([...found.keys()], ["10.1126/science.ade2574"]);
   assert.equal(fake.requests.length, 1);
-  assert.equal(fake.requests[0].url.searchParams.get("filter"), "doi:10.1126/science.ade2574|10.1101/9999.99.99.999999");
+  assert.equal(
+    fake.requests[0].url.searchParams.get("filter"),
+    "doi:10.1126/science.ade2574|10.1101/9999.99.99.999999",
+  );
   assert.equal(await openalex.lookup("pmid", "1"), undefined);
 });
 
@@ -101,12 +114,23 @@ test("Europe PMC: a bioRxiv preprint maps to server bioRxiv with DOI and abstrac
   assert.equal(journal.venue, "Journal of advanced research");
   assert.equal(journal.ids.pmid, "42826899");
   assert.equal(journal.server, undefined);
-  assert.match(journal.abstract, /^Introduction: Peptide hormones/, "section headings stay with their sentence, HTML stripped");
+  assert.match(
+    journal.abstract,
+    /^Introduction: Peptide hormones/,
+    "section headings stay with their sentence, HTML stripped",
+  );
   assert.doesNotMatch(journal.abstract, /<h4>/);
 
   const fake = fakeFetch(recorded);
-  const epmc = new EuropePmcSource({ http: new PoliteHttp({ fetch: fake.fetch, pacing: noPacing, contactEmail: "me@example.org" }) });
-  const results = await epmc.search({ query: '"protein language model"', since: "2026-01-01", until: "2026-12-31", limit: 3 });
+  const epmc = new EuropePmcSource({
+    http: new PoliteHttp({ fetch: fake.fetch, pacing: noPacing, contactEmail: "me@example.org" }),
+  });
+  const results = await epmc.search({
+    query: '"protein language model"',
+    since: "2026-01-01",
+    until: "2026-12-31",
+    limit: 3,
+  });
   assert.equal(results.length, 3);
   const q = fake.requests[0].url.searchParams;
   assert.equal(q.get("query"), '("protein language model") AND FIRST_PDATE:[2026-01-01 TO 2026-12-31]');
@@ -127,6 +151,15 @@ test("Semantic Scholar mapping and query terms", () => {
     citationCount: 3,
     url: "https://www.semanticscholar.org/paper/x",
   })!;
-  assert.deepEqual(p.ids, { s2: "0123456789abcdef0123456789abcdef01234567", doi: "10.1101/2026.10.01.1", arxiv: "2610.00001", pmid: "1" });
-  assert.deepEqual(queryTerms('ESM "contact prediction" AND (proteins) OR'), ["ESM", '"contact prediction"', "proteins"]);
+  assert.deepEqual(p.ids, {
+    s2: "0123456789abcdef0123456789abcdef01234567",
+    doi: "10.1101/2026.10.01.1",
+    arxiv: "2610.00001",
+    pmid: "1",
+  });
+  assert.deepEqual(queryTerms('ESM "contact prediction" AND (proteins) OR'), [
+    "ESM",
+    '"contact prediction"',
+    "proteins",
+  ]);
 });

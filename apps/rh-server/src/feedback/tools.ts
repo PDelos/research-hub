@@ -19,7 +19,8 @@ export function feedbackTools(deps: () => { cards: CardStore; feedback: Feedback
   };
   const recent = defineAppTool({
     name: "recent_cards",
-    description: "List the paper cards of the latest sweep with their position (1 = first), card id and current verdict.",
+    description:
+      "List the paper cards of the latest sweep with their position (1 = first), card id and current verdict.",
     returns: "Text: one line per card.",
     parameters: Type.Object({}),
     execute: async () => {
@@ -44,7 +45,9 @@ export function feedbackTools(deps: () => { cards: CardStore; feedback: Feedback
       verdict: Type.String({ description: "up, down or star" }),
       position: Type.Optional(Type.Number({ description: "Position in the latest sweep, 1 = first card" })),
       card_id: Type.Optional(Type.Number({ description: "The card id (from recent_cards)" })),
-      reason: Type.Optional(Type.String({ description: `The user's reason in their words, at most ${REASON_MAX} characters` })),
+      reason: Type.Optional(
+        Type.String({ description: `The user's reason in their words, at most ${REASON_MAX} characters` }),
+      ),
     }),
     execute: async (args, api, ctx) => {
       const { feedback, cards, store } = deps();
@@ -61,7 +64,8 @@ export function feedbackTools(deps: () => { cards: CardStore; feedback: Feedback
           throw error;
         }
       });
-      if (result.startsWith("error:")) return toolError(`Not recorded: ${result.slice(6)}.`, ["Fix it and call judge_card again."]);
+      if (result.startsWith("error:"))
+        return toolError(`Not recorded: ${result.slice(6)}.`, ["Fix it and call judge_card again."]);
       return toolText(result.slice(3));
     },
   });

@@ -9,11 +9,28 @@ import { arxivOnlyFetch, fakePapers } from "./fixtures/sweep-env.ts";
 import { startTestServer } from "./helpers.ts";
 
 const passAll = (id: string, _c: string, q: any) =>
-  id === "relevance" ? score(0.75, 5) : id === "matched_question" ? choice("Q2", Object.keys(q.criteria)) : id === "worth" ? noul(0.8) : id === "generalizable" ? noul(0.1) : id === "reason_kind" ? choice("great-foundation", Object.keys(q.criteria)) : undefined;
+  id === "relevance"
+    ? score(0.75, 5)
+    : id === "matched_question"
+      ? choice("Q2", Object.keys(q.criteria))
+      : id === "worth"
+        ? noul(0.8)
+        : id === "generalizable"
+          ? noul(0.1)
+          : id === "reason_kind"
+            ? choice("great-foundation", Object.keys(q.criteria))
+            : undefined;
 
 test("judging through the API: verdicts on cards, weight effects in details, weights, and precision@5 (2 ⭐, 1 👎, 2 unjudged → 67%)", async () => {
   const jev = scripted(passAll);
-  const server = await startTestServer({ hub: { ticker: false, fauxRules: [cardWriterRule], jevDecide: jev.decide, paperFetch: arxivOnlyFetch(fakePapers(7)) } });
+  const server = await startTestServer({
+    hub: {
+      ticker: false,
+      fauxRules: [cardWriterRule],
+      jevDecide: jev.decide,
+      paperFetch: arxivOnlyFetch(fakePapers(7)),
+    },
+  });
   const p = server.hub.project;
   try {
     p.brief.write("# Protein LMs");
@@ -30,7 +47,11 @@ test("judging through the API: verdicts on cards, weight effects in details, wei
     const starred = await server.client.judge(cards[0].id, "star", "Clear baseline for Q2, code available");
     assert.equal(starred.judgment!.verdict, "star");
     assert.equal(starred.judgment!.reason, "Clear baseline for Q2, code available");
-    assert.ok(starred.weightEffects.some((e) => e.kind === "question" && e.key === "Q2" && e.before === 1.5 && e.after === 1.65));
+    assert.ok(
+      starred.weightEffects.some(
+        (e) => e.kind === "question" && e.key === "Q2" && e.before === 1.5 && e.after === 1.65,
+      ),
+    );
     await server.client.judge(cards[1].id, "star");
     await server.client.judge(cards[2].id, "up");
     await server.client.judge(cards[2].id, "down", "too basic for me");
@@ -40,7 +61,10 @@ test("judging through the API: verdicts on cards, weight effects in details, wei
     assert.ok(weights.some((w) => w.kind === "source" && w.key === "arxiv"));
 
     const [precision] = await server.client.precision();
-    assert.deepEqual({ top: precision.top, judged: precision.judged, good: precision.good }, { top: 5, judged: 3, good: 2 });
+    assert.deepEqual(
+      { top: precision.top, judged: precision.judged, good: precision.good },
+      { top: 5, judged: 3, good: 2 },
+    );
     assert.ok(Math.abs(precision.precision! - 2 / 3) < 1e-9);
 
     const regrouped = (await server.client.cards()).groups[0].cards;
@@ -51,7 +75,13 @@ test("judging through the API: verdicts on cards, weight effects in details, wei
 
     const cleared = await server.client.clearJudgment(cards[1].id);
     assert.equal(cleared.judgment, null);
-    assert.deepEqual(p.feedback.kbRequests().map((r) => r.status).sort(), ["cancelled", "pending"]);
+    assert.deepEqual(
+      p.feedback
+        .kbRequests()
+        .map((r) => r.status)
+        .sort(),
+      ["cancelled", "pending"],
+    );
     await assert.rejects(server.client.judge(cards[0].id, "meh" as any), /verdict must be one of up, down, star/);
     await assert.rejects(server.client.judge(99999, "up"), /No card 99999/);
   } finally {
@@ -59,10 +89,17 @@ test("judging through the API: verdicts on cards, weight effects in details, wei
   }
 });
 
-test("in chat, \"star the second card, great foundation\" records a ⭐ with that reason on the latest sweep's second card", async () => {
+test('in chat, "star the second card, great foundation" records a ⭐ with that reason on the latest sweep\'s second card', async () => {
   const { deskJudgeRule } = await import("../src/faux-rules.ts");
   const jev = scripted(passAll);
-  const server = await startTestServer({ hub: { ticker: false, fauxRules: [cardWriterRule, deskJudgeRule], jevDecide: jev.decide, paperFetch: arxivOnlyFetch(fakePapers(4)) } });
+  const server = await startTestServer({
+    hub: {
+      ticker: false,
+      fauxRules: [cardWriterRule, deskJudgeRule],
+      jevDecide: jev.decide,
+      paperFetch: arxivOnlyFetch(fakePapers(4)),
+    },
+  });
   const p = server.hub.project;
   try {
     p.brief.write("# Protein LMs");

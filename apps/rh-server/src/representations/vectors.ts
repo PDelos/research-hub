@@ -54,13 +54,18 @@ export class PaperVectors {
     const { db, settings, embedder } = this.options;
     const current = { model: embedder.model, dims: embedder.dims };
     const saved = settings.get<{ model: string; dims: number } | null>(MODEL_SETTING, null);
-    const stale = (db.prepare("SELECT COUNT(*) n FROM representations WHERE model != ? OR dims != ?").get(current.model, current.dims) as { n: number }).n;
+    const stale = (
+      db
+        .prepare("SELECT COUNT(*) n FROM representations WHERE model != ? OR dims != ?")
+        .get(current.model, current.dims) as { n: number }
+    ).n;
     if (saved && saved.model === current.model && saved.dims === current.dims && !stale) return false;
     const hadVectors = (db.prepare("SELECT COUNT(*) n FROM representations").get() as { n: number }).n > 0;
     if (!ensureVectorTables(db, current.dims)) for (const kind of VECTOR_KINDS) db.exec(`DELETE FROM vec_${kind}`);
     db.exec("DELETE FROM representations");
     settings.set(MODEL_SETTING, current);
-    if (hadVectors) this.options.log?.info("representations.model_changed", { from: saved, to: current, pending: this.pending() });
+    if (hadVectors)
+      this.options.log?.info("representations.model_changed", { from: saved, to: current, pending: this.pending() });
     return hadVectors;
   }
 
@@ -69,7 +74,9 @@ export class PaperVectors {
     return Number(
       (
         this.options.db
-          .prepare("SELECT COUNT(*) n FROM papers p WHERE NOT EXISTS (SELECT 1 FROM representations r WHERE r.paper_id = p.id AND r.kind = 'whole' AND r.model = ?)")
+          .prepare(
+            "SELECT COUNT(*) n FROM papers p WHERE NOT EXISTS (SELECT 1 FROM representations r WHERE r.paper_id = p.id AND r.kind = 'whole' AND r.model = ?)",
+          )
           .get(this.model) as { n: number }
       ).n,
     );
@@ -78,7 +85,9 @@ export class PaperVectors {
   pendingIds(limit = 64): number[] {
     return (
       this.options.db
-        .prepare("SELECT id FROM papers p WHERE NOT EXISTS (SELECT 1 FROM representations r WHERE r.paper_id = p.id AND r.kind = 'whole' AND r.model = ?) ORDER BY id LIMIT ?")
+        .prepare(
+          "SELECT id FROM papers p WHERE NOT EXISTS (SELECT 1 FROM representations r WHERE r.paper_id = p.id AND r.kind = 'whole' AND r.model = ?) ORDER BY id LIMIT ?",
+        )
         .all(this.model, limit) as { id: number }[]
     ).map((r) => Number(r.id));
   }
@@ -113,14 +122,19 @@ export class PaperVectors {
           labels = facets.stored(paper.id) ?? (await facets.label(paper));
         } catch (error) {
           facetFailures++;
-          this.options.log?.warn("representations.facets_failed", { paperId: paper.id, error: error instanceof Error ? error.message : String(error) });
+          this.options.log?.warn("representations.facets_failed", {
+            paperId: paper.id,
+            error: error instanceof Error ? error.message : String(error),
+          });
         }
       }
       labeled.set(paper.id, labels);
     };
-    await Promise.all(Array.from({ length: FACET_LANES }, async (_, lane) => {
-      for (let k = lane; k < papers.length; k += FACET_LANES) await label(papers[k]);
-    }));
+    await Promise.all(
+      Array.from({ length: FACET_LANES }, async (_, lane) => {
+        for (let k = lane; k < papers.length; k += FACET_LANES) await label(papers[k]);
+      }),
+    );
     for (const paper of papers) todo.push({ paper, labels: labeled.get(paper.id) ?? [] });
     if (!todo.length) return { represented: 0, skipped, facetFailures };
 
@@ -147,7 +161,10 @@ export class PaperVectors {
       }
       const now = nowIso();
       slots.forEach((slot, i) => {
-        db.prepare(`INSERT INTO vec_${slot.kind} (rowid, embedding) VALUES (?, ?)`).run(BigInt(slot.paperId), vectors[i]);
+        db.prepare(`INSERT INTO vec_${slot.kind} (rowid, embedding) VALUES (?, ?)`).run(
+          BigInt(slot.paperId),
+          vectors[i],
+        );
         db.prepare("INSERT INTO representations (paper_id, kind, model, dims, created_at) VALUES (?, ?, ?, ?, ?)").run(
           slot.paperId,
           slot.kind,
@@ -179,7 +196,9 @@ export class PaperVectors {
   /** Which vectors a paper has. */
   kinds(paperId: number): VectorKind[] {
     return (
-      this.options.db.prepare("SELECT kind FROM representations WHERE paper_id = ? AND model = ? ORDER BY kind").all(paperId, this.model) as {
+      this.options.db
+        .prepare("SELECT kind FROM representations WHERE paper_id = ? AND model = ? ORDER BY kind")
+        .all(paperId, this.model) as {
         kind: VectorKind;
       }[]
     ).map((r) => r.kind);
@@ -198,7 +217,10 @@ export class PaperVectors {
    * The k papers most similar to a paper or a text, by the whole vector or one facet. A facet search from a paper
    * also reports each hit's background and whole distances, so "same method, different problem" stands out.
    */
-  async similar(from: { paperId: number } | { text: string }, options: { by?: VectorKind; k?: number } = {}): Promise<SimilarHit[]> {
+  async similar(
+    from: { paperId: number } | { text: string },
+    options: { by?: VectorKind; k?: number } = {},
+  ): Promise<SimilarHit[]> {
     const by = options.by ?? "whole";
     const k = options.k ?? SIMILAR_K_DEFAULT;
     if (!Number.isInteger(k) || k < 1 || k > 100) throw new RangeError(`k must be 1 to 100, got ${k}`);

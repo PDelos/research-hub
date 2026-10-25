@@ -78,7 +78,11 @@ export function projectRoutes(hub: Hub): Router {
   r.post("/v1/charter/answers", async (req, res) => {
     const answers = bodyOf(req).answers;
     if (!Array.isArray(answers) || !answers.length) throw invalid("answers must be a nonempty list of {id, answer}");
-    const open = new Map(p().questions.open().map((q) => [q.id, q]));
+    const open = new Map(
+      p()
+        .questions.open()
+        .map((q) => [q.id, q]),
+    );
     const clean = answers.map((a, i) => {
       const id = Number((a as any)?.id);
       const answer = (a as any)?.answer;

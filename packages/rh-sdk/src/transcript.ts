@@ -58,9 +58,7 @@ export function messageText(message: WireMessage): string {
   if (typeof content === "string") return content;
   if (!Array.isArray(content)) return "";
   return content
-    .map((block: { type?: string; text?: string }) =>
-      block.type === "text" ? (block.text ?? "") : "",
-    )
+    .map((block: { type?: string; text?: string }) => (block.type === "text" ? (block.text ?? "") : ""))
     .join("");
 }
 
@@ -120,8 +118,7 @@ export function toTranscript(
   const assistantBlocks = (message: WireAssistantMessage): AssistantBlockView[] =>
     message.content.flatMap((block): AssistantBlockView[] => {
       if (block.type === "text") return block.text ? [{ type: "text", text: block.text }] : [];
-      if (block.type === "thinking")
-        return block.thinking ? [{ type: "thinking", text: block.thinking }] : [];
+      if (block.type === "thinking") return block.thinking ? [{ type: "thinking", text: block.thinking }] : [];
       return [{ type: "tool", call: toolView(block.id, block.name, block.arguments) }];
     });
 
@@ -193,9 +190,7 @@ export function toMarkdown(items: readonly TranscriptItem[]): string {
             : `- \`${block.call.name}\` ${block.call.status}${block.call.result ? `\n\n\`\`\`\n${block.call.result.slice(0, 2000)}\n\`\`\`` : ""}`,
       );
       if (item.error) parts.push(`> ${item.error}`);
-      out.push(
-        `### Agent (${item.id === "live" ? "working" : `#${item.id}`})\n\n${parts.join("\n\n")}`,
-      );
+      out.push(`### Agent (${item.id === "live" ? "working" : `#${item.id}`})\n\n${parts.join("\n\n")}`);
     } else if (item.kind === "tool-result")
       out.push(
         `- \`${item.name}\` ${item.isError ? "error" : "result"}\n\n\`\`\`\n${item.text.slice(0, 2000)}\n\`\`\``,
@@ -230,9 +225,7 @@ export interface UsageSummary {
   cacheWriteCost: number;
 }
 
-export function sumUsage(
-  state?: Pick<WireUsageState, "models"> | { models: Record<string, WireUsage> },
-): UsageSummary {
+export function sumUsage(state?: Pick<WireUsageState, "models"> | { models: Record<string, WireUsage> }): UsageSummary {
   const total: UsageSummary = {
     tokens: 0,
     cost: 0,

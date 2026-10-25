@@ -43,7 +43,9 @@ export class Citations {
   /** Papers this one cites that are stored in the project. */
   references(paperId: number): number[] {
     return (
-      this.db.prepare("SELECT cited_paper_id FROM citation_links WHERE citing_paper_id = ? AND cited_paper_id IS NOT NULL").all(paperId) as {
+      this.db
+        .prepare("SELECT cited_paper_id FROM citation_links WHERE citing_paper_id = ? AND cited_paper_id IS NOT NULL")
+        .all(paperId) as {
         cited_paper_id: number;
       }[]
     ).map((r) => Number(r.cited_paper_id));
@@ -52,11 +54,15 @@ export class Citations {
   /** Stored papers that cite this one. */
   citedBy(paperId: number): number[] {
     return (
-      this.db.prepare("SELECT citing_paper_id FROM citation_links WHERE cited_paper_id = ?").all(paperId) as { citing_paper_id: number }[]
+      this.db.prepare("SELECT citing_paper_id FROM citation_links WHERE cited_paper_id = ?").all(paperId) as {
+        citing_paper_id: number;
+      }[]
     ).map((r) => Number(r.citing_paper_id));
   }
 
   private cites(from: number, to: number): boolean {
-    return !!this.db.prepare("SELECT 1 FROM citation_links WHERE citing_paper_id = ? AND cited_paper_id = ?").get(from, to);
+    return !!this.db
+      .prepare("SELECT 1 FROM citation_links WHERE citing_paper_id = ? AND cited_paper_id = ?")
+      .get(from, to);
   }
 }

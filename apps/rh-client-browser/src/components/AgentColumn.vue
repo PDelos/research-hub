@@ -44,7 +44,9 @@ function onKey(e: KeyboardEvent) {
       <span class="title">Research desk</span>
       <span class="muted">{{ store.agent?.model ?? "" }}</span>
       <span class="spacer" />
-      <span class="muted" v-if="store.agent">{{ k(store.agent.contextTokens) }} / {{ k(store.agent.contextWindow) }} context</span>
+      <span class="muted" v-if="store.agent"
+        >{{ k(store.agent.contextTokens) }} / {{ k(store.agent.contextWindow) }} context</span
+      >
     </div>
     <div class="transcript" ref="scroller" aria-live="polite">
       <p v-if="transcript.ready && !transcript.items.length" class="muted center">Say hello to the research desk.</p>
@@ -65,7 +67,13 @@ function onKey(e: KeyboardEvent) {
       <div v-if="transcript.running && !transcript.generating" class="muted typing">Working…</div>
     </div>
     <form class="composer" @submit.prevent="submit">
-      <textarea v-model="draft" rows="2" placeholder="Message the research desk" aria-label="Message" @keydown="onKey" />
+      <textarea
+        v-model="draft"
+        rows="2"
+        placeholder="Message the research desk"
+        aria-label="Message"
+        @keydown="onKey"
+      />
       <button type="submit" :disabled="!draft.trim() || sending">Send</button>
     </form>
   </aside>

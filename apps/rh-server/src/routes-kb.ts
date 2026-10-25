@@ -75,7 +75,11 @@ export function kbRoutes(hub: Hub): Router {
     const q = String(req.query.q ?? "").trim();
     if (!q) throw invalid("q is required");
     const limit = Math.min(20, Math.max(1, int(req.query.limit, "limit", 8)));
-    res.json(p().kbIndex.search(q, limit).map(({ path, stem, title, excerpt }) => ({ path, stem, title, excerpt })));
+    res.json(
+      p()
+        .kbIndex.search(q, limit)
+        .map(({ path, stem, title, excerpt }) => ({ path, stem, title, excerpt })),
+    );
   });
 
   return r;

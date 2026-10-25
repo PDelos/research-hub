@@ -12,10 +12,32 @@ import { arxivOnlyFetch, fakePapers, type FakePaper } from "./fixtures/sweep-env
 import { startTestServer, tempDir } from "./helpers.ts";
 
 const passAll = (id: string, _c: string, q: any) =>
-  id === "relevance" ? score(0.75, 5) : id === "matched_question" ? choice("Q1", Object.keys(q.criteria)) : id === "worth" ? noul(0.8) : id === "generalizable" ? noul(0.1) : undefined;
+  id === "relevance"
+    ? score(0.75, 5)
+    : id === "matched_question"
+      ? choice("Q1", Object.keys(q.criteria))
+      : id === "worth"
+        ? noul(0.8)
+        : id === "generalizable"
+          ? noul(0.1)
+          : undefined;
 
-async function project(papers: FakePaper[], rules: FauxRule[] = [cardWriterRule, librarianRule], dataDir?: string, extra: Record<string, unknown> = {}) {
-  const server = await startTestServer({ dataDir, hub: { ticker: false, fauxRules: rules, jevDecide: scripted(passAll).decide, paperFetch: arxivOnlyFetch(papers), ...extra } });
+async function project(
+  papers: FakePaper[],
+  rules: FauxRule[] = [cardWriterRule, librarianRule],
+  dataDir?: string,
+  extra: Record<string, unknown> = {},
+) {
+  const server = await startTestServer({
+    dataDir,
+    hub: {
+      ticker: false,
+      fauxRules: rules,
+      jevDecide: scripted(passAll).decide,
+      paperFetch: arxivOnlyFetch(papers),
+      ...extra,
+    },
+  });
   const p = server.hub.project;
   if (!p.charters.approved()) {
     p.brief.write("# Protein LMs");
@@ -49,12 +71,37 @@ test("a starred paper becomes one connected evidence note with all properties an
     const stem = p.ingest.note(paper.id)!;
     assert.match(stem, /^author-2026-paper-\d+-on-protein-language$/);
     const note = p.vault.read(`sources/${stem}.md`)!;
-    for (const prop of ["title", "authors", "arxiv", "year", "venue", "level", "kind", "relevance", "trust", "value", "kb_added", "why"]) assert.match(note, new RegExp(`^${prop}: `, "m"), prop);
+    for (const prop of [
+      "title",
+      "authors",
+      "arxiv",
+      "year",
+      "venue",
+      "level",
+      "kind",
+      "relevance",
+      "trust",
+      "value",
+      "kb_added",
+      "why",
+    ])
+      assert.match(note, new RegExp(`^${prop}: `, "m"), prop);
     assert.match(note, /^why: "Exactly the foundation I need"$/m);
-    for (const h of ["Summary", "Contributions", "Method", "Results", "Limitations", "Open questions", "Related papers"]) assert.match(note, new RegExp(`^## ${h}$`, "m"), h);
+    for (const h of [
+      "Summary",
+      "Contributions",
+      "Method",
+      "Results",
+      "Limitations",
+      "Open questions",
+      "Related papers",
+    ])
+      assert.match(note, new RegExp(`^## ${h}$`, "m"), h);
     assert.match(note, /## Limitations\n\nNot stated in the abstract/);
     // First paper of a concept: the page is created and links back; the note links to it and to Q1's page.
-    const concept = p.vault.read("concepts/how-do-protein-lms-transfer-to-structure.md") ?? p.vault.read("concepts/protein-language-models.md")!;
+    const concept =
+      p.vault.read("concepts/how-do-protein-lms-transfer-to-structure.md") ??
+      p.vault.read("concepts/protein-language-models.md")!;
     assert.ok(concept.includes(`[[${stem}]]`));
     assert.match(note, /- Concept: \[\[protein-language-models\]\]/);
     assert.match(note, /- Question: \[\[q1-how-do-protein-lms-transfer-to\]\]/);
@@ -62,12 +109,17 @@ test("a starred paper becomes one connected evidence note with all properties an
 
     // Two more: the index has three paper lines and the log three entries; a paper with no results says so.
     p.feedback.judge(cards[1].id, "star");
-    const noResults = cards.find((c) => p.papers.store.get(c.paperId)!.abstract!.startsWith("Protein language models are widely used"))!;
+    const noResults = cards.find((c) =>
+      p.papers.store.get(c.paperId)!.abstract!.startsWith("Protein language models are widely used"),
+    )!;
     p.feedback.judge(noResults.id, "star", "simple and clear");
     await done(p, 3);
     const index = p.vault.read("index.md")!;
     assert.equal(index.match(/^- \[\[/gm)!.length, 3);
-    assert.match(index, /- \[\[author-2026-paper-\d+-on-protein-language\]\] · .+ · advanced · "Exactly the foundation I need"/);
+    assert.match(
+      index,
+      /- \[\[author-2026-paper-\d+-on-protein-language\]\] · .+ · advanced · "Exactly the foundation I need"/,
+    );
     assert.equal(p.vault.read("log.md")!.match(/ingested \[\[/g)!.length, 3);
     const plain = p.vault.read(`sources/${p.ingest.note(noResults.paperId)}.md`)!;
     assert.match(plain, /## Results\n\nNot stated in the abstract/);
@@ -87,11 +139,21 @@ test("an invented number is refused; an edited note keeps the user's Summary whe
     if (!turn.sections["librarian"]) return undefined;
     if (!tried) {
       tried = true;
-      return call("write_evidence_note", { summary: "Improves accuracy by 99%.", contributions: "x", method: "x", results: "x", limitations: "x", open_questions: "x" });
+      return call("write_evidence_note", {
+        summary: "Improves accuracy by 99%.",
+        contributions: "x",
+        method: "x",
+        results: "x",
+        limitations: "x",
+        open_questions: "x",
+      });
     }
     if (turn.results.some((r) => r.name === "link_note" && !r.isError)) return say("ok");
     if (turn.results.some((r) => r.name === "write_evidence_note" && !r.isError)) {
-      const notes = turn.lastUser.match(/^EXISTING_NOTES: (.*)$/m)![1].split("; ").filter((n) => n !== "(none yet)");
+      const notes = turn.lastUser
+        .match(/^EXISTING_NOTES: (.*)$/m)![1]
+        .split("; ")
+        .filter((n) => n !== "(none yet)");
       return call("link_note", { concepts: ["protein language models"], related: notes });
     }
     return librarianRule(turn);
@@ -102,7 +164,9 @@ test("an invented number is refused; an edited note keeps the user's Summary whe
     p.feedback.judge(cards[0].id, "star");
     await done(p, 1);
     const first = p.ingest.note(cards[0].paperId)!;
-    const view = JSON.stringify(p.db.prepare("SELECT result_text FROM tool_calls WHERE tool_name = 'write_evidence_note'").all());
+    const view = JSON.stringify(
+      p.db.prepare("SELECT result_text FROM tool_calls WHERE tool_name = 'write_evidence_note'").all(),
+    );
     assert.match(view, /numbers not in the title, abstract or reason: 99/);
     // The user rewrites the Summary in Obsidian.
     const path = join(p.vault.dir, "sources", `${first}.md`);

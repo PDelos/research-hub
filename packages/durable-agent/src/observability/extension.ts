@@ -12,16 +12,13 @@ import type { AgentHookEvent, ObservabilitySink } from "./types.ts";
 
 const preview = (value: unknown, max = 600) => {
   const text = typeof value === "string" ? value : JSON.stringify(value);
-  return text && text.length > max
-    ? `${text.slice(0, max)} [${text.length - max} more chars]`
-    : text;
+  return text && text.length > max ? `${text.slice(0, max)} [${text.length - max} more chars]` : text;
 };
 
 const charsOf = (value: unknown): number => {
   if (typeof value === "string") return value.length;
   if (Array.isArray(value)) return value.reduce((n, v) => n + charsOf(v), 0);
-  if (value && typeof value === "object")
-    return Object.values(value).reduce((n: number, v) => n + charsOf(v), 0);
+  if (value && typeof value === "object") return Object.values(value).reduce((n: number, v) => n + charsOf(v), 0);
   return 0;
 };
 
@@ -105,9 +102,7 @@ export function observability(sink: ObservabilitySink, name = "observability"): 
               tool: call.name,
               isError: result.isError ?? false,
               diagnostics: result.diagnostics,
-              result: preview(
-                result.content?.map((c) => (c.type === "text" ? c.text : `[${c.type}]`)).join(""),
-              ),
+              result: preview(result.content?.map((c) => (c.type === "text" ? c.text : `[${c.type}]`)).join("")),
             },
           });
           return undefined;

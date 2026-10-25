@@ -1,14 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import {
-  attentionScore,
-  gate,
-  JevLedger,
-  JevClient,
-  normalized,
-  rankHfs,
-  type ScoreAnswer,
-} from "../src/index.ts";
+import { attentionScore, gate, JevLedger, JevClient, normalized, rankHfs, type ScoreAnswer } from "../src/index.ts";
 
 const s = (score: number, confidence = 0.8): ScoreAnswer => ({
   type: "score",
@@ -67,10 +59,10 @@ test("ledger totals and hands every call to its sink", async () => {
   const seen: unknown[] = [];
   const ledger = new JevLedger((r) => seen.push(r));
   const client = new JevClient({ provider: "mock" });
-  ledger.record(
-    await client.systemOne("x", { a: { type: "noul", instructions: "Is `x` fine?" } }),
-    { command: "t", version: 1 },
-  );
+  ledger.record(await client.systemOne("x", { a: { type: "noul", instructions: "Is `x` fine?" } }), {
+    command: "t",
+    version: 1,
+  });
   ledger.fail(new Error("boom"), { command: "t" });
   assert.equal(ledger.calls, 2);
   assert.equal(ledger.failures, 1);

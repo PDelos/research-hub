@@ -58,11 +58,7 @@ export function memoryTelemetry() {
   return { rows, store };
 }
 
-export const until = async (
-  check: () => boolean | Promise<boolean>,
-  ms = 10_000,
-  label = "condition",
-) => {
+export const until = async (check: () => boolean | Promise<boolean>, ms = 10_000, label = "condition") => {
   const end = Date.now() + ms;
   while (Date.now() < end) {
     if (await check()) return;

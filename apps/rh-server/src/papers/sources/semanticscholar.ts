@@ -8,9 +8,7 @@ const FIELDS = "title,abstract,authors,year,publicationDate,venue,externalIds,ci
 
 export class SemanticScholarSource implements PaperSource {
   readonly name = "semanticscholar" as const;
-  constructor(
-    private readonly deps: SourceDeps & { apiKey: string },
-  ) {}
+  constructor(private readonly deps: SourceDeps & { apiKey: string }) {}
 
   async search(q: SourceQuery): Promise<SourcePaper[]> {
     const query = queryTerms(q.query).join(" ");
@@ -22,7 +20,9 @@ export class SemanticScholarSource implements PaperSource {
       budgetMs: q.budgetMs,
       headers: { "x-api-key": this.deps.apiKey },
     });
-    return (body.data ?? []).map(mapS2Paper).filter((p): p is SourcePaper => !!p && inWindow(p.publishedAt, q.since, q.until));
+    return (body.data ?? [])
+      .map(mapS2Paper)
+      .filter((p): p is SourcePaper => !!p && inWindow(p.publishedAt, q.since, q.until));
   }
 }
 

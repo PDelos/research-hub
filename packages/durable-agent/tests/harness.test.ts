@@ -56,11 +56,7 @@ test("the faux catalog mirrors the configured IDs", () => {
 test("the harness stores in WAL, answers on the faux model, and offers no bash or file tools", async () => {
   const t = tempDir();
   try {
-    const { ctx, root, close } = await fauxHarness(
-      t.dir,
-      [(turn) => say(`hello ${turn.lastUser}`)],
-      [],
-    );
+    const { ctx, root, close } = await fauxHarness(t.dir, [(turn) => say(`hello ${turn.lastUser}`)], []);
     const settled = await ask(root, ctx, "world");
     assert.equal(settled.status, "done");
     const agent = await root.agent(ctx);

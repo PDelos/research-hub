@@ -29,7 +29,11 @@ watch(selected, async (s) => {
 const editing = ref(false);
 const draft = ref<CharterBody>();
 const lines = (list: string[]) => list.join("\n");
-const unlines = (text: string) => text.split("\n").map((l) => l.trim()).filter(Boolean);
+const unlines = (text: string) =>
+  text
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
 const text = ref({ concepts: "", subAreas: "", outOfScope: "" });
 function startEdit() {
   if (!shown.value) return;
@@ -156,15 +160,23 @@ async function replaceBrief() {
         </ol>
         <h3>Search queries</h3>
         <div class="chips">
-          <span v-for="q in shown.charter.queries" :key="q.text" class="chip">{{ q.text }}<small v-if="q.weight !== 1"> ×{{ q.weight }}</small></span>
+          <span v-for="q in shown.charter.queries" :key="q.text" class="chip"
+            >{{ q.text }}<small v-if="q.weight !== 1"> ×{{ q.weight }}</small></span
+          >
         </div>
         <h3>Concepts</h3>
-        <div class="chips"><span v-for="c in shown.charter.concepts" :key="c" class="chip">{{ c }}</span></div>
+        <div class="chips">
+          <span v-for="c in shown.charter.concepts" :key="c" class="chip">{{ c }}</span>
+        </div>
         <h3>Sub-areas</h3>
-        <div class="chips"><span v-for="c in shown.charter.subAreas" :key="c" class="chip">{{ c }}</span></div>
+        <div class="chips">
+          <span v-for="c in shown.charter.subAreas" :key="c" class="chip">{{ c }}</span>
+        </div>
         <template v-if="shown.charter.outOfScope.length">
           <h3>Out of scope</h3>
-          <div class="chips"><span v-for="c in shown.charter.outOfScope" :key="c" class="chip out">{{ c }}</span></div>
+          <div class="chips">
+            <span v-for="c in shown.charter.outOfScope" :key="c" class="chip out">{{ c }}</span>
+          </div>
         </template>
       </section>
       <p v-else-if="!running" class="muted">No charter yet.</p>

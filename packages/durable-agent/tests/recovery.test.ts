@@ -22,8 +22,7 @@ function host(dir: string, args: string[], env: Record<string, string> = {}) {
   return { child, done };
 }
 
-const lines = (file: string) =>
-  existsSync(file) ? readFileSync(file, "utf8").trim().split("\n").filter(Boolean) : [];
+const lines = (file: string) => (existsSync(file) ? readFileSync(file, "utf8").trim().split("\n").filter(Boolean) : []);
 
 test("SIGKILL mid-tool: a replay-safe tool reruns once, its memoized effect is not repeated", async () => {
   const t = tempDir();
@@ -37,9 +36,7 @@ test("SIGKILL mid-tool: a replay-safe tool reruns once, its memoized effect is n
     assert.equal(second.code, 0, second.err);
     const report = JSON.parse(second.out.trim().split("\n").at(-1)!);
     assert.equal(lines(effects).length, 1, "the effect ran once");
-    assert.deepEqual(report.results, [
-      { name: "slow_safe", isError: false, text: "safe finished" },
-    ]);
+    assert.deepEqual(report.results, [{ name: "slow_safe", isError: false, text: "safe finished" }]);
     assert.match(report.answers.at(-1), /result: safe finished/);
   } finally {
     t.cleanup();

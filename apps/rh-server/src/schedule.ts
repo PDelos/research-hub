@@ -38,7 +38,11 @@ function formatter(tz: string): Intl.DateTimeFormat {
 }
 
 export function localParts(instant: number, tz: string): LocalParts {
-  const parts = Object.fromEntries(formatter(tz).formatToParts(new Date(instant)).map((p) => [p.type, p.value]));
+  const parts = Object.fromEntries(
+    formatter(tz)
+      .formatToParts(new Date(instant))
+      .map((p) => [p.type, p.value]),
+  );
   return {
     y: Number(parts.year),
     m: Number(parts.month),
@@ -203,7 +207,8 @@ export class Scheduler {
         next.review.time = p.review.time;
       }
       if (p.review.weekday !== undefined) {
-        if (!WEEKDAYS.includes(p.review.weekday)) throw new ScheduleInvalid(`review.weekday must be one of ${WEEKDAYS.join(", ")}`);
+        if (!WEEKDAYS.includes(p.review.weekday))
+          throw new ScheduleInvalid(`review.weekday must be one of ${WEEKDAYS.join(", ")}`);
         next.review.weekday = p.review.weekday;
       }
     }
@@ -231,7 +236,9 @@ export class Scheduler {
       )
       .run(slot.kind, slot.key, slot.at, trigger, status, reason ?? null, nowIso());
     if (Number(res.changes) === 0) return undefined;
-    const run = toRun(this.deps.db.prepare("SELECT * FROM scheduled_runs WHERE id = ?").get(Number(res.lastInsertRowid)));
+    const run = toRun(
+      this.deps.db.prepare("SELECT * FROM scheduled_runs WHERE id = ?").get(Number(res.lastInsertRowid)),
+    );
     this.deps.log.info("schedule.recorded", { kind: run.kind, slot: run.slot, status: run.status, reason: run.reason });
     if (run.status === "requested")
       queueMicrotask(() => {
@@ -317,7 +324,9 @@ export class Scheduler {
   }
 
   runs(limit = 100): ScheduledRun[] {
-    return (this.deps.db.prepare("SELECT * FROM scheduled_runs ORDER BY id DESC LIMIT ?").all(limit) as any[]).map(toRun);
+    return (this.deps.db.prepare("SELECT * FROM scheduled_runs ORDER BY id DESC LIMIT ?").all(limit) as any[]).map(
+      toRun,
+    );
   }
 
   /** The next scheduled time of each enabled kind, only while the project is active. */

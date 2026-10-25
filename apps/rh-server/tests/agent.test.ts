@@ -12,7 +12,10 @@ import { startTestServer, tempDir } from "./helpers.ts";
 test("a faux chat round trip answers and the root conversation is reused after restart", async () => {
   const t = tempDir();
   try {
-    const first = await startTestServer({ dataDir: t.dir, hub: { fauxRules: [(turn) => say(`hello ${turn.lastUser}`)] } });
+    const first = await startTestServer({
+      dataDir: t.dir,
+      hub: { fauxRules: [(turn) => say(`hello ${turn.lastUser}`)] },
+    });
     const sent = await first.client.send("world", { waitMs: 10_000 });
     assert.equal(sent.status, "done");
     assert.equal(sent.answer?.text, "hello world");

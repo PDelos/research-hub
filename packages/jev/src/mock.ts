@@ -255,8 +255,7 @@ export class MockJev {
       else answers[id] = scoreAnswer(q, stateTokens);
     }
     const usage = {
-      input_tokens:
-        Math.ceil(flattenState(req.state).length / 4) + 20 * Object.keys(req.questions).length,
+      input_tokens: Math.ceil(flattenState(req.state).length / 4) + 20 * Object.keys(req.questions).length,
       output_tokens: 20 * Object.keys(req.questions).length,
     };
     return { model: this.model, answers, usage };

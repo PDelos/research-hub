@@ -62,9 +62,12 @@ export function computeScores(
   ]);
 
   // Trust: peer review (field-aware for preprints), citation velocity, open access, a described method.
-  const isPreprint = !paper.venue && (!!paper.server && PREPRINT_SERVERS.has(paper.server));
+  const isPreprint = !paper.venue && !!paper.server && PREPRINT_SERVERS.has(paper.server);
   const preprintNorm = paper.categories.some((c) => PREPRINT_NORM.test(c));
-  const years = Math.max(1, (options.now - Date.parse(paper.publishedAt ?? `${paper.year ?? 2000}-07-01`)) / (365.25 * 86_400_000));
+  const years = Math.max(
+    1,
+    (options.now - Date.parse(paper.publishedAt ?? `${paper.year ?? 2000}-07-01`)) / (365.25 * 86_400_000),
+  );
   const citations = paper.citedByCount ?? 0;
   const velocity = citations / years;
   const parts: string[] = [];
@@ -83,7 +86,9 @@ export function computeScores(
   } else parts.push("venue unknown");
   const citationPoints = Math.min(20, 6 * Math.log2(1 + velocity));
   trust += citationPoints;
-  parts.push(paper.citedByCount === undefined ? "citations unknown" : `${citations} citations (${velocity.toFixed(1)}/year)`);
+  parts.push(
+    paper.citedByCount === undefined ? "citations unknown" : `${citations} citations (${velocity.toFixed(1)}/year)`,
+  );
   if (paper.oaUrl) {
     trust += 5;
     parts.push("open access");
@@ -106,7 +111,11 @@ export function computeScores(
         : 0.6
       : 0.5;
   const value = clamp(100 * (0.55 * novelty + 0.3 * worth + 0.15 * kindFactor));
-  const valueReason = reason([`novelty ${novelty.toFixed(2)}`, `worth reading ${worth.toFixed(2)}`, `${kind}${options.orientation && kindFactor === 0.9 ? " (good start for a newcomer)" : ""}`]);
+  const valueReason = reason([
+    `novelty ${novelty.toFixed(2)}`,
+    `worth reading ${worth.toFixed(2)}`,
+    `${kind}${options.orientation && kindFactor === 0.9 ? " (good start for a newcomer)" : ""}`,
+  ]);
 
   return {
     relevance,
@@ -143,7 +152,8 @@ export function computeScores(
       },
       formulas: {
         relevance: "100 × (0.75 × Jev relevance + 0.25 × min(1, question weight / 2))",
-        trust: "50 + peer-reviewed 20 | preprint −5 (cs.*, q-bio.*) or −15 + min(20, 6 × log2(1 + citations/year)) + open access 5 + method described 5",
+        trust:
+          "50 + peer-reviewed 20 | preprint −5 (cs.*, q-bio.*) or −15 + min(20, 6 × log2(1 + citations/year)) + open access 5 + method described 5",
         value: "100 × (0.55 × novelty + 0.30 × worth + 0.15 × kind factor)",
       },
     },

@@ -15,7 +15,15 @@ if (!url || !out) {
 const port = 9300 + Math.floor(Math.random() * 500);
 const chrome = spawn(
   process.env.CHROMIUM ?? "chromium",
-  ["--headless=new", "--no-sandbox", "--disable-gpu", "--hide-scrollbars", `--remote-debugging-port=${port}`, `--user-data-dir=${mkdtempSync(join(tmpdir(), "rh-shot-"))}`, "about:blank"],
+  [
+    "--headless=new",
+    "--no-sandbox",
+    "--disable-gpu",
+    "--hide-scrollbars",
+    `--remote-debugging-port=${port}`,
+    `--user-data-dir=${mkdtempSync(join(tmpdir(), "rh-shot-"))}`,
+    "about:blank",
+  ],
   { stdio: "ignore" },
 );
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -39,12 +47,24 @@ try {
       pending.delete(m.id);
     }
   });
-  const send = (method, params = {}) => new Promise((r) => { const i = ++id; pending.set(i, r); ws.send(JSON.stringify({ id: i, method, params })); });
+  const send = (method, params = {}) =>
+    new Promise((r) => {
+      const i = ++id;
+      pending.set(i, r);
+      ws.send(JSON.stringify({ id: i, method, params }));
+    });
   await send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-color-scheme", value: scheme }] });
   await send("Emulation.setDeviceMetricsOverride", { width: 1400, height: 860, deviceScaleFactor: 1, mobile: false });
   await send("Page.navigate", { url });
   await sleep(Number(waitMs));
-  if (script) console.log("eval:", JSON.stringify((await send("Runtime.evaluate", { expression: script, awaitPromise: true, returnByValue: true })).result?.result?.value));
+  if (script)
+    console.log(
+      "eval:",
+      JSON.stringify(
+        (await send("Runtime.evaluate", { expression: script, awaitPromise: true, returnByValue: true })).result?.result
+          ?.value,
+      ),
+    );
   writeFileSync(out, Buffer.from((await send("Page.captureScreenshot", { format: "png" })).result.data, "base64"));
   ws.close();
 } finally {

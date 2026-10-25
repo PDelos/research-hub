@@ -13,7 +13,14 @@ import {
   type SubmissionId,
 } from "@earendil-works/pi-durable";
 import { allowOnly, defineAppTool, loadPrompt, once, toolError, toolText, type ModelCatalog } from "@rh/durable-agent";
-import { Brief, CharterInvalid, Charters, MAX_SCOPING_QUESTIONS, ScopingQuestions, validateCharter } from "./charter.ts";
+import {
+  Brief,
+  CharterInvalid,
+  Charters,
+  MAX_SCOPING_QUESTIONS,
+  ScopingQuestions,
+  validateCharter,
+} from "./charter.ts";
 import { nowIso, Settings } from "./db.ts";
 import type { Logger } from "./logger.ts";
 
@@ -123,14 +130,22 @@ export class CharterWriter {
       description: `Ask the user 1 to 5 scoping questions that change the charter. At most ${MAX_SCOPING_QUESTIONS} in the whole project.`,
       returns: "Text: how many questions were recorded, or why they were refused.",
       parameters: Type.Object({
-        questions: Type.Array(Type.String({ minLength: 1, maxLength: 300 }), { minItems: 1, maxItems: MAX_SCOPING_QUESTIONS }),
+        questions: Type.Array(Type.String({ minLength: 1, maxLength: 300 }), {
+          minItems: 1,
+          maxItems: MAX_SCOPING_QUESTIONS,
+        }),
       }),
       execute: async (args, api, ctx) => {
         const round = this.run()?.round ?? 1;
         // Memoized as text: "ok:<n>" or "error:<message>", so a replay neither asks twice nor changes the answer.
         const result = await once<string>(api, "asked", ctx, async () => {
           try {
-            return `ok:${deps.questions.ask(round, args.questions.map((q) => q.trim())).length}`;
+            return `ok:${
+              deps.questions.ask(
+                round,
+                args.questions.map((q) => q.trim()),
+              ).length
+            }`;
           } catch (error) {
             return `error:${error instanceof Error ? error.message : String(error)}`;
           }

@@ -11,7 +11,8 @@ import type { Logger } from "../logger.ts";
 export const VAULT_FOLDERS = ["sources", "concepts", "questions"] as const;
 const CHARTER_HASH = "vault_charter_hash";
 
-export const INDEX_HEADER = "# Knowledge base\n\nOne line per paper: title · summary · level · your reason.\n\n## Papers\n\n";
+export const INDEX_HEADER =
+  "# Knowledge base\n\nOne line per paper: title · summary · level · your reason.\n\n## Papers\n\n";
 export const LOG_HEADER = "# Log\n\n";
 
 const sha = (text: string) => createHash("sha256").update(text).digest("hex");
@@ -46,7 +47,12 @@ export function renderCharter(charter: Charter, version: number): string {
   lines.push("", "## Concepts", "", ...charter.concepts.map((c) => `- ${c}`));
   lines.push("", "## Sub-areas", "", ...charter.subAreas.map((c) => `- ${c}`));
   lines.push("", "## Search queries", "", ...charter.queries.map((q) => `- ${q.text} (weight ${q.weight})`));
-  lines.push("", "## Out of scope", "", ...(charter.outOfScope.length ? charter.outOfScope.map((c) => `- ${c}`) : ["- (none)"]));
+  lines.push(
+    "",
+    "## Out of scope",
+    "",
+    ...(charter.outOfScope.length ? charter.outOfScope.map((c) => `- ${c}`) : ["- (none)"]),
+  );
   return `${lines.join("\n")}\n`;
 }
 
@@ -67,7 +73,8 @@ export class Vault {
     // Obsidian settings from the template: only files that are missing (a new setting such as the graph colors
     // reaches existing vaults), never overwriting what is there, so the user's own choices are kept.
     const template = join(this.deps.templateDir, ".obsidian");
-    if (existsSync(template)) cpSync(template, join(this.dir, ".obsidian"), { recursive: true, force: false, errorOnExist: false });
+    if (existsSync(template))
+      cpSync(template, join(this.dir, ".obsidian"), { recursive: true, force: false, errorOnExist: false });
     if (!existsSync(join(this.dir, "index.md"))) this.write("index.md", INDEX_HEADER);
     if (!existsSync(join(this.dir, "log.md"))) this.write("log.md", LOG_HEADER);
     if (created) this.deps.log.info("vault.created", { dir: this.dir });
@@ -119,7 +126,10 @@ export class Vault {
 
   appendLog(entry: string): void {
     const current = this.read("log.md") ?? LOG_HEADER;
-    this.write("log.md", `${current.endsWith("\n") ? current : `${current}\n`}- ${new Date().toISOString().slice(0, 16).replace("T", " ")} ${entry}\n`);
+    this.write(
+      "log.md",
+      `${current.endsWith("\n") ? current : `${current}\n`}- ${new Date().toISOString().slice(0, 16).replace("T", " ")} ${entry}\n`,
+    );
   }
 
   /** Every markdown file in the vault (relative paths, sorted), except Obsidian's settings. */

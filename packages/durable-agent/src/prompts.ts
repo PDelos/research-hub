@@ -16,11 +16,7 @@ export function promptVariables(text: string): string[] {
   return [...new Set([...text.matchAll(VAR)].map((m) => m[1]))].sort();
 }
 
-export function renderTemplate(
-  text: string,
-  vars: Record<string, unknown>,
-  label = "prompt",
-): string {
+export function renderTemplate(text: string, vars: Record<string, unknown>, label = "prompt"): string {
   const missing = promptVariables(text).filter((name) => vars[name] === undefined);
   if (missing.length) throw new PromptError(`${label} is missing variables: ${missing.join(", ")}`);
   return text.replace(VAR, (_, name: string) => {
@@ -41,12 +37,7 @@ export function readPrompt(root: string, agent: string, file: string): string {
   return text;
 }
 
-export function loadPrompt(
-  root: string,
-  agent: string,
-  file: string,
-  vars: Record<string, unknown>,
-): string {
+export function loadPrompt(root: string, agent: string, file: string, vars: Record<string, unknown>): string {
   return renderTemplate(readPrompt(root, agent, file), vars, `${agent}/${file}`).trim();
 }
 

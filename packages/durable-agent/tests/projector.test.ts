@@ -32,18 +32,12 @@ test("1.1.0 timings reach telemetry, hooks report behavior, and a restart writes
       defineExtension({ name: "echo", tools: [echo] }),
       observability({ event: (e) => events.push(e) }),
     ];
-    const rules = [
-      (turn: any) => (turn.results.length === 0 ? call("echo", { text: "ping" }) : say("pong")),
-    ];
+    const rules = [(turn: any) => (turn.results.length === 0 ? call("echo", { text: "ping" }) : say("pong"))];
     const first = await fauxHarness(t.dir, rules, extensions);
     const tel = memoryTelemetry();
     const stop = startProjector(first.harness, tel.store);
     await ask(first.root, first.ctx, "go");
-    await until(
-      () => tel.rows.tools.size === 1 && tel.rows.generations.size === 2,
-      5000,
-      "projection",
-    );
+    await until(() => tel.rows.tools.size === 1 && tel.rows.generations.size === 2, 5000, "projection");
     const tool = [...tel.rows.tools.values()][0];
     assert.equal(tool.toolName, "echo");
     assert.ok(tool.durationMs >= 25, `durationMs ${tool.durationMs}`);
@@ -72,11 +66,7 @@ test("1.1.0 timings reach telemetry, hooks report behavior, and a restart writes
     const stop2 = startProjector(second.harness, again.store);
     second.harness.resume();
     await new Promise((r) => setTimeout(r, 200));
-    assert.equal(
-      again.rows.generations.size + again.rows.tools.size,
-      0,
-      "reopen republishes nothing",
-    );
+    assert.equal(again.rows.generations.size + again.rows.tools.size, 0, "reopen republishes nothing");
     stop2();
     await second.close();
   } finally {

@@ -6,7 +6,15 @@ import { choice, noul, score } from "./fixtures/jev-answers.ts";
 import { arxivOnlyFetch, fakePapers, sweepEnv } from "./fixtures/sweep-env.ts";
 
 const passAll = (id: string, _c: string, q: any) =>
-  id === "relevance" ? score(0.75, 5) : id === "matched_question" ? choice("Q1", Object.keys(q.criteria)) : id === "kind" ? choice("method", Object.keys(q.criteria)) : id === "worth" ? noul(0.8) : undefined;
+  id === "relevance"
+    ? score(0.75, 5)
+    : id === "matched_question"
+      ? choice("Q1", Object.keys(q.criteria))
+      : id === "kind"
+        ? choice("method", Object.keys(q.criteria))
+        : id === "worth"
+          ? noul(0.8)
+          : undefined;
 
 async function withCards(n = 4, over: Record<string, unknown> = {}) {
   const env = sweepEnv({ fetch: arxivOnlyFetch(fakePapers(n)), script: passAll, ...over });
@@ -22,7 +30,10 @@ test("gather records the charter queries that found each paper (review variants 
     const queries = JSON.parse(row.queries_json) as string[];
     const charterQueries = new Set(env.charters.approved()!.charter.queries.map((q) => q.text));
     assert.ok(queries.length >= 1);
-    assert.ok(queries.every((q) => charterQueries.has(q)), queries.join(" | "));
+    assert.ok(
+      queries.every((q) => charterQueries.has(q)),
+      queries.join(" | "),
+    );
   } finally {
     await env.done();
   }
@@ -55,7 +66,15 @@ test("star with a reason is stored, makes one knowledge-base request, and un-sta
 });
 
 test("👍 then 👎 nets one 👎; weights clamp at 2; effects show before and after; the plan uses effective weights", async () => {
-  const charter = sampleCharter({ queries: [{ text: "protein language model", weight: 2 }, "ESM embeddings", "contact prediction", "protein fine-tuning", "PLM benchmark"] });
+  const charter = sampleCharter({
+    queries: [
+      { text: "protein language model", weight: 2 },
+      "ESM embeddings",
+      "contact prediction",
+      "protein fine-tuning",
+      "PLM benchmark",
+    ],
+  });
   const a = await withCards(3, { charter });
   const b = await withCards(3, { charter });
   try {
@@ -78,7 +97,10 @@ test("👍 then 👎 nets one 👎; weights clamp at 2; effects show before and 
     a.env.feedback.judge(star.id, "star");
     assert.equal(a.env.feedback.weight("query", "protein language model", 0), 2);
     const effects = a.env.feedback.effects(star.id);
-    assert.deepEqual(effects.find((e) => e.kind === "query" && e.key === "protein language model"), { kind: "query", key: "protein language model", before: 2, after: 2 });
+    assert.deepEqual(
+      effects.find((e) => e.kind === "query" && e.key === "protein language model"),
+      { kind: "query", key: "protein language model", before: 2, after: 2 },
+    );
     assert.ok(effects.some((e) => e.kind === "question" && e.key === "Q1" && e.before === 1 && e.after === 1.15));
     assert.ok(effects.some((e) => e.kind === "source" && e.key === "arxiv" && e.before < e.after));
     // The runner's charter carries the effective weights.
@@ -86,7 +108,10 @@ test("👍 then 👎 nets one 👎; weights clamp at 2; effects show before and 
     assert.equal(runnerQ1.weight, 1.15, "the charter's 1 plus 0.15 for the ⭐");
     const down = a.cards.find((c) => c.id !== star.id && c.id !== a.cards[0].id)!;
     a.env.feedback.judge(down.id, "down", "too basic");
-    const queriesOfDown = JSON.parse((a.env.db.prepare("SELECT queries_json FROM sweep_papers WHERE paper_id = ?").get(down.paperId) as any).queries_json) as string[];
+    const queriesOfDown = JSON.parse(
+      (a.env.db.prepare("SELECT queries_json FROM sweep_papers WHERE paper_id = ?").get(down.paperId) as any)
+        .queries_json,
+    ) as string[];
     for (const q of queriesOfDown) {
       const charterWeight = a.env.charters.approved()!.charter.queries.find((x) => x.text === q)!.weight;
       assert.ok(a.env.runner.charter().queries.find((x) => x.text === q)!.weight <= charterWeight, q);

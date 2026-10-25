@@ -49,11 +49,7 @@ export function fromPolicy(
 }
 
 export function fits(window: number, p: CompactionPoints): boolean {
-  return (
-    p.background >= MIN_BACKGROUND &&
-    p.force - p.background >= GAP &&
-    window - p.force >= MIN_RESERVE
-  );
+  return p.background >= MIN_BACKGROUND && p.force - p.background >= GAP && window - p.force >= MIN_RESERVE;
 }
 
 /** Clamp points into a window: keep the reserve and the gap. */
@@ -70,8 +66,7 @@ export const snap = (tokens: number) => Math.round(tokens / STEP) * STEP;
 export function validatePoints(window: number, p: CompactionPoints): string | undefined {
   if (!Number.isInteger(p.background) || !Number.isInteger(p.force))
     return "Compaction points must be whole token counts.";
-  if (p.background < MIN_BACKGROUND)
-    return `The background point must be at least ${MIN_BACKGROUND} tokens.`;
+  if (p.background < MIN_BACKGROUND) return `The background point must be at least ${MIN_BACKGROUND} tokens.`;
   if (p.force - p.background < GAP)
     return `The background point must sit at least ${GAP} tokens below the force point.`;
   if (window - p.force < MIN_RESERVE)

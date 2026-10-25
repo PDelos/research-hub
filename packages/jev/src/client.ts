@@ -129,24 +129,17 @@ export class JevClient {
     this.model = opts.model;
     this.timeoutMs = opts.timeoutMs ?? REQUEST_TIMEOUT_MS;
     this.retryDelayMs = opts.retryDelayMs ?? 500;
-    if (
-      !Number.isInteger(this.timeoutMs) ||
-      this.timeoutMs <= 0 ||
-      this.timeoutMs > 2_147_483_647
-    ) {
+    if (!Number.isInteger(this.timeoutMs) || this.timeoutMs <= 0 || this.timeoutMs > 2_147_483_647) {
       throw new Error("timeoutMs must be a positive integer no greater than 2147483647.");
     }
-    if (!isNonnegative(this.retryDelayMs))
-      throw new Error("retryDelayMs must be finite and nonnegative.");
+    if (!isNonnegative(this.retryDelayMs)) throw new Error("retryDelayMs must be finite and nonnegative.");
     if (opts.pricing !== undefined) {
       if (
         !opts.pricing ||
         !isNonnegative(opts.pricing.inputPerMillion) ||
         !isNonnegative(opts.pricing.outputPerMillion)
       ) {
-        throw new Error(
-          "pricing requires finite, nonnegative inputPerMillion and outputPerMillion USD rates.",
-        );
+        throw new Error("pricing requires finite, nonnegative inputPerMillion and outputPerMillion USD rates.");
       }
       this.pricing = { ...opts.pricing };
     }
@@ -155,9 +148,7 @@ export class JevClient {
     this.apiKey = (opts.apiKey ?? process.env[KEY_ENV[this.provider]])?.trim();
     this.endpoint = opts.baseUrl ?? ENDPOINTS[this.provider];
     if (!this.apiKey) {
-      throw new Error(
-        `Provider "${this.provider}" needs a nonblank apiKey or ${KEY_ENV[this.provider]}.`,
-      );
+      throw new Error(`Provider "${this.provider}" needs a nonblank apiKey or ${KEY_ENV[this.provider]}.`);
     }
   }
 
@@ -184,9 +175,7 @@ export class JevClient {
   ): Promise<SystemOneResult> {
     opts.signal?.throwIfAborted();
     const requestedModel =
-      opts.model ??
-      this.model ??
-      (this.provider === "mock" ? this.mock.model : DEFAULT_MODELS[this.provider]);
+      opts.model ?? this.model ?? (this.provider === "mock" ? this.mock.model : DEFAULT_MODELS[this.provider]);
     const body: SystemOneRequest = { model: requestedModel, state, questions };
     validateRequest(body);
     let requestText: string;
@@ -237,10 +226,7 @@ export class JevClient {
         signal.throwIfAborted();
         if (RETRY_STATUSES.has(res.status) && attempt < MAX_ATTEMPTS) {
           const backoff = this.retryDelayMs * 2 ** (attempt - 1) * (1 + Math.random() * 0.2);
-          const delay = Math.min(
-            8000,
-            Math.max(backoff, retryAfterMs(res.headers.get("retry-after"))),
-          );
+          const delay = Math.min(8000, Math.max(backoff, retryAfterMs(res.headers.get("retry-after"))));
           await res.body?.cancel();
           await sleep(delay, signal);
           continue;
@@ -291,14 +277,9 @@ function selectProvider(explicit?: JevProvider): JevProvider {
   );
 }
 
-function resultCost(
-  response: SystemOneResponse,
-  provider: JevProvider,
-  pricing?: JevPricing,
-): JevCost {
+function resultCost(response: SystemOneResponse, provider: JevProvider, pricing?: JevPricing): JevCost {
   if (provider === "mock") return { amount: 0, source: "mock" };
-  if (isNonnegative(response.usage.cost))
-    return { amount: response.usage.cost, source: "reported" };
+  if (isNonnegative(response.usage.cost)) return { amount: response.usage.cost, source: "reported" };
   if (pricing) {
     const amount =
       (response.usage.input_tokens / 1_000_000) * pricing.inputPerMillion +
@@ -361,18 +342,13 @@ function sleep(ms: number, signal: AbortSignal): Promise<void> {
   });
 }
 
-const isObject = (x: unknown): x is Record<string, unknown> =>
-  x !== null && typeof x === "object" && !Array.isArray(x);
-const isNonnegative = (x: unknown): x is number =>
-  typeof x === "number" && Number.isFinite(x) && x >= 0;
+const isObject = (x: unknown): x is Record<string, unknown> => x !== null && typeof x === "object" && !Array.isArray(x);
+const isNonnegative = (x: unknown): x is number => typeof x === "number" && Number.isFinite(x) && x >= 0;
 const isUnit = (x: unknown): x is number => isNonnegative(x) && x <= 1;
 const isTokenCount = (x: unknown): x is number => isNonnegative(x) && Number.isSafeInteger(x);
 
 /** Strict live contract; unknown payload fields are deliberately retained. */
-export function validateResponse(
-  response: unknown,
-  questions: Questions,
-): asserts response is SystemOneResponse {
+export function validateResponse(response: unknown, questions: Questions): asserts response is SystemOneResponse {
   if (
     !isObject(response) ||
     !isObject(response.answers) ||
@@ -386,9 +362,7 @@ export function validateResponse(
     !isTokenCount(response.usage.input_tokens) ||
     !isTokenCount(response.usage.output_tokens)
   ) {
-    throw new ContractError(
-      "Invalid response usage: expected nonnegative integer input_tokens and output_tokens.",
-    );
+    throw new ContractError("Invalid response usage: expected nonnegative integer input_tokens and output_tokens.");
   }
   for (const [id, q] of Object.entries(questions)) {
     const answer = response.answers[id];
@@ -402,22 +376,14 @@ export function validateResponse(
     if (!isUnit(answer.confidence) || !isObject(answer.probabilities)) {
       throw new ContractError(`Invalid distribution: ${id}`);
     }
-    const keys =
-      q.type === "choice" ? Object.keys(q.criteria) : q.criteria.map((_, i) => String(i));
+    const keys = q.type === "choice" ? Object.keys(q.criteria) : q.criteria.map((_, i) => String(i));
     const probs = answer.probabilities;
-    if (
-      Object.keys(probs).length !== keys.length ||
-      !keys.every((k) => Object.hasOwn(probs, k) && isUnit(probs[k]))
-    ) {
+    if (Object.keys(probs).length !== keys.length || !keys.every((k) => Object.hasOwn(probs, k) && isUnit(probs[k]))) {
       throw new ContractError(`Distribution keys must match the declared criteria: ${id}`);
     }
     const sum = keys.reduce((acc, k) => acc + (probs[k] as number), 0);
-    if (Math.abs(sum - 1) > 0.025)
-      throw new ContractError(`Distribution does not sum to one: ${id} (${sum})`);
-    if (
-      q.type === "choice" &&
-      (typeof answer.choice !== "string" || !keys.includes(answer.choice))
-    ) {
+    if (Math.abs(sum - 1) > 0.025) throw new ContractError(`Distribution does not sum to one: ${id} (${sum})`);
+    if (q.type === "choice" && (typeof answer.choice !== "string" || !keys.includes(answer.choice))) {
       throw new ContractError(`Undeclared choice returned: ${id}`);
     }
     if (q.type === "score") {

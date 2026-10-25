@@ -50,7 +50,15 @@ export function cardView(project: ProjectRuntime, card: Card): CardView {
 
 function judgmentView(project: ProjectRuntime, cardId: number): JudgmentView | null {
   const j = project.feedback.get(cardId);
-  return j ? { verdict: j.verdict, reason: j.reason, reasonKind: j.reasonKind, ruleStatus: j.ruleStatus, updatedAt: j.updatedAt } : null;
+  return j
+    ? {
+        verdict: j.verdict,
+        reason: j.reason,
+        reasonKind: j.reasonKind,
+        ruleStatus: j.ruleStatus,
+        updatedAt: j.updatedAt,
+      }
+    : null;
 }
 
 function cardDetail(project: ProjectRuntime, card: Card): CardDetail {
@@ -63,7 +71,9 @@ function cardDetail(project: ProjectRuntime, card: Card): CardDetail {
 }
 
 export function sweepSummary(project: ProjectRuntime, s: SweepRecord): SweepSummary {
-  const cards = Number((project.db.prepare("SELECT COUNT(*) n FROM cards WHERE sweep_id = ?").get(s.id) as { n: number }).n);
+  const cards = Number(
+    (project.db.prepare("SELECT COUNT(*) n FROM cards WHERE sweep_id = ?").get(s.id) as { n: number }).n,
+  );
   return {
     id: s.id,
     trigger: s.trigger,
@@ -133,7 +143,9 @@ export function sweepRoutes(hub: Hub): Router {
 
   r.get("/v1/sweeps", (req, res) => {
     const project = p();
-    res.json(project.sweeps.list(Math.min(int(req.query.limit, "limit", 50), 200)).map((s) => sweepSummary(project, s)));
+    res.json(
+      project.sweeps.list(Math.min(int(req.query.limit, "limit", 50), 200)).map((s) => sweepSummary(project, s)),
+    );
   });
 
   r.get("/v1/sweeps/:id", (req, res) => {

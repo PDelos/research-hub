@@ -36,11 +36,20 @@ async function submit() {
       drafts a charter from it and may ask you a few questions.
       <span v-if="replacing">The approved charter stays in force until you approve the new draft.</span>
     </p>
-    <textarea v-model="text" rows="16" placeholder="# My research project&#10;&#10;I want to understand…" aria-label="Brief" />
+    <textarea
+      v-model="text"
+      rows="16"
+      placeholder="# My research project&#10;&#10;I want to understand…"
+      aria-label="Brief"
+    />
     <div class="row">
-      <label class="file">Upload .md <input type="file" accept=".md,.markdown,.txt,text/markdown,text/plain" @change="upload" /></label>
+      <label class="file"
+        >Upload .md <input type="file" accept=".md,.markdown,.txt,text/markdown,text/plain" @change="upload"
+      /></label>
       <span class="spacer" />
-      <span :class="tooLong ? 'error' : 'muted'">{{ chars.toLocaleString() }} / {{ LIMIT.toLocaleString() }} characters</span>
+      <span :class="tooLong ? 'error' : 'muted'"
+        >{{ chars.toLocaleString() }} / {{ LIMIT.toLocaleString() }} characters</span
+      >
       <button type="submit" class="primary" :disabled="!text.trim() || tooLong || sending">
         {{ sending ? "Saving…" : replacing ? "Replace and redraft" : "Save brief and draft charter" }}
       </button>

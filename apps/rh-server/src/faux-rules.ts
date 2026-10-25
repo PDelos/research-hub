@@ -12,7 +12,10 @@ const words = (text: string) =>
 
 /** A valid charter derived from the brief text. */
 export function fauxCharter(brief: string) {
-  const lines = brief.split("\n").map((l) => l.replace(/^#+\s*/, "").trim()).filter(Boolean);
+  const lines = brief
+    .split("\n")
+    .map((l) => l.replace(/^#+\s*/, "").trim())
+    .filter(Boolean);
   const topic = lines[0]?.slice(0, 80) || "the project theme";
   const vocab = [...new Set(words(brief))];
   const pick = (i: number) => vocab[i % Math.max(vocab.length, 1)] ?? `topic${i}`;
@@ -24,13 +27,18 @@ export function fauxCharter(brief: string) {
     ],
     concepts: [topic.toLowerCase(), pick(0), pick(3)].filter((v, i, a) => a.indexOf(v) === i),
     subAreas: [pick(4)],
-    queries: [`${topic} survey`, `${pick(0)} ${pick(1)}`, `${pick(2)} methods`, `${pick(3)} benchmark`, `${pick(4)} review`],
+    queries: [
+      `${topic} survey`,
+      `${pick(0)} ${pick(1)}`,
+      `${pick(2)} methods`,
+      `${pick(3)} benchmark`,
+      `${pick(4)} review`,
+    ],
     outOfScope: [] as string[],
   };
 }
 
-const section = (text: string, heading: string) =>
-  text.split(`## ${heading}`)[1]?.split(/\n## /)[0]?.trim() ?? "";
+const section = (text: string, heading: string) => text.split(`## ${heading}`)[1]?.split(/\n## /)[0]?.trim() ?? "";
 
 export const charterWriterRule: FauxRule = (turn) => {
   if (!turn.sections["charter-writer"]) return undefined;
@@ -74,7 +82,9 @@ export const deskSearchRule: FauxRule = (turn) => {
   if (turn.sections["charter-writer"] || turn.sections["card-writer"] || turn.sections["librarian"]) return undefined;
   const result = turn.results.find((r) => r.name === "search_papers");
   if (result) return say(result.text);
-  const m = turn.lastUser.match(/\b(?:find|search(?: for)?|look for)\b(?:\s+(?:recent|new))?(?:\s+papers?)?(?:\s+(?:on|about|for))?\s+(.+)/i);
+  const m = turn.lastUser.match(
+    /\b(?:find|search(?: for)?|look for)\b(?:\s+(?:recent|new))?(?:\s+papers?)?(?:\s+(?:on|about|for))?\s+(.+)/i,
+  );
   if (!m) return undefined;
   return call("search_papers", { query: m[1].replace(/[?.!]+$/, "").slice(0, 200), limit: 5 });
 };
@@ -88,28 +98,50 @@ export const cardWriterRule: FauxRule = (turn) => {
   if (turn.results.some((r) => r.name === "complete_sweep" && !r.isError)) return say("Cards written.");
   const listed = turn.results.find((r) => r.name === "list_candidates");
   if (!listed) return call("list_candidates", {});
-  const blocks = listed.text.split("\n\n").map((b) => ({
-    id: Number(b.match(/^#(\d+)/)?.[1]),
-    abstract: b.match(/abstract: (.*)$/m)?.[1] ?? "",
-  })).filter((b) => b.id);
-  const presented = new Set(turn.calls.filter((c) => c.name === "present_paper").map((c) => Number(c.arguments.paper_id)));
+  const blocks = listed.text
+    .split("\n\n")
+    .map((b) => ({
+      id: Number(b.match(/^#(\d+)/)?.[1]),
+      abstract: b.match(/abstract: (.*)$/m)?.[1] ?? "",
+    }))
+    .filter((b) => b.id);
+  const presented = new Set(
+    turn.calls.filter((c) => c.name === "present_paper").map((c) => Number(c.arguments.paper_id)),
+  );
   const skipped = blocks.filter((b) => b.abstract === "(no abstract)" || !b.abstract);
   const next = blocks.find((b) => !presented.has(b.id) && !skipped.includes(b));
   if (next) {
-    const first = next.abstract.split(/(?<=[.!?])\s+/)[0].split(/\s+/).slice(0, 60).join(" ");
+    const first = next.abstract
+      .split(/(?<=[.!?])\s+/)[0]
+      .split(/\s+/)
+      .slice(0, 60)
+      .join(" ");
     return call("present_paper", { paper_id: next.id, summary: first });
   }
-  return call("complete_sweep", { skipped: skipped.map((b) => ({ paper_id: b.id, reason: "no abstract to summarize" })) });
+  return call("complete_sweep", {
+    skipped: skipped.map((b) => ({ paper_id: b.id, reason: "no abstract to summarize" })),
+  });
 };
 
-const ORDINALS: Record<string, number> = { first: 1, second: 2, third: 3, fourth: 4, fifth: 5, sixth: 6, seventh: 7, last: -1 };
+const ORDINALS: Record<string, number> = {
+  first: 1,
+  second: 2,
+  third: 3,
+  fourth: 4,
+  fifth: 5,
+  sixth: 6,
+  seventh: 7,
+  last: -1,
+};
 
 /** The offline desk records judgments said in chat: "star the second card, great foundation". */
 export const deskJudgeRule: FauxRule = (turn) => {
   if (turn.sections["charter-writer"] || turn.sections["card-writer"] || turn.sections["librarian"]) return undefined;
   const result = turn.results.find((r) => r.name === "judge_card");
   if (result) return say(result.text);
-  const m = turn.lastUser.match(/\b(star|upvote|like|downvote|dislike)\s+(?:the\s+)?(?:card\s+)?(first|second|third|fourth|fifth|sixth|seventh|\d+)(?:st|nd|rd|th)?\s*(?:card)?[,.:;-]?\s*(.*)$/i);
+  const m = turn.lastUser.match(
+    /\b(star|upvote|like|downvote|dislike)\s+(?:the\s+)?(?:card\s+)?(first|second|third|fourth|fifth|sixth|seventh|\d+)(?:st|nd|rd|th)?\s*(?:card)?[,.:;-]?\s*(.*)$/i,
+  );
   if (!m) return undefined;
   const verdict = /star/i.test(m[1]) ? "star" : /down|dislike/i.test(m[1]) ? "down" : "up";
   const position = ORDINALS[m[2].toLowerCase()] ?? Number(m[2]);
@@ -145,4 +177,10 @@ export const librarianRule: FauxRule = (turn) => {
 };
 
 /** Default scripted rules for offline mode. */
-export const offlineRules: FauxRule[] = [charterWriterRule, cardWriterRule, librarianRule, deskJudgeRule, deskSearchRule];
+export const offlineRules: FauxRule[] = [
+  charterWriterRule,
+  cardWriterRule,
+  librarianRule,
+  deskJudgeRule,
+  deskSearchRule,
+];

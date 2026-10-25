@@ -33,7 +33,10 @@ const needsBrief = computed(() => store.project?.status === "needs-brief");
 // The knowledge base stays mounted once opened, so switching tabs never reloads Obsidian.
 const kbMounted = ref(tab.value === "kb");
 watch(tab, (t) => t === "kb" && (kbMounted.value = true));
-watch(() => store.kbOpen, (path) => path && go("kb"));
+watch(
+  () => store.kbOpen,
+  (path) => path && go("kb"),
+);
 onMounted(() => {
   window.addEventListener("hashchange", () => (tab.value = fromHash()));
   void connect();

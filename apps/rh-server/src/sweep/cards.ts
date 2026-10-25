@@ -31,7 +31,10 @@ export class CardStore {
   }
 
   /** Create the paper's card, or return the existing one (a replayed call never makes a second card). */
-  create(input: { paperId: number; sweepId: number; rank?: number; summary: string; scores: CardScores }): { card: Card; created: boolean } {
+  create(input: { paperId: number; sweepId: number; rank?: number; summary: string; scores: CardScores }): {
+    card: Card;
+    created: boolean;
+  } {
     const s = input.scores;
     const result = this.db
       .prepare(
@@ -40,8 +43,21 @@ export class CardStore {
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
-        input.paperId, input.sweepId, input.rank ?? null, input.summary, s.relevance, s.relevanceReason, s.trust, s.trustReason,
-        s.value, s.valueReason, s.level, s.matchedQuestion ?? null, s.borderline ? 1 : 0, JSON.stringify(s.details), nowIso(),
+        input.paperId,
+        input.sweepId,
+        input.rank ?? null,
+        input.summary,
+        s.relevance,
+        s.relevanceReason,
+        s.trust,
+        s.trustReason,
+        s.value,
+        s.valueReason,
+        s.level,
+        s.matchedQuestion ?? null,
+        s.borderline ? 1 : 0,
+        JSON.stringify(s.details),
+        nowIso(),
       );
     const created = Number(result.changes) > 0;
     if (created) for (const l of this.listeners) l();
@@ -60,7 +76,11 @@ export class CardStore {
 
   /** Cards newest sweep first, in rank order within a sweep. */
   list(limit = 100): Card[] {
-    return (this.db.prepare("SELECT * FROM cards ORDER BY sweep_id DESC, rank IS NULL, rank, id LIMIT ?").all(limit) as unknown as CardRow[]).map(toCard);
+    return (
+      this.db
+        .prepare("SELECT * FROM cards ORDER BY sweep_id DESC, rank IS NULL, rank, id LIMIT ?")
+        .all(limit) as unknown as CardRow[]
+    ).map(toCard);
   }
 
   count(): number {

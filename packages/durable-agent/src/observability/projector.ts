@@ -21,9 +21,7 @@ const textOf = (content: unknown): string =>
   typeof content === "string"
     ? content
     : Array.isArray(content)
-      ? content
-          .map((c: { type: string; text?: string }) => (c.type === "text" ? (c.text ?? "") : ""))
-          .join("")
+      ? content.map((c: { type: string; text?: string }) => (c.type === "text" ? (c.text ?? "") : "")).join("")
       : "";
 
 export function projectEntry(entry: EntryRecord, store: TelemetryStore): void {
@@ -86,10 +84,7 @@ export function projectEntry(entry: EntryRecord, store: TelemetryStore): void {
   store.entry?.({ ...base, kind: entry.kind, data: entry.data });
 }
 
-export function projectTask(
-  task: TaskRecord<JsonValue, JsonValue, JsonValue>,
-  store: TelemetryStore,
-): void {
+export function projectTask(task: TaskRecord<JsonValue, JsonValue, JsonValue>, store: TelemetryStore): void {
   const state = task.state as {
     status: string;
     outcome?: { status: string; error?: { message?: string } };
@@ -151,19 +146,14 @@ export function projectChange(change: CommitChange, store: TelemetryStore): void
  */
 export function rank(change: CommitChange): number {
   if (change.type === "conversation") return 0;
-  if (change.type === "entry")
-    return change.value.kind === "pi.user" || change.value.kind === "pi.assistant" ? 1 : 3;
+  if (change.type === "entry") return change.value.kind === "pi.user" || change.value.kind === "pi.assistant" ? 1 : 3;
   if (change.type === "task") return 2;
   if (change.type === "submission") return 4;
   return 5;
 }
 
 /** Subscribe and project off the Session line. Returns a stop function. */
-export function startProjector(
-  harness: Harness,
-  store: TelemetryStore,
-  log: LoggerLike = silentLogger,
-): () => void {
+export function startProjector(harness: Harness, store: TelemetryStore, log: LoggerLike = silentLogger): () => void {
   const queue: CommitChange[] = [];
   let scheduled = false;
   const drain = () => {
@@ -179,11 +169,7 @@ export function startProjector(
   };
   const unsubscribe = harness.subscribeCommits((publication) => {
     const relevant = publication.changes.filter(
-      (c) =>
-        c.type === "conversation" ||
-        c.type === "entry" ||
-        c.type === "task" ||
-        c.type === "submission",
+      (c) => c.type === "conversation" || c.type === "entry" || c.type === "task" || c.type === "submission",
     );
     queue.push(...relevant.sort((a, b) => rank(a) - rank(b)));
     if (!scheduled && queue.length) {

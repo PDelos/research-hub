@@ -10,10 +10,7 @@ export interface SseMessage {
  * Parse a Server-Sent Events body from fetch. Servers send a `: ping` comment every 15s, so
  * `idleMs` of silence means a half-open socket and ends the stream with an `offline` error.
  */
-export async function* readSse(
-  body: ReadableStream<Uint8Array>,
-  idleMs = 45_000,
-): AsyncGenerator<SseMessage> {
+export async function* readSse(body: ReadableStream<Uint8Array>, idleMs = 45_000): AsyncGenerator<SseMessage> {
   const reader = body
     .pipeThrough(new TextDecoderStream() as unknown as ReadableWritablePair<string, Uint8Array>)
     .getReader();
@@ -22,10 +19,7 @@ export async function* readSse(
     while (true) {
       let timer: ReturnType<typeof setTimeout> | undefined;
       const idle = new Promise<never>((_, reject) => {
-        timer = setTimeout(
-          () => reject(new RhError("offline", `No data for ${idleMs / 1000}s`)),
-          idleMs,
-        );
+        timer = setTimeout(() => reject(new RhError("offline", `No data for ${idleMs / 1000}s`)), idleMs);
       });
       let chunk: Awaited<ReturnType<typeof reader.read>>;
       try {

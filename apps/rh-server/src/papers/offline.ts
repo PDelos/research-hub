@@ -11,8 +11,23 @@ const METHODS = [
   "a diffusion model conditioned on sequence embeddings",
   "a transformer with axial attention over alignments",
 ];
-const FINDINGS = ["improves precision by 12%", "matches the best baseline with 40% fewer parameters", "raises recall from 0.61 to 0.74", "generalizes to unseen protein families", "reduces error by 18% on held-out data"];
-const AUTHORS = ["Ada Rivera", "Ben Okafor", "Chen Wei", "Dana Novak", "Eli Haddad", "Fatima Zahra", "Goran Petrov", "Hana Sato"];
+const FINDINGS = [
+  "improves precision by 12%",
+  "matches the best baseline with 40% fewer parameters",
+  "raises recall from 0.61 to 0.74",
+  "generalizes to unseen protein families",
+  "reduces error by 18% on held-out data",
+];
+const AUTHORS = [
+  "Ada Rivera",
+  "Ben Okafor",
+  "Chen Wei",
+  "Dana Novak",
+  "Eli Haddad",
+  "Fatima Zahra",
+  "Goran Petrov",
+  "Hana Sato",
+];
 
 interface Synthetic {
   arxiv: string;
@@ -28,7 +43,12 @@ function hashInt(text: string): number {
 }
 
 function corpus(query: string, prefix: string, n: number, today: Date): Synthetic[] {
-  const topic = query.replace(/["()]/g, "").replace(/\b(AND|OR|NOT)\b/g, " ").replace(/\s+/g, " ").trim() || "the topic";
+  const topic =
+    query
+      .replace(/["()]/g, "")
+      .replace(/\b(AND|OR|NOT)\b/g, " ")
+      .replace(/\s+/g, " ")
+      .trim() || "the topic";
   return Array.from({ length: n }, (_, i) => {
     const h = hashInt(`${prefix}:${topic}:${i}`);
     const method = METHODS[h % METHODS.length];
@@ -44,7 +64,9 @@ function corpus(query: string, prefix: string, n: number, today: Date): Syntheti
         `We propose ${method} trained on public data for ${topic}. ` +
         `On standard benchmarks our approach ${finding}. ` +
         `Code is available online.`,
-      authors: [AUTHORS[h % AUTHORS.length], AUTHORS[(h >>> 4) % AUTHORS.length]].filter((a, k, all) => all.indexOf(a) === k),
+      authors: [AUTHORS[h % AUTHORS.length], AUTHORS[(h >>> 4) % AUTHORS.length]].filter(
+        (a, k, all) => all.indexOf(a) === k,
+      ),
       date,
     };
   });
@@ -55,7 +77,9 @@ const escape = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").rep
 function arxivFeed(papers: Synthetic[]): string {
   const entries = papers
     .map(
-      (p) => `<entry><id>http://arxiv.org/abs/${p.arxiv}v1</id><title>${escape(p.title)}</title><summary>${escape(p.abstract)}</summary>
+      (
+        p,
+      ) => `<entry><id>http://arxiv.org/abs/${p.arxiv}v1</id><title>${escape(p.title)}</title><summary>${escape(p.abstract)}</summary>
 <published>${p.date}T12:00:00Z</published>${p.authors.map((a) => `<author><name>${a}</name></author>`).join("")}
 <link href="https://arxiv.org/pdf/${p.arxiv}v1" rel="related" type="application/pdf" title="pdf"/></entry>`,
     )
@@ -81,7 +105,10 @@ function openalexWork(p: Synthetic, venue: string | null, references: string[]) 
     authorships: p.authors.map((a) => ({ author: { display_name: a } })),
     primary_location: venue
       ? { landing_page_url: `https://doi.org/${p.doi}`, source: { display_name: venue, type: "journal" } }
-      : { landing_page_url: `https://arxiv.org/abs/${p.arxiv}`, source: { display_name: "arXiv (Cornell University)", type: "repository" } },
+      : {
+          landing_page_url: `https://arxiv.org/abs/${p.arxiv}`,
+          source: { display_name: "arXiv (Cornell University)", type: "repository" },
+        },
     best_oa_location: { pdf_url: `https://arxiv.org/pdf/${p.arxiv}` },
     cited_by_count: hashInt(id) % 50,
     referenced_works: references,
@@ -92,14 +119,22 @@ function openalexWork(p: Synthetic, venue: string | null, references: string[]) 
 }
 
 /** Shared references among offline works, so citation reports have something to show. */
-const REFERENCES = ["https://openalex.org/W100", "https://openalex.org/W101", "https://openalex.org/W102", "https://openalex.org/W103"];
+const REFERENCES = [
+  "https://openalex.org/W100",
+  "https://openalex.org/W101",
+  "https://openalex.org/W102",
+  "https://openalex.org/W103",
+];
 
 export function offlinePaperFetch(today: () => Date = () => new Date()): typeof fetch {
   return (async (input: string | URL | Request) => {
     const url = new URL(input instanceof Request ? input.url : String(input));
     const p = url.searchParams;
     if (url.host === "export.arxiv.org") {
-      const query = (p.get("search_query") ?? "").replace(/all:/g, "").replace(/ AND submittedDate:\[.*\]$/, "").replace(/ AND /g, " ");
+      const query = (p.get("search_query") ?? "")
+        .replace(/all:/g, "")
+        .replace(/ AND submittedDate:\[.*\]$/, "")
+        .replace(/ AND /g, " ");
       return new Response(arxivFeed(corpus(query, "arXiv", Math.min(Number(p.get("max_results") ?? 5), 10), today())), {
         headers: { "content-type": "application/atom+xml" },
       });
@@ -114,7 +149,11 @@ export function offlinePaperFetch(today: () => Date = () => new Date()): typeof 
           .filter((doi) => hashInt(doi) % 5 !== 0)
           .map((doi) => {
             const arxiv = doi.replace(/^10\.48550\/arxiv\./, "");
-            return openalexWork({ arxiv, doi, title: `Offline work ${arxiv}`, abstract: "", authors: [], date: "2026-01-01" }, null, REFERENCES.slice(0, 3));
+            return openalexWork(
+              { arxiv, doi, title: `Offline work ${arxiv}`, abstract: "", authors: [], date: "2026-01-01" },
+              null,
+              REFERENCES.slice(0, 3),
+            );
           });
         return Response.json({ results });
       }
@@ -124,7 +163,10 @@ export function offlinePaperFetch(today: () => Date = () => new Date()): typeof 
       const arxiv = corpus(search, "arXiv", n, today()).filter((_, i) => i % 3 === 0);
       const own = corpus(search, "OpenAlex", n - arxiv.length, today());
       return Response.json({
-        results: [...arxiv.map((w) => openalexWork(w, "Bioinformatics", REFERENCES.slice(0, 3))), ...own.map((w) => openalexWork(w, "Nature Methods", REFERENCES.slice(1)))],
+        results: [
+          ...arxiv.map((w) => openalexWork(w, "Bioinformatics", REFERENCES.slice(0, 3))),
+          ...own.map((w) => openalexWork(w, "Nature Methods", REFERENCES.slice(1))),
+        ],
       });
     }
     if (url.host === "api.openalex.org") return new Response("", { status: 404 });

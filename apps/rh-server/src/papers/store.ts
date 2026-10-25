@@ -117,7 +117,9 @@ export class PaperStore {
   }
 
   all(): Paper[] {
-    return (this.db.prepare("SELECT * FROM papers ORDER BY id").all() as unknown as PaperRow[]).map((r) => this.toPaper(r));
+    return (this.db.prepare("SELECT * FROM papers ORDER BY id").all() as unknown as PaperRow[]).map((r) =>
+      this.toPaper(r),
+    );
   }
 
   count(): number {
@@ -127,14 +129,18 @@ export class PaperStore {
   /** Records whose enrichment is still pending, oldest first. */
   pendingEnrichment(limit = 50): Paper[] {
     return (
-      this.db.prepare("SELECT * FROM papers WHERE enrichment = 'pending' ORDER BY id LIMIT ?").all(limit) as unknown as PaperRow[]
+      this.db
+        .prepare("SELECT * FROM papers WHERE enrichment = 'pending' ORDER BY id LIMIT ?")
+        .all(limit) as unknown as PaperRow[]
     ).map((r) => this.toPaper(r));
   }
 
   /** Record an enrichment attempt; "pending" keeps it eligible for a later retry. */
   setEnrichment(id: number, state: Enrichment): void {
     this.db
-      .prepare("UPDATE papers SET enrichment = ?, enrichment_attempts = enrichment_attempts + 1, updated_at = ? WHERE id = ?")
+      .prepare(
+        "UPDATE papers SET enrichment = ?, enrichment_attempts = enrichment_attempts + 1, updated_at = ? WHERE id = ?",
+      )
       .run(state, nowIso(), id);
   }
 
@@ -219,7 +225,8 @@ export class PaperStore {
     } else if (!row.year && p.year) next.year = p.year;
     if (p.abstract && p.abstract.length > (row.abstract?.length ?? 0)) next.abstract = p.abstract;
     if (p.categories?.length && !row.categories_json) next.categories_json = JSON.stringify(p.categories);
-    if (p.authors.length > (JSON.parse(row.authors_json) as string[]).length) next.authors_json = JSON.stringify(p.authors);
+    if (p.authors.length > (JSON.parse(row.authors_json) as string[]).length)
+      next.authors_json = JSON.stringify(p.authors);
     if (!row.title && p.title) {
       next.title = p.title;
       next.title_norm = normalizeTitle(p.title);
@@ -238,7 +245,9 @@ export class PaperStore {
     const source = this.get(from)!;
     this.db.prepare("UPDATE OR IGNORE paper_ids SET paper_id = ? WHERE paper_id = ?").run(into, from);
     this.db.prepare("UPDATE OR IGNORE paper_sources SET paper_id = ? WHERE paper_id = ?").run(into, from);
-    this.db.prepare("UPDATE OR IGNORE citation_links SET citing_paper_id = ? WHERE citing_paper_id = ?").run(into, from);
+    this.db
+      .prepare("UPDATE OR IGNORE citation_links SET citing_paper_id = ? WHERE citing_paper_id = ?")
+      .run(into, from);
     this.db.prepare("UPDATE citation_links SET cited_paper_id = ? WHERE cited_paper_id = ?").run(into, from);
     this.db.prepare("UPDATE papers SET possible_duplicate_of = ? WHERE possible_duplicate_of = ?").run(into, from);
     this.mergeFields(into, {
@@ -272,7 +281,9 @@ export class PaperStore {
     }
     // Links from known papers to this one become resolved.
     if (ids.openalex)
-      this.db.prepare("UPDATE citation_links SET cited_paper_id = ? WHERE cited_kind = 'openalex' AND cited_value = ?").run(id, ids.openalex);
+      this.db
+        .prepare("UPDATE citation_links SET cited_paper_id = ? WHERE cited_kind = 'openalex' AND cited_value = ?")
+        .run(id, ids.openalex);
   }
 
   /** Flag (never merge) another record with the same normalized title and no shared identifier. */
@@ -306,7 +317,9 @@ export class PaperStore {
     }[])
       ids[r.kind] = r.value;
     const sources = (
-      this.db.prepare("SELECT source FROM paper_sources WHERE paper_id = ? ORDER BY rowid").all(row.id) as { source: SourceName }[]
+      this.db.prepare("SELECT source FROM paper_sources WHERE paper_id = ? ORDER BY rowid").all(row.id) as {
+        source: SourceName;
+      }[]
     ).map((r) => r.source);
     const opt = <T>(v: T | null) => (v === null ? undefined : v);
     return {

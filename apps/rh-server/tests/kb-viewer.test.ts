@@ -21,7 +21,11 @@ async function viewerServer(over: Record<string, unknown> = {}) {
   mkdirSync(app, { recursive: true });
   writeFileSync(join(app, "index.html"), "<html></html>");
   writeFileSync(join(app, ".obsidian-version"), "1.14.4");
-  const server = await startTestServer({ dataDir: t.dir, env: { RH_UI_DIR: DIST }, hub: { ticker: false, kbViewer: { enabled: true, dir: FAKE, restartDelays: [200], ...over } } });
+  const server = await startTestServer({
+    dataDir: t.dir,
+    env: { RH_UI_DIR: DIST },
+    hub: { ticker: false, kbViewer: { enabled: true, dir: FAKE, restartDelays: [200], ...over } },
+  });
   const p = server.hub.project;
   p.brief.write("# x");
   p.charters.saveDraft(validateCharter(sampleCharter()), "agent");
@@ -43,20 +47,33 @@ test("the viewer is served on the hub's origin: /kb/ and its own API paths, with
     const page = await fetch(`http://${host(server)}/kb/`);
     assert.equal(page.status, 200);
     assert.match(await page.text(), /Fake Obsidian.*vaults:research/);
-    const api = (await (await fetch(`http://${host(server)}/api/vault/info?vault=research`, { headers: { authorization: "Bearer secret-token-0123456789" } })).json()) as any;
+    const api = (await (
+      await fetch(`http://${host(server)}/api/vault/info?vault=research`, {
+        headers: { authorization: "Bearer secret-token-0123456789" },
+      })
+    ).json()) as any;
     assert.equal(api.path, "/api/vault/info?vault=research");
     assert.equal(api.auth, null, "the hub's tokens never reach the viewer");
     assert.equal(((await (await fetch(`http://${host(server)}/kb/app.js?v=1`)).json()) as any).path, "/app.js?v=1");
-    assert.equal(((await (await fetch(`http://${host(server)}/vault-files/sources/a.md`)).json()) as any).path, "/vault-files/sources/a.md");
+    assert.equal(
+      ((await (await fetch(`http://${host(server)}/vault-files/sources/a.md`)).json()) as any).path,
+      "/vault-files/sources/a.md",
+    );
     // The hub's own assets still come from the hub; other /assets/ paths go to the viewer.
     const html = await (await fetch(`http://${host(server)}/`)).text();
     const own = html.match(/src="(\/assets\/[^"]+\.js)"/)![1];
     assert.match(await (await fetch(`http://${host(server)}${own}`)).text(), /Run sweep now/);
-    assert.equal(((await (await fetch(`http://${host(server)}/assets/overrides.css`)).json()) as any).path, "/assets/overrides.css");
+    assert.equal(
+      ((await (await fetch(`http://${host(server)}/assets/overrides.css`)).json()) as any).path,
+      "/assets/overrides.css",
+    );
     // The hub API is unaffected.
     assert.equal((await fetch(`http://${host(server)}/v1/health`)).status, 200);
     const info = await server.client.info();
-    assert.deepEqual({ state: info.kbViewer.state, ignis: info.kbViewer.ignisVersion, obsidian: info.kbViewer.obsidianVersion }, { state: "running", ignis: "0.0.1-test", obsidian: "1.14.4" });
+    assert.deepEqual(
+      { state: info.kbViewer.state, ignis: info.kbViewer.ignisVersion, obsidian: info.kbViewer.obsidianVersion },
+      { state: "running", ignis: "0.0.1-test", obsidian: "1.14.4" },
+    );
     assert.equal(p.kbViewer.target()!.host, "127.0.0.1");
   } finally {
     await done();
@@ -66,16 +83,27 @@ test("the viewer is served on the hub's origin: /kb/ and its own API paths, with
 test("cross-site requests, foreign hosts and foreign WebSocket origins are refused; same-origin WebSockets reach the viewer", async () => {
   const { server, done } = await viewerServer();
   try {
-    assert.equal((await fetch(`http://${host(server)}/kb/`, { headers: { "sec-fetch-site": "cross-site" } })).status, 403);
-    assert.equal((await fetch(`http://${host(server)}/api/fs/tree`, { headers: { origin: "https://evil.example" } })).status, 403);
+    assert.equal(
+      (await fetch(`http://${host(server)}/kb/`, { headers: { "sec-fetch-site": "cross-site" } })).status,
+      403,
+    );
+    assert.equal(
+      (await fetch(`http://${host(server)}/api/fs/tree`, { headers: { origin: "https://evil.example" } })).status,
+      403,
+    );
     const foreign = await new Promise<number>((resolve) =>
-      http.get({ host: "127.0.0.1", port: server.port, path: "/kb/", headers: { host: "evil.example" } }, (r) => (r.resume(), resolve(r.statusCode!))),
+      http.get(
+        { host: "127.0.0.1", port: server.port, path: "/kb/", headers: { host: "evil.example" } },
+        (r) => (r.resume(), resolve(r.statusCode!)),
+      ),
     );
     assert.equal(foreign, 403, "a foreign Host header (DNS rebinding) is refused");
     const upgrade = (origin: string) =>
       new Promise<string>((resolve) => {
         const s = net.connect(server.port, "127.0.0.1", () =>
-          s.write(`GET /ws?vault=research HTTP/1.1\r\nHost: ${host(server)}\r\nOrigin: ${origin}\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n`),
+          s.write(
+            `GET /ws?vault=research HTTP/1.1\r\nHost: ${host(server)}\r\nOrigin: ${origin}\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n`,
+          ),
         );
         let data = "";
         s.on("data", (d) => {
@@ -101,7 +129,9 @@ test("the viewer listens on loopback only and restarts within 10 seconds after a
   const { server, p, done } = await viewerServer();
   try {
     const { port } = p.kbViewer.target()!;
-    const external = Object.values(networkInterfaces()).flat().find((i) => i && i.family === "IPv4" && !i.internal)?.address;
+    const external = Object.values(networkInterfaces())
+      .flat()
+      .find((i) => i && i.family === "IPv4" && !i.internal)?.address;
     if (external) {
       const refused = await new Promise<boolean>((resolve) => {
         const s = net.connect(port, external);
@@ -129,7 +159,10 @@ test("the viewer listens on loopback only and restarts within 10 seconds after a
 
 test("disabled (RH_KB_VIEWER=off) and unavailable (no Ignis, or offline without Obsidian) are reported, never fatal", async () => {
   assert.equal(loadConfig({ RH_MODE: "offline", RH_KB_VIEWER: "off" } as NodeJS.ProcessEnv).kbViewer.enabled, false);
-  assert.throws(() => loadConfig({ RH_MODE: "offline", RH_KB_VIEWER: "maybe" } as NodeJS.ProcessEnv), /RH_KB_VIEWER must be on or off/);
+  assert.throws(
+    () => loadConfig({ RH_MODE: "offline", RH_KB_VIEWER: "maybe" } as NodeJS.ProcessEnv),
+    /RH_KB_VIEWER must be on or off/,
+  );
   const off = await viewerServer({ enabled: false });
   try {
     assert.equal((await off.server.client.info()).kbViewer.state, "disabled");
@@ -140,7 +173,10 @@ test("disabled (RH_KB_VIEWER=off) and unavailable (no Ignis, or offline without 
     await off.done();
   }
   const t = tempDir();
-  const missing = await startTestServer({ dataDir: t.dir, hub: { ticker: false, kbViewer: { enabled: true, dir: join(t.dir, "nowhere") } } });
+  const missing = await startTestServer({
+    dataDir: t.dir,
+    hub: { ticker: false, kbViewer: { enabled: true, dir: join(t.dir, "nowhere") } },
+  });
   try {
     const p = missing.hub.project;
     p.brief.write("# x");
@@ -155,7 +191,10 @@ test("disabled (RH_KB_VIEWER=off) and unavailable (no Ignis, or offline without 
     t.cleanup();
   }
   const t2 = tempDir();
-  const noObsidian = await startTestServer({ dataDir: t2.dir, hub: { ticker: false, kbViewer: { enabled: true, dir: FAKE } } });
+  const noObsidian = await startTestServer({
+    dataDir: t2.dir,
+    hub: { ticker: false, kbViewer: { enabled: true, dir: FAKE } },
+  });
   try {
     const p = noObsidian.hub.project;
     p.brief.write("# x");

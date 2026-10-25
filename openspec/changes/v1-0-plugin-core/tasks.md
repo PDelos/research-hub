@@ -3,7 +3,7 @@
 ## 0. Stack upgrade (before the refactor)
 
 - [x] 0.1 Move to Node 26 LTS (image, `engines`, @types/node) and TypeScript 6.0.3; verify `npm run check` and all tests pass
-- [ ] 0.2 Adopt Vite+ 1.x (`vp`): one config with lint, fmt and test sections, replace the separate Vite, Oxlint and Oxfmt setup, format the whole codebase once (its own commit), make `vp check` (format, lint, types) an enforced check; verify `vp check`, `vp build` and all tests pass
+- [x] 0.2 Adopt Vite+ 1.x (`vp`): one config with lint, fmt and test sections, replace the separate Vite, Oxlint and Oxfmt setup, format the whole codebase once (its own commit), make `vp check` (format, lint, types) an enforced check; verify `vp check`, `vp build` and all tests pass
 - [ ] 0.3 Upgrade pi-durable, pi-ai and chord to 1.4.0 behind `packages/durable-agent`; verify the recovery (SIGKILL) tests, the agent tests and an offline end to end pass unchanged (otherwise stay on 1.1.0 and record why)
 - [ ] 0.4 Upgrade Vue, Express and the remaining dependencies to current versions and rebuild the Docker image on `node:26-slim`; verify `npm audit`, the image build and a container start
 

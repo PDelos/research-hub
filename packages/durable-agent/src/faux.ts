@@ -32,9 +32,7 @@ const textOf = (content: unknown): string =>
   typeof content === "string"
     ? content
     : Array.isArray(content)
-      ? content
-          .map((c: { type: string; text?: string }) => (c.type === "text" ? (c.text ?? "") : ""))
-          .join("")
+      ? content.map((c: { type: string; text?: string }) => (c.type === "text" ? (c.text ?? "") : "")).join("")
       : "";
 
 export function readTurn(messages: Message[]): FauxTurn {
@@ -82,23 +80,15 @@ export function readTurn(messages: Message[]): FauxTurn {
 
 export const say = (text: string): AssistantMessage => fauxAssistantMessage(fauxText(text));
 
-export const call = (
-  name: string,
-  args: Record<string, unknown>,
-  text = `Calling ${name}.`,
-): AssistantMessage =>
+export const call = (name: string, args: Record<string, unknown>, text = `Calling ${name}.`): AssistantMessage =>
   fauxAssistantMessage([fauxText(text), fauxToolCall(name, args as never)], {
     stopReason: "toolUse",
   });
 
-export const calls = (
-  list: { name: string; args: Record<string, unknown> }[],
-  text = "Working.",
-): AssistantMessage =>
-  fauxAssistantMessage(
-    [fauxText(text), ...list.map((c) => fauxToolCall(c.name, c.args as never))],
-    { stopReason: "toolUse" },
-  );
+export const calls = (list: { name: string; args: Record<string, unknown> }[], text = "Working."): AssistantMessage =>
+  fauxAssistantMessage([fauxText(text), ...list.map((c) => fauxToolCall(c.name, c.args as never))], {
+    stopReason: "toolUse",
+  });
 
 export function installScriptedFaux(
   models: MutableModels,

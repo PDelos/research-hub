@@ -16,7 +16,12 @@ export class EuropePmcSource implements PaperSource {
     if (!terms.length) return [];
     let query = `(${terms.join(" AND ")})`;
     if (q.since || q.until) query += ` AND FIRST_PDATE:[${q.since ?? "1900-01-01"} TO ${q.until ?? "2999-12-31"}]`;
-    const params = new URLSearchParams({ query, resultType: "core", format: "json", pageSize: String(Math.min(q.limit, 100)) });
+    const params = new URLSearchParams({
+      query,
+      resultType: "core",
+      format: "json",
+      pageSize: String(Math.min(q.limit, 100)),
+    });
     if (this.deps.http.contactEmail) params.set("email", this.deps.http.contactEmail);
     const body = await this.deps.http.json<{ resultList?: { result?: any[] } }>(`${EUROPEPMC_API}?${params}`, {
       source: this.name,
@@ -35,14 +40,16 @@ export function mapEuropePmcRecord(r: any): SourcePaper | null {
   const authors = ((r.authorList?.author ?? []) as any[])
     .map((a) => cleanText(a.fullName ?? a.collectiveName))
     .filter(Boolean);
-  const free = ((r.fullTextUrlList?.fullTextUrl ?? []) as any[]).find((u) => u.availabilityCode === "OA" || u.availabilityCode === "F");
+  const free = ((r.fullTextUrlList?.fullTextUrl ?? []) as any[]).find(
+    (u) => u.availabilityCode === "OA" || u.availabilityCode === "F",
+  );
   return {
     source: "europepmc",
     externalId: `${r.source}:${r.id}`,
     ids: normalizeIds({ doi: r.doi, pmid: r.pmid, pmcid: r.pmcid }),
     title,
     abstract: abstractText(r.abstractText),
-    authors: authors.length ? authors : (r.authorString ? String(r.authorString).replace(/\.$/, "").split(/,\s*/) : []),
+    authors: authors.length ? authors : r.authorString ? String(r.authorString).replace(/\.$/, "").split(/,\s*/) : [],
     year: r.pubYear ? Number(r.pubYear) : undefined,
     publishedAt: normalizeDate(r.firstPublicationDate),
     venue: preprint ? undefined : cleanText(r.journalInfo?.journal?.title) || undefined,

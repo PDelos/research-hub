@@ -43,24 +43,18 @@ const ITEMS = [
   },
 ];
 
-test(
-  "live hfs ranks the three fixtures as expected",
-  { skip: !live && "set JEV_LIVE=1" },
-  async () => {
-    const client = new JevClient({ provider: "openrouter" });
-    const ledger = new JevLedger();
-    const cmd = loadCommand("hfs", DIR);
-    for (const item of ITEMS) {
-      const { result } = await runCommand(cmd, { ...BASE, ...item }, (s, q, o) =>
-        client.systemOne(s, q, o),
-      );
-      ledger.record(result, { command: cmd.name, version: cmd.version });
-      const ranked = rankHfs(result.answers, cmd.policy);
-      console.log(
-        `${item.expect.padEnd(6)} -> ${ranked.ranked.map((r) => `${r.category} ${r.score}`).join(", ")} | ${result.meta.elapsedMs} ms | $${result.meta.cost.amount} (${result.meta.cost.source}) | ${result.meta.resolvedModel}`,
-      );
-      assert.equal(ranked.primary, item.expect, item.title);
-    }
-    console.log(ledger.summary());
-  },
-);
+test("live hfs ranks the three fixtures as expected", { skip: !live && "set JEV_LIVE=1" }, async () => {
+  const client = new JevClient({ provider: "openrouter" });
+  const ledger = new JevLedger();
+  const cmd = loadCommand("hfs", DIR);
+  for (const item of ITEMS) {
+    const { result } = await runCommand(cmd, { ...BASE, ...item }, (s, q, o) => client.systemOne(s, q, o));
+    ledger.record(result, { command: cmd.name, version: cmd.version });
+    const ranked = rankHfs(result.answers, cmd.policy);
+    console.log(
+      `${item.expect.padEnd(6)} -> ${ranked.ranked.map((r) => `${r.category} ${r.score}`).join(", ")} | ${result.meta.elapsedMs} ms | $${result.meta.cost.amount} (${result.meta.cost.source}) | ${result.meta.resolvedModel}`,
+    );
+    assert.equal(ranked.primary, item.expect, item.title);
+  }
+  console.log(ledger.summary());
+});

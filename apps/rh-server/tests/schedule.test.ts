@@ -11,7 +11,9 @@ const at = (iso: string) => Date.parse(iso);
 
 test("5.1 daily and weekly slots in UTC", () => {
   assert.deepEqual(dailySlot(at("2026-10-23T10:00:00Z"), "06:00", "UTC"), {
-    kind: "sweep", key: "sweep:2026-10-23", at: at("2026-10-23T06:00:00Z"),
+    kind: "sweep",
+    key: "sweep:2026-10-23",
+    at: at("2026-10-23T06:00:00Z"),
   });
   assert.equal(dailySlot(at("2026-10-23T05:59:00Z"), "06:00", "UTC").key, "sweep:2026-10-22");
   assert.equal(dailySlot(at("2026-10-23T10:00:00Z"), "06:00", "UTC", 2).key, "sweep:2026-10-21");
@@ -37,10 +39,22 @@ test("5.1 Europe/Madrid across both 2026 DST changes keeps 06:00 local", () => {
 
 test("5.1 schedule configuration is validated", () => {
   const base = { RH_MODE: "offline" } as NodeJS.ProcessEnv;
-  assert.throws(() => loadConfig({ ...base, RH_TIMEZONE: "Mars/Olympus" }), (e: any) => e instanceof ConfigError && e.variable === "RH_TIMEZONE");
-  assert.throws(() => loadConfig({ ...base, RH_SWEEP_TIME: "25:00" }), (e: any) => e.variable === "RH_SWEEP_TIME");
-  assert.throws(() => loadConfig({ ...base, RH_REVIEW_TIME: "funday 07:00" }), (e: any) => e.variable === "RH_REVIEW_TIME");
-  assert.deepEqual(loadConfig({ ...base, RH_REVIEW_TIME: "Wed 08:30" }).schedule.review, { weekday: "wed", time: "08:30" });
+  assert.throws(
+    () => loadConfig({ ...base, RH_TIMEZONE: "Mars/Olympus" }),
+    (e: any) => e instanceof ConfigError && e.variable === "RH_TIMEZONE",
+  );
+  assert.throws(
+    () => loadConfig({ ...base, RH_SWEEP_TIME: "25:00" }),
+    (e: any) => e.variable === "RH_SWEEP_TIME",
+  );
+  assert.throws(
+    () => loadConfig({ ...base, RH_REVIEW_TIME: "funday 07:00" }),
+    (e: any) => e.variable === "RH_REVIEW_TIME",
+  );
+  assert.deepEqual(loadConfig({ ...base, RH_REVIEW_TIME: "Wed 08:30" }).schedule.review, {
+    weekday: "wed",
+    time: "08:30",
+  });
 });
 
 // These tests check the schedule's records only; the sweep runner (v0.3) is off so requested slots stay requested.
@@ -63,22 +77,36 @@ test("5.2 defaults come from RH_SWEEP_TIME; saved changes override the environme
   try {
     let server = await activeServer({ RH_SWEEP_TIME: "06:20" }, t.dir);
     try {
-    const http = (method: string, path: string, body?: unknown) =>
-      fetch(`${server.url}${path}`, { method, headers: { authorization: `Bearer ${TOKEN}`, "content-type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
-    let schedule = (await (await http("GET", "/v1/schedule")).json()) as any;
-    assert.deepEqual(schedule, { timeZone: "UTC", sweep: { enabled: true, time: "06:20" }, review: { enabled: true, weekday: "sun", time: "07:00" } });
-    assert.equal((await http("PUT", "/v1/schedule", { sweep: { time: "25:99" } })).status, 400);
-    schedule = (await (await http("PUT", "/v1/schedule", { sweep: { enabled: false }, review: { weekday: "wed" } })).json()) as any;
-    assert.equal(schedule.review.weekday, "wed");
+      const http = (method: string, path: string, body?: unknown) =>
+        fetch(`${server.url}${path}`, {
+          method,
+          headers: { authorization: `Bearer ${TOKEN}`, "content-type": "application/json" },
+          body: body ? JSON.stringify(body) : undefined,
+        });
+      let schedule = (await (await http("GET", "/v1/schedule")).json()) as any;
+      assert.deepEqual(schedule, {
+        timeZone: "UTC",
+        sweep: { enabled: true, time: "06:20" },
+        review: { enabled: true, weekday: "sun", time: "07:00" },
+      });
+      assert.equal((await http("PUT", "/v1/schedule", { sweep: { time: "25:99" } })).status, 400);
+      schedule = (await (
+        await http("PUT", "/v1/schedule", { sweep: { enabled: false }, review: { weekday: "wed" } })
+      ).json()) as any;
+      assert.equal(schedule.review.weekday, "wed");
     } finally {
       await server.stop();
     }
     server = await activeServer({ RH_SWEEP_TIME: "09:00" }, t.dir);
     try {
-    const after = server.hub.project.scheduler.schedule();
-    assert.equal(after.sweep.enabled, false, "turning the sweep off survives a restart");
-    assert.equal(after.sweep.time, "06:20", "saved settings take precedence over a changed environment");
-    assert.deepEqual(server.hub.project.scheduler.tick(at("2026-10-23T10:00:00Z")).map((r) => r.kind), ["review"], "no sweep while off");
+      const after = server.hub.project.scheduler.schedule();
+      assert.equal(after.sweep.enabled, false, "turning the sweep off survives a restart");
+      assert.equal(after.sweep.time, "06:20", "saved settings take precedence over a changed environment");
+      assert.deepEqual(
+        server.hub.project.scheduler.tick(at("2026-10-23T10:00:00Z")).map((r) => r.kind),
+        ["review"],
+        "no sweep while off",
+      );
     } finally {
       await server.stop();
     }
@@ -101,7 +129,10 @@ test("5.3 exactly once per slot: two ticks and a restart inside the slot record 
     server = await activeServer({}, t.dir);
     try {
       assert.equal(server.hub.project.scheduler.tick(at("2026-10-23T06:02:00Z")).length, 0, "restart inside the slot");
-      assert.deepEqual(rows(server).map((r) => [r.slot, r.status]), [["sweep:2026-10-23", "requested"]]);
+      assert.deepEqual(
+        rows(server).map((r) => [r.slot, r.status]),
+        [["sweep:2026-10-23", "requested"]],
+      );
     } finally {
       await server.stop();
     }
@@ -118,17 +149,26 @@ test("5.4 catch-up, charter not approved, and paused slots", async () => {
     // Last sweep ran on the 21st; the hub was down on the 22nd and comes back on the 23rd at 10:00.
     s.tick(at("2026-10-21T06:00:30Z"));
     const down = s.tick(at("2026-10-23T10:00:00Z"));
-    assert.deepEqual(down.map((r) => [r.slot, r.status, r.reason]), [
-      ["sweep:2026-10-22", "skipped", MISSED],
-      ["sweep:2026-10-23", "requested", null],
-    ]);
+    assert.deepEqual(
+      down.map((r) => [r.slot, r.status, r.reason]),
+      [
+        ["sweep:2026-10-22", "skipped", MISSED],
+        ["sweep:2026-10-23", "requested", null],
+      ],
+    );
 
     // Paused at the slot: skipped "project paused", and nothing is caught up after resuming.
     server.hub.project.state.pause();
-    assert.deepEqual(s.tick(at("2026-10-24T06:00:30Z")).map((r) => [r.slot, r.reason]), [["sweep:2026-10-24", "project paused"]]);
+    assert.deepEqual(
+      s.tick(at("2026-10-24T06:00:30Z")).map((r) => [r.slot, r.reason]),
+      [["sweep:2026-10-24", "project paused"]],
+    );
     server.hub.project.state.resume(at("2026-10-24T07:00:00Z"));
     assert.equal(s.tick(at("2026-10-24T07:05:00Z")).length, 0);
-    assert.deepEqual(s.tick(at("2026-10-25T06:00:30Z")).map((r) => r.status), ["requested"]);
+    assert.deepEqual(
+      s.tick(at("2026-10-25T06:00:30Z")).map((r) => r.status),
+      ["requested"],
+    );
   } finally {
     await server.stop();
   }
@@ -138,7 +178,10 @@ test("5.4 catch-up, charter not approved, and paused slots", async () => {
     p.brief.write("# x");
     p.charters.saveDraft(validateCharter(sampleCharter()), "agent");
     p.scheduler.setSchedule({ review: { enabled: false } });
-    assert.deepEqual(p.scheduler.tick(at("2026-10-23T06:00:30Z")).map((r) => [r.status, r.reason]), [["skipped", "charter not approved"]]);
+    assert.deepEqual(
+      p.scheduler.tick(at("2026-10-23T06:00:30Z")).map((r) => [r.status, r.reason]),
+      [["skipped", "charter not approved"]],
+    );
   } finally {
     await draftOnly.stop();
   }
@@ -149,21 +192,36 @@ test("5.5 + 5.6 manual runs never take the scheduled slot; one active run per ki
   try {
     const s = server.hub.project.scheduler;
     s.setSchedule({ review: { enabled: false } });
-    const res = await fetch(`${server.url}/v1/runs/sweep`, { method: "POST", headers: { authorization: `Bearer ${TOKEN}` } });
+    const res = await fetch(`${server.url}/v1/runs/sweep`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${TOKEN}` },
+    });
     assert.equal(res.status, 202);
     assert.equal(((await res.json()) as any).trigger, "manual");
-    assert.deepEqual(s.tick(at("2026-10-23T06:00:30Z")).map((r) => [r.slot, r.status]), [["sweep:2026-10-23", "requested"]]);
+    assert.deepEqual(
+      s.tick(at("2026-10-23T06:00:30Z")).map((r) => [r.slot, r.status]),
+      [["sweep:2026-10-23", "requested"]],
+    );
     server.hub.project.db.prepare("UPDATE scheduled_runs SET status = 'running' WHERE slot = 'sweep:2026-10-23'").run();
     const second = s.trigger("sweep");
     assert.equal(second.status, "skipped");
     assert.equal(second.reason, "sweep already running");
-    const log = (await (await fetch(`${server.url}/v1/scheduled-runs`, { headers: { authorization: `Bearer ${TOKEN}` } })).json()) as any;
-    assert.deepEqual(log.map((r: any) => [r.trigger, r.status, r.reason]), [
-      ["manual", "skipped", "sweep already running"],
-      ["scheduled", "running", null],
-      ["manual", "requested", null],
-    ]);
-    assert.equal((await fetch(`${server.url}/v1/runs/nap`, { method: "POST", headers: { authorization: `Bearer ${TOKEN}` } })).status, 404);
+    const log = (await (
+      await fetch(`${server.url}/v1/scheduled-runs`, { headers: { authorization: `Bearer ${TOKEN}` } })
+    ).json()) as any;
+    assert.deepEqual(
+      log.map((r: any) => [r.trigger, r.status, r.reason]),
+      [
+        ["manual", "skipped", "sweep already running"],
+        ["scheduled", "running", null],
+        ["manual", "requested", null],
+      ],
+    );
+    assert.equal(
+      (await fetch(`${server.url}/v1/runs/nap`, { method: "POST", headers: { authorization: `Bearer ${TOKEN}` } }))
+        .status,
+      404,
+    );
   } finally {
     await server.stop();
   }
@@ -172,7 +230,10 @@ test("5.5 + 5.6 manual runs never take the scheduled slot; one active run per ki
 test("4.2 the overview shows status, version, next runs for an active project only, and the month's cost", async () => {
   const server = await activeServer({ RH_PROJECT_NAME: "proteins" });
   try {
-    const get = async () => (await (await fetch(`${server.url}/v1/project`, { headers: { authorization: `Bearer ${TOKEN}` } })).json()) as any;
+    const get = async () =>
+      (await (
+        await fetch(`${server.url}/v1/project`, { headers: { authorization: `Bearer ${TOKEN}` } })
+      ).json()) as any;
     const active = await get();
     assert.equal(active.name, "proteins");
     assert.equal(active.status, "active");

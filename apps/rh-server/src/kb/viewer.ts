@@ -3,7 +3,17 @@
 // reached solely through the hub's same-origin proxy. On first start the pinned Obsidian package is downloaded
 // from Obsidian's official release (never in offline mode). Crashes restart after 2 s, backing off to 10 s.
 import { spawn, type ChildProcess } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, rmSync, symlinkSync, unlinkSync, writeFileSync, lstatSync, readlinkSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  unlinkSync,
+  writeFileSync,
+  lstatSync,
+  readlinkSync,
+} from "node:fs";
 import { createServer } from "node:net";
 import { join } from "node:path";
 import { gunzipSync } from "node:zlib";
@@ -102,10 +112,15 @@ export class KbViewer {
       IGNIS_OBSIDIAN_PIN: o.obsidianVersion,
       NODE_ENV: "production",
     };
-    const child = spawn(process.execPath, ["--require", LOOPBACK, server], { cwd: o.ignisDir, env, stdio: ["ignore", "pipe", "pipe"] });
+    const child = spawn(process.execPath, ["--require", LOOPBACK, server], {
+      cwd: o.ignisDir,
+      env,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
     this.child = child;
     const forward = (level: "info" | "warn") => (chunk: Buffer) => {
-      for (const line of chunk.toString().split("\n").filter(Boolean)) o.log[level]("kb.viewer_output", { line: line.slice(0, 500) });
+      for (const line of chunk.toString().split("\n").filter(Boolean))
+        o.log[level]("kb.viewer_output", { line: line.slice(0, 500) });
     };
     child.stdout?.on("data", forward("info"));
     child.stderr?.on("data", forward("warn"));
@@ -199,8 +214,14 @@ export class KbViewer {
     const o = this.options;
     const dir = join(o.stateDir, "obsidian-app");
     const stamp = join(dir, ".obsidian-version");
-    if (existsSync(join(dir, "index.html")) && existsSync(stamp) && readFileSync(stamp, "utf8").trim() === o.obsidianVersion) return;
-    if (o.offline) throw new Error(`Obsidian ${o.obsidianVersion} is not downloaded yet, and offline mode makes no downloads`);
+    if (
+      existsSync(join(dir, "index.html")) &&
+      existsSync(stamp) &&
+      readFileSync(stamp, "utf8").trim() === o.obsidianVersion
+    )
+      return;
+    if (o.offline)
+      throw new Error(`Obsidian ${o.obsidianVersion} is not downloaded yet, and offline mode makes no downloads`);
     const url = `https://github.com/obsidianmd/obsidian-releases/releases/download/v${o.obsidianVersion}/obsidian-${o.obsidianVersion}.asar.gz`;
     o.log.info("kb.obsidian_download", { url });
     const res = await (o.fetch ?? fetch)(url, { signal: AbortSignal.timeout(120_000) });

@@ -69,7 +69,10 @@ export class PoliteHttp {
   }
 
   async json<T>(url: string, options: RequestOptions): Promise<T> {
-    const response = await this.request(url, { ...options, headers: { accept: "application/json", ...options.headers } });
+    const response = await this.request(url, {
+      ...options,
+      headers: { accept: "application/json", ...options.headers },
+    });
     try {
       return (await response.json()) as T;
     } catch {
@@ -108,10 +111,12 @@ export class PoliteHttp {
         }
         retryAfter = parseRetryAfter(response.headers.get("retry-after"), this.now());
         await response.body?.cancel();
-        if (attempt === attempts) throw new SourceError(options.source, `${lastError} after ${attempts} attempts`, response.status);
+        if (attempt === attempts)
+          throw new SourceError(options.source, `${lastError} after ${attempts} attempts`, response.status);
       } catch (error) {
         if (error instanceof SourceError) throw error;
-        lastError = error instanceof Error ? (error.name === "TimeoutError" ? "timed out" : error.message) : String(error);
+        lastError =
+          error instanceof Error ? (error.name === "TimeoutError" ? "timed out" : error.message) : String(error);
         if (attempt === attempts) break;
       }
       const wait = retryAfter ?? 2_000 * 2 ** (attempt - 1);

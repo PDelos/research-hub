@@ -69,12 +69,9 @@ export function listCommands(dir: string): string[] {
 export function loadCommand(name: string, dir: string): JevCommand {
   const file = join(dir, name, "command.json");
   const cmd = JSON.parse(readFileSync(file, "utf8")) as JevCommand;
-  if (cmd.name !== name)
-    throw new Error(`${file}: name "${cmd.name}" does not match its folder "${name}"`);
-  if (!Number.isInteger(cmd.version) || cmd.version < 1)
-    throw new Error(`${file}: version must be a positive integer`);
-  if (!cmd.questions || typeof cmd.questions !== "object")
-    throw new Error(`${file}: questions must be an object`);
+  if (cmd.name !== name) throw new Error(`${file}: name "${cmd.name}" does not match its folder "${name}"`);
+  if (!Number.isInteger(cmd.version) || cmd.version < 1) throw new Error(`${file}: version must be a positive integer`);
+  if (!cmd.questions || typeof cmd.questions !== "object") throw new Error(`${file}: questions must be an object`);
   cmd.policy ??= {};
   return cmd;
 }
@@ -131,11 +128,10 @@ export function renderCommand(cmd: JevCommand, vars: Vars): RenderedCommand {
     } else {
       questions = {};
       items.forEach((item, i) => {
-        const scoped = fill(
-          cmd.questions,
-          { ...vars, [cmd.each!.as]: item, index: i },
-          missing,
-        ) as Record<string, unknown>;
+        const scoped = fill(cmd.questions, { ...vars, [cmd.each!.as]: item, index: i }, missing) as Record<
+          string,
+          unknown
+        >;
         for (const [id, q] of Object.entries(scoped)) questions[`${id}_${i}`] = q;
       });
     }

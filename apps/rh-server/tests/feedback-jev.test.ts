@@ -5,12 +5,17 @@ import { loadCommand } from "@rh/jev";
 import { choice, noul, score } from "./fixtures/jev-answers.ts";
 import { arxivOnlyFetch, fakePapers, JEV_DIR, sweepEnv } from "./fixtures/sweep-env.ts";
 
-const ruleP: Record<string, number> = { "Skip any paper without released code": 0.85, "Maybe prefer shorter papers": 0.55, "Nice figure 3": 0.1 };
+const ruleP: Record<string, number> = {
+  "Skip any paper without released code": 0.85,
+  "Maybe prefer shorter papers": 0.55,
+  "Nice figure 3": 0.1,
+};
 const script = (id: string, _c: string, q: any, state: any) => {
   if (id === "relevance") return score(0.75, 5);
   if (id === "matched_question") return choice("Q1", Object.keys(q.criteria));
   if (id === "worth") return noul(0.8);
-  if (id === "reason_kind") return choice(String(state.judgment?.reason).includes("code") ? "great-method" : "other", Object.keys(q.criteria));
+  if (id === "reason_kind")
+    return choice(String(state.judgment?.reason).includes("code") ? "great-method" : "other", Object.keys(q.criteria));
   if (id === "generalizable") return noul(ruleP[String(state.judgment?.reason)] ?? 0);
   return undefined;
 };
@@ -35,7 +40,10 @@ test("reason-parse: a rule-like reason (â‰¥ 0.7) becomes a rule candidate, 0.4â€
     assert.equal(j(1).ruleStatus, "unclassified");
     assert.equal(j(2).ruleStatus, "none");
     assert.equal(j(3).ruleStatus, "none", "no reason, nothing to parse");
-    assert.deepEqual(env.reasons.candidates().map((c) => c.reason), ["Skip any paper without released code"]);
+    assert.deepEqual(
+      env.reasons.candidates().map((c) => c.reason),
+      ["Skip any paper without released code"],
+    );
     assert.equal((env.db.prepare("SELECT COUNT(*) n FROM jev_calls WHERE command = 'reason-parse'").get() as any).n, 3);
     assert.equal((env.db.prepare("SELECT COUNT(*) n FROM generations").get() as any).n, 0, "no LLM call");
     // A changed reason is parsed again and its old candidate is withdrawn.
@@ -68,7 +76,10 @@ test("the next sweep's gate input carries the latest judgments as taste examples
   try {
     const first = await env.runner.settled(env.runner.start("manual").id);
     const cards = env.presentAll(first.id);
-    assert.ok(env.jev.calls.every((c) => !(c.state as any).taste_examples), "no judgments yet, no examples");
+    assert.ok(
+      env.jev.calls.every((c) => !(c.state as any).taste_examples),
+      "no judgments yet, no examples",
+    );
     env.feedback.judge(cards[0].id, "star", "Exactly the baseline I need. " + "x".repeat(400));
     env.feedback.judge(cards[1].id, "down");
     const before = env.jev.calls.length;
@@ -84,8 +95,16 @@ test("the next sweep's gate input carries the latest judgments as taste examples
     const starred = taste.examples.find((e: any) => e.verdict === "star");
     assert.equal(starred.title, env.papers.store.get(cards[0].paperId)!.title);
     assert.equal(starred.reason.length, 200);
-    const recorded = env.db.prepare("SELECT extra_json FROM jev_calls WHERE command = 'on-theme+paper-kind+worth-reading' ORDER BY id DESC LIMIT 1").get() as any;
-    assert.equal(JSON.parse(recorded.extra_json).tasteExamples, 2, "the ledger records how many taste examples went in");
+    const recorded = env.db
+      .prepare(
+        "SELECT extra_json FROM jev_calls WHERE command = 'on-theme+paper-kind+worth-reading' ORDER BY id DESC LIMIT 1",
+      )
+      .get() as any;
+    assert.equal(
+      JSON.parse(recorded.extra_json).tasteExamples,
+      2,
+      "the ledger records how many taste examples went in",
+    );
   } finally {
     await env.done();
   }
@@ -96,7 +115,11 @@ test("judgments in quick succession never send a reason to Jev twice", async () 
   try {
     const parses = Promise.all(
       cards.map((c, i) => {
-        env.feedback.judge(c.id, "up", ["Skip any paper without released code", "Maybe prefer shorter papers", "Nice figure 3", "Nice figure 3"][i]);
+        env.feedback.judge(
+          c.id,
+          "up",
+          ["Skip any paper without released code", "Maybe prefer shorter papers", "Nice figure 3", "Nice figure 3"][i],
+        );
         return env.reasons.parsePending();
       }),
     );

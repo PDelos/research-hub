@@ -2,12 +2,26 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
-  cleanText, normalizeArxivId, normalizeDate, normalizeDoi, normalizeIds, normalizeOpenAlexId, normalizePmcid, normalizePmid,
-  normalizeTitle, splitSentences,
+  cleanText,
+  normalizeArxivId,
+  normalizeDate,
+  normalizeDoi,
+  normalizeIds,
+  normalizeOpenAlexId,
+  normalizePmcid,
+  normalizePmid,
+  normalizeTitle,
+  splitSentences,
 } from "../src/papers/normalize.ts";
 
 test("DOIs in every common form normalize to the same value", () => {
-  for (const raw of ["10.1101/2026.10.01.123456", "https://doi.org/10.1101/2026.10.01.123456", "http://dx.doi.org/10.1101/2026.10.01.123456", "doi:10.1101/2026.10.01.123456", "  10.1101/2026.10.01.123456 "])
+  for (const raw of [
+    "10.1101/2026.10.01.123456",
+    "https://doi.org/10.1101/2026.10.01.123456",
+    "http://dx.doi.org/10.1101/2026.10.01.123456",
+    "doi:10.1101/2026.10.01.123456",
+    "  10.1101/2026.10.01.123456 ",
+  ])
     assert.equal(normalizeDoi(raw), "10.1101/2026.10.01.123456");
   assert.equal(normalizeDoi("10.1038/S41586-021-03819-2"), "10.1038/s41586-021-03819-2");
   assert.equal(normalizeDoi("not a doi"), undefined);
@@ -15,12 +29,21 @@ test("DOIs in every common form normalize to the same value", () => {
 });
 
 test("arXiv IDs lose their version and URL; old-style IDs are kept", () => {
-  for (const raw of ["2401.01234", "2401.01234v3", "arXiv:2401.01234v1", "http://arxiv.org/abs/2401.01234v2", "https://arxiv.org/pdf/2401.01234v2.pdf"])
+  for (const raw of [
+    "2401.01234",
+    "2401.01234v3",
+    "arXiv:2401.01234v1",
+    "http://arxiv.org/abs/2401.01234v2",
+    "https://arxiv.org/pdf/2401.01234v2.pdf",
+  ])
     assert.equal(normalizeArxivId(raw), "2401.01234");
   assert.equal(normalizeArxivId("q-bio/0601001v1"), "q-bio/0601001");
   assert.equal(normalizeArxivId("math.GT/0309136"), "math.gt/0309136");
   assert.equal(normalizeArxivId("hello"), undefined);
-  assert.deepEqual(normalizeIds({ doi: "https://doi.org/10.48550/arXiv.2401.01234" }), { doi: "10.48550/arxiv.2401.01234", arxiv: "2401.01234" });
+  assert.deepEqual(normalizeIds({ doi: "https://doi.org/10.48550/arXiv.2401.01234" }), {
+    doi: "10.48550/arxiv.2401.01234",
+    arxiv: "2401.01234",
+  });
 });
 
 test("PubMed, PMC and OpenAlex IDs", () => {
@@ -62,8 +85,15 @@ test("sentence splitting keeps decimals, e.g., et al. and initials intact", () =
     "Code is available.",
   ]);
   assert.deepEqual(splitSentences(""), []);
-  assert.deepEqual(splitSentences("We release the weights under the MIT License. 1"), ["We release the weights under the MIT License."], "a trailing footnote mark is dropped");
+  assert.deepEqual(
+    splitSentences("We release the weights under the MIT License. 1"),
+    ["We release the weights under the MIT License."],
+    "a trailing footnote mark is dropped",
+  );
   assert.deepEqual(splitSentences("One sentence without a period"), ["One sentence without a period"]);
   assert.deepEqual(splitSentences("<p>First part.</p><p>Second part.</p>"), ["First part.", "Second part."]);
-  assert.deepEqual(splitSentences("We test i.e. three settings. Results follow."), ["We test i.e. three settings.", "Results follow."]);
+  assert.deepEqual(splitSentences("We test i.e. three settings. Results follow."), [
+    "We test i.e. three settings.",
+    "Results follow.",
+  ]);
 });

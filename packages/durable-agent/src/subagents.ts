@@ -2,12 +2,7 @@
 // Replay-safe: a rerun after a crash finds the same children (by owner task) and the same submissions (by request id).
 import type { Context } from "@earendil-works/chord";
 import type { AssistantMessage } from "@earendil-works/pi-ai";
-import {
-  AssistantEntry,
-  configure,
-  type AgentChange,
-  type ToolExecutionApi,
-} from "@earendil-works/pi-durable";
+import { AssistantEntry, configure, type AgentChange, type ToolExecutionApi } from "@earendil-works/pi-durable";
 
 export interface SubagentSpec {
   prompt: string;
@@ -60,9 +55,9 @@ export async function spawnSubagents(
   options: { requestPrefix: string; concurrency?: number },
 ): Promise<SubagentResult[]> {
   const ids = await api.commit(async (tx) => {
-    const existing = (
-      await tx.scanConversations({ ownerTaskId: api.taskId }, specs.length + 10)
-    ).items.map((c) => c.id);
+    const existing = (await tx.scanConversations({ ownerTaskId: api.taskId }, specs.length + 10)).items.map(
+      (c) => c.id,
+    );
     const out: number[] = [];
     for (let i = 0; i < specs.length; i++) {
       if (existing[i] !== undefined) {

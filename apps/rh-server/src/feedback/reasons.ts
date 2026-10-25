@@ -1,7 +1,15 @@
 // Reason classification (spec paper-feedback: Reason classification; design D4): one Jev `reason-parse` call per
 // non-empty reason. A reason that states a general rule (≥ 0.7) is queued as a rule candidate for the weekly review;
 // 0.4–0.7 is stored as unclassified; no LLM is called. If Jev fails, the judgment stays `pending` and is retried.
-import { loadCommand, runCommand, type ChoiceAnswer, type Decide, type JevCommand, type JevLedger, type NoulAnswer } from "@rh/jev";
+import {
+  loadCommand,
+  runCommand,
+  type ChoiceAnswer,
+  type Decide,
+  type JevCommand,
+  type JevLedger,
+  type NoulAnswer,
+} from "@rh/jev";
 import { nowIso, type Db } from "../db.ts";
 import type { Logger } from "../logger.ts";
 
@@ -37,7 +45,9 @@ export class ReasonParser {
 
   private async pass(): Promise<number> {
     const rows = this.deps.db
-      .prepare("SELECT j.card_id, j.verdict, j.reason, p.title FROM judgments j JOIN papers p ON p.id = j.paper_id WHERE j.rule_status = 'pending' AND j.reason IS NOT NULL ORDER BY j.updated_at")
+      .prepare(
+        "SELECT j.card_id, j.verdict, j.reason, p.title FROM judgments j JOIN papers p ON p.id = j.paper_id WHERE j.rule_status = 'pending' AND j.reason IS NOT NULL ORDER BY j.updated_at",
+      )
       .all() as { card_id: number; verdict: string; reason: string; title: string }[];
     let done = 0;
     for (const row of rows) {
@@ -45,7 +55,10 @@ export class ReasonParser {
         await this.parse(Number(row.card_id), row.verdict, row.reason, row.title);
         done++;
       } catch (error) {
-        this.deps.log.warn("feedback.reason_parse_failed", { cardId: row.card_id, error: error instanceof Error ? error.message : String(error) });
+        this.deps.log.warn("feedback.reason_parse_failed", {
+          cardId: row.card_id,
+          error: error instanceof Error ? error.message : String(error),
+        });
         break; // Jev is down: leave the rest pending for the next attempt
       }
     }
@@ -69,7 +82,9 @@ export class ReasonParser {
     const db = this.deps.db;
     // Only apply if the reason was not changed meanwhile.
     const changed = db
-      .prepare("UPDATE judgments SET reason_kind = ?, rule_probability = ?, rule_status = ? WHERE card_id = ? AND reason = ? AND rule_status = 'pending'")
+      .prepare(
+        "UPDATE judgments SET reason_kind = ?, rule_probability = ?, rule_status = ? WHERE card_id = ? AND reason = ? AND rule_status = 'pending'",
+      )
       .run(kind, p, status, cardId, reason).changes;
     if (Number(changed) && status === "candidate")
       db.prepare(
@@ -78,7 +93,14 @@ export class ReasonParser {
     this.deps.log.info("feedback.reason_parsed", { cardId, kind, generalizable: p, status });
   }
 
-  candidates(): { cardId: number; reason: string; reasonKind?: string; probability: number; status: string; createdAt: string }[] {
+  candidates(): {
+    cardId: number;
+    reason: string;
+    reasonKind?: string;
+    probability: number;
+    status: string;
+    createdAt: string;
+  }[] {
     return (this.deps.db.prepare("SELECT * FROM rule_candidates ORDER BY created_at").all() as any[]).map((r) => ({
       cardId: Number(r.card_id),
       reason: r.reason,

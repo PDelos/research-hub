@@ -2,13 +2,7 @@ import assert from "node:assert/strict";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
-import {
-  assertDefinitionOfDone,
-  listPrompts,
-  PromptError,
-  promptVariables,
-  renderTemplate,
-} from "../src/prompts.ts";
+import { assertDefinitionOfDone, listPrompts, PromptError, promptVariables, renderTemplate } from "../src/prompts.ts";
 
 const ROOT = join(import.meta.dirname, "../../..");
 const AGENTS = join(ROOT, "apps/rh-server/prompt_engineering/agents");
@@ -29,12 +23,9 @@ test("every user prompt has a Definition Of Done and every agent has a system pr
   for (const agent of agents)
     assert.ok(existsSync(join(AGENTS, agent, "SYSTEM_PROMPT.md")), `${agent} has SYSTEM_PROMPT.md`);
   for (const p of prompts.filter((p) => p.file.startsWith("USER_PROMPT_"))) {
-    assert.doesNotThrow(() =>
-      assertDefinitionOfDone(readFileSync(p.path, "utf8"), `${p.agent}/${p.file}`),
-    );
+    assert.doesNotThrow(() => assertDefinitionOfDone(readFileSync(p.path, "utf8"), `${p.agent}/${p.file}`));
   }
-  for (const p of prompts)
-    assert.match(p.file, /^(SYSTEM_PROMPT|USER_PROMPT_[a-z_]+)\.md$/, p.path);
+  for (const p of prompts) assert.match(p.file, /^(SYSTEM_PROMPT|USER_PROMPT_[a-z_]+)\.md$/, p.path);
 });
 
 test("no TypeScript source inlines a prompt", () => {
@@ -46,10 +37,7 @@ test("no TypeScript source inlines a prompt", () => {
       if (statSync(path).isDirectory()) walk(path);
       else if (/\.(ts|vue)$/.test(name)) {
         const text = readFileSync(path, "utf8");
-        if (
-          /Definition Of Done|^\s*["'`]You are (an?|the) /m.test(text) ||
-          /`[^`]*\n##\s+\w/.test(text)
-        )
+        if (/Definition Of Done|^\s*["'`]You are (an?|the) /m.test(text) || /`[^`]*\n##\s+\w/.test(text))
           offenders.push(path);
       }
     }

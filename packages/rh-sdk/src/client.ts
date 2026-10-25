@@ -85,12 +85,14 @@ export class HubClient {
   charter = () => this.call<CharterView>("GET", "/charter");
   charterVersion = (n: number) => this.call<CharterRecord>("GET", `/charter/versions/${n}`);
   editCharter = (charter: CharterBody) => this.call<CharterView>("PUT", "/charter", { charter });
-  answer = (answers: { id: number; answer: string }[]) => this.call<CharterView>("POST", "/charter/answers", { answers });
+  answer = (answers: { id: number; answer: string }[]) =>
+    this.call<CharterView>("POST", "/charter/answers", { answers });
   approve = () => this.call<CharterView>("POST", "/charter/approve", {});
   retryCharter = () => this.call<CharterView>("POST", "/charter/retry", {});
   schedule = () => this.call<ScheduleSettings>("GET", "/schedule");
-  setSchedule = (patch: Partial<{ sweep: Partial<ScheduleSettings["sweep"]>; review: Partial<ScheduleSettings["review"]> }>) =>
-    this.call<ScheduleSettings>("PUT", "/schedule", patch);
+  setSchedule = (
+    patch: Partial<{ sweep: Partial<ScheduleSettings["sweep"]>; review: Partial<ScheduleSettings["review"]> }>,
+  ) => this.call<ScheduleSettings>("PUT", "/schedule", patch);
   scheduledRuns = (limit = 100) => this.call<ScheduledRun[]>("GET", `/scheduled-runs?limit=${limit}`);
 
   // Sweeps and cards (v0.3)
@@ -111,7 +113,8 @@ export class HubClient {
   // Knowledge base (v0.5)
   kbPapers = () => this.call<KbPaper[]>("GET", "/kb/papers");
   kbNote = (stem: string) => this.call<KbNote>("GET", `/kb/notes/${encodeURIComponent(stem)}`);
-  kbSearch = (query: string, limit = 8) => this.call<KbSearchHit[]>("GET", `/kb/search?q=${encodeURIComponent(query)}&limit=${limit}`);
+  kbSearch = (query: string, limit = 8) =>
+    this.call<KbSearchHit[]>("GET", `/kb/search?q=${encodeURIComponent(query)}&limit=${limit}`);
   triggerRun = (kind: "sweep" | "review") => this.call<ScheduledRun>("POST", `/runs/${kind}`, {});
 
   /** Follow the project's stream until the signal aborts. */

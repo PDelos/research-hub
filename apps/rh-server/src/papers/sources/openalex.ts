@@ -19,10 +19,16 @@ export class OpenAlexSource implements PaperSource {
     if (q.since) filters.push(`from_publication_date:${q.since}`);
     if (q.until) filters.push(`to_publication_date:${q.until}`);
     const body = await this.deps.http.json<{ results: any[] }>(
-      this.url("/works", { search, ...(filters.length ? { filter: filters.join(",") } : {}), "per-page": String(Math.min(q.limit, 100)) }),
+      this.url("/works", {
+        search,
+        ...(filters.length ? { filter: filters.join(",") } : {}),
+        "per-page": String(Math.min(q.limit, 100)),
+      }),
       { source: this.name, budgetMs: q.budgetMs },
     );
-    return body.results.map(mapOpenAlexWork).filter((p): p is SourcePaper => !!p && inWindow(p.publishedAt, q.since, q.until));
+    return body.results
+      .map(mapOpenAlexWork)
+      .filter((p): p is SourcePaper => !!p && inWindow(p.publishedAt, q.since, q.until));
   }
 
   /** Works for up to 50 DOIs in one request; DOIs not in OpenAlex are absent from the map. */
@@ -43,7 +49,11 @@ export class OpenAlexSource implements PaperSource {
   }
 
   /** One work by OpenAlex ID, PMID or PMCID; undefined when OpenAlex does not know it (404). */
-  async lookup(kind: "openalex" | "pmid" | "pmcid", value: string, budgetMs?: number): Promise<SourcePaper | undefined> {
+  async lookup(
+    kind: "openalex" | "pmid" | "pmcid",
+    value: string,
+    budgetMs?: number,
+  ): Promise<SourcePaper | undefined> {
     const key = kind === "openalex" ? value : `${kind}:${value}`;
     const response = await this.deps.http.request(this.url(`/works/${encodeURIComponent(key)}`, {}), {
       source: this.name,
@@ -76,7 +86,9 @@ export function mapOpenAlexWork(work: any): SourcePaper | null {
     ids,
     title,
     abstract: abstractFromInvertedIndex(work.abstract_inverted_index),
-    authors: (work.authorships ?? []).map((a: any) => cleanText(a?.author?.display_name ?? a?.raw_author_name)).filter(Boolean),
+    authors: (work.authorships ?? [])
+      .map((a: any) => cleanText(a?.author?.display_name ?? a?.raw_author_name))
+      .filter(Boolean),
     year: work.publication_year ?? undefined,
     publishedAt: normalizeDate(work.publication_date),
     venue: !isRepository && host.display_name ? cleanText(host.display_name) : undefined,

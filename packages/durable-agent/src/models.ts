@@ -107,8 +107,7 @@ export function createModelCatalog(options: {
       });
   }
   const ref = (id: string): ModelRef => {
-    if (!ids.includes(id))
-      throw new Error(`Unknown model ${id}. Configured models: ${ids.join(", ")}.`);
+    if (!ids.includes(id)) throw new Error(`Unknown model ${id}. Configured models: ${ids.join(", ")}.`);
     return { provider, modelId: id };
   };
   return {

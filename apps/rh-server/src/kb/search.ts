@@ -32,7 +32,10 @@ export function noteTitle(path: string, text: string): string {
 
 /** Plain words joined as an AND query of quoted terms (FTS5 syntax characters are never passed through). */
 export function ftsQuery(query: string): string {
-  return (query.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? []).slice(0, 12).map((t) => `"${t}"`).join(" ");
+  return (query.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [])
+    .slice(0, 12)
+    .map((t) => `"${t}"`)
+    .join(" ");
 }
 
 export class KbIndex {
@@ -60,7 +63,15 @@ export class KbIndex {
   /** Re-index files whose modification time or size changed, add new ones, drop deleted ones. */
   sync(): { changed: number; removed: number } {
     const { db, vault } = this.deps;
-    const known = new Map((db.prepare("SELECT path, mtime_ms, size FROM kb_files").all() as { path: string; mtime_ms: number; size: number }[]).map((r) => [r.path, r]));
+    const known = new Map(
+      (
+        db.prepare("SELECT path, mtime_ms, size FROM kb_files").all() as {
+          path: string;
+          mtime_ms: number;
+          size: number;
+        }[]
+      ).map((r) => [r.path, r]),
+    );
     let changed = 0;
     const present = new Set(vault.markdownFiles());
     for (const path of present) {
@@ -95,7 +106,13 @@ export class KbIndex {
            FROM kb_fts WHERE kb_fts MATCH ? ORDER BY score, path LIMIT ?`,
         )
         .all(q, k) as { path: string; title: string; excerpt: string; score: number }[]
-    ).map((r) => ({ path: r.path, stem: r.path.split("/").pop()!.replace(/\.md$/, ""), title: r.title, excerpt: r.excerpt, score: r.score }));
+    ).map((r) => ({
+      path: r.path,
+      stem: r.path.split("/").pop()!.replace(/\.md$/, ""),
+      title: r.title,
+      excerpt: r.excerpt,
+      score: r.score,
+    }));
   }
 
   /** Watch the vault (debounced 500 ms) and rescan every 5 s as a backstop. */
@@ -144,6 +161,8 @@ export class KbIndex {
     }
     db.prepare("DELETE FROM kb_fts WHERE path = ?").run(path);
     db.prepare("INSERT INTO kb_fts (path, title, body) VALUES (?, ?, ?)").run(path, noteTitle(path, text), text);
-    db.prepare("INSERT INTO kb_files (path, mtime_ms, size) VALUES (?, ?, ?) ON CONFLICT (path) DO UPDATE SET mtime_ms = excluded.mtime_ms, size = excluded.size").run(path, st.mtimeMs, st.size);
+    db.prepare(
+      "INSERT INTO kb_files (path, mtime_ms, size) VALUES (?, ?, ?) ON CONFLICT (path) DO UPDATE SET mtime_ms = excluded.mtime_ms, size = excluded.size",
+    ).run(path, st.mtimeMs, st.size);
   }
 }

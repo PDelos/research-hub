@@ -143,16 +143,14 @@ export class Telemetry implements TelemetryStore {
       "INSERT OR IGNORE INTO tool_calls (generation_entry_id, call_id, conversation_id, run_entry_id, tool_name, args_json) VALUES (:gen, :call, :conv, :run, :name, :args)",
     );
     for (const c of rec.toolCalls)
-      insert.run(bind({ gen: rec.entryId, call: c.id, conv: rec.conversationId, run, name: c.name, args: c.arguments ?? {} }));
+      insert.run(
+        bind({ gen: rec.entryId, call: c.id, conv: rec.conversationId, run, name: c.name, args: c.arguments ?? {} }),
+      );
     if (run === undefined) return;
     // An aborted generation (process killed or turn interrupted) is not an answer: the run stays open until the
     // resumed turn produces one.
     const status =
-      rec.stopReason === "error"
-        ? "error"
-        : rec.stopReason === "aborted" || rec.toolCalls.length
-          ? "running"
-          : "done";
+      rec.stopReason === "error" ? "error" : rec.stopReason === "aborted" || rec.toolCalls.length ? "running" : "done";
     this.db
       .prepare(
         "UPDATE agent_runs SET ended_at = :ended, status = CASE WHEN status = 'done' THEN status ELSE :status END, answer_entry_id = CASE WHEN :done = 1 THEN :entry ELSE answer_entry_id END WHERE run_entry_id = :run",
@@ -193,7 +191,16 @@ export class Telemetry implements TelemetryStore {
            status = CASE WHEN status IN ('done', 'error') THEN status ELSE :status END
          WHERE generation_entry_id = :gen AND call_id = :call`,
       )
-      .run(bind({ task: rec.taskId, started: rec.startedAt, ended: rec.endedAt, status, gen: input.assistant, call: input.callId }));
+      .run(
+        bind({
+          task: rec.taskId,
+          started: rec.startedAt,
+          ended: rec.endedAt,
+          status,
+          gen: input.assistant,
+          call: input.callId,
+        }),
+      );
   }
 
   toolResult(rec: ToolResultTelemetry): void {
@@ -209,7 +216,9 @@ export class Telemetry implements TelemetryStore {
       "is_error = :is_error, result_text = :text, result_entry_id = :entry, duration_ms = :dur, status = :status";
     const byTask =
       rec.taskId !== undefined
-        ? this.db.prepare(`UPDATE tool_calls SET ${set} WHERE task_id = :task`).run(bind({ ...values, task: rec.taskId }))
+        ? this.db
+            .prepare(`UPDATE tool_calls SET ${set} WHERE task_id = :task`)
+            .run(bind({ ...values, task: rec.taskId }))
         : undefined;
     if (!byTask || Number(byTask.changes) === 0)
       this.db
@@ -268,7 +277,9 @@ export class Telemetry implements TelemetryStore {
         "SELECT COUNT(*) gens, COALESCE(SUM(input_tokens + cache_read_tokens + cache_write_tokens), 0) tin, COALESCE(SUM(output_tokens), 0) tout, COALESCE(SUM(cost_usd), 0) cost, GROUP_CONCAT(DISTINCT model) models FROM generations WHERE run_entry_id = ?",
       )
       .get(row.run_entry_id) as any;
-    const calls = this.db.prepare("SELECT COUNT(*) n FROM tool_calls WHERE run_entry_id = ?").get(row.run_entry_id) as any;
+    const calls = this.db
+      .prepare("SELECT COUNT(*) n FROM tool_calls WHERE run_entry_id = ?")
+      .get(row.run_entry_id) as any;
     return {
       id: row.run_entry_id,
       conversationId: row.conversation_id,

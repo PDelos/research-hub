@@ -40,7 +40,8 @@ function follow(event: MouseEvent) {
   }
 }
 
-const shown = (v: unknown) => (Array.isArray(v) ? v.join(", ") : typeof v === "object" && v ? JSON.stringify(v) : String(v ?? ""));
+const shown = (v: unknown) =>
+  Array.isArray(v) ? v.join(", ") : typeof v === "object" && v ? JSON.stringify(v) : String(v ?? "");
 const HIDDEN = new Set(["title"]);
 </script>
 
@@ -48,7 +49,12 @@ const HIDDEN = new Set(["title"]);
   <div class="library">
     <div class="library-list">
       <form class="kb-search" @submit.prevent="search">
-        <input v-model="query" type="search" placeholder="Search the knowledge base…" aria-label="Search the knowledge base" />
+        <input
+          v-model="query"
+          type="search"
+          placeholder="Search the knowledge base…"
+          aria-label="Search the knowledge base"
+        />
       </form>
       <template v-if="hits">
         <h3 class="section">Search results</h3>
@@ -63,7 +69,12 @@ const HIDDEN = new Set(["title"]);
       </template>
       <h3 class="section">Papers in the knowledge base</h3>
       <ul class="kb-items">
-        <li v-for="p in papers" :key="p.paperId" :class="{ sel: note && note.stem === p.stem, static: !p.stem }" @click="open(p.stem)">
+        <li
+          v-for="p in papers"
+          :key="p.paperId"
+          :class="{ sel: note && note.stem === p.stem, static: !p.stem }"
+          @click="open(p.stem)"
+        >
           <strong>{{ p.title }}</strong>
           <span class="muted small">
             <span v-if="p.level" class="badge level">{{ p.level }}</span>

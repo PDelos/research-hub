@@ -1,14 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import {
-  DEFAULT_POINTS,
-  fit,
-  fits,
-  fromPolicy,
-  k,
-  toPolicy,
-  validatePoints,
-} from "../src/compaction.ts";
+import { DEFAULT_POINTS, fit, fits, fromPolicy, k, toPolicy, validatePoints } from "../src/compaction.ts";
 
 test("defaults: background 100k, force 200k on a 1M window", () => {
   assert.deepEqual(DEFAULT_POINTS, { background: 100_000, force: 200_000 });
@@ -34,10 +26,7 @@ test("fit clamps into small windows and keeps the gap", () => {
 
 test("validatePoints explains every rejection", () => {
   assert.equal(validatePoints(1_000_000, DEFAULT_POINTS), undefined);
-  assert.match(
-    validatePoints(1_000_000, { background: 199_500, force: 200_000 })!,
-    /below the force point/,
-  );
+  assert.match(validatePoints(1_000_000, { background: 199_500, force: 200_000 })!, /below the force point/);
   assert.match(validatePoints(1_000_000, { background: 100, force: 200_000 })!, /at least 4096/);
   assert.match(validatePoints(200_000, { background: 100_000, force: 190_000 })!, /leave at least/);
   assert.equal(k(100_000), "100k");

@@ -13,7 +13,14 @@ test("shared references, direct citation and co-citation", () => {
   try {
     const store = new PaperStore(db);
     const add = (w: string, references: string[] = []) =>
-      store.upsert({ source: "openalex", externalId: w, ids: { openalex: w }, title: `Work ${w}`, authors: [], references }).id;
+      store.upsert({
+        source: "openalex",
+        externalId: w,
+        ids: { openalex: w },
+        title: `Work ${w}`,
+        authors: [],
+        references,
+      }).id;
     // A cites B; both reference W10, W11, W12; C and D cite both A and B.
     const a = add("W1", ["W2", "W10", "W11", "W12", "W13"]);
     const b = add("W2", ["W10", "W11", "W12", "W14"]);

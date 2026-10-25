@@ -35,10 +35,13 @@ test("10 arXiv queries issued at once are sent at least 3 seconds apart", async 
     sleep: clock.sleep,
     fetch: (async () => (sentAt.push(clock.now()), new Response("<feed/>"))) as typeof fetch,
   });
-  const all = Promise.all(Array.from({ length: 10 }, (_, i) => http.text(`https://export.arxiv.org/api/query?q=${i}`, { source: "arxiv" })));
+  const all = Promise.all(
+    Array.from({ length: 10 }, (_, i) => http.text(`https://export.arxiv.org/api/query?q=${i}`, { source: "arxiv" })),
+  );
   await clock.run(all);
   assert.equal(sentAt.length, 10);
-  for (let i = 1; i < sentAt.length; i++) assert.ok(sentAt[i] - sentAt[i - 1] >= 3_000, `gap ${i}: ${sentAt[i] - sentAt[i - 1]} ms`);
+  for (let i = 1; i < sentAt.length; i++)
+    assert.ok(sentAt[i] - sentAt[i - 1] >= 3_000, `gap ${i}: ${sentAt[i] - sentAt[i - 1]} ms`);
 });
 
 test("HTTP 429 is retried after Retry-After and then succeeds; the user agent carries the contact email", async () => {
@@ -64,22 +67,48 @@ test("HTTP 429 is retried after Retry-After and then succeeds; the user agent ca
 test("503 three times fails with the reason; 400 fails at once; budget stops retries", async () => {
   const clock = fakeClock();
   let calls = 0;
-  const unavailable = new PoliteHttp({ now: clock.now, sleep: clock.sleep, fetch: (async () => (calls++, new Response("", { status: 503 }))) as typeof fetch });
-  await assert.rejects(clock.run(unavailable.json("https://www.ebi.ac.uk/x", { source: "europepmc" })), (e: unknown) => e instanceof SourceError && e.source === "europepmc" && /HTTP 503 after 3 attempts/.test(e.message));
+  const unavailable = new PoliteHttp({
+    now: clock.now,
+    sleep: clock.sleep,
+    fetch: (async () => (calls++, new Response("", { status: 503 }))) as typeof fetch,
+  });
+  await assert.rejects(
+    clock.run(unavailable.json("https://www.ebi.ac.uk/x", { source: "europepmc" })),
+    (e: unknown) => e instanceof SourceError && e.source === "europepmc" && /HTTP 503 after 3 attempts/.test(e.message),
+  );
   assert.equal(calls, 3);
 
   calls = 0;
-  const bad = new PoliteHttp({ now: clock.now, sleep: clock.sleep, fetch: (async () => (calls++, new Response("", { status: 400 }))) as typeof fetch });
+  const bad = new PoliteHttp({
+    now: clock.now,
+    sleep: clock.sleep,
+    fetch: (async () => (calls++, new Response("", { status: 400 }))) as typeof fetch,
+  });
   await assert.rejects(clock.run(bad.json("https://www.ebi.ac.uk/x", { source: "europepmc" })), /HTTP 400/);
   assert.equal(calls, 1);
 
   calls = 0;
-  const longWait = new PoliteHttp({ now: clock.now, sleep: clock.sleep, fetch: (async () => (calls++, new Response("", { status: 429, headers: { "retry-after": "50" } }))) as typeof fetch });
-  await assert.rejects(clock.run(longWait.json("https://api.openalex.org/x", { source: "openalex", budgetMs: 30_000 })), /exceed the 30 s budget/);
+  const longWait = new PoliteHttp({
+    now: clock.now,
+    sleep: clock.sleep,
+    fetch: (async () => (calls++, new Response("", { status: 429, headers: { "retry-after": "50" } }))) as typeof fetch,
+  });
+  await assert.rejects(
+    clock.run(longWait.json("https://api.openalex.org/x", { source: "openalex", budgetMs: 30_000 })),
+    /exceed the 30 s budget/,
+  );
   assert.equal(calls, 1);
 
   calls = 0;
-  const flaky = new PoliteHttp({ now: clock.now, sleep: clock.sleep, fetch: (async () => { calls++; if (calls < 3) throw new TypeError("fetch failed"); return Response.json([1]); }) as typeof fetch });
+  const flaky = new PoliteHttp({
+    now: clock.now,
+    sleep: clock.sleep,
+    fetch: (async () => {
+      calls++;
+      if (calls < 3) throw new TypeError("fetch failed");
+      return Response.json([1]);
+    }) as typeof fetch,
+  });
   assert.deepEqual(await clock.run(flaky.json("https://api.openalex.org/y", { source: "openalex" })), [1]);
 });
 

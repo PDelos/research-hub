@@ -68,8 +68,14 @@ test("chat is accepted with 202; a message sent while busy is queued, never drop
     const done = await server.client.send("third", { waitMs: 60_000 });
     assert.equal(done.status, "done");
     const runs = (await server.client.runs()).reverse();
-    assert.deepEqual(runs.map((r) => r.text), ["first", "second", "third"]);
-    assert.ok(runs.every((r) => r.status === "done"), JSON.stringify(runs.map((r) => r.status)));
+    assert.deepEqual(
+      runs.map((r) => r.text),
+      ["first", "second", "third"],
+    );
+    assert.ok(
+      runs.every((r) => r.status === "done"),
+      JSON.stringify(runs.map((r) => r.status)),
+    );
     assert.ok(first.submissionId < second.submissionId);
   } finally {
     await server.stop();

@@ -29,7 +29,10 @@ test("crossing the background point compacts without blocking the next message",
     project.setCompaction({ points: { background: 4096, force: 60_000 } });
     for (let i = 0; i < 6; i++) await server.client.send(filler(120), { waitMs: 30_000 });
     await until(() => w.events.some((e) => e.type === "compaction_start"), 30_000, "a compaction started");
-    const start = w.events.find((e) => e.type === "compaction_start") as Extract<WireAgentEvent, { type: "compaction_start" }>;
+    const start = w.events.find((e) => e.type === "compaction_start") as Extract<
+      WireAgentEvent,
+      { type: "compaction_start" }
+    >;
     assert.equal(start.blocking, false, "background compaction");
     const next = await server.client.send("still there?", { waitMs: 30_000 });
     assert.equal(next.status, "done");
@@ -38,7 +41,10 @@ test("crossing the background point compacts without blocking the next message",
     assert.equal(after.status, "done");
     const runs = await server.client.runs(20);
     const peak = Math.max(...runs.filter((r) => r.text.startsWith("protein")).map((r) => r.inputTokens));
-    assert.ok(runs[0].inputTokens < peak, `after compaction a turn reads less context (${runs[0].inputTokens} < ${peak})`);
+    assert.ok(
+      runs[0].inputTokens < peak,
+      `after compaction a turn reads less context (${runs[0].inputTokens} < ${peak})`,
+    );
   } finally {
     await w.stop();
     await server.stop();
@@ -54,8 +60,14 @@ test("at the force point the next turn waits for compaction, then proceeds", { t
     for (let i = 0; i < 4; i++) await server.client.send(filler(150), { waitMs: 30_000 });
     const sent = await server.client.send("after the force point", { waitMs: 60_000 });
     assert.equal(sent.status, "done");
-    const starts = w.events.filter((e) => e.type === "compaction_start") as Extract<WireAgentEvent, { type: "compaction_start" }>[];
-    assert.ok(starts.some((s) => s.blocking), `a blocking compaction ran: ${JSON.stringify(starts)}`);
+    const starts = w.events.filter((e) => e.type === "compaction_start") as Extract<
+      WireAgentEvent,
+      { type: "compaction_start" }
+    >[];
+    assert.ok(
+      starts.some((s) => s.blocking),
+      `a blocking compaction ran: ${JSON.stringify(starts)}`,
+    );
   } finally {
     await w.stop();
     await server.stop();

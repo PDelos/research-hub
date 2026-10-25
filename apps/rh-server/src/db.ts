@@ -210,7 +210,9 @@ export type VectorKind = (typeof VECTOR_KINDS)[number];
  * Returns true when they were (re)created, which happens on first start and when the dimension changes.
  */
 export function ensureVectorTables(db: Db, dims: number): boolean {
-  const current = db.prepare("SELECT sql FROM sqlite_master WHERE name = 'vec_whole'").get() as { sql: string } | undefined;
+  const current = db.prepare("SELECT sql FROM sqlite_master WHERE name = 'vec_whole'").get() as
+    | { sql: string }
+    | undefined;
   if (current && current.sql.includes(`float[${dims}]`)) return false;
   for (const kind of VECTOR_KINDS) {
     db.exec(`DROP TABLE IF EXISTS vec_${kind}`);
@@ -279,7 +281,9 @@ export function bind(params: Record<string, unknown>): Record<string, string | n
       v === undefined || v === null
         ? null
         : typeof v === "boolean"
-          ? v ? 1 : 0
+          ? v
+            ? 1
+            : 0
           : typeof v === "object"
             ? JSON.stringify(v)
             : (v as string | number | bigint);

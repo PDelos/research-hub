@@ -20,14 +20,28 @@ test("OpenRouter embeddings: 70 texts go out in batches of 32, 32 and 6 with dim
       bodies.push(body);
       auth = new Headers(init.headers).get("authorization") ?? "";
       // Answer out of order to check the index sort.
-      const data = body.input.map((_: string, i: number) => ({ index: i, embedding: Array.from({ length: 4 }, (_, k) => (k === i % 4 ? 3 : 0)) })).reverse();
+      const data = body.input
+        .map((_: string, i: number) => ({
+          index: i,
+          embedding: Array.from({ length: 4 }, (_, k) => (k === i % 4 ? 3 : 0)),
+        }))
+        .reverse();
       return Response.json({ data, usage: { total_tokens: body.input.length * 5, cost: body.input.length * 1e-8 } });
     }) as typeof fetch;
     const ledger = new EmbeddingLedger(db);
-    const embedder = new OpenRouterEmbedder({ apiKey: "sk-test-key", model: "qwen/qwen3-embedding-8b", dims: 4, ledger, http: new PoliteHttp({ fetch: fetchImpl }) });
+    const embedder = new OpenRouterEmbedder({
+      apiKey: "sk-test-key",
+      model: "qwen/qwen3-embedding-8b",
+      dims: 4,
+      ledger,
+      http: new PoliteHttp({ fetch: fetchImpl }),
+    });
     const texts = Array.from({ length: 70 }, (_, i) => `text ${i}`);
     const vectors = await embedder.embed(texts);
-    assert.deepEqual(bodies.map((b) => b.input.length), [32, 32, 6]);
+    assert.deepEqual(
+      bodies.map((b) => b.input.length),
+      [32, 32, 6],
+    );
     assert.ok(bodies.every((b) => b.model === "qwen/qwen3-embedding-8b" && b.dimensions === 4));
     assert.equal(auth, "Bearer sk-test-key");
     assert.equal(vectors.length, 70);
@@ -51,13 +65,23 @@ test("a wrong dimension or an error answer fails the call and is recorded as an 
   try {
     const ledger = new EmbeddingLedger(db);
     const wrongDims = new OpenRouterEmbedder({
-      apiKey: "k", model: "m", dims: 8, ledger,
-      http: new PoliteHttp({ fetch: (async () => Response.json({ data: [{ index: 0, embedding: [1, 0] }] })) as typeof fetch }),
+      apiKey: "k",
+      model: "m",
+      dims: 8,
+      ledger,
+      http: new PoliteHttp({
+        fetch: (async () => Response.json({ data: [{ index: 0, embedding: [1, 0] }] })) as typeof fetch,
+      }),
     });
     await assert.rejects(wrongDims.embed(["x"]), /returned 2 dimensions, RH_EMBED_DIMS is 8/);
     const errorBody = new OpenRouterEmbedder({
-      apiKey: "k", model: "m", dims: 8, ledger,
-      http: new PoliteHttp({ fetch: (async () => Response.json({ error: { message: "model not found" } })) as typeof fetch }),
+      apiKey: "k",
+      model: "m",
+      dims: 8,
+      ledger,
+      http: new PoliteHttp({
+        fetch: (async () => Response.json({ error: { message: "model not found" } })) as typeof fetch,
+      }),
     });
     await assert.rejects(errorBody.embed(["x"]), /model not found/);
     assert.equal((db.prepare("SELECT COUNT(*) n FROM embedding_calls WHERE error IS NOT NULL").get() as any).n, 2);

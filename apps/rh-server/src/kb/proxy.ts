@@ -9,7 +9,11 @@ import type { KbViewer } from "./viewer.ts";
 
 export const VIEWER_PREFIXES = /^\/(api|ws|vault-files|downloads)(\/|\?|$)/;
 
-const hostname = (host: string) => host.toLowerCase().replace(/:\d+$/, "").replace(/^\[(.*)\]$/, "$1");
+const hostname = (host: string) =>
+  host
+    .toLowerCase()
+    .replace(/:\d+$/, "")
+    .replace(/^\[(.*)\]$/, "$1");
 
 /** Why a browser request to the viewer must be refused, or undefined when it may pass. */
 export function refusal(req: IncomingMessage, allowedHosts: Set<string>): string | undefined {
@@ -41,17 +45,25 @@ function unavailablePage(status: ReturnType<KbViewer["status"]>): string {
 }
 
 /** Express middleware for the viewer's paths. `assets` mode only handles /assets/ (mount it after the hub's static files). */
-export function kbProxy(viewer: () => KbViewer | undefined, allowedHosts: Set<string>, mode: "paths" | "assets" = "paths"): RequestHandler {
+export function kbProxy(
+  viewer: () => KbViewer | undefined,
+  allowedHosts: Set<string>,
+  mode: "paths" | "assets" = "paths",
+): RequestHandler {
   return (req, res, next) => {
     const path = mode === "assets" ? (req.url.startsWith("/assets/") ? req.url : undefined) : viewerPath(req.url);
     if (path === undefined) return next();
     const why = refusal(req, allowedHosts);
-    if (why) return void res.status(403).json({ error: { code: "forbidden", message: `Knowledge base viewer: ${why}` } });
+    if (why)
+      return void res.status(403).json({ error: { code: "forbidden", message: `Knowledge base viewer: ${why}` } });
     const v = viewer();
     const target = v?.target();
     if (!target) {
       if (mode === "assets") return next();
-      return void res.status(503).type("html").send(unavailablePage(v?.status() ?? { state: "disabled", obsidianVersion: "", restarts: 0 }));
+      return void res
+        .status(503)
+        .type("html")
+        .send(unavailablePage(v?.status() ?? { state: "disabled", obsidianVersion: "", restarts: 0 }));
     }
     const headers = { ...req.headers, host: `127.0.0.1:${target.port}` };
     delete headers.authorization;
@@ -60,7 +72,11 @@ export function kbProxy(viewer: () => KbViewer | undefined, allowedHosts: Set<st
       r.pipe(res);
     });
     upstream.on("error", () => {
-      if (!res.headersSent) res.status(502).type("html").send(unavailablePage({ state: "crashed", obsidianVersion: "", restarts: 0 }));
+      if (!res.headersSent)
+        res
+          .status(502)
+          .type("html")
+          .send(unavailablePage({ state: "crashed", obsidianVersion: "", restarts: 0 }));
       else res.end();
     });
     req.pipe(upstream);
@@ -79,7 +95,9 @@ export function kbUpgrade(viewer: () => KbViewer | undefined, allowedHosts: Set<
     const upstream = net.connect(target.port, target.host, () => {
       const headers = { ...req.headers, host: `127.0.0.1:${target.port}` };
       delete headers.authorization;
-      const lines = Object.entries(headers).flatMap(([k, v]) => (Array.isArray(v) ? v.map((x) => `${k}: ${x}`) : [`${k}: ${v}`]));
+      const lines = Object.entries(headers).flatMap(([k, v]) =>
+        Array.isArray(v) ? v.map((x) => `${k}: ${x}`) : [`${k}: ${v}`],
+      );
       upstream.write(`${req.method} ${path} HTTP/1.1\r\n${lines.join("\r\n")}\r\n\r\n`);
       if (head.length) upstream.write(head);
       socket.pipe(upstream).pipe(socket);

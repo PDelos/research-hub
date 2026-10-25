@@ -60,26 +60,18 @@ const emptyAgentState = (): AgentViewState => ({
   ready: false,
 });
 
-function setPath(
-  target: Record<string | number, unknown>,
-  path: readonly (string | number)[],
-  delta: string,
-) {
+function setPath(target: Record<string | number, unknown>, path: readonly (string | number)[], delta: string) {
   let node = target;
   for (let i = 0; i < path.length - 1; i++) {
     const key = path[i];
-    if (typeof node[key] !== "object" || node[key] === null)
-      node[key] = typeof path[i + 1] === "number" ? [] : {};
+    if (typeof node[key] !== "object" || node[key] === null) node[key] = typeof path[i + 1] === "number" ? [] : {};
     node = node[key] as Record<string | number, unknown>;
   }
   const last = path[path.length - 1];
   node[last] = String(node[last] ?? "") + delta;
 }
 
-export function applyMessageChange(
-  message: WireAssistantMessage,
-  change: WireMessageChange,
-): WireAssistantMessage {
+export function applyMessageChange(message: WireAssistantMessage, change: WireMessageChange): WireAssistantMessage {
   if (change.type === "message") return structuredClone(change.message);
   const content = [...message.content] as WireAssistantBlock[];
   const i = change.contentIndex;
@@ -95,9 +87,7 @@ export function applyMessageChange(
       thinking: (block?.type === "thinking" ? block.thinking : "") + change.delta,
     };
   } else if (change.type === "toolcall_delta") {
-    const block = structuredClone(
-      content[i] ?? { type: "toolCall", id: "", name: "", arguments: {} },
-    );
+    const block = structuredClone(content[i] ?? { type: "toolCall", id: "", name: "", arguments: {} });
     setPath(block as unknown as Record<string, unknown>, change.path, change.delta);
     content[i] = block;
   }
@@ -117,8 +107,7 @@ export class AgentModel extends Emitter {
 
   /** Apply one stream frame; returns true when state changed. */
   apply(frame: Frame): boolean {
-    if (frame.type === "hello" && this.conversationId === undefined)
-      this.conversationId = frame.mainConversationId;
+    if (frame.type === "hello" && this.conversationId === undefined) this.conversationId = frame.mainConversationId;
     if (
       (frame.type === "agent.snapshot" || frame.type === "agent.batch") &&
       frame.conversationId !== this.conversationId
@@ -165,14 +154,9 @@ export class AgentModel extends Emitter {
 
   private reset(snapshot: WireSnapshotEvent) {
     this.entries = new Map(snapshot.entries.map((entry) => [entry.id, entry]));
-    this.live = snapshot.generation?.message
-      ? structuredClone(snapshot.generation.message)
-      : undefined;
+    this.live = snapshot.generation?.message ? structuredClone(snapshot.generation.message) : undefined;
     this.tools = new Map(
-      snapshot.tools.map((slot) => [
-        slot.callId,
-        { name: slot.name, status: slot.status, output: slot.output ?? "" },
-      ]),
+      snapshot.tools.map((slot) => [slot.callId, { name: slot.name, status: slot.status, output: slot.output ?? "" }]),
     );
     this.state.running = !!snapshot.run;
     this.state.agent = snapshot.agent;
@@ -203,8 +187,7 @@ export class AgentModel extends Emitter {
         this.live = undefined;
         return;
       case "message_start":
-        if (event.message.role === "assistant")
-          this.live = structuredClone(event.message as WireAssistantMessage);
+        if (event.message.role === "assistant") this.live = structuredClone(event.message as WireAssistantMessage);
         return;
       case "message_update":
         if (!this.live)
@@ -240,8 +223,7 @@ export class AgentModel extends Emitter {
         };
         const output = event.output;
         if (output && "set" in output) tool.output = output.set;
-        else if (output)
-          tool.output = tool.output.slice(output.trimStart ?? 0) + (output.append ?? "");
+        else if (output) tool.output = tool.output.slice(output.trimStart ?? 0) + (output.append ?? "");
         tool.status = "running";
         this.tools.set(event.toolCallId, tool);
         return;
@@ -269,17 +251,13 @@ export class AgentModel extends Emitter {
         this.state.retry = undefined;
         return;
       case "compaction_start":
-        if (!this.state.compactions.includes(event.taskId))
-          this.state.compactions.push(event.taskId);
+        if (!this.state.compactions.includes(event.taskId)) this.state.compactions.push(event.taskId);
         return;
       case "compaction_end":
         this.state.compactions = this.state.compactions.filter((id) => id !== event.taskId);
         return;
       case "task_failed":
-        this.state.notices = [
-          ...this.state.notices.slice(-9),
-          `${event.kind} failed: ${event.message}`,
-        ];
+        this.state.notices = [...this.state.notices.slice(-9), `${event.kind} failed: ${event.message}`];
         return;
       default:
         return;

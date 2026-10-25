@@ -6,7 +6,8 @@ export type Rule = (sentence: string) => [facet: string, confidence: number];
 /** Keyword rule: "we propose/use/train..." → method, numbers/"improves" → result, else background. */
 export const keywordRule: Rule = (s) => {
   if (/\b(code|available|funded)\b/i.test(s)) return ["other", 0.9];
-  if (/\b(we (propose|use|train|fine-tune|introduce|apply|develop|build)|our (model|method|approach))\b/i.test(s)) return ["method", 0.9];
+  if (/\b(we (propose|use|train|fine-tune|introduce|apply|develop|build)|our (model|method|approach))\b/i.test(s))
+    return ["method", 0.9];
   if (/\b(improv|outperform|achiev|show|reach|result|accuracy|\d+(\.\d+)?%)/i.test(s)) return ["result", 0.85];
   return ["background", 0.8];
 };
@@ -22,7 +23,12 @@ export function scriptedJev(rule: Rule = keywordRule) {
       const [choice, confidence] = rule(sentence);
       const options = Object.keys((q as { criteria: Record<string, unknown> }).criteria);
       const rest = (1 - confidence) / (options.length - 1);
-      answers[id] = { type: "choice", choice, confidence, probabilities: Object.fromEntries(options.map((o) => [o, o === choice ? confidence : rest])) };
+      answers[id] = {
+        type: "choice",
+        choice,
+        confidence,
+        probabilities: Object.fromEntries(options.map((o) => [o, o === choice ? confidence : rest])),
+      };
     }
     calls.push({ sentences });
     return {
@@ -30,7 +36,14 @@ export function scriptedJev(rule: Rule = keywordRule) {
       answers,
       usage: { input_tokens: 100, output_tokens: 10 },
       raw: {} as SystemOneResult["raw"],
-      meta: { provider: "mock", requestedModel: "jev", resolvedModel: "jev-scripted", elapsedMs: 1, attempts: 1, cost: { amount: 0.000014, source: "reported" } },
+      meta: {
+        provider: "mock",
+        requestedModel: "jev",
+        resolvedModel: "jev-scripted",
+        elapsedMs: 1,
+        attempts: 1,
+        cost: { amount: 0.000014, source: "reported" },
+      },
     } as SystemOneResult;
   };
   return { decide, calls };

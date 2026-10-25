@@ -99,8 +99,20 @@ test(
 test(
   "two results with the same normalized title but no shared identifier stay two records, flagged",
   withStore((store) => {
-    const a = store.upsert({ source: "arxiv", externalId: "x", ids: { arxiv: "2401.00001" }, title: "Graph Neural Networks for Gene Regulation", authors: [] });
-    const b = store.upsert({ source: "europepmc", externalId: "y", ids: { doi: "10.1101/2026.01.01.000001" }, title: "Graph neural networks for gene regulation.", authors: [] });
+    const a = store.upsert({
+      source: "arxiv",
+      externalId: "x",
+      ids: { arxiv: "2401.00001" },
+      title: "Graph Neural Networks for Gene Regulation",
+      authors: [],
+    });
+    const b = store.upsert({
+      source: "europepmc",
+      externalId: "y",
+      ids: { doi: "10.1101/2026.01.01.000001" },
+      title: "Graph neural networks for gene regulation.",
+      authors: [],
+    });
     assert.notEqual(a.id, b.id);
     assert.equal(store.count(), 2);
     assert.equal(store.get(b.id)!.possibleDuplicateOf, a.id);
@@ -111,14 +123,32 @@ test(
 test(
   "title-only papers, retraction and enrichment state",
   withStore((store) => {
-    const { id } = store.upsert({ source: "europepmc", externalId: "PPR2", ids: { doi: "10.1101/2026.10.01.555555" }, title: "A fresh preprint", authors: [], server: "bioRxiv" });
+    const { id } = store.upsert({
+      source: "europepmc",
+      externalId: "PPR2",
+      ids: { doi: "10.1101/2026.10.01.555555" },
+      title: "A fresh preprint",
+      authors: [],
+      server: "bioRxiv",
+    });
     let paper = store.get(id)!;
     assert.equal(paper.titleOnly, true);
     assert.equal(paper.enrichment, "pending");
-    assert.deepEqual(store.pendingEnrichment().map((p) => p.id), [id]);
+    assert.deepEqual(
+      store.pendingEnrichment().map((p) => p.id),
+      [id],
+    );
     store.setEnrichment(id, "pending");
     assert.equal(store.get(id)!.enrichmentAttempts, 1);
-    store.upsert({ source: "openalex", externalId: "W5", ids: { doi: "10.1101/2026.10.01.555555", openalex: "W5" }, title: "A fresh preprint", abstract: "Now with text.", authors: [], retracted: true });
+    store.upsert({
+      source: "openalex",
+      externalId: "W5",
+      ids: { doi: "10.1101/2026.10.01.555555", openalex: "W5" },
+      title: "A fresh preprint",
+      abstract: "Now with text.",
+      authors: [],
+      retracted: true,
+    });
     store.setEnrichment(id, "done");
     paper = store.get(id)!;
     assert.equal(paper.titleOnly, false);
@@ -131,10 +161,31 @@ test(
 test(
   "citation links resolve to known papers, also when the cited paper arrives later",
   withStore((store, db) => {
-    const a = store.upsert({ source: "openalex", externalId: "W1", ids: { openalex: "W1" }, title: "Citing paper", authors: [], references: ["https://openalex.org/W2", "W3"] });
-    const b = store.upsert({ source: "openalex", externalId: "W2", ids: { openalex: "W2" }, title: "Cited paper", authors: [] });
-    const links = db.prepare("SELECT cited_value, cited_paper_id FROM citation_links WHERE citing_paper_id = ? ORDER BY cited_value").all(a.id) as any[];
-    assert.deepEqual(links.map((l) => [l.cited_value, l.cited_paper_id === null ? null : Number(l.cited_paper_id)]), [["W2", b.id], ["W3", null]]);
+    const a = store.upsert({
+      source: "openalex",
+      externalId: "W1",
+      ids: { openalex: "W1" },
+      title: "Citing paper",
+      authors: [],
+      references: ["https://openalex.org/W2", "W3"],
+    });
+    const b = store.upsert({
+      source: "openalex",
+      externalId: "W2",
+      ids: { openalex: "W2" },
+      title: "Cited paper",
+      authors: [],
+    });
+    const links = db
+      .prepare("SELECT cited_value, cited_paper_id FROM citation_links WHERE citing_paper_id = ? ORDER BY cited_value")
+      .all(a.id) as any[];
+    assert.deepEqual(
+      links.map((l) => [l.cited_value, l.cited_paper_id === null ? null : Number(l.cited_paper_id)]),
+      [
+        ["W2", b.id],
+        ["W3", null],
+      ],
+    );
   }),
 );
 

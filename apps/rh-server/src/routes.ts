@@ -2,7 +2,15 @@
 import { randomUUID } from "node:crypto";
 import express, { type Request, type Router } from "express";
 import type { EntryId, SubmissionId } from "@earendil-works/pi-durable";
-import { messageText, toTranscript, type Health, type Info, type SendResult, type WireEntry, type WireMessage } from "@rh/sdk";
+import {
+  messageText,
+  toTranscript,
+  type Health,
+  type Info,
+  type SendResult,
+  type WireEntry,
+  type WireMessage,
+} from "@rh/sdk";
 import { requireAuth } from "./auth.ts";
 import { ApiFault, int, invalid, notFound, optInt } from "./errors.ts";
 import type { Hub } from "./hub.ts";
@@ -55,7 +63,8 @@ export function routes(hub: Hub, streams: StreamHub): Router {
     if (typeof content !== "string" || !content.trim()) throw invalid("content must be a nonblank string");
     if (content.length > MAX_MESSAGE) throw invalid(`content must be at most ${MAX_MESSAGE} characters`);
     const requestId = body.requestId === undefined ? randomUUID() : body.requestId;
-    if (typeof requestId !== "string" || requestId.length > 128) throw invalid("requestId must be a string of at most 128 characters");
+    if (typeof requestId !== "string" || requestId.length > 128)
+      throw invalid("requestId must be a string of at most 128 characters");
     const waitMs = body.waitMs === undefined ? 0 : Number(body.waitMs);
     if (!Number.isInteger(waitMs) || waitMs < 0 || waitMs > 300_000) throw invalid("waitMs must be 0 to 300000");
     const { harness, ctx } = p.harness;
@@ -69,16 +78,29 @@ export function routes(hub: Hub, streams: StreamHub): Router {
       const closed = new AbortController();
       res.on("close", () => closed.abort());
       const stop = AbortSignal.any([AbortSignal.timeout(waitMs), closed.signal]);
-      const aborted = new Promise<undefined>((ok) => stop.addEventListener("abort", () => ok(undefined), { once: true }));
+      const aborted = new Promise<undefined>((ok) =>
+        stop.addEventListener("abort", () => ok(undefined), { once: true }),
+      );
       record = (await Promise.race([submission.wait(ctx), aborted])) ?? (await submission.status(ctx));
     }
     let result: SendResult;
     if (record.status === "done" && record.answer !== undefined) {
       const entry = await harness.commit((tx) => tx.entry(record.answer as EntryId), ctx);
-      const text = (entry?.model ?? []).map((m) => messageText(m as WireMessage)).join("").trim();
-      result = { submissionId: submission.id as number, status: "done", answer: { entryId: record.answer as number, text } };
+      const text = (entry?.model ?? [])
+        .map((m) => messageText(m as WireMessage))
+        .join("")
+        .trim();
+      result = {
+        submissionId: submission.id as number,
+        status: "done",
+        answer: { entryId: record.answer as number, text },
+      };
     } else if (record.status === "unanswered") {
-      result = { submissionId: submission.id as number, status: "unanswered", reason: (record as { reason?: string }).reason };
+      result = {
+        submissionId: submission.id as number,
+        status: "unanswered",
+        reason: (record as { reason?: string }).reason,
+      };
     } else {
       result = { submissionId: submission.id as number, status: record.status === "queued" ? "queued" : "pending" };
     }
@@ -125,7 +147,8 @@ export function routes(hub: Hub, streams: StreamHub): Router {
   r.post("/v1/jev/ping", async (req, res) => {
     const p = await project(req);
     const text = bodyOf(req).text;
-    if (text !== undefined && (typeof text !== "string" || text.length > 1000)) throw invalid("text must be a string of at most 1000 characters");
+    if (text !== undefined && (typeof text !== "string" || text.length > 1000))
+      throw invalid("text must be a string of at most 1000 characters");
     res.json(await p.jevPing(text as string | undefined));
   });
 

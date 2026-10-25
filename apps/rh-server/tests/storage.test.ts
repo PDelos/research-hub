@@ -52,16 +52,25 @@ test("migration 2 upgrades a version-1 database and keeps its telemetry rows", a
     const path = join(t.dir, "project.sqlite");
     // A v0.0 database: migration 1 only, with one run recorded.
     const first = openProjectDb(path);
-    first.db.prepare("INSERT INTO agent_runs (run_entry_id, conversation_id, text, started_at) VALUES (7, 1, 'old run', 1)").run();
-    first.db.exec("DROP TABLE kb_notes; DROP TABLE kb_fts; DROP TABLE kb_files; DROP TABLE kb_requests; CREATE TABLE kb_requests (paper_id INTEGER NOT NULL UNIQUE, card_id INTEGER NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL); DROP TABLE judgments; DROP TABLE weight_effects; DROP TABLE weights; DROP TABLE rule_candidates; DROP TABLE kb_requests; ALTER TABLE sweep_papers DROP COLUMN queries_json; ALTER TABLE jev_calls DROP COLUMN extra_json; DROP TABLE sweep_papers; DROP TABLE paper_decisions; DROP TABLE cards; DROP TABLE sweeps; ALTER TABLE papers DROP COLUMN categories_json; ALTER TABLE jev_calls DROP COLUMN tag; ALTER TABLE embedding_calls DROP COLUMN tag; DROP TABLE papers; DROP TABLE paper_ids; DROP TABLE paper_sources; DROP TABLE metadata_cache; DROP TABLE citation_links; DROP TABLE facet_labels; DROP TABLE representations; DROP TABLE embedding_calls; DROP TABLE charters; DROP TABLE scoping_questions; DROP TABLE scheduled_runs; PRAGMA user_version = 1;");
+    first.db
+      .prepare("INSERT INTO agent_runs (run_entry_id, conversation_id, text, started_at) VALUES (7, 1, 'old run', 1)")
+      .run();
+    first.db.exec(
+      "DROP TABLE kb_notes; DROP TABLE kb_fts; DROP TABLE kb_files; DROP TABLE kb_requests; CREATE TABLE kb_requests (paper_id INTEGER NOT NULL UNIQUE, card_id INTEGER NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL); DROP TABLE judgments; DROP TABLE weight_effects; DROP TABLE weights; DROP TABLE rule_candidates; DROP TABLE kb_requests; ALTER TABLE sweep_papers DROP COLUMN queries_json; ALTER TABLE jev_calls DROP COLUMN extra_json; DROP TABLE sweep_papers; DROP TABLE paper_decisions; DROP TABLE cards; DROP TABLE sweeps; ALTER TABLE papers DROP COLUMN categories_json; ALTER TABLE jev_calls DROP COLUMN tag; ALTER TABLE embedding_calls DROP COLUMN tag; DROP TABLE papers; DROP TABLE paper_ids; DROP TABLE paper_sources; DROP TABLE metadata_cache; DROP TABLE citation_links; DROP TABLE facet_labels; DROP TABLE representations; DROP TABLE embedding_calls; DROP TABLE charters; DROP TABLE scoping_questions; DROP TABLE scheduled_runs; PRAGMA user_version = 1;",
+    );
     first.db.close();
     const raw = new DatabaseSync(path);
     assert.equal((raw.prepare("PRAGMA user_version").get() as any).user_version, 1);
     raw.close();
     const second = openProjectDb(path);
     assert.equal((second.db.prepare("PRAGMA user_version").get() as any).user_version, 6);
-    assert.equal((second.db.prepare("SELECT text FROM agent_runs WHERE run_entry_id = 7").get() as any).text, "old run");
-    const insert = second.db.prepare("INSERT OR IGNORE INTO scheduled_runs (kind, slot, trigger, status, created_at) VALUES ('sweep', 'sweep:2026-10-23', 'scheduled', 'requested', 'now')");
+    assert.equal(
+      (second.db.prepare("SELECT text FROM agent_runs WHERE run_entry_id = 7").get() as any).text,
+      "old run",
+    );
+    const insert = second.db.prepare(
+      "INSERT OR IGNORE INTO scheduled_runs (kind, slot, trigger, status, created_at) VALUES ('sweep', 'sweep:2026-10-23', 'scheduled', 'requested', 'now')",
+    );
     insert.run();
     assert.equal(Number(insert.run().changes), 0, "UNIQUE(kind, slot) keeps one record per slot");
     second.db.close();
@@ -76,7 +85,9 @@ test("migration 3 upgrades a version-2 database and keeps its settings", async (
     const path = join(t.dir, "project.sqlite");
     const first = openProjectDb(path);
     first.db.prepare("INSERT INTO settings (key, value, updated_at) VALUES ('kept', '\"yes\"', 'now')").run();
-    first.db.exec("DROP TABLE kb_notes; DROP TABLE kb_fts; DROP TABLE kb_files; DROP TABLE kb_requests; CREATE TABLE kb_requests (paper_id INTEGER NOT NULL UNIQUE, card_id INTEGER NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL); DROP TABLE judgments; DROP TABLE weight_effects; DROP TABLE weights; DROP TABLE rule_candidates; DROP TABLE kb_requests; ALTER TABLE sweep_papers DROP COLUMN queries_json; ALTER TABLE jev_calls DROP COLUMN extra_json; DROP TABLE sweep_papers; DROP TABLE paper_decisions; DROP TABLE cards; DROP TABLE sweeps; ALTER TABLE papers DROP COLUMN categories_json; ALTER TABLE jev_calls DROP COLUMN tag; ALTER TABLE embedding_calls DROP COLUMN tag; DROP TABLE papers; DROP TABLE paper_ids; DROP TABLE paper_sources; DROP TABLE metadata_cache; DROP TABLE citation_links; DROP TABLE facet_labels; DROP TABLE representations; DROP TABLE embedding_calls; PRAGMA user_version = 2;");
+    first.db.exec(
+      "DROP TABLE kb_notes; DROP TABLE kb_fts; DROP TABLE kb_files; DROP TABLE kb_requests; CREATE TABLE kb_requests (paper_id INTEGER NOT NULL UNIQUE, card_id INTEGER NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL); DROP TABLE judgments; DROP TABLE weight_effects; DROP TABLE weights; DROP TABLE rule_candidates; DROP TABLE kb_requests; ALTER TABLE sweep_papers DROP COLUMN queries_json; ALTER TABLE jev_calls DROP COLUMN extra_json; DROP TABLE sweep_papers; DROP TABLE paper_decisions; DROP TABLE cards; DROP TABLE sweeps; ALTER TABLE papers DROP COLUMN categories_json; ALTER TABLE jev_calls DROP COLUMN tag; ALTER TABLE embedding_calls DROP COLUMN tag; DROP TABLE papers; DROP TABLE paper_ids; DROP TABLE paper_sources; DROP TABLE metadata_cache; DROP TABLE citation_links; DROP TABLE facet_labels; DROP TABLE representations; DROP TABLE embedding_calls; PRAGMA user_version = 2;",
+    );
     first.db.close();
     const second = openProjectDb(path);
     assert.equal((second.db.prepare("PRAGMA user_version").get() as any).user_version, 6);
@@ -93,9 +104,17 @@ test("migration 6 upgrades a version-5 database: notes, search index, ingest att
   try {
     const path = join(t.dir, "project.sqlite");
     const first = openProjectDb(path);
-    first.db.exec("DROP TABLE kb_notes; DROP TABLE kb_fts; DROP TABLE kb_files; DROP TABLE kb_requests; CREATE TABLE kb_requests (paper_id INTEGER NOT NULL UNIQUE, card_id INTEGER NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL); PRAGMA user_version = 5;");
-    first.db.prepare("INSERT INTO papers (id, title, title_norm, created_at, updated_at) VALUES (1, 'P', 'p', 'now', 'now')").run();
-    first.db.prepare("INSERT INTO kb_requests (paper_id, card_id, status, created_at, updated_at) VALUES (1, 1, 'pending', 'now', 'now')").run();
+    first.db.exec(
+      "DROP TABLE kb_notes; DROP TABLE kb_fts; DROP TABLE kb_files; DROP TABLE kb_requests; CREATE TABLE kb_requests (paper_id INTEGER NOT NULL UNIQUE, card_id INTEGER NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL); PRAGMA user_version = 5;",
+    );
+    first.db
+      .prepare("INSERT INTO papers (id, title, title_norm, created_at, updated_at) VALUES (1, 'P', 'p', 'now', 'now')")
+      .run();
+    first.db
+      .prepare(
+        "INSERT INTO kb_requests (paper_id, card_id, status, created_at, updated_at) VALUES (1, 1, 'pending', 'now', 'now')",
+      )
+      .run();
     first.db.close();
     const second = openProjectDb(path);
     assert.equal((second.db.prepare("PRAGMA user_version").get() as any).user_version, 6);
@@ -115,13 +134,17 @@ test("migration 5 upgrades a version-4 database: judgments, weights, rule candid
   try {
     const path = join(t.dir, "project.sqlite");
     const first = openProjectDb(path);
-    first.db.exec("DROP TABLE kb_notes; DROP TABLE kb_fts; DROP TABLE kb_files; DROP TABLE kb_requests; CREATE TABLE kb_requests (paper_id INTEGER NOT NULL UNIQUE, card_id INTEGER NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL); DROP TABLE judgments; DROP TABLE weight_effects; DROP TABLE weights; DROP TABLE rule_candidates; DROP TABLE kb_requests; ALTER TABLE sweep_papers DROP COLUMN queries_json; ALTER TABLE jev_calls DROP COLUMN extra_json; PRAGMA user_version = 4;");
+    first.db.exec(
+      "DROP TABLE kb_notes; DROP TABLE kb_fts; DROP TABLE kb_files; DROP TABLE kb_requests; CREATE TABLE kb_requests (paper_id INTEGER NOT NULL UNIQUE, card_id INTEGER NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL); DROP TABLE judgments; DROP TABLE weight_effects; DROP TABLE weights; DROP TABLE rule_candidates; DROP TABLE kb_requests; ALTER TABLE sweep_papers DROP COLUMN queries_json; ALTER TABLE jev_calls DROP COLUMN extra_json; PRAGMA user_version = 4;",
+    );
     first.db.close();
     const second = openProjectDb(path);
     assert.equal((second.db.prepare("PRAGMA user_version").get() as any).user_version, 6);
     for (const table of ["judgments", "weight_effects", "weights", "rule_candidates", "kb_requests"])
       assert.ok(second.db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(table), table);
-    assert.ok((second.db.prepare("PRAGMA table_info(sweep_papers)").all() as any[]).some((c) => c.name === "queries_json"));
+    assert.ok(
+      (second.db.prepare("PRAGMA table_info(sweep_papers)").all() as any[]).some((c) => c.name === "queries_json"),
+    );
     second.db.close();
   } finally {
     t.cleanup();
@@ -133,14 +156,19 @@ test("migration 4 upgrades a version-3 database: sweep tables, categories and co
   try {
     const path = join(t.dir, "project.sqlite");
     const first = openProjectDb(path);
-    first.db.prepare("INSERT INTO papers (title, title_norm, created_at, updated_at) VALUES ('Kept', 'kept', 'now', 'now')").run();
-    first.db.exec("DROP TABLE kb_notes; DROP TABLE kb_fts; DROP TABLE kb_files; DROP TABLE kb_requests; CREATE TABLE kb_requests (paper_id INTEGER NOT NULL UNIQUE, card_id INTEGER NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL); DROP TABLE judgments; DROP TABLE weight_effects; DROP TABLE weights; DROP TABLE rule_candidates; DROP TABLE kb_requests; ALTER TABLE sweep_papers DROP COLUMN queries_json; ALTER TABLE jev_calls DROP COLUMN extra_json; DROP TABLE sweep_papers; DROP TABLE paper_decisions; DROP TABLE cards; DROP TABLE sweeps; ALTER TABLE papers DROP COLUMN categories_json; ALTER TABLE jev_calls DROP COLUMN tag; ALTER TABLE embedding_calls DROP COLUMN tag; PRAGMA user_version = 3;");
+    first.db
+      .prepare("INSERT INTO papers (title, title_norm, created_at, updated_at) VALUES ('Kept', 'kept', 'now', 'now')")
+      .run();
+    first.db.exec(
+      "DROP TABLE kb_notes; DROP TABLE kb_fts; DROP TABLE kb_files; DROP TABLE kb_requests; CREATE TABLE kb_requests (paper_id INTEGER NOT NULL UNIQUE, card_id INTEGER NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL); DROP TABLE judgments; DROP TABLE weight_effects; DROP TABLE weights; DROP TABLE rule_candidates; DROP TABLE kb_requests; ALTER TABLE sweep_papers DROP COLUMN queries_json; ALTER TABLE jev_calls DROP COLUMN extra_json; DROP TABLE sweep_papers; DROP TABLE paper_decisions; DROP TABLE cards; DROP TABLE sweeps; ALTER TABLE papers DROP COLUMN categories_json; ALTER TABLE jev_calls DROP COLUMN tag; ALTER TABLE embedding_calls DROP COLUMN tag; PRAGMA user_version = 3;",
+    );
     first.db.close();
     const second = openProjectDb(path);
     assert.equal((second.db.prepare("PRAGMA user_version").get() as any).user_version, 6);
     for (const table of ["sweeps", "sweep_papers", "paper_decisions", "cards"])
       assert.ok(second.db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(table), table);
-    const columns = (table: string) => (second.db.prepare(`PRAGMA table_info(${table})`).all() as any[]).map((c) => c.name);
+    const columns = (table: string) =>
+      (second.db.prepare(`PRAGMA table_info(${table})`).all() as any[]).map((c) => c.name);
     assert.ok(columns("papers").includes("categories_json"));
     assert.ok(columns("jev_calls").includes("tag"));
     assert.ok(columns("embedding_calls").includes("tag"));
@@ -156,7 +184,16 @@ test("migration 3 adds the paper tables; vector tables follow the configured dim
   const t = tempDir();
   try {
     const { db } = openProjectDb(join(t.dir, "project.sqlite"));
-    for (const table of ["papers", "paper_ids", "paper_sources", "metadata_cache", "citation_links", "facet_labels", "representations", "embedding_calls"])
+    for (const table of [
+      "papers",
+      "paper_ids",
+      "paper_sources",
+      "metadata_cache",
+      "citation_links",
+      "facet_labels",
+      "representations",
+      "embedding_calls",
+    ])
       assert.ok(db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(table), table);
     assert.equal(ensureVectorTables(db, 1024), true, "created");
     assert.equal(ensureVectorTables(db, 1024), false, "unchanged");
@@ -179,7 +216,9 @@ test("startup creates the four vector tables for RH_EMBED_DIMS", async () => {
   try {
     const db = server.hub.project.db;
     for (const kind of ["whole", "background", "method", "result"]) {
-      const row = db.prepare("SELECT sql FROM sqlite_master WHERE name = ?").get(`vec_${kind}`) as { sql: string } | undefined;
+      const row = db.prepare("SELECT sql FROM sqlite_master WHERE name = ?").get(`vec_${kind}`) as
+        | { sql: string }
+        | undefined;
       assert.ok(row, `vec_${kind} exists`);
       assert.match(row.sql, /float\[256\]/);
     }

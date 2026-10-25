@@ -53,7 +53,13 @@ test("a bumped version asks for a lock update, then passes", () => {
 
 test("key order and formatting do not change the hash", () => {
   const cmd = loadCommand("relevance", FIXTURES);
-  const reordered = JSON.parse(JSON.stringify({ ...cmd, policy: { ...cmd.policy }, questions: Object.fromEntries(Object.entries(cmd.questions).reverse()) }));
+  const reordered = JSON.parse(
+    JSON.stringify({
+      ...cmd,
+      policy: { ...cmd.policy },
+      questions: Object.fromEntries(Object.entries(cmd.questions).reverse()),
+    }),
+  );
   assert.equal(commandHash(reordered), commandHash(cmd));
 });
 

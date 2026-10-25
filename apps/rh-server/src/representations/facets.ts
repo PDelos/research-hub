@@ -2,7 +2,15 @@
 // background, method, result or other by the versioned `abstract-facets` command in one call per paper; a label
 // below the command's min_confidence (0.5) counts as other. Inputs over Jev's 30,000-byte cap drop trailing
 // sentences (they count as other).
-import { inputBytes, JevLedger, loadCommand, MAX_INPUT_BYTES, renderCommand, type Decide, type JevCommand } from "@rh/jev";
+import {
+  inputBytes,
+  JevLedger,
+  loadCommand,
+  MAX_INPUT_BYTES,
+  renderCommand,
+  type Decide,
+  type JevCommand,
+} from "@rh/jev";
 import type { Db } from "../db.ts";
 import { splitSentences } from "../papers/normalize.ts";
 
@@ -26,9 +34,7 @@ export class FacetLabeler {
   readonly command: JevCommand;
   readonly minConfidence: number;
 
-  constructor(
-    private readonly options: { db: Db; jevDir: string; decide: Decide; ledger: JevLedger },
-  ) {
+  constructor(private readonly options: { db: Db; jevDir: string; decide: Decide; ledger: JevLedger }) {
     this.command = loadCommand(FACET_COMMAND, options.jevDir);
     this.minConfidence = Number(this.command.policy.min_confidence ?? 0.5);
   }
@@ -40,9 +46,18 @@ export class FacetLabeler {
   /** Stored labels for a paper at the current command version, or undefined when it has none. */
   stored(paperId: number): FacetLabel[] | undefined {
     const rows = this.options.db
-      .prepare("SELECT sentence_index, sentence, facet, confidence FROM facet_labels WHERE paper_id = ? AND command_version = ? ORDER BY sentence_index")
+      .prepare(
+        "SELECT sentence_index, sentence, facet, confidence FROM facet_labels WHERE paper_id = ? AND command_version = ? ORDER BY sentence_index",
+      )
       .all(paperId, this.version) as { sentence_index: number; sentence: string; facet: Facet; confidence: number }[];
-    return rows.length ? rows.map((r) => ({ index: Number(r.sentence_index), sentence: r.sentence, facet: r.facet, confidence: r.confidence })) : undefined;
+    return rows.length
+      ? rows.map((r) => ({
+          index: Number(r.sentence_index),
+          sentence: r.sentence,
+          facet: r.facet,
+          confidence: r.confidence,
+        }))
+      : undefined;
   }
 
   /** Label a paper's abstract with one Jev call and store the labels (replacing older versions). */
@@ -55,7 +70,11 @@ export class FacetLabeler {
     try {
       const rendered = renderCommand(this.command, vars);
       const result = await this.options.decide(rendered.state, rendered.questions, { model: rendered.model });
-      this.options.ledger.record(result, { command: this.command.name, version: this.version, extra: { paperId: paper.id } });
+      this.options.ledger.record(result, {
+        command: this.command.name,
+        version: this.version,
+        extra: { paperId: paper.id },
+      });
       labels = sentences.map((sentence, index) => {
         const answer = index < questions ? result.answers[`facet_${index}`] : undefined;
         if (!answer || answer.type !== "choice") return { index, sentence, facet: "other" as Facet, confidence: 0 };
@@ -64,7 +83,12 @@ export class FacetLabeler {
         return { index, sentence, facet, confidence: answer.confidence, chosen };
       });
     } catch (error) {
-      this.options.ledger.fail(error, { command: this.command.name, version: this.version, questions, extra: { paperId: paper.id } });
+      this.options.ledger.fail(error, {
+        command: this.command.name,
+        version: this.version,
+        questions,
+        extra: { paperId: paper.id },
+      });
       throw error;
     }
     this.save(paper.id, labels);
@@ -83,7 +107,10 @@ export class FacetLabeler {
     for (;;) {
       const vars = { title, sentences: included };
       const rendered = renderCommand(this.command, vars);
-      if (inputBytes({ state: rendered.state, questions: rendered.questions }) <= MAX_INPUT_BYTES || included.length === 1)
+      if (
+        inputBytes({ state: rendered.state, questions: rendered.questions }) <= MAX_INPUT_BYTES ||
+        included.length === 1
+      )
         return { included, vars };
       included = included.slice(0, -1);
     }

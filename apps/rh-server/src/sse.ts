@@ -128,7 +128,11 @@ export class StreamHub {
       mainConversationId: id as number,
     });
     const stream = await watchEvents(harness, id, ctx);
-    sse.send({ type: "agent.snapshot", conversationId: id as number, snapshot: JSON.parse(JSON.stringify(stream.snapshot)) });
+    sse.send({
+      type: "agent.snapshot",
+      conversationId: id as number,
+      snapshot: JSON.parse(JSON.stringify(stream.snapshot)),
+    });
     stream.start(async (events) => {
       if (!sse.closed)
         sse.send({ type: "agent.batch", conversationId: id as number, events: JSON.parse(JSON.stringify(events)) });

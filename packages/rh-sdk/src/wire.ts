@@ -57,11 +57,7 @@ export interface WireToolResultMessage {
 export interface WireOtherMessage {
   role: string;
 }
-export type WireMessage =
-  | WireUserMessage
-  | WireAssistantMessage
-  | WireToolResultMessage
-  | WireOtherMessage;
+export type WireMessage = WireUserMessage | WireAssistantMessage | WireToolResultMessage | WireOtherMessage;
 
 export interface WireEntry {
   id: number;

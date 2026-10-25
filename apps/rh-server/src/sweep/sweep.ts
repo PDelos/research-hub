@@ -49,7 +49,14 @@ export interface SweepRecord {
   conversationId?: number;
   submissionId?: number;
   completion?: { presented: number[]; skipped: { paperId: number; reason: string }[] };
-  cost?: { jevUsd: number; jevCalls: number; embeddingUsd: number; embeddingCalls: number; modelUsd: number; totalUsd: number };
+  cost?: {
+    jevUsd: number;
+    jevCalls: number;
+    embeddingUsd: number;
+    embeddingCalls: number;
+    modelUsd: number;
+    totalUsd: number;
+  };
   startedAt: string;
   endedAt?: string;
 }
@@ -96,7 +103,11 @@ export interface SweepDeps {
  * Weighted draw without replacement (Efraimidis–Spirakis): each query gets the key u^(1/w) and the `max` largest
  * keys win, so a higher weight is drawn more often and every query with a positive weight can be drawn.
  */
-export function drawQueries(queries: { text: string; weight: number }[], max: number, random: () => number): PlannedQuery[] {
+export function drawQueries(
+  queries: { text: string; weight: number }[],
+  max: number,
+  random: () => number,
+): PlannedQuery[] {
   return queries
     .filter((q) => q.weight > 0)
     .map((q) => ({ q, key: Math.pow(Math.max(random(), Number.MIN_VALUE), 1 / q.weight) }))
@@ -108,7 +119,9 @@ export function drawQueries(queries: { text: string; weight: number }[], max: nu
 export function planQueries(charter: Charter, orientation: boolean, random: () => number): PlannedQuery[] {
   const drawn = drawQueries(charter.queries, MAX_QUERIES, random);
   if (!orientation) return drawn;
-  const variants = drawn.slice(0, ORIENTATION_VARIANTS).map((q) => ({ text: `${q.text} review`, weight: q.weight, variant: "review" as const }));
+  const variants = drawn
+    .slice(0, ORIENTATION_VARIANTS)
+    .map((q) => ({ text: `${q.text} review`, weight: q.weight, variant: "review" as const }));
   return [...drawn, ...variants];
 }
 
@@ -116,7 +129,8 @@ export function planQueries(charter: Charter, orientation: boolean, random: () =
 
 const scoreOf = (a: Answer | undefined): number => (a && a.type === "score" ? normalized(a as ScoreAnswer) : 0);
 const noulOf = (a: Answer | undefined): number => (a && a.type === "noul" ? a.noul : 0);
-const choiceOf = (a: Answer | undefined): string | undefined => (a && a.type === "choice" ? (a as ChoiceAnswer).choice : undefined);
+const choiceOf = (a: Answer | undefined): string | undefined =>
+  a && a.type === "choice" ? (a as ChoiceAnswer).choice : undefined;
 
 export function levelFrom(answer: Answer | undefined): Level {
   return LEVELS[Math.min(3, Math.max(0, Math.round(scoreOf(answer) * 3)))];
@@ -136,8 +150,20 @@ export function freshness(publishedAt: string | undefined, now: number): number 
 }
 
 /** Rank score (design D3): importance first, then relevance, question weight, level fit and freshness. */
-export function rankScore(x: { importance: number; relevance: number; questionWeight: number; levelFit: number; freshness: number }): number {
-  return 0.4 * x.importance + 0.2 * x.relevance + 0.15 * Math.min(1, x.questionWeight / 2) + 0.15 * x.levelFit + 0.1 * x.freshness;
+export function rankScore(x: {
+  importance: number;
+  relevance: number;
+  questionWeight: number;
+  levelFit: number;
+  freshness: number;
+}): number {
+  return (
+    0.4 * x.importance +
+    0.2 * x.relevance +
+    0.15 * Math.min(1, x.questionWeight / 2) +
+    0.15 * x.levelFit +
+    0.1 * x.freshness
+  );
 }
 
 export function questionWeight(charter: Charter, matched: string | undefined): number {
@@ -175,7 +201,9 @@ export class SweepRunner {
 
   setCardsPerSweep(n: unknown): number {
     if (typeof n !== "number" || !Number.isInteger(n) || n < CARDS_PER_SWEEP.min || n > CARDS_PER_SWEEP.max)
-      throw new RangeError(`cards_per_sweep must be a whole number from ${CARDS_PER_SWEEP.min} to ${CARDS_PER_SWEEP.max}`);
+      throw new RangeError(
+        `cards_per_sweep must be a whole number from ${CARDS_PER_SWEEP.min} to ${CARDS_PER_SWEEP.max}`,
+      );
     this.deps.settings.set("cards_per_sweep", n);
     return n;
   }
@@ -186,11 +214,15 @@ export class SweepRunner {
   }
 
   list(limit = 50): SweepRecord[] {
-    return (this.deps.db.prepare("SELECT * FROM sweeps ORDER BY id DESC LIMIT ?").all(limit) as unknown as SweepRow[]).map(toRecord);
+    return (
+      this.deps.db.prepare("SELECT * FROM sweeps ORDER BY id DESC LIMIT ?").all(limit) as unknown as SweepRow[]
+    ).map(toRecord);
   }
 
   running(): SweepRecord | undefined {
-    const row = this.deps.db.prepare("SELECT * FROM sweeps WHERE status = 'running' ORDER BY id LIMIT 1").get() as SweepRow | undefined;
+    const row = this.deps.db.prepare("SELECT * FROM sweeps WHERE status = 'running' ORDER BY id LIMIT 1").get() as
+      | SweepRow
+      | undefined;
     return row ? toRecord(row) : undefined;
   }
 
@@ -206,13 +238,17 @@ export class SweepRunner {
   /** Claim requested sweep slots and resume interrupted sweeps (startup, and whenever a slot is recorded). */
   pickUp(): void {
     if (this.closed) return;
-    for (const sweep of (this.deps.db.prepare("SELECT * FROM sweeps WHERE status = 'running'").all() as unknown as SweepRow[]).map(toRecord)) {
+    for (const sweep of (
+      this.deps.db.prepare("SELECT * FROM sweeps WHERE status = 'running'").all() as unknown as SweepRow[]
+    ).map(toRecord)) {
       if (sweep.phase === "cards") this.cards?.resume(sweep);
       else this.schedule(sweep);
     }
     if (this.running()) return;
     const requested = this.deps.db
-      .prepare("SELECT id, trigger FROM scheduled_runs WHERE kind = 'sweep' AND status = 'requested' ORDER BY id LIMIT 1")
+      .prepare(
+        "SELECT id, trigger FROM scheduled_runs WHERE kind = 'sweep' AND status = 'requested' ORDER BY id LIMIT 1",
+      )
       .get() as { id: number; trigger: string } | undefined;
     if (requested) this.start(requested.trigger, Number(requested.id));
   }
@@ -222,10 +258,13 @@ export class SweepRunner {
     const existing = this.running();
     if (existing) return existing;
     const result = this.deps.db
-      .prepare("INSERT INTO sweeps (scheduled_run_id, trigger, status, phase, started_at) VALUES (?, ?, 'running', 'plan', ?)")
+      .prepare(
+        "INSERT INTO sweeps (scheduled_run_id, trigger, status, phase, started_at) VALUES (?, ?, 'running', 'plan', ?)",
+      )
       .run(scheduledRunId ?? null, trigger, nowIso());
     const id = Number(result.lastInsertRowid);
-    if (scheduledRunId !== undefined) this.deps.db.prepare("UPDATE scheduled_runs SET status = 'running' WHERE id = ?").run(scheduledRunId);
+    if (scheduledRunId !== undefined)
+      this.deps.db.prepare("UPDATE scheduled_runs SET status = 'running' WHERE id = ?").run(scheduledRunId);
     this.deps.log.info("sweep.started", { sweep: id, trigger, scheduledRunId });
     const sweep = this.get(id)!;
     this.emit(sweep);
@@ -297,7 +336,10 @@ export class SweepRunner {
         }
       });
     } catch (error) {
-      this.deps.log.error("sweep.drive_failed", { sweep: id, error: error instanceof Error ? error.message : String(error) });
+      this.deps.log.error("sweep.drive_failed", {
+        sweep: id,
+        error: error instanceof Error ? error.message : String(error),
+      });
     } finally {
       this.driving.delete(id);
     }
@@ -354,7 +396,9 @@ export class SweepRunner {
     let since: string | null = null;
     if (!orientation) {
       const previous = this.deps.db
-        .prepare("SELECT started_at FROM sweeps WHERE id < ? AND status IN ('completed', 'no_new_papers') ORDER BY id DESC LIMIT 1")
+        .prepare(
+          "SELECT started_at FROM sweeps WHERE id < ? AND status IN ('completed', 'no_new_papers') ORDER BY id DESC LIMIT 1",
+        )
         .get(sweep.id) as { started_at: string } | undefined;
       since = (previous?.started_at ?? new Date(this.now() - 7 * 86_400_000).toISOString()).slice(0, 10);
     }
@@ -365,7 +409,9 @@ export class SweepRunner {
   }
 
   private async gather(sweep: SweepRecord): Promise<Record<string, number>> {
-    const insert = this.deps.db.prepare("INSERT OR IGNORE INTO sweep_papers (sweep_id, paper_id, status) VALUES (?, ?, 'new')");
+    const insert = this.deps.db.prepare(
+      "INSERT OR IGNORE INTO sweep_papers (sweep_id, paper_id, status) VALUES (?, ?, 'new')",
+    );
     const foundBy = new Map<number, Set<string>>();
     const detail: { query: string; found: number; failed: string[] }[] = [];
     let failedQueries = 0;
@@ -393,7 +439,9 @@ export class SweepRunner {
       }
     }
     // The charter queries that found each paper (review variants count for their base query), for weight nudges.
-    const setQueries = this.deps.db.prepare("UPDATE sweep_papers SET queries_json = ? WHERE sweep_id = ? AND paper_id = ?");
+    const setQueries = this.deps.db.prepare(
+      "UPDATE sweep_papers SET queries_json = ? WHERE sweep_id = ? AND paper_id = ?",
+    );
     for (const [paperId, queries] of foundBy) setQueries.run(JSON.stringify([...queries]), sweep.id, paperId);
     this.setDetail(sweep.id, "gather", detail);
     if (sweep.queries.length && failedQueries === sweep.queries.length)
@@ -402,7 +450,9 @@ export class SweepRunner {
   }
 
   private dedupe(sweep: SweepRecord): Record<string, number> {
-    const rows = this.deps.db.prepare("SELECT paper_id FROM sweep_papers WHERE sweep_id = ? AND status = 'new'").all(sweep.id) as {
+    const rows = this.deps.db
+      .prepare("SELECT paper_id FROM sweep_papers WHERE sweep_id = ? AND status = 'new'")
+      .all(sweep.id) as {
       paper_id: number;
     }[];
     const seen = this.deps.db.prepare(
@@ -412,7 +462,8 @@ export class SweepRunner {
     const drop = this.deps.db.prepare("DELETE FROM sweep_papers WHERE sweep_id = ? AND paper_id = ?");
     let dropped = 0;
     for (const { paper_id } of rows) {
-      const isSeen = (seen.get({ p: paper_id, s: sweep.id }) as { seen: number }).seen || this.deps.judgedPaper?.(Number(paper_id));
+      const isSeen =
+        (seen.get({ p: paper_id, s: sweep.id }) as { seen: number }).seen || this.deps.judgedPaper?.(Number(paper_id));
       if (isSeen) {
         drop.run(sweep.id, paper_id);
         dropped++;
@@ -423,7 +474,10 @@ export class SweepRunner {
 
   private async gate(sweep: SweepRecord): Promise<Record<string, number>> {
     const charter = this.charter();
-    const onTheme = this.deps.decisions.command("on-theme").policy as { relevance_min: number; review_band: [number, number] };
+    const onTheme = this.deps.decisions.command("on-theme").policy as {
+      relevance_min: number;
+      review_band: [number, number];
+    };
     const worthPolicy = this.deps.decisions.command("worth-reading").policy as { worth_min: number };
     const pending = this.idsWith(sweep.id, "new");
     const update = this.deps.db.prepare(
@@ -463,7 +517,13 @@ export class SweepRunner {
     return {
       gated: this.idsWith(sweep.id, "gated").length,
       rejected: this.idsWith(sweep.id, "rejected").length,
-      borderline: Number((this.deps.db.prepare("SELECT COUNT(*) n FROM sweep_papers WHERE sweep_id = ? AND borderline = 1").get(sweep.id) as { n: number }).n),
+      borderline: Number(
+        (
+          this.deps.db
+            .prepare("SELECT COUNT(*) n FROM sweep_papers WHERE sweep_id = ? AND borderline = 1")
+            .get(sweep.id) as { n: number }
+        ).n,
+      ),
     };
   }
 
@@ -478,7 +538,9 @@ export class SweepRunner {
   private async level(sweep: SweepRecord): Promise<Record<string, number>> {
     const charter = this.charter();
     const ids = (
-      this.deps.db.prepare("SELECT paper_id FROM sweep_papers WHERE sweep_id = ? AND status = 'gated' AND level IS NULL").all(sweep.id) as {
+      this.deps.db
+        .prepare("SELECT paper_id FROM sweep_papers WHERE sweep_id = ? AND status = 'gated' AND level IS NULL")
+        .all(sweep.id) as {
         paper_id: number;
       }[]
     ).map((r) => Number(r.paper_id));
@@ -487,16 +549,26 @@ export class SweepRunner {
     );
     await lanes(ids, GATE_PARALLEL, async (id) => {
       const paper = this.deps.papers.store.get(id)!;
-      const row = this.deps.db.prepare("SELECT kind FROM sweep_papers WHERE sweep_id = ? AND paper_id = ?").get(sweep.id, id) as { kind: string | null };
+      const row = this.deps.db
+        .prepare("SELECT kind FROM sweep_papers WHERE sweep_id = ? AND paper_id = ?")
+        .get(sweep.id, id) as { kind: string | null };
       const answers = await this.deps.decisions.decide(id, RANKING, {
         ...gateVars(paper, charter),
         kind: row.kind ?? "unknown",
         year: paper.year ?? "unknown",
         venue: paper.venue ?? paper.server ?? "unknown",
         citations: paper.citedByCount ?? "unknown",
-        stage: sweep.orientation ? "new to the field: needs foundations and overviews first" : "familiar with the field: wants important new work",
+        stage: sweep.orientation
+          ? "new to the field: needs foundations and overviews first"
+          : "familiar with the field: wants important new work",
       });
-      update.run(levelFrom(answers.level.level), noulOf(answers.level.prereq_heavy), scoreOf(answers.importance.importance), sweep.id, id);
+      update.run(
+        levelFrom(answers.level.level),
+        noulOf(answers.level.prereq_heavy),
+        scoreOf(answers.importance.importance),
+        sweep.id,
+        id,
+      );
     });
     return { leveled: this.idsWith(sweep.id, "gated").length };
   }
@@ -505,21 +577,33 @@ export class SweepRunner {
     const charter = this.charter();
     const n = this.cardsPerSweep();
     const rows = this.deps.db
-      .prepare("SELECT paper_id, matched_question, level, importance, relevance FROM sweep_papers WHERE sweep_id = ? AND status = 'gated'")
-      .all(sweep.id) as { paper_id: number; matched_question: string | null; level: Level; importance: number; relevance: number }[];
+      .prepare(
+        "SELECT paper_id, matched_question, level, importance, relevance FROM sweep_papers WHERE sweep_id = ? AND status = 'gated'",
+      )
+      .all(sweep.id) as {
+      paper_id: number;
+      matched_question: string | null;
+      level: Level;
+      importance: number;
+      relevance: number;
+    }[];
     const now = this.now();
     const scored: { id: number; score: number }[] = [];
     let blocked = 0;
-    const set = this.deps.db.prepare("UPDATE sweep_papers SET status = ?, reason = ?, rank_score = ?, rank = ? WHERE sweep_id = ? AND paper_id = ?");
+    const set = this.deps.db.prepare(
+      "UPDATE sweep_papers SET status = ?, reason = ?, rank_score = ?, rank = ? WHERE sweep_id = ? AND paper_id = ?",
+    );
     for (const r of rows) {
       const paper = this.deps.papers.store.get(Number(r.paper_id))!;
-      const score = rankScore({
-        importance: r.importance ?? 0,
-        relevance: r.relevance ?? 0,
-        questionWeight: questionWeight(charter, r.matched_question ?? undefined),
-        levelFit: levelFit(r.level ?? "core", sweep.orientation),
-        freshness: sweep.orientation ? 0.5 : freshness(paper.publishedAt, now),
-      }) + 0.05 * (this.sourceWeight(paper) - 1);
+      const score =
+        rankScore({
+          importance: r.importance ?? 0,
+          relevance: r.relevance ?? 0,
+          questionWeight: questionWeight(charter, r.matched_question ?? undefined),
+          levelFit: levelFit(r.level ?? "core", sweep.orientation),
+          freshness: sweep.orientation ? 0.5 : freshness(paper.publishedAt, now),
+        }) +
+        0.05 * (this.sourceWeight(paper) - 1);
       if (paper.retracted) {
         set.run("blocked", "retracted", score, null, sweep.id, r.paper_id);
         this.deps.log.info("sweep.blocked_retracted", { sweep: sweep.id, paperId: r.paper_id, title: paper.title });
@@ -542,19 +626,26 @@ export class SweepRunner {
 
   private idsWith(sweepId: number, status: string): number[] {
     return (
-      this.deps.db.prepare("SELECT paper_id FROM sweep_papers WHERE sweep_id = ? AND status = ? ORDER BY paper_id").all(sweepId, status) as {
+      this.deps.db
+        .prepare("SELECT paper_id FROM sweep_papers WHERE sweep_id = ? AND status = ? ORDER BY paper_id")
+        .all(sweepId, status) as {
         paper_id: number;
       }[]
     ).map((r) => Number(r.paper_id));
   }
 
   private count(sweepId: number): number {
-    return Number((this.deps.db.prepare("SELECT COUNT(*) n FROM sweep_papers WHERE sweep_id = ?").get(sweepId) as { n: number }).n);
+    return Number(
+      (this.deps.db.prepare("SELECT COUNT(*) n FROM sweep_papers WHERE sweep_id = ?").get(sweepId) as { n: number }).n,
+    );
   }
 
   private patchPhase(id: number, phase: Phase, patch: Partial<PhaseRecord>): void {
     const sweep = this.get(id)!;
-    const phases = { ...sweep.phases, [phase]: { ...(sweep.phases[phase] ?? { status: "running", startedAt: nowIso(), attempts: 0 }), ...patch } };
+    const phases = {
+      ...sweep.phases,
+      [phase]: { ...(sweep.phases[phase] ?? { status: "running", startedAt: nowIso(), attempts: 0 }), ...patch },
+    };
     this.deps.db.prepare("UPDATE sweeps SET phases_json = ? WHERE id = ?").run(JSON.stringify(phases), id);
   }
 
@@ -564,7 +655,12 @@ export class SweepRunner {
 
   private phaseStarted(id: number, phase: Phase, attempt: number): void {
     const existing = this.get(id)!.phases[phase];
-    this.patchPhase(id, phase, { status: "running", startedAt: existing?.startedAt ?? nowIso(), attempts: attempt, error: undefined });
+    this.patchPhase(id, phase, {
+      status: "running",
+      startedAt: existing?.startedAt ?? nowIso(),
+      attempts: attempt,
+      error: undefined,
+    });
     this.deps.log.info("sweep.phase_started", { sweep: id, phase, attempt });
   }
 
@@ -574,7 +670,9 @@ export class SweepRunner {
     const totals = { ...sweep.counts, ...counts };
     const next = PHASES[PHASES.indexOf(phase) + 1];
     if (sweep.status === "running")
-      this.deps.db.prepare("UPDATE sweeps SET phase = ?, counts_json = ?, attempts = 0, next_retry_at = NULL WHERE id = ?").run(next, JSON.stringify(totals), id);
+      this.deps.db
+        .prepare("UPDATE sweeps SET phase = ?, counts_json = ?, attempts = 0, next_retry_at = NULL WHERE id = ?")
+        .run(next, JSON.stringify(totals), id);
     else this.deps.db.prepare("UPDATE sweeps SET counts_json = ? WHERE id = ?").run(JSON.stringify(totals), id);
     this.deps.log.info("sweep.phase_done", { sweep: id, phase, counts });
     this.emit(this.get(id)!);
@@ -592,8 +690,16 @@ export class SweepRunner {
       return undefined;
     }
     const at = this.now() + delays[attempts - 1];
-    this.deps.db.prepare("UPDATE sweeps SET attempts = ?, next_retry_at = ?, error = ? WHERE id = ?").run(attempts, at, error, id);
-    this.deps.log.warn("sweep.phase_failed", { sweep: id, phase, attempt: attempts, error, retryInMs: delays[attempts - 1] });
+    this.deps.db
+      .prepare("UPDATE sweeps SET attempts = ?, next_retry_at = ?, error = ? WHERE id = ?")
+      .run(attempts, at, error, id);
+    this.deps.log.warn("sweep.phase_failed", {
+      sweep: id,
+      phase,
+      attempt: attempts,
+      error,
+      retryInMs: delays[attempts - 1],
+    });
     this.emit(this.get(id)!);
     return at;
   }
@@ -602,14 +708,20 @@ export class SweepRunner {
   cardsSettled(id: number, outcome: { ok: true } | { ok: false; reason: string }): void {
     const sweep = this.get(id);
     if (!sweep || sweep.status !== "running") return;
-    this.patchPhase(id, "cards", { status: outcome.ok ? "done" : "failed", endedAt: nowIso(), ...(outcome.ok ? {} : { error: outcome.reason }) });
+    this.patchPhase(id, "cards", {
+      status: outcome.ok ? "done" : "failed",
+      endedAt: nowIso(),
+      ...(outcome.ok ? {} : { error: outcome.reason }),
+    });
     if (outcome.ok) this.finish(id, "completed");
     else this.finish(id, "failed", outcome.reason);
   }
 
   /** Record the cards turn (conversation and submission) so a restart can re-attach. */
   cardsStarted(id: number, conversationId: number, submissionId: number): void {
-    this.deps.db.prepare("UPDATE sweeps SET conversation_id = ?, submission_id = ? WHERE id = ?").run(conversationId, submissionId, id);
+    this.deps.db
+      .prepare("UPDATE sweeps SET conversation_id = ?, submission_id = ? WHERE id = ?")
+      .run(conversationId, submissionId, id);
     this.patchPhase(id, "cards", { status: "running", startedAt: nowIso(), attempts: 1 });
     this.emit(this.get(id)!);
   }
@@ -621,10 +733,18 @@ export class SweepRunner {
   private finish(id: number, status: Exclude<SweepStatus, "running">, error?: string): void {
     const sweep = this.get(id)!;
     const tag = `sweep:${id}`;
-    const jev = this.deps.db.prepare("SELECT COUNT(*) n, COALESCE(SUM(CASE WHEN cost_source IN ('reported','estimated') THEN cost_usd END), 0) c FROM jev_calls WHERE tag = ?").get(tag) as { n: number; c: number };
-    const emb = this.deps.db.prepare("SELECT COUNT(*) n, COALESCE(SUM(cost_usd), 0) c FROM embedding_calls WHERE tag = ? AND error IS NULL").get(tag) as { n: number; c: number };
+    const jev = this.deps.db
+      .prepare(
+        "SELECT COUNT(*) n, COALESCE(SUM(CASE WHEN cost_source IN ('reported','estimated') THEN cost_usd END), 0) c FROM jev_calls WHERE tag = ?",
+      )
+      .get(tag) as { n: number; c: number };
+    const emb = this.deps.db
+      .prepare("SELECT COUNT(*) n, COALESCE(SUM(cost_usd), 0) c FROM embedding_calls WHERE tag = ? AND error IS NULL")
+      .get(tag) as { n: number; c: number };
     const model = sweep.conversationId
-      ? (this.deps.db.prepare("SELECT COALESCE(SUM(cost_usd), 0) c FROM generations WHERE conversation_id = ?").get(sweep.conversationId) as { c: number })
+      ? (this.deps.db
+          .prepare("SELECT COALESCE(SUM(cost_usd), 0) c FROM generations WHERE conversation_id = ?")
+          .get(sweep.conversationId) as { c: number })
       : { c: 0 };
     const cost = {
       jevUsd: Number(jev.c),
@@ -635,12 +755,18 @@ export class SweepRunner {
       totalUsd: Number(jev.c) + Number(emb.c) + Number(model.c),
     };
     this.deps.db
-      .prepare("UPDATE sweeps SET status = ?, error = ?, next_retry_at = NULL, cost_json = ?, ended_at = ? WHERE id = ?")
+      .prepare(
+        "UPDATE sweeps SET status = ?, error = ?, next_retry_at = NULL, cost_json = ?, ended_at = ? WHERE id = ?",
+      )
       .run(status, error ?? null, JSON.stringify(cost), nowIso(), id);
     if (sweep.scheduledRunId !== undefined)
       this.deps.db
         .prepare("UPDATE scheduled_runs SET status = ?, reason = COALESCE(?, reason) WHERE id = ?")
-        .run(status === "failed" ? "failed" : "done", status === "failed" ? error ?? null : status === "no_new_papers" ? "no new papers" : null, sweep.scheduledRunId);
+        .run(
+          status === "failed" ? "failed" : "done",
+          status === "failed" ? (error ?? null) : status === "no_new_papers" ? "no new papers" : null,
+          sweep.scheduledRunId,
+        );
     this.deps.log.info("sweep.finished", { sweep: id, status, error, cost });
     this.emit(this.get(id)!);
     // The next requested sweep (if any) may start now.
@@ -674,7 +800,10 @@ export function gateVars(paper: Paper, charter: Charter) {
     title: paper.title,
     abstract: clip(paper.abstract) || "(no abstract)",
     questions: charter.questions.map((q: CharterQuestion) => ({ id: q.id, text: q.text })),
-    question_options: { ...Object.fromEntries(charter.questions.map((q) => [q.id, q.text])), none: "None of the research questions" },
+    question_options: {
+      ...Object.fromEntries(charter.questions.map((q) => [q.id, q.text])),
+      none: "None of the research questions",
+    },
     concepts: charter.concepts,
     out_of_scope: charter.outOfScope,
   };

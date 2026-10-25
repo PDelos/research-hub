@@ -61,17 +61,13 @@ export function rankHfs(answers: Record<string, Answer>, policy: HfsPolicy = {})
     const answer = asScore(answers[category], category);
     return { category, score: Math.round(normalized(answer) * 100), confidence: answer.confidence };
   }).sort((a, b) => b.score - a.score || order.indexOf(a.category) - order.indexOf(b.category));
-  const scores = Object.fromEntries(ranked.map((r) => [r.category, r.score])) as Record<
-    HfsCategory,
-    number
-  >;
+  const scores = Object.fromEntries(ranked.map((r) => [r.category, r.score])) as Record<HfsCategory, number>;
   return {
     ranked,
     primary: ranked[0].category,
     labels: ranked.filter((r) => r.score >= threshold).map((r) => r.category),
     scores,
-    suspectCombo:
-      scores.hype >= threshold && scores.signal >= threshold && scores.facts < threshold,
+    suspectCombo: scores.hype >= threshold && scores.signal >= threshold && scores.facts < threshold,
   };
 }
 
@@ -85,8 +81,7 @@ export function attentionScore(
   weights: AttentionWeights = DEFAULT_ATTENTION,
 ): number {
   const raw =
-    (weights.signal * scores.signal + weights.facts * scores.facts + weights.hype * scores.hype) /
-      100 +
+    (weights.signal * scores.signal + weights.facts * scores.facts + weights.hype * scores.hype) / 100 +
     weights.relevance * relevance;
   const all = Object.values(weights);
   const min = all.filter((w) => w < 0).reduce((a, b) => a + b, 0);

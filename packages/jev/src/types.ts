@@ -150,11 +150,7 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 /** Validate runtime input as well as TypeScript callers, before any transport. */
 export function validateRequest(request: unknown): asserts request is SystemOneRequest {
   if (!isRecord(request)) throw new QuestionValidationError("Expected a request object.");
-  if (
-    typeof request.state !== "string" &&
-    !isRecord(request.state) &&
-    !Array.isArray(request.state)
-  ) {
+  if (typeof request.state !== "string" && !isRecord(request.state) && !Array.isArray(request.state)) {
     throw new QuestionValidationError("State must be a string, object, or array.");
   }
   if (request.model !== undefined && (typeof request.model !== "string" || !request.model.trim())) {
@@ -174,21 +170,16 @@ export function validateQuestions(questions: unknown): asserts questions is Ques
       throw new QuestionValidationError(`Question "${id}" has a missing or unknown type.`);
     }
     if (typeof q.instructions === "string" ? !q.instructions.trim() : !isRecord(q.instructions)) {
-      throw new QuestionValidationError(
-        `Question "${id}" needs nonblank string or object instructions.`,
-      );
+      throw new QuestionValidationError(`Question "${id}" needs nonblank string or object instructions.`);
     }
     if (q.type === "noul" && q.criteria !== undefined) {
       if (
         !isRecord(q.criteria) ||
         Object.entries(q.criteria).some(
-          ([key, value]) =>
-            !["true", "false"].includes(key) || (value !== undefined && typeof value !== "string"),
+          ([key, value]) => !["true", "false"].includes(key) || (value !== undefined && typeof value !== "string"),
         )
       ) {
-        throw new QuestionValidationError(
-          `Noul "${id}" criteria must map true/false to descriptions.`,
-        );
+        throw new QuestionValidationError(`Noul "${id}" criteria must map true/false to descriptions.`);
       }
     }
     if (q.type === "choice") {
@@ -212,10 +203,7 @@ export function validateQuestions(questions: unknown): asserts questions is Ques
       if (!Array.isArray(q.criteria)) {
         throw new QuestionValidationError(`Score "${id}" criteria must be an array.`);
       }
-      if (
-        q.criteria.length < LIMITS.MIN_SCORE_LEVELS ||
-        q.criteria.length > LIMITS.MAX_SCORE_LEVELS
-      ) {
+      if (q.criteria.length < LIMITS.MIN_SCORE_LEVELS || q.criteria.length > LIMITS.MAX_SCORE_LEVELS) {
         throw new QuestionValidationError(
           `Score "${id}" must have between ${LIMITS.MIN_SCORE_LEVELS} and ${LIMITS.MAX_SCORE_LEVELS} levels; got ${q.criteria.length}.`,
         );

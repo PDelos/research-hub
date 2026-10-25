@@ -17,7 +17,12 @@ export const noul = (p: number): Answer => ({ type: "noul", noul: p });
 
 export function choice(option: string, options: string[], confidence = 0.9): Answer {
   const rest = (1 - confidence) / Math.max(1, options.length - 1);
-  return { type: "choice", choice: option, confidence, probabilities: Object.fromEntries(options.map((o) => [o, o === option ? confidence : rest])) };
+  return {
+    type: "choice",
+    choice: option,
+    confidence,
+    probabilities: Object.fromEntries(options.map((o) => [o, o === option ? confidence : rest])),
+  };
 }
 
 /** `answer(question id without command prefix, command, question, state)`; return undefined for a neutral default. */
@@ -34,14 +39,25 @@ export function scripted(script: Script, cost = 0.00003) {
       const [command, id] = fullId.includes("__") ? fullId.split("__") : ["", fullId];
       answers[fullId] =
         script(id, command, q, state) ??
-        (q.type === "score" ? score(0.5, q.criteria.length) : q.type === "noul" ? noul(0.5) : choice(Object.keys(q.criteria)[0], Object.keys(q.criteria)));
+        (q.type === "score"
+          ? score(0.5, q.criteria.length)
+          : q.type === "noul"
+            ? noul(0.5)
+            : choice(Object.keys(q.criteria)[0], Object.keys(q.criteria)));
     }
     return {
       model: "jev-scripted",
       answers,
       usage: { input_tokens: 200, output_tokens: 0 },
       raw: {} as SystemOneResult["raw"],
-      meta: { provider: "mock", requestedModel: "jev", resolvedModel: "jev-scripted", elapsedMs: 1, attempts: 1, cost: { amount: cost, source: "reported" } },
+      meta: {
+        provider: "mock",
+        requestedModel: "jev",
+        resolvedModel: "jev-scripted",
+        elapsedMs: 1,
+        attempts: 1,
+        cost: { amount: cost, source: "reported" },
+      },
     } as SystemOneResult;
   };
   return { decide, calls, fail: (error?: Error) => (failing = error) };

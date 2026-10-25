@@ -91,10 +91,19 @@ export class PaperDecisions {
     try {
       result = await this.options.decide(state, questions);
     } catch (error) {
-      this.options.ledger.fail(error, { command: label, version: this.command(missing[0]).version, questions: Object.keys(questions).length, extra: { paperId, versions, tasteExamples: taste.length } });
+      this.options.ledger.fail(error, {
+        command: label,
+        version: this.command(missing[0]).version,
+        questions: Object.keys(questions).length,
+        extra: { paperId, versions, tasteExamples: taste.length },
+      });
       throw error;
     }
-    this.options.ledger.record(result, { command: label, version: this.command(missing[0]).version, extra: { paperId, versions, tasteExamples: taste.length } });
+    this.options.ledger.record(result, {
+      command: label,
+      version: this.command(missing[0]).version,
+      extra: { paperId, versions, tasteExamples: taste.length },
+    });
     const insert = this.options.db.prepare(
       "INSERT OR IGNORE INTO paper_decisions (paper_id, command, version, answers_json, created_at) VALUES (?, ?, ?, ?, ?)",
     );

@@ -64,11 +64,16 @@ export class Feedback {
 
   /** Record (or replace) the judgment of a card; replays weights and updates the knowledge-base request. */
   judge(cardId: number, verdict: unknown, reason?: unknown): Judgment {
-    if (!VERDICTS.includes(verdict as Verdict)) throw new JudgmentInvalid(`verdict must be one of ${VERDICTS.join(", ")}`);
-    if (reason !== undefined && reason !== null && typeof reason !== "string") throw new JudgmentInvalid("reason must be text");
+    if (!VERDICTS.includes(verdict as Verdict))
+      throw new JudgmentInvalid(`verdict must be one of ${VERDICTS.join(", ")}`);
+    if (reason !== undefined && reason !== null && typeof reason !== "string")
+      throw new JudgmentInvalid("reason must be text");
     const text = typeof reason === "string" ? reason.trim() : "";
-    if (text.length > REASON_MAX) throw new JudgmentInvalid(`reason has ${text.length} characters, at most ${REASON_MAX} allowed`);
-    const card = this.deps.db.prepare("SELECT id, paper_id FROM cards WHERE id = ?").get(cardId) as { id: number; paper_id: number } | undefined;
+    if (text.length > REASON_MAX)
+      throw new JudgmentInvalid(`reason has ${text.length} characters, at most ${REASON_MAX} allowed`);
+    const card = this.deps.db.prepare("SELECT id, paper_id FROM cards WHERE id = ?").get(cardId) as
+      | { id: number; paper_id: number }
+      | undefined;
     if (!card) throw new JudgmentInvalid(`no card ${cardId}`);
     const previous = this.get(cardId);
     const now = nowIso();
@@ -81,11 +86,27 @@ export class Feedback {
            rule_probability = CASE WHEN ? THEN NULL ELSE rule_probability END,
            rule_status = CASE WHEN ? THEN excluded.rule_status ELSE rule_status END`,
       )
-      .run(cardId, card.paper_id, verdict as string, text || null, text ? "pending" : "none", now, now, reasonChanged ? 1 : 0, reasonChanged ? 1 : 0, reasonChanged ? 1 : 0);
+      .run(
+        cardId,
+        card.paper_id,
+        verdict as string,
+        text || null,
+        text ? "pending" : "none",
+        now,
+        now,
+        reasonChanged ? 1 : 0,
+        reasonChanged ? 1 : 0,
+        reasonChanged ? 1 : 0,
+      );
     if (reasonChanged) this.deps.db.prepare("DELETE FROM rule_candidates WHERE card_id = ?").run(cardId);
     this.handOff(Number(card.paper_id), cardId, verdict as Verdict);
     this.replay();
-    this.deps.log.info("feedback.judged", { cardId, verdict, reason: text ? `${text.length} chars` : undefined, previous: previous?.verdict });
+    this.deps.log.info("feedback.judged", {
+      cardId,
+      verdict,
+      reason: text ? `${text.length} chars` : undefined,
+      previous: previous?.verdict,
+    });
     for (const l of this.listeners) l(cardId);
     return this.get(cardId)!;
   }
@@ -102,7 +123,9 @@ export class Feedback {
   }
 
   get(cardId: number): Judgment | undefined {
-    const row = this.deps.db.prepare("SELECT * FROM judgments WHERE card_id = ?").get(cardId) as JudgmentRow | undefined;
+    const row = this.deps.db.prepare("SELECT * FROM judgments WHERE card_id = ?").get(cardId) as
+      | JudgmentRow
+      | undefined;
     return row ? toJudgment(row) : undefined;
   }
 
@@ -110,7 +133,9 @@ export class Feedback {
   recent(limit = 8): (Judgment & { title: string })[] {
     return (
       this.deps.db
-        .prepare("SELECT j.*, p.title FROM judgments j JOIN papers p ON p.id = j.paper_id ORDER BY j.updated_at DESC, j.card_id DESC LIMIT ?")
+        .prepare(
+          "SELECT j.*, p.title FROM judgments j JOIN papers p ON p.id = j.paper_id ORDER BY j.updated_at DESC, j.card_id DESC LIMIT ?",
+        )
         .all(limit) as unknown as (JudgmentRow & { title: string })[]
     ).map((r) => ({ ...toJudgment(r), title: r.title }));
   }
@@ -134,16 +159,29 @@ export class Feedback {
            ON CONFLICT (paper_id) DO UPDATE SET status = CASE WHEN status = 'cancelled' THEN 'pending' ELSE status END, updated_at = excluded.updated_at`,
         )
         .run(paperId, cardId, now, now);
-    else this.deps.db.prepare("UPDATE kb_requests SET status = 'cancelled', updated_at = ? WHERE paper_id = ? AND status = 'pending'").run(now, paperId);
+    else
+      this.deps.db
+        .prepare(
+          "UPDATE kb_requests SET status = 'cancelled', updated_at = ? WHERE paper_id = ? AND status = 'pending'",
+        )
+        .run(now, paperId);
   }
 
-  kbRequests(status?: "pending" | "cancelled" | "done"): { paperId: number; cardId: number; status: string; createdAt: string; updatedAt: string }[] {
+  kbRequests(
+    status?: "pending" | "cancelled" | "done",
+  ): { paperId: number; cardId: number; status: string; createdAt: string; updatedAt: string }[] {
     const rows = (
       status
         ? this.deps.db.prepare("SELECT * FROM kb_requests WHERE status = ? ORDER BY created_at").all(status)
         : this.deps.db.prepare("SELECT * FROM kb_requests ORDER BY created_at").all()
     ) as { paper_id: number; card_id: number; status: string; created_at: string; updated_at: string }[];
-    return rows.map((r) => ({ paperId: Number(r.paper_id), cardId: Number(r.card_id), status: r.status, createdAt: r.created_at, updatedAt: r.updated_at }));
+    return rows.map((r) => ({
+      paperId: Number(r.paper_id),
+      cardId: Number(r.card_id),
+      status: r.status,
+      createdAt: r.created_at,
+      updatedAt: r.updated_at,
+    }));
   }
 
   // ---- weights (D2)
@@ -154,25 +192,37 @@ export class Feedback {
     const charter = this.deps.charters.approved()?.charter;
     const weights = new Map<string, { kind: WeightKind; key: string; base: number; value: number }>();
     const id = (kind: WeightKind, key: string) => `${kind}\u0000${key}`;
-    for (const q of charter?.questions ?? []) weights.set(id("question", q.id), { kind: "question", key: q.id, base: q.weight, value: q.weight });
-    for (const q of charter?.queries ?? []) weights.set(id("query", q.text), { kind: "query", key: q.text, base: q.weight, value: q.weight });
+    for (const q of charter?.questions ?? [])
+      weights.set(id("question", q.id), { kind: "question", key: q.id, base: q.weight, value: q.weight });
+    for (const q of charter?.queries ?? [])
+      weights.set(id("query", q.text), { kind: "query", key: q.text, base: q.weight, value: q.weight });
     const judgments = db
       .prepare(
         `SELECT j.card_id, j.paper_id, j.verdict, c.matched_question, c.sweep_id FROM judgments j JOIN cards c ON c.id = j.card_id
          ORDER BY j.updated_at, j.card_id`,
       )
-      .all() as { card_id: number; paper_id: number; verdict: Verdict; matched_question: string | null; sweep_id: number }[];
+      .all() as {
+      card_id: number;
+      paper_id: number;
+      verdict: Verdict;
+      matched_question: string | null;
+      sweep_id: number;
+    }[];
     const effects: { cardId: number; kind: WeightKind; key: string; before: number; after: number }[] = [];
     for (const j of judgments) {
       const targets: [WeightKind, string][] = [];
-      if (j.matched_question && weights.has(id("question", j.matched_question))) targets.push(["question", j.matched_question]);
-      const found = db.prepare("SELECT queries_json FROM sweep_papers WHERE sweep_id = ? AND paper_id = ?").get(j.sweep_id, j.paper_id) as
-        | { queries_json: string | null }
-        | undefined;
+      if (j.matched_question && weights.has(id("question", j.matched_question)))
+        targets.push(["question", j.matched_question]);
+      const found = db
+        .prepare("SELECT queries_json FROM sweep_papers WHERE sweep_id = ? AND paper_id = ?")
+        .get(j.sweep_id, j.paper_id) as { queries_json: string | null } | undefined;
       for (const q of found?.queries_json ? (JSON.parse(found.queries_json) as string[]) : [])
         if (weights.has(id("query", q))) targets.push(["query", q]);
-      for (const { source } of db.prepare("SELECT source FROM paper_sources WHERE paper_id = ? ORDER BY source").all(j.paper_id) as { source: string }[]) {
-        if (!weights.has(id("source", source))) weights.set(id("source", source), { kind: "source", key: source, base: 1, value: 1 });
+      for (const { source } of db
+        .prepare("SELECT source FROM paper_sources WHERE paper_id = ? ORDER BY source")
+        .all(j.paper_id) as { source: string }[]) {
+        if (!weights.has(id("source", source)))
+          weights.set(id("source", source), { kind: "source", key: source, base: 1, value: 1 });
         targets.push(["source", source]);
       }
       for (const [kind, key] of targets) {
@@ -187,7 +237,9 @@ export class Feedback {
       db.exec("DELETE FROM weights; DELETE FROM weight_effects;");
       const insertWeight = db.prepare("INSERT INTO weights (kind, key, base, value) VALUES (?, ?, ?, ?)");
       for (const w of weights.values()) insertWeight.run(w.kind, w.key, w.base, w.value);
-      const insertEffect = db.prepare("INSERT INTO weight_effects (card_id, kind, key, before, after) VALUES (?, ?, ?, ?, ?)");
+      const insertEffect = db.prepare(
+        "INSERT INTO weight_effects (card_id, kind, key, before, after) VALUES (?, ?, ?, ?, ?)",
+      );
       for (const e of effects) insertEffect.run(e.cardId, e.kind, e.key, e.before, e.after);
       db.exec("COMMIT");
     } catch (error) {
@@ -198,12 +250,16 @@ export class Feedback {
 
   /** Effective weight, or `fallback` (the charter weight; 1 for a source) when nothing changed it. */
   weight(kind: WeightKind, key: string, fallback: number): number {
-    const row = this.deps.db.prepare("SELECT value FROM weights WHERE kind = ? AND key = ?").get(kind, key) as { value: number } | undefined;
+    const row = this.deps.db.prepare("SELECT value FROM weights WHERE kind = ? AND key = ?").get(kind, key) as
+      | { value: number }
+      | undefined;
     return row ? Number(row.value) : fallback;
   }
 
   weights(): Weight[] {
-    return (this.deps.db.prepare("SELECT kind, key, base, value FROM weights ORDER BY kind, key").all() as unknown as Weight[]).map((w) => ({
+    return (
+      this.deps.db.prepare("SELECT kind, key, base, value FROM weights ORDER BY kind, key").all() as unknown as Weight[]
+    ).map((w) => ({
       kind: w.kind,
       key: w.key,
       base: Number(w.base),
@@ -212,24 +268,37 @@ export class Feedback {
   }
 
   effects(cardId: number): WeightEffect[] {
-    return (this.deps.db.prepare("SELECT kind, key, before, after FROM weight_effects WHERE card_id = ? ORDER BY rowid").all(cardId) as unknown as WeightEffect[]).map(
-      (e) => ({ kind: e.kind, key: e.key, before: Number(e.before), after: Number(e.after) }),
-    );
+    return (
+      this.deps.db
+        .prepare("SELECT kind, key, before, after FROM weight_effects WHERE card_id = ? ORDER BY rowid")
+        .all(cardId) as unknown as WeightEffect[]
+    ).map((e) => ({ kind: e.kind, key: e.key, before: Number(e.before), after: Number(e.after) }));
   }
 
   // ---- precision@5 (D8)
 
   precision(limit = 30): Precision[] {
     const sweeps = this.deps.db
-      .prepare("SELECT DISTINCT s.id, s.started_at FROM sweeps s JOIN cards c ON c.sweep_id = s.id ORDER BY s.id DESC LIMIT ?")
+      .prepare(
+        "SELECT DISTINCT s.id, s.started_at FROM sweeps s JOIN cards c ON c.sweep_id = s.id ORDER BY s.id DESC LIMIT ?",
+      )
       .all(limit) as { id: number; started_at: string }[];
     return sweeps.map((s) => {
       const top = this.deps.db
-        .prepare("SELECT c.id, j.verdict FROM cards c LEFT JOIN judgments j ON j.card_id = c.id WHERE c.sweep_id = ? ORDER BY c.rank IS NULL, c.rank, c.id LIMIT 5")
+        .prepare(
+          "SELECT c.id, j.verdict FROM cards c LEFT JOIN judgments j ON j.card_id = c.id WHERE c.sweep_id = ? ORDER BY c.rank IS NULL, c.rank, c.id LIMIT 5",
+        )
         .all(s.id) as { id: number; verdict: Verdict | null }[];
       const judged = top.filter((t) => t.verdict).length;
       const good = top.filter((t) => t.verdict === "up" || t.verdict === "star").length;
-      return { sweepId: Number(s.id), startedAt: s.started_at, top: top.length, judged, good, precision: judged ? good / judged : null };
+      return {
+        sweepId: Number(s.id),
+        startedAt: s.started_at,
+        top: top.length,
+        judged,
+        good,
+        precision: judged ? good / judged : null,
+      };
     });
   }
 }

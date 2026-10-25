@@ -65,13 +65,7 @@ test("missing variables throw with every name", () => {
     () => renderCommand(cmd, { title: "x" }),
     (error: unknown) => {
       assert.ok(error instanceof TemplateError);
-      assert.deepEqual(error.missing, [
-        "excerpt",
-        "findings",
-        "section_keywords",
-        "source",
-        "taste_examples",
-      ]);
+      assert.deepEqual(error.missing, ["excerpt", "findings", "section_keywords", "source", "taste_examples"]);
       return true;
     },
   );
@@ -93,8 +87,6 @@ test("each repeats questions per claim with suffixed ids", () => {
 
 test("runCommand renders and decides through the seam", async () => {
   const client = new JevClient({ provider: "mock" });
-  const { result } = await runCommand(loadCommand("hfs", DIR), SAMPLE, (s, q, o) =>
-    client.systemOne(s, q, o),
-  );
+  const { result } = await runCommand(loadCommand("hfs", DIR), SAMPLE, (s, q, o) => client.systemOne(s, q, o));
   assert.deepEqual(Object.keys(result.answers).sort(), ["facts", "hype", "signal"]);
 });

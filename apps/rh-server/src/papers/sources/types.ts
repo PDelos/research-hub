@@ -25,7 +25,10 @@ export interface SourceDeps {
 export function queryTerms(query: string): string[] {
   const terms: string[] = [];
   for (const m of query.matchAll(/"([^"]+)"|(\S+)/g)) {
-    const term = (m[1] ?? m[2]).replace(/[^\p{L}\p{N}\s.+-]/gu, " ").replace(/\s+/g, " ").trim();
+    const term = (m[1] ?? m[2])
+      .replace(/[^\p{L}\p{N}\s.+-]/gu, " ")
+      .replace(/\s+/g, " ")
+      .trim();
     if (term && !/^(and|or|not)$/i.test(term)) terms.push(m[1] ? `"${term}"` : term);
   }
   return terms;

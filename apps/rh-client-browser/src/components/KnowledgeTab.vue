@@ -13,7 +13,13 @@ let poll: ReturnType<typeof setInterval> | undefined;
 type Leaf = { setViewState(state: { type: string; active?: boolean }): Promise<void> };
 type ObsidianWindow = Window & {
   require?: (name: string) => unknown;
-  app?: { workspace?: { layoutReady?: boolean; openLinkText(t: string, s: string): unknown; getLeaf(newLeaf?: boolean): Leaf } };
+  app?: {
+    workspace?: {
+      layoutReady?: boolean;
+      openLinkText(t: string, s: string): unknown;
+      getLeaf(newLeaf?: boolean): Leaf;
+    };
+  };
 };
 const win = () => frame.value?.contentWindow as ObsidianWindow | null | undefined;
 
@@ -40,7 +46,9 @@ async function showGraph() {
 /** On first load Obsidian may still restore its last note after it reports ready; make sure the graph wins. */
 async function graphOnLoad() {
   for (let i = 0; i < 4 && view.value === "graph"; i++) {
-    const active = (win()?.app?.workspace as { activeLeaf?: { view?: { getViewType?(): string } } } | undefined)?.activeLeaf?.view?.getViewType?.();
+    const active = (
+      win()?.app?.workspace as { activeLeaf?: { view?: { getViewType?(): string } } } | undefined
+    )?.activeLeaf?.view?.getViewType?.();
     if (active !== "graph") await showGraph();
     await new Promise((r) => setTimeout(r, 600));
   }
@@ -92,7 +100,10 @@ watch(
   <div class="kb-tab">
     <div v-if="viewer && viewer.state === 'disabled'" class="empty">
       <h2>The knowledge base viewer is off</h2>
-      <p>Set <code>RH_KB_VIEWER=on</code> in the project's <code>.env</code> and restart to read and edit the vault with Obsidian here. The Library tab works either way.</p>
+      <p>
+        Set <code>RH_KB_VIEWER=on</code> in the project's <code>.env</code> and restart to read and edit the vault with
+        Obsidian here. The Library tab works either way.
+      </p>
     </div>
     <div v-else-if="viewer && viewer.state !== 'running'" class="empty">
       <h2>The knowledge base viewer is not running</h2>
@@ -102,7 +113,10 @@ watch(
       <div class="kb-bar">
         <button :class="['ghost', { on: view === 'graph' }]" :disabled="!ready" @click="showGraph">Graph</button>
         <button :class="['ghost', { on: view === 'note' }]" :disabled="!ready" @click="showIndex">Index</button>
-        <span class="muted small kb-legend"><i class="kb-dot kb-dot-papers" /> papers <i class="kb-dot kb-dot-concepts" /> concepts <i class="kb-dot kb-dot-questions" /> questions</span>
+        <span class="muted small kb-legend"
+          ><i class="kb-dot kb-dot-papers" /> papers <i class="kb-dot kb-dot-concepts" /> concepts
+          <i class="kb-dot kb-dot-questions" /> questions</span
+        >
       </div>
       <iframe ref="frame" class="kb-frame" :src="initial" title="Knowledge base" />
       <div v-if="!ready" class="kb-overlay">

@@ -11,8 +11,12 @@ const config = loadConfig({
   RH_PORT: port,
   RH_API_TOKEN: "test-api-token-0123456789",
 } as NodeJS.ProcessEnv);
-const server = await startServer(config, createLogger({ level: "warn", write: (l) => process.stderr.write(`${l}\n`) }), {
-  fauxTokensPerSecond: Number(process.env.FAUX_TPS ?? 2000),
-});
+const server = await startServer(
+  config,
+  createLogger({ level: "warn", write: (l) => process.stderr.write(`${l}\n`) }),
+  {
+    fauxTokensPerSecond: Number(process.env.FAUX_TPS ?? 2000),
+  },
+);
 process.stdout.write(`${server.url}\n`);
 process.on("SIGTERM", () => void server.stop().then(() => process.exit(0)));

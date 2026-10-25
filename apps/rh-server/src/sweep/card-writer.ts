@@ -63,7 +63,8 @@ export class CardWriter implements CardStage {
     const system = loadPrompt(join(deps.promptsDir, "agents"), "card-writer", "SYSTEM_PROMPT.md", {});
     const list = defineAppTool({
       name: "list_candidates",
-      description: "List today's ranked candidates with title, abstract, level, kind, matched question and computed scores.",
+      description:
+        "List today's ranked candidates with title, abstract, level, kind, matched question and computed scores.",
       returns: "Text: one block per candidate, in rank order.",
       parameters: Type.Object({}),
       execute: async () => {
@@ -93,16 +94,22 @@ export class CardWriter implements CardStage {
         const sweep = this.current();
         if (!sweep) return toolError("No sweep is waiting for cards.", ["Stop here."]);
         const entry = this.candidates(sweep, true).find(({ paper }) => paper.id === args.paper_id);
-        if (!entry) return toolError(`Paper ${args.paper_id} is not a candidate of this sweep.`, ["Use an id from list_candidates."]);
+        if (!entry)
+          return toolError(`Paper ${args.paper_id} is not a candidate of this sweep.`, [
+            "Use an id from list_candidates.",
+          ]);
         const summary = args.summary.trim().replace(/\s+/g, " ");
         const words = summary ? summary.split(" ").length : 0;
         if (words < 1 || words > SUMMARY_MAX_WORDS)
-          return toolError(`The summary has ${words} words; 1 to ${SUMMARY_MAX_WORDS} are allowed.`, ["Shorten it and call present_paper again."]);
+          return toolError(`The summary has ${words} words; 1 to ${SUMMARY_MAX_WORDS} are allowed.`, [
+            "Shorten it and call present_paper again.",
+          ]);
         const invented = ungroundedNumbers(summary, `${entry.paper.title} ${entry.paper.abstract ?? ""}`);
         if (invented.length)
-          return toolError(`The summary states numbers that are not in the title or abstract: ${invented.join(", ")}.`, [
-            "Remove them and describe only what the abstract says.",
-          ]);
+          return toolError(
+            `The summary states numbers that are not in the title or abstract: ${invented.join(", ")}.`,
+            ["Remove them and describe only what the abstract says."],
+          );
         const cardId = await once<number>(api, "card", ctx, async () => {
           const { card } = this.deps.cards.create({
             paperId: entry.paper.id,
@@ -111,7 +118,9 @@ export class CardWriter implements CardStage {
             summary,
             scores: this.scores(sweep, entry.sp, entry.paper),
           });
-          this.deps.db.prepare("UPDATE sweep_papers SET status = 'presented' WHERE sweep_id = ? AND paper_id = ?").run(sweep.id, entry.paper.id);
+          this.deps.db
+            .prepare("UPDATE sweep_papers SET status = 'presented' WHERE sweep_id = ? AND paper_id = ?")
+            .run(sweep.id, entry.paper.id);
           return card.id;
         });
         const card = this.deps.cards.get(cardId)!;
@@ -122,7 +131,8 @@ export class CardWriter implements CardStage {
     });
     const complete = defineAppTool({
       name: "complete_sweep",
-      description: "Finish the sweep after presenting the candidates; list every candidate you did not present with a reason.",
+      description:
+        "Finish the sweep after presenting the candidates; list every candidate you did not present with a reason.",
       returns: "Text: the completion record, or which candidates still need a card or a reason.",
       parameters: Type.Object({
         skipped: Type.Optional(
@@ -136,16 +146,26 @@ export class CardWriter implements CardStage {
         if (!sweep) return toolError("No sweep is waiting for cards.", ["Stop here."]);
         const skipped = (args.skipped ?? []).map((s) => ({ paperId: s.paper_id, reason: s.reason.trim() }));
         const all = this.candidates(sweep, true);
-        const open = all.filter(({ sp, paper }) => sp.status !== "presented" && !skipped.some((s) => s.paperId === paper.id && s.reason));
+        const open = all.filter(
+          ({ sp, paper }) => sp.status !== "presented" && !skipped.some((s) => s.paperId === paper.id && s.reason),
+        );
         if (open.length)
-          return toolError(`Not complete: ${open.map(({ paper }) => `#${paper.id}`).join(", ")} have neither a card nor a skip reason.`, [
-            "Present them with present_paper or list them in skipped with a reason.",
-          ]);
+          return toolError(
+            `Not complete: ${open.map(({ paper }) => `#${paper.id}`).join(", ")} have neither a card nor a skip reason.`,
+            ["Present them with present_paper or list them in skipped with a reason."],
+          );
         const result = await once<string>(api, "complete", ctx, async () => {
-          const mark = this.deps.db.prepare("UPDATE sweep_papers SET status = 'skipped', reason = ? WHERE sweep_id = ? AND paper_id = ? AND status = 'candidate'");
+          const mark = this.deps.db.prepare(
+            "UPDATE sweep_papers SET status = 'skipped', reason = ? WHERE sweep_id = ? AND paper_id = ? AND status = 'candidate'",
+          );
           for (const s of skipped) mark.run(s.reason, sweep.id, s.paperId);
-          const presented = all.filter(({ paper }) => this.deps.cards.byPaper(paper.id)?.sweepId === sweep.id).map(({ paper }) => paper.id);
-          this.deps.runner.recordCompletion(sweep.id, { presented, skipped: skipped.filter((s) => all.some(({ paper }) => paper.id === s.paperId)) });
+          const presented = all
+            .filter(({ paper }) => this.deps.cards.byPaper(paper.id)?.sweepId === sweep.id)
+            .map(({ paper }) => paper.id);
+          this.deps.runner.recordCompletion(sweep.id, {
+            presented,
+            skipped: skipped.filter((s) => all.some(({ paper }) => paper.id === s.paperId)),
+          });
           return `Sweep ${sweep.id} complete: ${presented.length} cards, ${skipped.length} skipped.`;
         });
         return toolText(result);
@@ -174,7 +194,10 @@ export class CardWriter implements CardStage {
   private candidates(sweep: SweepRecord, includePresented = false): { sp: SweepPaper; paper: Paper }[] {
     return this.deps.runner
       .papers(sweep.id)
-      .filter((sp) => sp.status === "candidate" || (includePresented && (sp.status === "presented" || sp.status === "skipped")))
+      .filter(
+        (sp) =>
+          sp.status === "candidate" || (includePresented && (sp.status === "presented" || sp.status === "skipped")),
+      )
       .map((sp) => ({ sp, paper: this.deps.papers.store.get(sp.paperId)! }))
       .filter((c) => !!c.paper);
   }
@@ -204,7 +227,11 @@ export class CardWriter implements CardStage {
     const conversation = await harness.createConversation(
       {
         ownership: { kind: "ownerless" },
-        agent: { model: this.deps.catalog.forJob("desk"), thinkingLevel: "low", extensions: [this.extension, this.deps.observe] },
+        agent: {
+          model: this.deps.catalog.forJob("desk"),
+          thinkingLevel: "low",
+          extensions: [this.extension, this.deps.observe],
+        },
       },
       ctx,
     );
@@ -213,9 +240,16 @@ export class CardWriter implements CardStage {
       candidates: String(this.candidates(sweep).length),
       stage: sweep.orientation ? "new to the field: foundations first" : "familiar with the field",
     });
-    const submission = await conversation.submit({ type: "input", content: prompt, requestId: `cards:${sweep.id}` }, ctx);
+    const submission = await conversation.submit(
+      { type: "input", content: prompt, requestId: `cards:${sweep.id}` },
+      ctx,
+    );
     this.deps.runner.cardsStarted(sweep.id, conversation.id as number, submission.id as number);
-    this.deps.log.info("cards.run_started", { sweep: sweep.id, conversationId: conversation.id, submissionId: submission.id });
+    this.deps.log.info("cards.run_started", {
+      sweep: sweep.id,
+      conversationId: conversation.id,
+      submissionId: submission.id,
+    });
     this.resume(this.deps.runner.get(sweep.id)!);
   }
 
@@ -241,7 +275,11 @@ export class CardWriter implements CardStage {
     const sweep = this.deps.runner.get(sweepId);
     if (!sweep || sweep.status !== "running") return;
     if (sweep.completion) this.deps.runner.cardsSettled(sweepId, { ok: true });
-    else this.deps.runner.cardsSettled(sweepId, { ok: false, reason: "the card writer ended without calling complete_sweep" });
+    else
+      this.deps.runner.cardsSettled(sweepId, {
+        ok: false,
+        reason: "the card writer ended without calling complete_sweep",
+      });
   }
 
   /** The conversation of a sweep's card turn (for the Runs view). */

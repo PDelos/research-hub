@@ -26,10 +26,38 @@ const passAll = (id: string, _cmd: string, q: any) => {
 };
 
 const basePaper = (over: Partial<Paper>): Paper => ({
-  id: 1, ids: {}, title: "T", abstract: "A.", authors: [], year: 2026, publishedAt: "2026-09-01", retracted: false, enrichment: "done",
-  enrichmentAttempts: 1, titleOnly: false, categories: [], sources: ["arxiv"], createdAt: "", updatedAt: "", citedByCount: 0, ...over,
+  id: 1,
+  ids: {},
+  title: "T",
+  abstract: "A.",
+  authors: [],
+  year: 2026,
+  publishedAt: "2026-09-01",
+  retracted: false,
+  enrichment: "done",
+  enrichmentAttempts: 1,
+  titleOnly: false,
+  categories: [],
+  sources: ["arxiv"],
+  createdAt: "",
+  updatedAt: "",
+  citedByCount: 0,
+  ...over,
 });
-const sp: SweepPaper = { sweepId: 1, paperId: 1, status: "candidate", borderline: false, relevance: 0.75, matchedQuestion: "Q2", kind: "method", worth: 0.8, novelty: 2 / 3, level: "core", importance: 0.67, rank: 1 };
+const sp: SweepPaper = {
+  sweepId: 1,
+  paperId: 1,
+  status: "candidate",
+  borderline: false,
+  relevance: 0.75,
+  matchedQuestion: "Q2",
+  kind: "method",
+  worth: 0.8,
+  novelty: 2 / 3,
+  level: "core",
+  importance: 0.67,
+  rank: 1,
+};
 
 test("trust is field-aware: an arXiv cs.LG preprint is penalized less than a bioRxiv preprint, and both reasons say so", () => {
   const charter = validateCharter(sampleCharter());
@@ -39,29 +67,67 @@ test("trust is field-aware: an arXiv cs.LG preprint is penalized less than a bio
   assert.equal(ai.trust - bio.trust, 10);
   assert.match(ai.trustReason, /arXiv preprint \(cs\.LG: preprints are the norm, −5\)/);
   assert.match(bio.trustReason, /bioRxiv preprint, not peer-reviewed \(−15\)/);
-  const journal = computeScores(basePaper({ venue: "Nature Methods", citedByCount: 40, publishedAt: "2024-10-23", oaUrl: "https://x" }), sp, charter, { ...opts, hasMethodFacet: true });
+  const journal = computeScores(
+    basePaper({ venue: "Nature Methods", citedByCount: 40, publishedAt: "2024-10-23", oaUrl: "https://x" }),
+    sp,
+    charter,
+    { ...opts, hasMethodFacet: true },
+  );
   assert.ok(journal.trust > ai.trust);
-  assert.match(journal.trustReason, /peer-reviewed: Nature Methods · 40 citations \(20\.0\/year\) · open access · method described/);
+  assert.match(
+    journal.trustReason,
+    /peer-reviewed: Nature Methods · 40 citations \(20\.0\/year\) · open access · method described/,
+  );
   for (const s of [ai, bio, journal]) {
     for (const r of [s.relevanceReason, s.trustReason, s.valueReason]) assert.ok(r.length > 0 && r.length <= 120, r);
     for (const n of [s.relevance, s.trust, s.value]) assert.ok(Number.isInteger(n) && n >= 0 && n <= 100);
   }
-  const long = computeScores(basePaper({}), { ...sp, matchedQuestion: "Q1" }, validateCharter(sampleCharter({ questions: [{ text: "How do protein language models transfer what they learn from sequences to structure and function, and where do they fail?" }, { text: "B?" }, { text: "C?" }] })), opts);
-  assert.ok(long.relevanceReason.length <= 120 && long.relevanceReason.endsWith("…") && long.relevanceReason.includes("Q1"), long.relevanceReason);
+  const long = computeScores(
+    basePaper({}),
+    { ...sp, matchedQuestion: "Q1" },
+    validateCharter(
+      sampleCharter({
+        questions: [
+          {
+            text: "How do protein language models transfer what they learn from sequences to structure and function, and where do they fail?",
+          },
+          { text: "B?" },
+          { text: "C?" },
+        ],
+      }),
+    ),
+    opts,
+  );
+  assert.ok(
+    long.relevanceReason.length <= 120 && long.relevanceReason.endsWith("…") && long.relevanceReason.includes("Q1"),
+    long.relevanceReason,
+  );
   // Relevance: 100 × (0.75 × 0.75 + 0.25 × min(1, 1.5 / 2)) = 75.
   assert.equal(ai.relevance, 75);
   assert.match(ai.relevanceReason, /^Jev relevance 0\.75 · Q2 \(weight 1\.5\): Which tasks need fine-tuning\?/);
 });
 
 test("summaries may not state numbers absent from the title and abstract", () => {
-  assert.deepEqual(ungroundedNumbers("Improves precision to 0.74 on 2,000 proteins.", "precision rises from 0.61 to 0.74 on 2000 proteins"), []);
+  assert.deepEqual(
+    ungroundedNumbers(
+      "Improves precision to 0.74 on 2,000 proteins.",
+      "precision rises from 0.61 to 0.74 on 2000 proteins",
+    ),
+    [],
+  );
   assert.deepEqual(ungroundedNumbers("Improves accuracy by 12%.", "accuracy improves"), ["12"]);
   assert.deepEqual(ungroundedNumbers("Uses ESM-2.", "We fine-tune ESM-2."), []);
 });
 
-async function activeServer(papers: FakePaper[], rules: FauxRule[] = [cardWriterRule], works?: (doi: string) => Record<string, unknown> | undefined) {
+async function activeServer(
+  papers: FakePaper[],
+  rules: FauxRule[] = [cardWriterRule],
+  works?: (doi: string) => Record<string, unknown> | undefined,
+) {
   const jev = scripted(passAll);
-  const server = await startTestServer({ hub: { ticker: false, fauxRules: rules, jevDecide: jev.decide, paperFetch: arxivOnlyFetch(papers, works) } });
+  const server = await startTestServer({
+    hub: { ticker: false, fauxRules: rules, jevDecide: jev.decide, paperFetch: arxivOnlyFetch(papers, works) },
+  });
   const p = server.hub.project;
   p.brief.write("# Protein LMs");
   p.charters.saveDraft(validateCharter(sampleCharter()), "agent");
@@ -79,7 +145,14 @@ test("a sweep's candidates become complete cards written by the card writer, and
   const papers = fakePapers(9);
   const retracted = `10.48550/arxiv.${papers[8].id}`;
   const { server, p } = await activeServer(papers, [cardWriterRule], (doi) =>
-    doi === retracted ? { id: "https://openalex.org/W9", doi: `https://doi.org/${doi}`, display_name: papers[8].title, is_retracted: true } : undefined,
+    doi === retracted
+      ? {
+          id: "https://openalex.org/W9",
+          doi: `https://doi.org/${doi}`,
+          display_name: papers[8].title,
+          is_retracted: true,
+        }
+      : undefined,
   );
   try {
     const sweep = await sweepOnce(p);
@@ -88,18 +161,37 @@ test("a sweep's candidates become complete cards written by the card writer, and
     assert.equal(cards.length, 7);
     for (const card of cards) {
       const paper = p.papers.store.get(card.paperId)!;
-      assert.ok(paper.title && paper.authors.length && paper.year && (paper.venue ?? paper.server) && (paper.url ?? paper.ids.doi));
+      assert.ok(
+        paper.title &&
+          paper.authors.length &&
+          paper.year &&
+          (paper.venue ?? paper.server) &&
+          (paper.url ?? paper.ids.doi),
+      );
       assert.ok(card.summary.split(" ").length <= 80);
       assert.equal(card.matchedQuestion, "Q2");
       assert.equal(card.level, "core");
       for (const r of [card.relevanceReason, card.trustReason, card.valueReason]) assert.ok(r && r.length <= 120);
       // Traceability: every score shows its decisions with command versions, and its inputs.
-      assert.deepEqual(Object.keys(card.details.decisions).sort(), ["importance", "level", "on-theme", "paper-kind", "worth-reading"]);
+      assert.deepEqual(Object.keys(card.details.decisions).sort(), [
+        "importance",
+        "level",
+        "on-theme",
+        "paper-kind",
+        "worth-reading",
+      ]);
       assert.ok(Object.values(card.details.decisions).every((d) => d.version === 1));
       assert.ok(card.details.formulas.trust && card.details.inputs.relevance === 0.75);
     }
-    assert.deepEqual(cards.map((c) => c.rank), [1, 2, 3, 4, 5, 6, 7]);
-    assert.equal(p.cards.byPaper(p.papers.store.find({ arxiv: papers[8].id })!.id), undefined, "the retracted paper has no card");
+    assert.deepEqual(
+      cards.map((c) => c.rank),
+      [1, 2, 3, 4, 5, 6, 7],
+    );
+    assert.equal(
+      p.cards.byPaper(p.papers.store.find({ arxiv: papers[8].id })!.id),
+      undefined,
+      "the retracted paper has no card",
+    );
     assert.deepEqual(sweep.completion!.skipped, []);
     assert.equal(sweep.completion!.presented.length, 7);
     assert.equal(sweep.phases.cards?.status, "done");
@@ -118,15 +210,24 @@ test("an invented number is refused; presenting a paper twice keeps one card; a 
     const presents = turn.calls.filter((c) => c.name === "present_paper");
     if (!tried) {
       tried = true;
-      return call("present_paper", { paper_id: ids[0], summary: "This method improves accuracy by 99% over all baselines." });
+      return call("present_paper", {
+        paper_id: ids[0],
+        summary: "This method improves accuracy by 99% over all baselines.",
+      });
     }
     // Then: present the first paper twice (a replay), every other except the last, and skip the last.
     const plan = [ids[0], ids[0], ...ids.slice(1, -1)];
     const done = presents.length - 1;
-    if (done < plan.length) return call("present_paper", { paper_id: plan[done], summary: "A protein language model method for better contact maps." });
+    if (done < plan.length)
+      return call("present_paper", {
+        paper_id: plan[done],
+        summary: "A protein language model method for better contact maps.",
+      });
     if (!turn.calls.some((c) => c.name === "complete_sweep")) return call("complete_sweep", { skipped: [] });
     if (!turn.results.some((r) => r.name === "complete_sweep" && !r.isError))
-      return call("complete_sweep", { skipped: [{ paper_id: ids.at(-1), reason: "duplicate of a paper already in the feed" }] });
+      return call("complete_sweep", {
+        skipped: [{ paper_id: ids.at(-1), reason: "duplicate of a paper already in the feed" }],
+      });
     return say("done");
   };
   const { server, p } = await activeServer(fakePapers(4), [tricky]);
@@ -135,14 +236,19 @@ test("an invented number is refused; presenting a paper twice keeps one card; a 
     assert.equal(sweep.status, "completed", sweep.error ?? "");
     // Tool results as recorded by telemetry.
     await new Promise((r) => setTimeout(r, 200));
-    const view = JSON.stringify(p.db.prepare("SELECT tool_name, is_error, result_text FROM tool_calls ORDER BY id").all());
+    const view = JSON.stringify(
+      p.db.prepare("SELECT tool_name, is_error, result_text FROM tool_calls ORDER BY id").all(),
+    );
     assert.match(view, /states numbers that are not in the title or abstract: 99/);
     assert.match(view, /have neither a card nor a skip reason/);
     assert.equal(p.cards.count(), 3, "one card per paper even when presented twice");
     assert.ok(p.cards.list().every((c) => !/99/.test(c.summary)));
     const skipped = p.sweeps.papers(sweep.id).find((x) => x.status === "skipped")!;
     assert.equal(skipped.reason, "duplicate of a paper already in the feed");
-    assert.deepEqual(sweep.completion!.skipped.map((s) => s.reason), ["duplicate of a paper already in the feed"]);
+    assert.deepEqual(
+      sweep.completion!.skipped.map((s) => s.reason),
+      ["duplicate of a paper already in the feed"],
+    );
   } finally {
     await server.stop();
   }
@@ -154,7 +260,10 @@ test("a card turn that ends without complete_sweep fails the sweep and keeps its
     const listed = turn.results.find((r) => r.name === "list_candidates");
     if (!listed) return call("list_candidates", {});
     if (!turn.calls.some((c) => c.name === "present_paper"))
-      return call("present_paper", { paper_id: Number(listed.text.match(/^#(\d+)/)![1]), summary: "A protein language model method." });
+      return call("present_paper", {
+        paper_id: Number(listed.text.match(/^#(\d+)/)![1]),
+        summary: "A protein language model method.",
+      });
     return say("I am done.");
   };
   const { server, p } = await activeServer(fakePapers(3), [lazy]);
@@ -174,14 +283,24 @@ test("a restart during the card turn re-attaches and completes the sweep with on
   try {
     const papers = fakePapers(3);
     const jev = scripted(passAll);
-    const opts = { dataDir: t.dir, hub: { ticker: false, fauxRules: [cardWriterRule], fauxTokensPerSecond: 40, jevDecide: jev.decide, paperFetch: arxivOnlyFetch(papers) } };
+    const opts = {
+      dataDir: t.dir,
+      hub: {
+        ticker: false,
+        fauxRules: [cardWriterRule],
+        fauxTokensPerSecond: 40,
+        jevDecide: jev.decide,
+        paperFetch: arxivOnlyFetch(papers),
+      },
+    };
     const first = await startTestServer(opts);
     const p = first.hub.project;
     p.brief.write("# Protein LMs");
     p.charters.saveDraft(validateCharter(sampleCharter()), "agent");
     p.charters.approve();
     p.scheduler.trigger("sweep");
-    for (let i = 0; i < 1000 && !(p.sweeps.list()[0]?.phase === "cards" && p.cards.count() >= 1); i++) await new Promise((r) => setTimeout(r, 10));
+    for (let i = 0; i < 1000 && !(p.sweeps.list()[0]?.phase === "cards" && p.cards.count() >= 1); i++)
+      await new Promise((r) => setTimeout(r, 10));
     const id = p.sweeps.list()[0].id;
     assert.equal(p.sweeps.get(id)!.status, "running", "stopped in the middle of the card turn");
     await first.stop();

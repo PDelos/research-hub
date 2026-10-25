@@ -7,7 +7,8 @@ import { call, say } from "@rh/durable-agent";
 import { charterWriterRule, fauxCharter } from "../src/faux-rules.ts";
 import { startTestServer, TOKEN, until, type TestServer } from "./helpers.ts";
 
-const BRIEF = "# Protein language models\nI want to understand how protein language models learn structure and where they fail.";
+const BRIEF =
+  "# Protein language models\nI want to understand how protein language models learn structure and where they fail.";
 
 function api(server: TestServer) {
   return async (method: string, path: string, body?: unknown) => {
@@ -23,10 +24,14 @@ function api(server: TestServer) {
 
 async function settled(call: ReturnType<typeof api>) {
   let last: any;
-  await until(async () => {
-    last = (await call("GET", "/v1/charter")).body;
-    return last.run && last.run.status !== "running";
-  }, 20_000, "charter run settled");
+  await until(
+    async () => {
+      last = (await call("GET", "/v1/charter")).body;
+      return last.run && last.run.status !== "running";
+    },
+    20_000,
+    "charter run settled",
+  );
   return last;
 }
 
@@ -44,14 +49,21 @@ test("2.1 + 3.3 a fresh project needs a brief; a valid brief yields a Q1..Qn dra
     const view = await settled(http);
     assert.equal(view.run.status, "done");
     assert.equal(view.status, "charter-review");
-    assert.deepEqual(view.draft.charter.questions.map((q: any) => q.id), ["Q1", "Q2", "Q3"]);
+    assert.deepEqual(
+      view.draft.charter.questions.map((q: any) => q.id),
+      ["Q1", "Q2", "Q3"],
+    );
     assert.equal(view.questions.length, 2);
     assert.equal(view.questionsLeft, 3);
 
     // Separate from chat: the chat transcript has no drafting messages; the drafting run used the review model.
     const transcript = JSON.stringify((await http("GET", "/v1/transcript")).body.items);
     assert.ok(!transcript.includes("Draft the charter"));
-    await until(async () => (await http("GET", "/v1/runs")).body.some((r: any) => r.text.includes("Draft the charter")), 5_000, "run recorded");
+    await until(
+      async () => (await http("GET", "/v1/runs")).body.some((r: any) => r.text.includes("Draft the charter")),
+      5_000,
+      "run recorded",
+    );
     const runs = (await http("GET", "/v1/runs")).body;
     const draftRun = runs.find((r: any) => r.text.includes("Draft the charter"));
     assert.deepEqual(draftRun.models, ["anthropic/claude-sonnet-5.5"]);
@@ -66,7 +78,16 @@ test("3.2 a replayed tool call records the draft and the questions once; a sixth
   try {
     const project = server.hub.project;
     project.brief.write(BRIEF);
-    project.settings.set("charter_run", { id: 1, kind: "draft", status: "running", round: 1, invalidSaves: 0, saved: false, startedAt: "now", prompt: "" });
+    project.settings.set("charter_run", {
+      id: 1,
+      kind: "draft",
+      status: "running",
+      round: 1,
+      invalidSaves: 0,
+      saved: false,
+      startedAt: "now",
+      prompt: "",
+    });
     // A fake tool API with a durable memo, as pi-durable gives a replayed call.
     const memo = new Map<string, unknown>();
     const fakeApi = {
@@ -122,9 +143,14 @@ test("3.4 an invalid draft is corrected and never stored; 3 invalid saves fail t
     assert.equal(first.run.status, "done");
     assert.equal(first.run.invalidSaves, 1);
     const errors = (await http("GET", "/v1/runs")).body;
-    const detail = (await http("GET", `/v1/runs/${errors.find((r: any) => r.text.includes("Draft the charter")).id}`)).body;
+    const detail = (await http("GET", `/v1/runs/${errors.find((r: any) => r.text.includes("Draft the charter")).id}`))
+      .body;
     assert.ok(detail.toolCallList.some((c: any) => c.isError && /questions: 9 given, 3 to 7 allowed/.test(c.result)));
-    assert.equal((server.hub.project.db.prepare("SELECT COUNT(*) n FROM charters").get() as any).n, 1, "only the valid draft");
+    assert.equal(
+      (server.hub.project.db.prepare("SELECT COUNT(*) n FROM charters").get() as any).n,
+      1,
+      "only the valid draft",
+    );
 
     invalidMode = "always";
     await http("PUT", "/v1/brief", { brief: `${BRIEF}\nA second version.` });
@@ -149,12 +175,21 @@ test("3.5 + 3.6 + 2.2 answers revise the draft; approval versions it; edits and 
     await http("PUT", "/v1/brief", { brief: BRIEF });
     const draft = await settled(http);
     const q = draft.questions.find((x: any) => /clinical/i.test(x.text));
-    const answered = await http("POST", "/v1/charter/answers", { answers: [{ id: q.id, answer: "Clinical applications are out of scope" }] });
+    const answered = await http("POST", "/v1/charter/answers", {
+      answers: [{ id: q.id, answer: "Clinical applications are out of scope" }],
+    });
     assert.equal(answered.status, 200);
     const revised = await settled(http);
     assert.equal(revised.run.kind, "revision");
-    assert.ok(revised.draft.charter.outOfScope.includes("Clinical applications"), JSON.stringify(revised.draft.charter.outOfScope));
-    assert.equal((await http("POST", "/v1/charter/answers", { answers: [{ id: q.id, answer: "again" }] })).status, 400, "already answered");
+    assert.ok(
+      revised.draft.charter.outOfScope.includes("Clinical applications"),
+      JSON.stringify(revised.draft.charter.outOfScope),
+    );
+    assert.equal(
+      (await http("POST", "/v1/charter/answers", { answers: [{ id: q.id, answer: "again" }] })).status,
+      400,
+      "already answered",
+    );
 
     const approved = (await http("POST", "/v1/charter/approve")).body;
     assert.equal(approved.status, "active");

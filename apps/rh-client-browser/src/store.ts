@@ -138,8 +138,7 @@ export async function connect() {
           store.sweep = frame.sweep ?? undefined;
           void refreshFeed();
           void refreshSchedule();
-        }
-        else if (frame.type === "usage") {
+        } else if (frame.type === "usage") {
           store.totals = frame.totals;
           refreshRunsSoon();
           void refreshProject();

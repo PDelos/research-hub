@@ -53,9 +53,17 @@ export class PaperService {
       contactEmail: config.contactEmail,
       log,
       // Offline mode never reaches the real APIs, so there is nothing to pace.
-      ...(offline ? { pacing: { "export.arxiv.org": 0, "api.openalex.org": 0, "www.ebi.ac.uk": 0, "api.semanticscholar.org": 0 } } : {}),
+      ...(offline
+        ? { pacing: { "export.arxiv.org": 0, "api.openalex.org": 0, "www.ebi.ac.uk": 0, "api.semanticscholar.org": 0 } }
+        : {}),
     });
-    this.search = new PaperSearch({ store: this.store, cache: this.cache, http, s2ApiKey: offline ? undefined : config.s2ApiKey, log });
+    this.search = new PaperSearch({
+      store: this.store,
+      cache: this.cache,
+      http,
+      s2ApiKey: offline ? undefined : config.s2ApiKey,
+      log,
+    });
     const embedder =
       options.embedder ??
       (offline || !options.openrouterKey
@@ -68,7 +76,14 @@ export class PaperService {
             http: new PoliteHttp({ fetch: options.fetch, log }),
           }));
     this.facets = new FacetLabeler({ db, jevDir: options.jevDir, decide: options.decide, ledger: options.jevLedger });
-    this.vectors = new PaperVectors({ db, settings: options.settings, store: this.store, embedder, facets: this.facets, log });
+    this.vectors = new PaperVectors({
+      db,
+      settings: options.settings,
+      store: this.store,
+      embedder,
+      facets: this.facets,
+      log,
+    });
     this.citations = new Citations(db);
     this.vectors.syncModel();
   }
@@ -81,7 +96,9 @@ export class PaperService {
       represented = await this.vectors.represent(result.papers.map((p) => p.id));
     } catch (error) {
       // Records are stored either way; missing vectors are filled by the next call or the background catch-up.
-      this.options.log.warn("representations.failed", { error: error instanceof Error ? error.message : String(error) });
+      this.options.log.warn("representations.failed", {
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
     return { ...result, represented };
   }
@@ -101,7 +118,10 @@ export class PaperService {
         }
         this.options.log.info("representations.catch_up_done", { pending: this.vectors.pending() });
       } catch (error) {
-        this.options.log.warn("representations.catch_up_failed", { error: error instanceof Error ? error.message : String(error), pending: this.vectors.pending() });
+        this.options.log.warn("representations.catch_up_failed", {
+          error: error instanceof Error ? error.message : String(error),
+          pending: this.vectors.pending(),
+        });
       }
     })();
   }

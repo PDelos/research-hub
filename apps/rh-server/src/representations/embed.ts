@@ -35,7 +35,17 @@ export class EmbeddingLedger {
       .prepare(
         "INSERT INTO embedding_calls (model, inputs, tokens, cost_usd, cost_source, elapsed_ms, error, tag, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
       )
-      .run(call.model, call.inputs, call.tokens ?? null, call.costUsd ?? null, call.costSource, call.elapsedMs, call.error ?? null, currentCostTag() ?? null, nowIso());
+      .run(
+        call.model,
+        call.inputs,
+        call.tokens ?? null,
+        call.costUsd ?? null,
+        call.costSource,
+        call.elapsedMs,
+        call.error ?? null,
+        currentCostTag() ?? null,
+        nowIso(),
+      );
   }
 
   totals(sinceIso?: string): { calls: number; inputs: number; tokens: number; usd: number } {
@@ -82,7 +92,8 @@ export class OpenRouterEmbedder implements Embedder {
 
   async embed(texts: string[]): Promise<Float32Array[]> {
     const out: Float32Array[] = [];
-    for (let i = 0; i < texts.length; i += EMBED_BATCH) out.push(...(await this.batch(texts.slice(i, i + EMBED_BATCH))));
+    for (let i = 0; i < texts.length; i += EMBED_BATCH)
+      out.push(...(await this.batch(texts.slice(i, i + EMBED_BATCH))));
     return out;
   }
 
@@ -105,11 +116,13 @@ export class OpenRouterEmbedder implements Embedder {
       });
       if (!body.data || body.data.length !== input.length)
         throw new Error(body.error?.message ?? `expected ${input.length} embeddings, got ${body.data?.length ?? 0}`);
-      const vectors = [...body.data].sort((a, b) => a.index - b.index).map((d) => {
-        if (d.embedding.length !== this.dims)
-          throw new Error(`${this.model} returned ${d.embedding.length} dimensions, RH_EMBED_DIMS is ${this.dims}`);
-        return l2normalize(Float32Array.from(d.embedding));
-      });
+      const vectors = [...body.data]
+        .sort((a, b) => a.index - b.index)
+        .map((d) => {
+          if (d.embedding.length !== this.dims)
+            throw new Error(`${this.model} returned ${d.embedding.length} dimensions, RH_EMBED_DIMS is ${this.dims}`);
+          return l2normalize(Float32Array.from(d.embedding));
+        });
       call.tokens = body.usage?.total_tokens ?? body.usage?.prompt_tokens;
       if (typeof body.usage?.cost === "number") {
         call.costUsd = body.usage.cost;
@@ -139,7 +152,13 @@ export class FakeEmbedder implements Embedder {
 
   async embed(texts: string[]): Promise<Float32Array[]> {
     for (let i = 0; i < texts.length; i += EMBED_BATCH)
-      this.ledger?.record({ model: this.model, inputs: Math.min(EMBED_BATCH, texts.length - i), costUsd: 0, costSource: "offline", elapsedMs: 0 });
+      this.ledger?.record({
+        model: this.model,
+        inputs: Math.min(EMBED_BATCH, texts.length - i),
+        costUsd: 0,
+        costSource: "offline",
+        elapsedMs: 0,
+      });
     return texts.map((t) => this.vector(t));
   }
 
@@ -159,8 +178,33 @@ export class FakeEmbedder implements Embedder {
   }
 }
 
-const STOP = new Set(["the", "a", "an", "of", "and", "or", "in", "on", "for", "to", "with", "we", "our", "is", "are", "by", "from", "this", "that", "as", "at", "be"]);
+const STOP = new Set([
+  "the",
+  "a",
+  "an",
+  "of",
+  "and",
+  "or",
+  "in",
+  "on",
+  "for",
+  "to",
+  "with",
+  "we",
+  "our",
+  "is",
+  "are",
+  "by",
+  "from",
+  "this",
+  "that",
+  "as",
+  "at",
+  "be",
+]);
 
 function fakeWords(text: string): string[] {
-  return (text.toLowerCase().match(/[a-z0-9]+/g) ?? []).filter((w) => !STOP.has(w)).map((w) => (w.length > 3 ? w.replace(/s$/, "") : w));
+  return (text.toLowerCase().match(/[a-z0-9]+/g) ?? [])
+    .filter((w) => !STOP.has(w))
+    .map((w) => (w.length > 3 ? w.replace(/s$/, "") : w));
 }

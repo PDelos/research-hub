@@ -26,8 +26,20 @@ function setup(rule?: Parameters<typeof scriptedJev>[0]) {
   const jev = scriptedJev(rule);
   const records: any[] = [];
   const store = new PaperStore(db);
-  for (let i = 1; i <= 4; i++) store.upsert({ source: "arxiv", externalId: String(i), ids: { arxiv: `2601.0000${i}` }, title: `Paper ${i}`, authors: [] });
-  const labeler = new FacetLabeler({ db, jevDir: JEV_DIR, decide: jev.decide, ledger: new JevLedger((r) => records.push(r)) });
+  for (let i = 1; i <= 4; i++)
+    store.upsert({
+      source: "arxiv",
+      externalId: String(i),
+      ids: { arxiv: `2601.0000${i}` },
+      title: `Paper ${i}`,
+      authors: [],
+    });
+  const labeler = new FacetLabeler({
+    db,
+    jevDir: JEV_DIR,
+    decide: jev.decide,
+    ledger: new JevLedger((r) => records.push(r)),
+  });
   return { db, jev, records, labeler, done: () => (db.close(), t.cleanup()) };
 }
 
@@ -48,19 +60,30 @@ test("an abstract with 6 sentences gets one label per sentence from one abstract
   try {
     const labels = await s.labeler.label({ id: 1, title: "Contacts for orphan proteins", abstract: SIX });
     assert.equal(labels.length, 6);
-    assert.deepEqual(labels.map((l) => l.facet), ["background", "background", "method", "method", "result", "other"]);
+    assert.deepEqual(
+      labels.map((l) => l.facet),
+      ["background", "background", "method", "method", "result", "other"],
+    );
     assert.equal(s.jev.calls.length, 1);
     assert.equal(s.jev.calls[0].sentences.length, 6);
     assert.equal(s.records.length, 1);
     assert.equal(s.records[0].command, "abstract-facets");
     assert.equal(s.records[0].version, 1);
-    const rows = s.db.prepare("SELECT facet, command_version FROM facet_labels WHERE paper_id = 1 ORDER BY sentence_index").all() as any[];
+    const rows = s.db
+      .prepare("SELECT facet, command_version FROM facet_labels WHERE paper_id = 1 ORDER BY sentence_index")
+      .all() as any[];
     assert.equal(rows.length, 6);
     assert.ok(rows.every((r) => r.command_version === 1));
-    assert.deepEqual(s.labeler.stored(1)!.map((l) => l.facet), labels.map((l) => l.facet));
+    assert.deepEqual(
+      s.labeler.stored(1)!.map((l) => l.facet),
+      labels.map((l) => l.facet),
+    );
     assert.deepEqual(FacetLabeler.group(labels), {
       background: [SIX.split(". ")[0] + ".", "Orphan proteins lack homologs, which limits alignment-based methods."],
-      method: ["We fine-tune ESM-2 on 20,000 structures with a contact head.", "Our model uses attention maps as pairwise features."],
+      method: [
+        "We fine-tune ESM-2 on 20,000 structures with a contact head.",
+        "Our model uses attention maps as pairwise features.",
+      ],
       result: ["Precision improves from 0.61 to 0.74 on CASP15 targets."],
     });
   } finally {
@@ -87,7 +110,10 @@ test("no abstract means no Jev call; very long abstracts are cut at sentence bou
   try {
     assert.deepEqual(await s.labeler.label({ id: 3, title: "Only a title" }), []);
     assert.equal(s.jev.calls.length, 0);
-    const long = Array.from({ length: 120 }, (_, i) => `Sentence number ${i} describes a long and detailed background of the problem with many words in it.`).join(" ");
+    const long = Array.from(
+      { length: 120 },
+      (_, i) => `Sentence number ${i} describes a long and detailed background of the problem with many words in it.`,
+    ).join(" ");
     const labels = await s.labeler.label({ id: 4, title: "Long", abstract: long });
     assert.equal(labels.length, 120);
     const asked = s.jev.calls[0].sentences.length;

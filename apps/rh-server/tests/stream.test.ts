@@ -35,7 +35,11 @@ test("a stream starts with hello and a snapshot, then two viewers see the same m
     assert.equal(a.frames[0].type, "hello");
     assert.equal(a.frames[1].type, "agent.snapshot");
     await server.client.send("sync me");
-    await until(() => text(a.model).includes("echo sync me") && text(b.model).includes("echo sync me"), 10_000, "both replies");
+    await until(
+      () => text(a.model).includes("echo sync me") && text(b.model).includes("echo sync me"),
+      10_000,
+      "both replies",
+    );
     assert.ok(text(a.model).includes("sync me"));
     assert.ok(a.frames.some((f) => f.type === "agent.state"));
     assert.ok(a.frames.some((f) => f.type === "usage"));
@@ -59,7 +63,10 @@ test("a viewer that connects mid-reply gets the partial reply in its snapshot, t
     const second = follow(server.client);
     try {
       await until(() => second.model.state.ready, 10_000, "second snapshot");
-      const snapshot = second.frames.find((f) => f.type === "agent.snapshot") as Extract<Frame, { type: "agent.snapshot" }>;
+      const snapshot = second.frames.find((f) => f.type === "agent.snapshot") as Extract<
+        Frame,
+        { type: "agent.snapshot" }
+      >;
       assert.ok(snapshot.snapshot.run, "the run is still active at reconnect");
       await until(() => text(second.model).includes(long), 30_000, "the full reply");
       assert.equal(second.model.state.generating, false);
@@ -72,7 +79,9 @@ test("a viewer that connects mid-reply gets the partial reply in its snapshot, t
 });
 
 test("closing every viewer never aborts the agent's work", async () => {
-  const server = await startTestServer({ hub: { fauxTokensPerSecond: 80, fauxRules: [() => say("finished ".repeat(40))] } });
+  const server = await startTestServer({
+    hub: { fauxTokensPerSecond: 80, fauxRules: [() => say("finished ".repeat(40))] },
+  });
   try {
     const viewer = follow(server.client);
     await until(() => viewer.model.state.ready, 10_000, "snapshot");

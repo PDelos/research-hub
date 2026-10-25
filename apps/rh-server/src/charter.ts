@@ -145,9 +145,7 @@ export class Charters {
 
   /** The approved charter in force: the highest version. */
   approved(): CharterRecord | undefined {
-    const r = this.db
-      .prepare("SELECT * FROM charters WHERE version IS NOT NULL ORDER BY version DESC LIMIT 1")
-      .get();
+    const r = this.db.prepare("SELECT * FROM charters WHERE version IS NOT NULL ORDER BY version DESC LIMIT 1").get();
     return r ? toRecord(r) : undefined;
   }
 
@@ -158,7 +156,9 @@ export class Charters {
 
   versions(): { version: number; approvedAt: string; source: string }[] {
     return (
-      this.db.prepare("SELECT version, approved_at, source FROM charters WHERE version IS NOT NULL ORDER BY version").all() as any[]
+      this.db
+        .prepare("SELECT version, approved_at, source FROM charters WHERE version IS NOT NULL ORDER BY version")
+        .all() as any[]
     ).map((r) => ({ version: r.version, approvedAt: r.approved_at, source: r.source }));
   }
 
@@ -269,8 +269,7 @@ export class Brief {
   /** Validate (UTF-8 text, nonblank, ≤ 50,000 characters) and store atomically; nothing is written on failure. */
   write(text: unknown): string {
     if (typeof text !== "string" || !text.trim()) throw new BriefInvalid("brief must be nonblank markdown text");
-    if (text.includes("�") || text.includes("\u0000"))
-      throw new BriefInvalid("brief must be valid UTF-8 text");
+    if (text.includes("�") || text.includes("\u0000")) throw new BriefInvalid("brief must be valid UTF-8 text");
     const chars = [...text].length;
     if (chars > MAX_BRIEF_CHARS)
       throw new BriefInvalid(`brief is ${chars} characters; the limit is ${MAX_BRIEF_CHARS.toLocaleString("en-US")}`);

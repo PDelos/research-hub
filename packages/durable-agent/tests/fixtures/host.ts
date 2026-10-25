@@ -44,12 +44,9 @@ const spawnTwo = defineAppTool({
   parameters: Type.Object({}),
   replay: "safe",
   execute: async (_args, api, ctx) => {
-    const results = await spawnSubagents(
-      api,
-      ctx,
-      [{ prompt: "child task 0" }, { prompt: "child task 1" }],
-      { requestPrefix: `kids:${api.taskId}` },
-    );
+    const results = await spawnSubagents(api, ctx, [{ prompt: "child task 0" }, { prompt: "child task 1" }], {
+      requestPrefix: `kids:${api.taskId}`,
+    });
     return toolText(results.map((r) => `${r.conversationId}:${r.answerText}`).join(" | "));
   },
 });
@@ -57,13 +54,9 @@ const spawnTwo = defineAppTool({
 const { harness, ctx, root, close } = await fauxHarness(
   dir,
   [
-    (t) =>
-      t.lastUser.startsWith("child task") && t.results.length === 0
-        ? call("slow_safe", {})
-        : undefined,
+    (t) => (t.lastUser.startsWith("child task") && t.results.length === 0 ? call("slow_safe", {}) : undefined),
     (t) => (t.lastUser.startsWith("child task") ? say(`${t.lastUser} done`) : undefined),
-    (t) =>
-      t.results.length > 0 ? say(`result: ${t.results.map((r) => r.text).join(" | ")}`) : undefined,
+    (t) => (t.results.length > 0 ? say(`result: ${t.results.map((r) => r.text).join(" | ")}`) : undefined),
     (t) => (t.lastUser === "safe" ? call("slow_safe", {}) : undefined),
     (t) => (t.lastUser === "unsafe" ? call("slow_unsafe", {}) : undefined),
     (t) => (t.lastUser === "spawn" ? call("spawn_two", {}) : undefined),
@@ -80,9 +73,7 @@ if (mode === "submit") {
   await root.waitForIdle(ctx);
 }
 const page = await root.entries({ order: "ascending" }, 200, undefined, ctx);
-const results = page.items
-  .filter((e) => e.kind === "pi.tool-result")
-  .map((e) => e.model?.[0] as any);
+const results = page.items.filter((e) => e.kind === "pi.tool-result").map((e) => e.model?.[0] as any);
 const answers = page.items
   .filter((e) => e.kind === "pi.assistant")
   .map((e) =>
@@ -91,8 +82,7 @@ const answers = page.items
       .map((b: any) => b.text)
       .join(""),
   );
-const conversations = (await harness.commit((tx) => tx.scanConversations({}, 100), ctx)).items
-  .length;
+const conversations = (await harness.commit((tx) => tx.scanConversations({}, 100), ctx)).items.length;
 console.log(
   JSON.stringify({
     results: results.map((r) => ({
