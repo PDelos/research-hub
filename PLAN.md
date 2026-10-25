@@ -4,12 +4,14 @@
 > new container. Each has its own **proactive durable agent** that sweeps for papers every day, uses **Jev to make almost every
 > decision**, presents a few paper cards, learns from your 👎/👍/⭐ + reasons, and grows an
 > Obsidian-compatible **knowledge base** from the papers you approve. Every week it reviews its own
-> performance and **proposes improvements that you approve**.
+> performance and what you have shown interest in, and **proposes improvements, charter updates and new
+> research questions that you approve**: the charter evolves with you and with the field.
 >
 > Field focus: **AI + bioinformatics (neural networks)**. Runs on your own machine or server, **one Docker
 > container per project**, everything (including the Obsidian knowledge-base viewer) inside it.
 
-Last updated: 2026-10-23 (one container per project, Ignis bundled, no interference between projects)
+Last updated: 2026-10-25 (v0 complete; the self-improvement review with an evolving charter and new research
+questions is now v1; trust, relations and curriculum move to v2)
 
 ---
 
@@ -181,6 +183,8 @@ through the ledger (cost, model, command version, raw payload) and is stored wit
 | `link-candidate` (`each` over KB pairs) | review | `bridge` (noul: A's method/result could address B's open question) · `already_linked` (noul) | **only top pairs** go to the LLM to write a research direction | LLM scanning all pairs |
 | `proposal-evidence` | review | `sufficient` (noul: the evidence supports this change) | drafts without evidence are dropped before you see them | LLM self-critique |
 | `level-ready` | review | `ready` (noul: your reasons show command of the current level) | triggers a level-up proposal | LLM judgment |
+| `interest-topic` (`each` over chat turns and reasons) | review | `topic` (choice over charter questions + `new`) · `strength` (score 3) | uncovered strong topics become charter-proposal candidates | LLM reading the chat history |
+| `question-promise` (`each` over candidate questions) | review | `specific` (noul) · `answerable` (noul: literature can address it) · `covered` (noul: an existing question already covers it) · `fit` (score 3: fits your level) | only the top 3–5 reach the review model | LLM brainstorming over everything |
 
 All commands receive `taste_examples` (your recent judgments: title, verdict, **short reason**) and
 `taste_rules` (approved rules) in `state` — the news agent's few-shot pattern, extended with reasons.
@@ -230,7 +234,7 @@ slower, less accurate long-context mode, so Jev only ever sees title/abstract-si
 | **research-desk** (root, per project) | Runs sweeps, writes cards, talks to you | `run_paper_sweep`, `list_candidates`, `read_paper`, `research_papers` (spawns readers), `jev_classify`, `present_paper`, `ask_user`, `query_kb`, `search_kb`, `card_feedback`, `edit_query`, `edit_source_weight`, `propose_change`, `set_schedule`, `complete_sweep` |
 | **paper-reader** (subagent) | Reads full text, extracts claims/method/results, checks claims with Jev | `read_paper`, `read_full_text`, `jev_classify`, `report_findings` |
 | **librarian** (subagent, on ⭐) | Writes the vault evidence note, connects it to ≥1 concept/question page | `read_paper`, `read_full_text`, `search_kb`, `kb_write_source`, `kb_upsert_concept`, `kb_upsert_question`, `kb_link` |
-| **reviewer** (subagent, weekly, read-only on settings) | Metrics, calibration, missing links, proposals | `review_metrics`, `jev_classify`, `query_kb`, `search_kb`, `propose_change` |
+| **reviewer** (subagent, weekly, read-only on settings) | Metrics, calibration, interests, charter proposals, new research questions, proposals | `review_metrics`, `interest_report`, `question_candidates`, `similar_papers`, `jev_classify`, `query_kb`, `search_kb`, `propose_change`, `propose_charter_change`, `propose_research_direction` |
 
 Tool rules (from the news agent): `replay: "safe"` where re-running is harmless; anything that
 creates a card, subagent, task or KB note runs **once per tool task** (`onceInCommit`), so a
@@ -280,13 +284,47 @@ Card example:
 | taste | Cluster this week's reasons → rule proposals (only after `proposal-evidence` passes) |
 | queries & sources | Dead queries (0 stars in N sweeps), productive new terms from ⭐ papers, source weights |
 | curriculum | `level-ready` → level-up proposal |
-| missing links | Jev `link-candidate` over embedding-near but unlinked KB pairs from different clusters → top 3 → Sonnet writes **research directions** (become `questions/` notes on approval) |
+| interests | What you engage with since the last review: ⭐/👍/👎 and reasons, rule candidates, weight drift of questions/queries/sources, what you asked the desk in chat (topics extracted by Jev), notes you edited or opened in the vault |
+| charter | **Charter proposals** from interests and evidence: add, raise, lower or retire research questions; add queries (productive terms from ⭐ papers and chat), retire dead ones; add or remove out-of-scope topics; adjust concepts and sub-areas. Each is a diff against the approved charter with its evidence (the judgments, papers and chat turns behind it) |
+| field | What changed outside: topics and terms rising among recently gathered papers (including rejected ones), sub-areas the sweeps never reach, highly cited new work near the KB |
+| new questions | Candidate research questions from several sources (see "Finding new questions" below), filtered by Jev, the best 3–5 written up by the review model as **research directions** with the papers that motivate them |
+| missing links | Jev `link-candidate` over embedding-near but unlinked KB pairs from different clusters → top pairs feed "new questions" |
 | process | e.g. "cards per sweep 7 → 5, you skip the last 2" |
 | report | A review card + proposal cards in the UI |
 
 Proposals are rows with `type`, `diff` (exact change), `evidence`, `status`. **Approve** applies the diff
 deterministically; **reject** with an optional reason (which also feeds `taste_examples`).
 Every decision is logged; accuracy is charted week over week on the project dashboard.
+
+### The charter evolves (with your approval)
+
+The charter is the project's statement of direction, so it never changes silently, but it is no longer fixed
+after the first approval. Every review proposes concrete charter changes from what you showed interest in and from
+what changed in the field; approving them creates a **new charter version** (the history stays, `charter.md` in
+the vault follows unless you edited it). Approved research directions become **new charter questions** (Q6, Q7, …)
+with their own queries, so the very next sweep searches for evidence on them. Questions that stay unproductive (no
+⭐ for several weeks) are proposed for retirement. The review frequency is a setting (weekly by default; "every N
+days" or on demand from the UI).
+
+### Finding new questions
+
+Candidate questions are generated cheaply by code and Jev from the project's own material, and only the best few
+reach the review model:
+
+| Source | How |
+|---|---|
+| Same method, different problem | Pairs with close **method** facet vectors but distant **background** vectors (v0.2 representations): "has A's method been tried on B's problem?" |
+| Missing links | `link-candidate`: A's method or result could address B's open question, and they are not linked or citing each other |
+| Recurring open questions | The "Open questions" sections of KB notes, clustered; a question that recurs across papers and no KB paper answers |
+| Contradictions | Jev `relation` (v2) or a review-time check flags papers whose results disagree: "which holds, and when?" |
+| Citation-graph gaps | Two clusters of KB papers that never cite each other but share concepts |
+| Rising topics | Terms and topics growing among recently gathered papers that the charter does not cover yet |
+| Your interests | Topics you keep asking about in chat or starring that no charter question covers |
+
+Jev scores each candidate (`question-promise`: specific, answerable from literature, not already covered by a
+charter question, fits your level), the top 3–5 go to the review model, which writes each as a research direction:
+the question, why it might produce results, the motivating papers, and suggested queries. On approval it becomes a
+charter question and a `questions/` page in the vault.
 
 ---
 
@@ -403,10 +441,10 @@ Rules:
 | bioRxiv / medRxiv API | biology preprints | keyless |
 | Semantic Scholar | TLDRs, recommendations | **optional**: the keyless pool returned HTTP 429 on every request, so only used with `S2_API_KEY` |
 
-Full text (v1): prefer structured sources (arXiv HTML, Europe PMC OA XML) over PDFs. For PDFs, a
+Full text (v2): prefer structured sources (arXiv HTML, Europe PMC OA XML) over PDFs. For PDFs, a
 **Docling** sidecar is the leading option for multi-column academic layouts, tables and formulas (it is
 Python, so it would be bundled as a supervised helper process inside the project container, like Ignis;
-decide in v1). Record the extractor in note
+decide in v2). Record the extractor in note
 properties so notes can be re-extracted later.
 
 ---
@@ -483,7 +521,7 @@ view is the only viewer.
 | Embeddings: ~300 abstracts × ~300 tokens with `qwen3-embedding-8b` (whole + 3 facet vectors) | **< $0.002** |
 | Jev `abstract-facets`: one call per new paper (~10 sentence questions; measured $0.0001 per paper on 2026-10-23) | ~300 × $0.0001 ≈ **$0.03** |
 | Desk agent sweep run + 7 cards (Haiku 5.5, ~200K in / 10K out incl. re-reading) | ~$0.03 |
-| ≤3 reader subagents with full text (v1, Haiku 5.5) | ~$0.01–0.03 |
+| ≤3 reader subagents with full text (v2, Haiku 5.5) | ~$0.01–0.03 |
 | Librarian per ⭐ (~2/day, Haiku 5.5) | ~$0.01 |
 | Weekly review (Sonnet 5.5, ~100K in / 10K out) | ~$0.30 per week |
 | **Total** | **≈ $3–6 / project / month**; chat extra |
@@ -538,8 +576,8 @@ After v0:
 
 | Phase | Deliverables |
 |---|---|
-| **v1 — trust, relations, curriculum** | Crossref reference verification; Jev `trust-read`, `relation`, `same-work`; full text (arXiv HTML / Europe PMC XML / Docling); paper-reader subagents + `claim-support`; curriculum level-ups; Graph view (Cytoscape.js); Obsidian Bases views |
-| **v2 — self-improvement** | `rh.review`; proposals UI; taste rules from rule candidates; `proposal-evidence`, `level-ready`, `link-candidate`; calibration; research directions |
+| **v1 — self-improvement and an evolving charter** (moved first, 2026-10-25) | `rh.review` on a configurable schedule; proposals UI; interests (judgments, reasons, chat via `interest-topic`); charter proposals → new charter versions; new research questions from the sources in §8 (`question-promise`, `link-candidate`, same-method-different-problem, recurring open questions, citation gaps, rising topics) → research directions → charter questions; taste rules from rule candidates; `proposal-evidence`, `level-ready`; calibration |
+| **v2 — trust, relations, curriculum** | Crossref reference verification; Jev `trust-read`, `relation` (also feeds contradiction-based questions), `same-work`; full text (arXiv HTML / Europe PMC XML / Docling); paper-reader subagents + `claim-support`; curriculum level-ups; Graph view (Cytoscape.js); Obsidian Bases views |
 | **v3 — breadth & polish** | Budgets, `chat-route`, `:batch` models for non-urgent work, CLI client, project export, optional Laya experiment |
 
 ---
@@ -593,6 +631,6 @@ Each choice was checked against current alternatives; ✅ = kept, 🔄 = changed
 | Knowledge base | Obsidian-compatible markdown vault | Vector-DB RAG, graph DB | ✅ Kept: matches the 2026 "LLM wiki" pattern; BM25 over markdown benchmarked well |
 | Knowledge base viewer (v0.5) | Ignis: real Obsidian UI as a self-hosted web app, bundled in the project container, iframe tab, hub theme | linuxserver/obsidian (streamed desktop: laggy, heavy), Ignis as a separate container, Quartz (read-only), own Library view only | 🔄 New: user wants Obsidian in the browser, all on the server, one container per project; pending a 30-minute trial |
 | Deployment unit | One container per project | Several projects in one hub container | 🔄 Changed 2026-10-23 at the user's request: simpler, isolated by Docker; interference prevented by locks, ports, host names, limits, staggering |
-| Graph view (v1) | Cytoscape.js | sigma.js (WebGL, large graphs), G6 | ✅ Kept for hundreds of nodes; sigma.js if graphs grow to thousands |
-| PDF → markdown (v1) | Structured sources first; Docling for PDFs | Marker (GPU), MarkItDown (shallow), GROBID (no math) | 🔄 New: Docling as the leading option, decided in v1 |
+| Graph view (v2) | Cytoscape.js | sigma.js (WebGL, large graphs), G6 | ✅ Kept for hundreds of nodes; sigma.js if graphs grow to thousands |
+| PDF → markdown (v2) | Structured sources first; Docling for PDFs | Marker (GPU), MarkItDown (shallow), GROBID (no math) | 🔄 New: Docling as the leading option, decided in v2 |
 | Spec process | OpenSpec 1.14.3, layered changes | Plain PLAN.md | ✅ Kept; all six v0 changes pass `openspec validate --strict` |
