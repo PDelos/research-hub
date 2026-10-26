@@ -148,6 +148,12 @@ const authors = (a: string[]) => (a.length > 3 ? `${a.slice(0, 3).join(", ")} et
         </header>
         <div class="tags">
           <span class="badge level">{{ card.level }}</span>
+          <span
+            v-if="card.exploration"
+            class="badge exploration"
+            title="An exploration pick: a paper unlike the ones you liked, so the feed does not narrow. Judge it like any other."
+            >Exploration</span
+          >
           <span v-if="card.borderline" class="badge offline" title="Passed the gate in the review band"
             >borderline · relevance {{ card.relevance }}</span
           >

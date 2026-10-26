@@ -12,6 +12,7 @@ import type { FeedbackExports } from "../rh.feedback/main.ts";
 import type { PapersExports } from "../rh.papers/main.ts";
 import type { ProviderExports } from "../rh.provider-openrouter/main.ts";
 import type { ScheduleExports } from "../rh.schedule/main.ts";
+import { migrateExploration, pickExploration } from "./exploration.ts";
 
 export interface SweepExports extends AgentHooks {
   decisions: PaperDecisions;
@@ -28,6 +29,7 @@ export function activate(context: PluginContext): SweepExports {
   const { charters } = context.exports["rh.charter"] as CharterExports;
   const { scheduler } = context.exports["rh.schedule"] as ScheduleExports;
   const { feedback, attachCards } = context.exports["rh.feedback"] as FeedbackExports;
+  migrateExploration(context.rh);
   const decisions = new PaperDecisions({
     db: host.db,
     jevDir: jev.jevDir,
@@ -49,6 +51,15 @@ export function activate(context: PluginContext): SweepExports {
     judgedPaper: (paperId) => feedback.isJudged(paperId),
     weight: (kind, key, fallback) => feedback.weight(kind, key, fallback),
     // A value saved before v1-1 (settings table) counts until the plugin setting is changed.
+    explore: ({ sweepId, ranked, slots }) =>
+      pickExploration({
+        db: host.db,
+        vectors: papers.vectors,
+        sweepId,
+        ranked,
+        slots,
+        picks: context.settings.explorationPicks as number,
+      }),
     cardsPerSweep: () =>
       (context.savedSettings.cardsPerSweep as number | undefined) ??
       host.settings.get<number | undefined>("cards_per_sweep", undefined) ??

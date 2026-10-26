@@ -97,6 +97,11 @@ export interface SweepDeps {
   retryDelaysMs?: number[];
   /** Cards per sweep from the rh.sweep plugin setting (v1-1); the settings table otherwise. */
   cardsPerSweep?: () => number;
+  /**
+   * Exploration picks (v1-1): given the gated papers best first and the number of card slots, the papers that take
+   * the last slots (chosen from outside the top ones). None when absent.
+   */
+  explore?: (x: { sweepId: number; ranked: number[]; slots: number }) => number[];
 }
 
 // ---------------------------------------------------------------- plan
@@ -615,8 +620,15 @@ export class SweepRunner {
       scored.push({ id: Number(r.paper_id), score });
     }
     scored.sort((a, b) => b.score - a.score || a.id - b.id);
-    scored.forEach((s, i) => set.run(i < n ? "candidate" : "ranked_out", null, s.score, i + 1, sweep.id, s.id));
-    const candidates = Math.min(n, scored.length);
+    // Exploration picks take the last card slots; the rest keep their rank order.
+    const picks = new Set(this.deps.explore?.({ sweepId: sweep.id, ranked: scored.map((s) => s.id), slots: n }) ?? []);
+    const top = scored.filter((s) => !picks.has(s.id)).slice(0, Math.max(0, n - picks.size));
+    const chosen = [...top, ...scored.filter((s) => picks.has(s.id))];
+    const chosenIds = new Set(chosen.map((s) => s.id));
+    [...chosen, ...scored.filter((s) => !chosenIds.has(s.id))].forEach((s, i) =>
+      set.run(i < chosen.length ? "candidate" : "ranked_out", null, s.score, i + 1, sweep.id, s.id),
+    );
+    const candidates = chosen.length;
     if (!candidates) {
       this.finish(sweep.id, "no_new_papers");
       return { candidates: 0, rankedOut: 0, blocked };

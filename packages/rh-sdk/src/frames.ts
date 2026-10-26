@@ -365,6 +365,8 @@ export interface SweepPaperView {
   status: string;
   reason?: string;
   borderline: boolean;
+  /** An exploration pick: least like the papers you liked (v1.1). */
+  exploration: boolean;
   relevance?: number;
   level?: string;
   kind?: string;
@@ -406,6 +408,8 @@ export interface CardView {
   level: string;
   matchedQuestion?: { id: string; text: string };
   borderline: boolean;
+  /** An exploration pick: least like the papers you liked (v1.1). */
+  exploration: boolean;
   createdAt: string;
   paper: PaperMeta;
   judgment: JudgmentView | null;

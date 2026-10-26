@@ -1,5 +1,6 @@
 // Sweeps and cards (v0.3): the Feed (cards grouped by sweep, newest first), card details with score traceability,
 // sweep details with phases, counts and the cost split, and the cards-per-sweep setting.
+import { isExploration } from "../plugins/rh.sweep/exploration.ts";
 import { SettingsInvalid } from "./kernel/settings.ts";
 import express, { type Router } from "express";
 import type { CardDetail, CardGroup, CardView, JudgmentView, PaperMeta, SweepDetail, SweepSummary } from "@rh/sdk";
@@ -43,6 +44,7 @@ export function cardView(project: ProjectRuntime, card: Card): CardView {
     level: card.level,
     matchedQuestion: question ? { id: question.id, text: question.text } : undefined,
     borderline: card.borderline,
+    exploration: isExploration(project.db, card.sweepId, card.paperId),
     createdAt: card.createdAt,
     paper: paperMeta(project, card.paperId),
     judgment: judgmentView(project, card.id),
@@ -170,6 +172,7 @@ export function sweepRoutes(hub: Hub): Router {
         kind: sp.kind,
         rank: sp.rank,
         rankScore: sp.rankScore,
+        exploration: isExploration(project.db, sweep.id, sp.paperId),
       })),
     };
     res.json(detail);

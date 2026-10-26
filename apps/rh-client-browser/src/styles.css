@@ -1006,3 +1006,8 @@ button.danger {
   padding: 16px 20px;
   overflow: auto;
 }
+
+.badge.exploration {
+  color: var(--accent);
+  border-color: var(--accent);
+}
