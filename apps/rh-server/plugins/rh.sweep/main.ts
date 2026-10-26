@@ -48,7 +48,14 @@ export function activate(context: PluginContext): SweepExports {
     judged: () => feedback.count(),
     judgedPaper: (paperId) => feedback.isJudged(paperId),
     weight: (kind, key, fallback) => feedback.weight(kind, key, fallback),
+    // A value saved before v1-1 (settings table) counts until the plugin setting is changed.
+    cardsPerSweep: () =>
+      (context.savedSettings.cardsPerSweep as number | undefined) ??
+      host.settings.get<number | undefined>("cards_per_sweep", undefined) ??
+      (context.settings.cardsPerSweep as number),
   });
+  // Settings are read when used, so a change applies without restarting the sweep.
+  context.onSettingsChange(() => undefined);
   const cards = new CardStore(host.db);
   attachCards(cards);
   const cardWriter = new CardWriter({

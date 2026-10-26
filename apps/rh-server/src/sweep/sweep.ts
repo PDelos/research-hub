@@ -95,6 +95,8 @@ export interface SweepDeps {
   now?: () => number;
   random?: () => number;
   retryDelaysMs?: number[];
+  /** Cards per sweep from the rh.sweep plugin setting (v1-1); the settings table otherwise. */
+  cardsPerSweep?: () => number;
 }
 
 // ---------------------------------------------------------------- plan
@@ -196,7 +198,7 @@ export class SweepRunner {
   }
 
   cardsPerSweep(): number {
-    return this.deps.settings.get("cards_per_sweep", CARDS_PER_SWEEP.default);
+    return this.deps.cardsPerSweep?.() ?? this.deps.settings.get("cards_per_sweep", CARDS_PER_SWEEP.default);
   }
 
   setCardsPerSweep(n: unknown): number {

@@ -15,7 +15,7 @@
 ## 3. Scheduler and the sweep's settings
 
 - [x] 3.1 Migration 7 (`nightly` run kind), nightly slots at `RH_NIGHTLY_TIME` (default 02:00) in the schedule settings and UI, the review shown as the weekly digest; verify scheduling tests for the nightly slot (exactly once, catch-up) and the updated storage version
-- [ ] 3.2 `rh.sweep` settings `cardsPerSweep` and `explorationPicks` (live, with the v0 value carried over), `/v1/sweep-settings` on top of them; verify the v0 sweep-settings tests and a settings change without restart
+- [x] 3.2 `rh.sweep` settings `cardsPerSweep` and `explorationPicks` (live, with the v0 value carried over), `/v1/sweep-settings` on top of them; verify the v0 sweep-settings tests and a settings change without restart
 
 ## 4. Undo
 

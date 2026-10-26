@@ -1,5 +1,6 @@
 // Sweeps and cards (v0.3): the Feed (cards grouped by sweep, newest first), card details with score traceability,
 // sweep details with phases, counts and the cost split, and the cards-per-sweep setting.
+import { SettingsInvalid } from "./kernel/settings.ts";
 import express, { type Router } from "express";
 import type { CardDetail, CardGroup, CardView, JudgmentView, PaperMeta, SweepDetail, SweepSummary } from "@rh/sdk";
 import { JudgmentInvalid } from "./feedback/feedback.ts";
@@ -176,13 +177,15 @@ export function sweepRoutes(hub: Hub): Router {
 
   r.get("/v1/sweep-settings", (_req, res) => void res.json({ cardsPerSweep: p().sweeps.cardsPerSweep() }));
 
-  r.put("/v1/sweep-settings", (req, res) => {
+  r.put("/v1/sweep-settings", async (req, res) => {
     const body = (req.body ?? {}) as Record<string, unknown>;
     if (body.cardsPerSweep !== undefined) {
+      // A plugin setting since v1-1: the change is recorded in the plugin history and can be undone.
       try {
-        p().sweeps.setCardsPerSweep(body.cardsPerSweep);
+        await p().plugins.kernel.configure("rh.sweep", { cardsPerSweep: body.cardsPerSweep });
       } catch (error) {
-        throw invalid(error instanceof Error ? error.message : String(error));
+        if (error instanceof SettingsInvalid) throw invalid(error.problems.join("; "));
+        throw error;
       }
     }
     res.json({ cardsPerSweep: p().sweeps.cardsPerSweep() });

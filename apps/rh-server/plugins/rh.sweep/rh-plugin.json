@@ -3,7 +3,9 @@
   "version": "1.0.0",
   "displayName": "Daily sweep and cards",
   "description": "The daily sweep: gathers papers for the charter's questions, gates and ranks them with Jev, and writes the day's cards (Relevance, Trust, Value).",
-  "engines": { "research-hub": "^1.0.0" },
+  "engines": {
+    "research-hub": "^1.0.0"
+  },
   "main": "main.ts",
   "required": true,
   "activationEvents": ["onStartup"],
@@ -16,7 +18,14 @@
     "rh.feedback": "^1.0.0"
   },
   "contributes": {
-    "tabs": [{ "id": "feed", "title": "Feed", "view": "feed", "order": 10 }],
+    "tabs": [
+      {
+        "id": "feed",
+        "title": "Feed",
+        "view": "feed",
+        "order": 10
+      }
+    ],
     "jevCommands": [
       "../../prompt_engineering/jev/worth-reading",
       "../../prompt_engineering/jev/importance",
@@ -24,6 +33,29 @@
       "../../prompt_engineering/jev/on-theme",
       "../../prompt_engineering/jev/paper-kind"
     ],
-    "prompts": [{ "agent": "card-writer", "path": "../../prompt_engineering/agents/card-writer" }]
+    "prompts": [
+      {
+        "agent": "card-writer",
+        "path": "../../prompt_engineering/agents/card-writer"
+      }
+    ],
+    "settings": {
+      "properties": {
+        "cardsPerSweep": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 15,
+          "default": 7,
+          "description": "Cards each sweep presents."
+        },
+        "explorationPicks": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2,
+          "default": 1,
+          "description": "Card slots given to papers least like the ones you liked (0 turns exploration off)."
+        }
+      }
+    }
   }
 }
