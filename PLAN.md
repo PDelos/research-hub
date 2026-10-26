@@ -594,9 +594,10 @@ Budget caps per project (daily/monthly) stop new sweeps and notify when reached.
 ## 17. Build pyramid (OpenSpec changes)
 
 **v0 is complete (2026-10-25)**: all six layers below are archived. **v1-0 is complete (2026-10-26)**: the kernel
-and all of v0 as VS Code-style plugins (what it built: EVOLUTION.md §2.5). **What comes next is planned in
+and all of v0 as VS Code-style plugins (what it built: EVOLUTION.md §2.5). **v1-1 is complete (2026-10-26)**: the light image (232 MB, Obsidian as an
+add-on), the daily cycle (sweep with exploration picks, nightly run, weekly digest with comments) and one-change undo. **What comes next is planned in
 [EVOLUTION.md §0 and §6](EVOLUTION.md)** (revised 2026-10-26: core loop first, human on the loop):
-`v1-1-lite-daily-cycle` (a light image, Obsidian as an add-on, the daily cycle orchestrated with a weekly digest and
+`v1-1-lite-daily-cycle` ✅ (a light image, Obsidian as an add-on, the daily cycle orchestrated with a weekly digest and
 a "What changed" feed with undo) → `v1-2-harness` (replays on your judgments, a judge calibrated on your verdicts) →
 `v1-3-self-improvement` (nightly error analysis, fixes proven on held-out judgments and applied with undo,
 exploration picks) → `v1-4-knowledge-loop` (charter and new-question proposals). Full text, the Upgrades tab, the

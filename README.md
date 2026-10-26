@@ -5,11 +5,13 @@ durable agent (built on [pi-durable](https://github.com/earendil-works/pi)) that
 [Jev](https://openrouter.ai/docs/guides/community/jev) make the bulk decisions, present a few paper cards a day,
 learn from your 👎/👍/⭐ and grow an Obsidian-compatible knowledge base. A new theme is a new container.
 
-**Status: v1.0 (plugin core).** v0 built the durable agent, Jev client, live stream, browser UI and containers (v0.0),
+**Status: v1.1 (light image and the daily cycle).** v0 built the durable agent, Jev client, live stream, browser UI and containers (v0.0),
 the brief, charter and schedule (v0.1), paper search with representations (v0.2), the daily sweep with paper cards
 (v0.3), learning from your judgments (v0.4) and the knowledge base with the real Obsidian interface (v0.5). v1.0 turns
 all of it into **plugins, like VS Code**: a small kernel and a plugin for every feature, which you can enable,
-disable, configure, swap, install and roll back per project (see [Plugins](#plugins)).
+disable, configure, swap, install and roll back per project (see [Plugins](#plugins)). v1.1 makes the hub light
+(232 MB, Obsidian as an add-on image) and runs **one daily cycle** you only read and judge (see
+[The daily cycle](#the-daily-cycle)).
 
 ## Architecture and what comes next
 
@@ -129,6 +131,22 @@ foundation". Your judgments teach the next sweeps, without any extra model calls
 - **Precision@5**, the share of a sweep's top 5 cards you liked or starred among those you judged, is shown as a
   trend in the Feed.
 
+## The daily cycle
+
+Each project runs one cycle on its own; your part is reading, judging and, when you like, commenting.
+
+| When | What happens |
+|---|---|
+| Every morning (`RH_SWEEP_TIME`, 06:00) | The sweep brings about 7 cards. Once you have liked papers, the last card is an **Exploration** pick: a paper outside the top ones, least like what you liked, so the feed does not narrow (setting `explorationPicks` of `rh.sweep`, 0 to 2, default 1) |
+| Any time | You judge cards 👎/👍/⭐ with a reason, or ask the desk |
+| Every night (`RH_NIGHTLY_TIME`, 02:00) | The nightly run records the day; later versions analyze what you disliked or missed here and test fixes on your past judgments |
+| Weekly (`RH_REVIEW_TIME`, Sunday 07:00) | The **digest** (Digest tab): the week's sweeps and cards, your judgments and precision@5, the exploration picks and how you judged them, new knowledge-base notes, cost, and **every change** with an **Undo**. Each section has a comment box; your comments appear in the next digest |
+
+A status line on the Feed and the Digest says where the cycle stands: the last sweep, how many cards wait for you,
+and the next sweep, nightly run and digest. **Undo** reverses one change and keeps later ones (it is refused, with
+the reason, when a later change touched the same setting). Cards per sweep and exploration picks are plugin
+settings, so their changes are listed and undoable too.
+
 ## The knowledge base
 
 Every ⭐ becomes an evidence note in the project's Obsidian vault (`$RH_DATA_DIR/vault/`): the librarian (the
@@ -140,7 +158,9 @@ line to `index.md` and `log.md`. **Your edits win:** the hub only creates notes 
 edited it.
 
 - **Library** tab: knowledge-base papers, keyword search over the vault, and each note rendered.
-- **Knowledge base** tab: the real Obsidian interface (Ignis) inside the hub, in the hub's colors, light and dark,
+- **Knowledge base** tab: shows the active viewer. Without a choice it is Obsidian where the image has it (the
+  `research-hub:obsidian` add-on) and the Library otherwise; pick one under Plugins → Knowledge base.
+- **Obsidian** (add-on image): the real Obsidian interface (Ignis) inside the hub, in the hub's colors, light and dark,
   opening on the **graph view** (papers, concepts and research questions in three colors; Graph and Index buttons); it stays loaded when you switch tabs, and "Open in knowledge base" in the Library jumps to a
   note. Edits you make there are searchable within seconds, and notes the hub writes appear without a reload.
 - The research desk always sees `index.md` and opens notes on demand (`search_kb`, `query_kb`): ask "which papers in
@@ -239,10 +259,15 @@ Every research theme is its own container with its own data folder, port and nam
 ```bash
 ./new-project.sh proteins          # creates projects/proteins/ (compose file + .env), port 4850, sweep 06:00
 ./new-project.sh genomics          # projects/genomics/, port 4860, sweep 06:20
+./new-project.sh notes --obsidian  # with the Obsidian viewer (the add-on image)
 cd projects/proteins
 #   put this project's OpenRouter key in .env
 docker compose up -d               # open http://proteins.localhost:4850
 ```
+
+Two images: `research-hub:latest` (light: 232 MB on disk, an 82 MB download; the server is one bundled file on a
+minimal Node runtime; the Library shows the knowledge base) and `research-hub:obsidian` (the same plus Obsidian, 297
+MB). `docker compose build` builds the one a project's compose file names.
 
 `new-project.sh` gives every project a unique compose name (`rh-<name>`), the next free port, a sweep time 20
 minutes after the previous project (so they don't hit the paper APIs together) and fresh tokens. Projects never
@@ -291,7 +316,9 @@ curl -s -X POST -H "authorization: Bearer $RH_API_TOKEN" -H 'content-type: appli
 | `POST /v1/charter/answers` · `/approve` · `/retry` | Answer scoping questions · approve the draft · retry a failed draft |
 | `GET /v1/charter/versions/:n` | An approved version |
 | `GET/PUT /v1/schedule` | Sweep time and on/off, review weekday, time and on/off |
-| `GET /v1/scheduled-runs` · `POST /v1/runs/{sweep,review}` | Run log (requested, skipped with reason) · run now |
+| `GET /v1/scheduled-runs` · `POST /v1/runs/{sweep,nightly,review}` | Run log (requested, skipped with reason) · run now (review = the digest) |
+| `GET /v1/cycle` | Where the daily cycle stands: last sweep, cards waiting, next sweep, nightly run and digest |
+| `GET /v1/digests[/:id]` · `POST /v1/digests/:id/comments` | Weekly digests · comment on a section (`section`, `text`) |
 | `GET /v1/cards` · `GET /v1/cards/:id` | The Feed (cards grouped by sweep, newest first) · one card with score details |
 | `GET /v1/sweeps[/:id]` | Sweeps with phases, counts, papers by status and the cost split |
 | `GET/PUT /v1/sweep-settings` | Cards per sweep (1 to 15, default 7) |
@@ -304,7 +331,7 @@ curl -s -X POST -H "authorization: Bearer $RH_API_TOKEN" -H 'content-type: appli
 | `POST /v1/plugins/install` · `/install/:planId/approve` · `DELETE /install/:planId` | Prepare an install (`source`: `folder` or `git`) · approve · cancel |
 | `POST /v1/plugins/:id/enable` · `/disable` | Enable · disable (`cascade` to take dependents along) |
 | `PUT /v1/plugins/:id/settings` · `DELETE /v1/plugins/:id` | Change settings (`values`, null removes) · uninstall (`?deleteData=true`) |
-| `GET /v1/plugins/history` · `POST /v1/plugins/rollback` | Every change · restore an earlier state (`commit`) |
+| `GET /v1/plugins/history` · `POST /v1/plugins/rollback` · `POST /v1/plugins/undo` | Every change · restore an earlier state (`commit`) · undo one change, keeping later ones (`commit`) |
 
 ## Development
 
@@ -312,7 +339,9 @@ curl -s -X POST -H "authorization: Bearer $RH_API_TOKEN" -H 'content-type: appli
 npm test               # every workspace's tests, offline (fake model, mock Jev)
 npm run check          # vp check (formatting, lint, types) + workspace type checks + check:jev + check:env
 npm run test:ui        # Playwright UI tests and light/dark screenshots, offline (uses the system Chromium if any)
-scripts/e2e-offline.sh # the whole flow through the UI proxy, plugins included, in about a minute
+scripts/e2e-offline.sh # the whole flow through the UI proxy (plugins and the cycle included), about a minute
+                       #   E2E_BUNDLE=1: on the bundled server · E2E_IMAGE=research-hub:latest: inside a container
+npm run pack -w rh-server  # bundle the server into apps/rh-server/dist (what the image runs)
 npm run lint           # vp lint;  npm run fmt: vp fmt
 ```
 

@@ -40,4 +40,4 @@
     409 Jev and 24 embedding calls, $0.037248), Obsidian running, the Digest tab present, cycle status and schedule
     (nightly 02:00) served, no errors. The project is paused (since 2026-10-25 22:17 UTC), so its cycle runs are
     recorded as skipped until it is resumed; left paused for the user to decide.
-- [ ] 6.3 README (light image and add-on, the daily cycle, the Digest tab, undo), PLAN/EVOLUTION status
+- [x] 6.3 README (light image and add-on, the daily cycle, the Digest tab, undo), PLAN/EVOLUTION status
