@@ -3,7 +3,10 @@
 // manifests are reported with their problems instead of stopping the hub.
 import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
+import { contributionProblems } from "./contributions.ts";
 import { engineProblem, loadManifest, ManifestInvalid, type PluginManifest } from "./manifest.ts";
+import { initiallyEnabled } from "./settings.ts";
+import type { LockEntry } from "./state.ts";
 
 export const BUILTIN_PLUGINS_DIR = join(import.meta.dirname, "..", "..", "plugins");
 
@@ -44,6 +47,11 @@ export function discover(options: { builtinDir?: string; installedDir?: string; 
           });
           continue;
         }
+        const problems = contributionProblems(manifest, dir);
+        if (problems.length) {
+          invalid.push({ dir, builtin, problems });
+          continue;
+        }
         const incompatible = engineProblem(manifest, options.kernel);
         plugins.set(manifest.id, { manifest, dir, builtin, ...(incompatible ? { incompatible } : {}) });
       } catch (error) {
@@ -56,4 +64,21 @@ export function discover(options: { builtinDir?: string; installedDir?: string; 
   scan(options.builtinDir ?? BUILTIN_PLUGINS_DIR, true);
   scan(options.installedDir, false);
   return { plugins, invalid };
+}
+
+/** The lockfile entry a built-in plugin gets when a project first sees it (enabled unless its environment switch is off). */
+export function builtinEntry(manifest: PluginManifest, env: NodeJS.ProcessEnv = process.env): LockEntry {
+  return {
+    version: manifest.version,
+    source: { kind: "builtin" },
+    enabled: initiallyEnabled(manifest, env),
+    settings: {},
+  };
+}
+
+/** The first lockfile of a project: every built-in plugin (an existing v0 project keeps all its features). */
+export function initialPlugins(discovery: Discovery, env: NodeJS.ProcessEnv = process.env): Record<string, LockEntry> {
+  return Object.fromEntries(
+    [...discovery.plugins.values()].filter((p) => p.builtin).map((p) => [p.manifest.id, builtinEntry(p.manifest, env)]),
+  );
 }

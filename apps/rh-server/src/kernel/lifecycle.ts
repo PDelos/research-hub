@@ -10,7 +10,8 @@ import type { PluginRunState, PluginSummary } from "@rh/sdk";
 import type { Logger } from "../logger.ts";
 import { dependents as dependentsOf, resolve, type GraphNode } from "./graph.ts";
 import type { PluginManifest } from "./manifest.ts";
-import type { Discovery, DiscoveredPlugin } from "./registry.ts";
+import { builtinEntry, type Discovery, type DiscoveredPlugin } from "./registry.ts";
+import { resolveSettings, SettingsInvalid, validateSettings } from "./settings.ts";
 import type { Actor, Lockfile, PluginState } from "./state.ts";
 
 export interface Disposable {
@@ -44,11 +45,15 @@ export interface KernelOptions {
   state: PluginState;
   log: Logger;
   activationTimeoutMs?: number;
+  /** Environment for settings defaults and first-start enablement (default process.env). */
+  env?: NodeJS.ProcessEnv;
   /** Load a plugin's code; by default its `main` module is imported. */
   load?: (plugin: DiscoveredPlugin) => Promise<PluginModule>;
   /** The `rh` API handed to a plugin (task 1.5). */
   api?: (plugin: DiscoveredPlugin) => unknown;
 }
+
+export { SettingsInvalid };
 
 export class PluginUnavailable extends Error {
   constructor(
@@ -113,13 +118,7 @@ export class PluginKernel {
     if (missing.length || stale.length)
       await this.options.state.update(
         (l) => {
-          for (const r of missing)
-            l.plugins[r.plugin.manifest.id] = {
-              version: r.plugin.manifest.version,
-              source: { kind: "builtin" },
-              enabled: true,
-              settings: {},
-            };
+          for (const r of missing) l.plugins[r.plugin.manifest.id] = builtinEntry(r.plugin.manifest, this.options.env);
           for (const r of stale) l.plugins[r.plugin.manifest.id].version = r.plugin.manifest.version;
         },
         missing.length
@@ -192,7 +191,7 @@ export class PluginKernel {
     const log = this.options.log.child({ plugin: manifest.id });
     this.set(r, "activating");
     const storageDir = join(this.options.state.dir, "data", manifest.id);
-    const settings = this.options.state.current().plugins[manifest.id]?.settings ?? {};
+    const settings = this.settings(manifest.id);
     const timeoutMs = this.options.activationTimeoutMs ?? 10_000;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let context: PluginContext | undefined;
@@ -301,12 +300,46 @@ export class PluginKernel {
     for (const id of this.activeOrder.toReversed()) {
       const entry = lock.plugins[id];
       const r = this.records.get(id)!;
-      if (!entry?.enabled || JSON.stringify(entry.settings) !== r.settingsJson) await this.deactivate(id);
+      if (!entry?.enabled || JSON.stringify(this.settings(id)) !== r.settingsJson) await this.deactivate(id);
     }
     // A failed plugin gets a fresh chance once it is enabled again or reconfigured.
     for (const r of this.records.values()) if (r.state === "failed") this.set(r, "inactive");
     this.recompute();
     for (const event of this.fired) await this.fire(event);
+  }
+
+  /** A plugin's effective settings: schema defaults, environment defaults, then saved values. */
+  settings(id: string): Record<string, unknown> {
+    const r = this.records.get(id);
+    if (!r) throw new PluginUnavailable(id, "not installed");
+    return resolveSettings(
+      r.plugin.manifest,
+      this.options.state.current().plugins[id]?.settings ?? {},
+      this.options.env,
+    );
+  }
+
+  /**
+   * Change some of a plugin's settings (one commit, validated first: SettingsInvalid names the setting and the
+   * rule); a running plugin is restarted with the new values. `undefined` removes a saved value.
+   */
+  async configure(id: string, changes: Record<string, unknown>, actor: Actor = "user"): Promise<void> {
+    const r = this.records.get(id);
+    if (!r) throw new PluginUnavailable(id, "not installed");
+    const saved = { ...this.options.state.current().plugins[id]?.settings };
+    for (const [key, value] of Object.entries(changes))
+      if (value === undefined) delete saved[key];
+      else saved[key] = value;
+    validateSettings(r.plugin.manifest, resolveSettings(r.plugin.manifest, saved, this.options.env));
+    await this.options.state.update(
+      (l) => {
+        if (!l.plugins[id]) throw new PluginUnavailable(id, "not in the lockfile");
+        l.plugins[id].settings = saved;
+      },
+      `configure ${id}: ${Object.keys(changes).join(", ")}`,
+      actor,
+    );
+    await this.apply();
   }
 
   /** Roll the plugin state back to commit `commitId` and re-apply it. */

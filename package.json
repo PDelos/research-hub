@@ -16,7 +16,7 @@
     "fmt": "vp fmt",
     "fmt:check": "vp fmt --check",
     "check:env": "node scripts/check-env.mjs",
-    "check:jev": "tsx packages/jev/scripts/check-lock.ts apps/rh-server/prompt_engineering/jev",
+    "check:jev": "tsx packages/jev/scripts/check-lock.ts apps/rh-server/prompt_engineering/jev && tsx apps/rh-server/scripts/check-plugin-jev.ts",
     "lock:jev": "tsx packages/jev/scripts/check-lock.ts apps/rh-server/prompt_engineering/jev --update"
   },
   "devDependencies": {
