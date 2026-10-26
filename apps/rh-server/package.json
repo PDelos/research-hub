@@ -7,7 +7,8 @@
     "start": "tsx src/main.ts",
     "dev": "tsx watch src/main.ts",
     "test": "tsx --test --test-concurrency=1 tests/*.test.ts",
-    "typecheck": "tsc -p ."
+    "typecheck": "tsc -p .",
+    "pack": "vp pack"
   },
   "dependencies": {
     "@earendil-works/chord": "1.4.0",

@@ -4,14 +4,16 @@
 # install the sample external plugin, restart, use its chat tool from the desk, and roll back. No keys, no network
 # (fake model, mock Jev, synthetic sources).
 # Usage: scripts/e2e-offline.sh [port]   (needs the UI built: npm run build -w rh-client-browser)
+#        E2E_BUNDLE=1 scripts/e2e-offline.sh   runs the bundled server (npm run pack -w rh-server) with plain node
 set -euo pipefail
 PORT="${1:-4899}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 DATA="$(mktemp -d)"
 LOG="$DATA/server.log"
+if [ -n "${E2E_BUNDLE:-}" ]; then ENTRY=(apps/rh-server/dist/server.mjs); else ENTRY=(--import tsx apps/rh-server/src/main.ts); fi
 start() {
   (cd "$ROOT" && RH_ENV_FILE=none RH_MODE=offline RH_DATA_DIR="$DATA/data" RH_PORT="$PORT" RH_KB_VIEWER=off \
-    exec node --import tsx apps/rh-server/src/main.ts >> "$LOG" 2>&1) &
+    exec node "${ENTRY[@]}" >> "$LOG" 2>&1) &
   PID=$!
   for _ in $(seq 1 60); do curl -sf "http://127.0.0.1:$PORT/v1/health" > /dev/null && return; sleep 0.5; done
   echo "the hub did not start (log: $LOG)"; exit 1

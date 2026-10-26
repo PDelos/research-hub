@@ -1,7 +1,7 @@
 ## 1. Light image
 
 - [x] 1.1 Resolve every on-disk path from one `appDir()`; reach built-in plugin code through a static module map; verify all tests pass and the offline e2e passes
-- [ ] 1.2 Bundle the server with `vp pack` (tsdown) into `apps/rh-server/dist/server.mjs` with only `sqlite-vec` external and the unused provider SDKs left out; verify the bundle starts offline, chats, sweeps and serves the UI
+- [x] 1.2 Bundle the server with `vp pack` (tsdown) into `apps/rh-server/dist/server.mjs` with only `sqlite-vec` external and the unused provider SDKs left out; verify the bundle starts offline, chats, sweeps and serves the UI
 - [ ] 1.3 Dockerfile stages `lite` (default, `RH_KB_VIEWER=off`) and `obsidian` (adds Ignis); `new-project.sh --obsidian`; verify the lite image is under 300 MB and runs the offline e2e inside the container
 
 ## 2. Viewer choice
