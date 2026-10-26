@@ -17,7 +17,8 @@
     "fmt:check": "vp fmt --check",
     "check:env": "node scripts/check-env.mjs",
     "check:jev": "tsx packages/jev/scripts/check-lock.ts apps/rh-server/prompt_engineering/jev && tsx apps/rh-server/scripts/check-plugin-jev.ts",
-    "lock:jev": "tsx packages/jev/scripts/check-lock.ts apps/rh-server/prompt_engineering/jev --update"
+    "lock:jev": "tsx packages/jev/scripts/check-lock.ts apps/rh-server/prompt_engineering/jev --update",
+    "test:ui": "npm run test:ui -w apps/rh-client-browser"
   },
   "devDependencies": {
     "@types/node": "^26.6.5",

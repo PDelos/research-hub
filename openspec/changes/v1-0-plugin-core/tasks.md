@@ -25,13 +25,13 @@
 ## 3. External plugins
 
 - [x] 3.1 Implement the plugin host (child process with Node's permission model, clean environment, JSON-RPC `rh` proxy, crash and hang handling) and install from a folder or git URL with permission approval, uninstall with or without data; verify tests with a sample external plugin that adds a chat tool and a paper source, a crashing plugin, an undeclared host and no visible secrets
-- [ ] 3.2 Serve external UI entries and mount them as custom elements with the hub's tokens; verify a sample plugin tab renders and disappears when disabled
+- [x] 3.2 Serve external UI entries and mount them as custom elements with the hub's tokens; verify a sample plugin tab renders and disappears when disabled
 
 ## 4. API and UI
 
 - [x] 4.1 Add the `/v1/plugins` routes, `/v1/info` kernel and plugin versions, and SDK methods; verify API tests (list, details, install with approval, enable, disable, settings validation, history, rollback)
-- [ ] 4.2 Add Vue Router and Pinia, build the tab bar and Settings from contributions, and add the Plugins tab (state, contributions, permissions, settings, history, actions); verify `npm run build`, the UI test, and screenshots of the Plugins tab in light and dark
-- [ ] 4.3 Add Playwright UI tests (tab bar follows enable/disable, viewer swap, Plugins tab actions, light and dark screenshots) and run them offline; verify they pass and replace `scripts/screenshot.mjs` in the docs
+- [x] 4.2 Add Vue Router and Pinia, build the tab bar and Settings from contributions, and add the Plugins tab (state, contributions, permissions, settings, history, actions); verify `npm run build`, the UI test, and screenshots of the Plugins tab in light and dark
+- [x] 4.3 Add Playwright UI tests (tab bar follows enable/disable, viewer swap, Plugins tab actions, light and dark screenshots) and run them offline; verify they pass and replace `scripts/screenshot.mjs` in the docs
 
 ## 5. Integration
 

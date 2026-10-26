@@ -49,7 +49,7 @@ export function settingsProperties(manifest: PluginManifest): Record<string, Set
     if (decl.cardinality === "one")
       implicit[point] = {
         type: "string",
-        description: `Active ${point} contribution`,
+        description: decl.description ?? `Which ${point} contribution is active`,
         ...(decl.default ? { default: decl.default } : {}),
       };
   return { ...implicit, ...declared };

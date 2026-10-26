@@ -1,0 +1,12 @@
+{
+  "id": "acme.reading-list",
+  "version": "0.1.0",
+  "displayName": "Reading list",
+  "description": "A test plugin with a tab of its own: the knowledge-base papers as a reading list.",
+  "engines": { "research-hub": "^1.0.0" },
+  "browser": "ui/reading-list.js",
+  "activationEvents": ["onView:reading-list"],
+  "contributes": {
+    "tabs": [{ "id": "reading-list", "title": "Reading list", "view": "acme-reading-list", "order": 35 }]
+  }
+}

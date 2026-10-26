@@ -147,6 +147,8 @@ export class HubClient {
   uninstallPlugin = (id: string, deleteData = false) =>
     this.call<void>("DELETE", `/plugins/${encodeURIComponent(id)}${deleteData ? "?deleteData=true" : ""}`);
   rollbackPlugins = (commit: string) => this.call<PluginList>("POST", "/plugins/rollback", { commit });
+  /** Tell the hub a tab was opened, so plugins activated by onView:<tab> start. */
+  openView = (tab: string) => this.call<void>("POST", `/plugins/views/${encodeURIComponent(tab)}/open`, {});
 
   /** Follow the project's stream until the signal aborts. */
   async *stream(signal?: AbortSignal): AsyncGenerator<Frame> {

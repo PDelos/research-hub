@@ -9,8 +9,17 @@ const documented = new Set(
     .map((l) => l.match(/^#?\s*([A-Z][A-Z0-9_]+)=/)?.[1])
     .filter(Boolean),
 );
-// Variables set by tooling rather than by the user.
-const ignored = new Set(["NODE_ENV", "NODE_TEST_CONTEXT", "HOME", "PATH", "JEV_BACKEND", "JEV_LIVE"]);
+// Variables set by tooling rather than by the user (E2E_PORT, CHROMIUM: the Playwright UI tests).
+const ignored = new Set([
+  "NODE_ENV",
+  "NODE_TEST_CONTEXT",
+  "HOME",
+  "PATH",
+  "JEV_BACKEND",
+  "JEV_LIVE",
+  "E2E_PORT",
+  "CHROMIUM",
+]);
 
 const files = [];
 const walk = (dir) => {

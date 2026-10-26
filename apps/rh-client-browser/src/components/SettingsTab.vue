@@ -2,6 +2,10 @@
 import { onMounted, ref, watch } from "vue";
 import type { WeightView, Weekday } from "@rh/sdk";
 import { client, refreshProject, refreshSchedule, store } from "../store.ts";
+import { usePlugins } from "../stores/plugins.ts";
+import PluginSettingsForm from "./PluginSettingsForm.vue";
+
+const plugins = usePlugins();
 
 const days: { id: Weekday; label: string }[] = [
   { id: "mon", label: "Monday" },
@@ -109,6 +113,17 @@ async function runNow(kind: "sweep" | "review") {
       <label>Cards per sweep <input v-model.number="cardsPerSweep" type="number" min="1" max="15" /></label>
       <button class="ghost" @click="saveCards">Save</button>
     </fieldset>
+
+    <h2>Plugin settings</h2>
+    <p class="muted">
+      Each enabled plugin's settings. Values saved here take precedence over the container's defaults.
+    </p>
+    <section v-for="g in plugins.contributions?.settings ?? []" :key="g.pluginId" class="plugin-group">
+      <h3>
+        {{ g.displayName }} <span class="muted small">{{ g.pluginId }}</span>
+      </h3>
+      <PluginSettingsForm :plugin-id="g.pluginId" :properties="g.properties" :values="g.values" />
+    </section>
 
     <h2>Weights</h2>
     <p class="muted">Your judgments nudge these: 👍 +0.10, ⭐ +0.15, 👎 −0.15, kept between 0.1 and 2.</p>

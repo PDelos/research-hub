@@ -171,6 +171,14 @@ export function pluginRoutes(hub: Hub): Router {
     res.json(view);
   });
 
+  // The UI opened a tab: plugins waiting for onView:<tab> start now (lazy activation).
+  r.post("/v1/plugins/views/:tab/open", async (req, res) => {
+    const tab = String(req.params.tab);
+    if (!/^[a-z0-9-]+$/.test(tab)) throw invalid("tab must be a tab id");
+    await host().kernel.fire(`onView:${tab}`);
+    res.status(204).end();
+  });
+
   r.get("/v1/plugins/history", async (req, res) => {
     const limit = Math.min(500, Math.max(1, optInt(req.query.limit, "limit") ?? 100));
     res.json(await host().state.history(limit));

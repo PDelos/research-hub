@@ -1,0 +1,44 @@
+// The plugins store (Pinia): what the enabled plugins contribute (tabs, the knowledge-base viewer, settings) and the
+// plugin list. The stream's `plugins` frame refreshes it, so tabs follow enable and disable without a reload.
+import { defineStore } from "pinia";
+import type { PluginContributionsView, PluginSummary } from "@rh/sdk";
+import { client } from "../store.ts";
+
+/** Which plugins could run: when it changes, so may the tabs, the viewer choice and the settings. */
+function availability(list: PluginSummary[]): string {
+  return list.map((p) => `${p.id}:${["disabled", "blocked", "incompatible"].includes(p.state) ? 0 : 1}`).join();
+}
+
+export const usePlugins = defineStore("plugins", {
+  state: () => ({
+    contributions: undefined as PluginContributionsView | undefined,
+    plugins: [] as PluginSummary[],
+    kernelApi: "",
+    invalid: [] as { dir: string; problems: string[] }[],
+    error: "",
+  }),
+  getters: {
+    tabs: (s) => s.contributions?.tabs ?? [],
+    viewer: (s) => s.contributions?.viewer.active ?? null,
+  },
+  actions: {
+    async refresh() {
+      try {
+        const [contributions, list] = await Promise.all([client.contributions(), client.plugins()]);
+        this.contributions = contributions;
+        this.plugins = list.plugins;
+        this.kernelApi = list.kernelApi;
+        this.invalid = list.invalid;
+        this.error = "";
+      } catch (e) {
+        this.error = e instanceof Error ? e.message : String(e);
+      }
+    },
+    /** States from the stream; contributions follow when the set of available plugins changed. */
+    applyFrame(plugins: PluginSummary[]) {
+      const changed = availability(plugins) !== availability(this.plugins);
+      this.plugins = plugins;
+      if (changed || !this.contributions) void this.refresh();
+    },
+  },
+});

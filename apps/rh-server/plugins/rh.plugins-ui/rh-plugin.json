@@ -1,0 +1,10 @@
+{
+  "id": "rh.plugins-ui",
+  "version": "1.0.0",
+  "displayName": "Plugins",
+  "description": "The Plugins tab: every plugin with its state, contributions, permissions, settings and history; install, enable, disable, configure, uninstall and roll back.",
+  "engines": { "research-hub": "^1.0.0" },
+  "required": true,
+  "activationEvents": [],
+  "contributes": { "tabs": [{ "id": "plugins", "title": "Plugins", "view": "plugins", "order": 70 }] }
+}

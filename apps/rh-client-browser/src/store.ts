@@ -9,6 +9,7 @@ import {
   type PrecisionPoint,
   type CharterView,
   type CostTotals,
+  type PluginSummary,
   type Info,
   type ProjectOverview,
   type RunDetail,
@@ -115,6 +116,12 @@ function refreshRunsSoon() {
   }, 400);
 }
 
+const pluginListeners = new Set<(plugins: PluginSummary[]) => void>();
+/** Plugin states from the stream (the plugins store subscribes). */
+export function onPlugins(fn: (plugins: PluginSummary[]) => void) {
+  pluginListeners.add(fn);
+}
+
 export async function connect() {
   try {
     store.info = await client.info();
@@ -138,6 +145,8 @@ export async function connect() {
           store.sweep = frame.sweep ?? undefined;
           void refreshFeed();
           void refreshSchedule();
+        } else if (frame.type === "plugins") {
+          for (const fn of pluginListeners) fn(frame.plugins);
         } else if (frame.type === "usage") {
           store.totals = frame.totals;
           refreshRunsSoon();

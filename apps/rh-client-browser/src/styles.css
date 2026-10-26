@@ -882,3 +882,127 @@ td.down {
     grid-template-columns: 1fr;
   }
 }
+
+/* Plugins tab and plugin settings (v1.0) */
+.plugins {
+  padding: 16px 20px 40px;
+  overflow: auto;
+}
+.plugins-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+.plugins-body {
+  display: grid;
+  grid-template-columns: minmax(220px, 2fr) 3fr;
+  gap: 16px;
+  align-items: start;
+}
+@media (max-width: 760px) {
+  .plugins-body {
+    grid-template-columns: 1fr;
+  }
+}
+.plugin-list {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+.plugin-list td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line);
+  cursor: pointer;
+}
+.plugin-list tr.on td {
+  background: var(--user);
+}
+.plugin-details,
+.install,
+.plan,
+.plugin-group {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 12px 16px;
+}
+.install {
+  margin: 12px 0;
+}
+.install input {
+  flex: 1;
+  min-width: 0;
+}
+.plan {
+  margin-top: 12px;
+}
+.plugin-details h4,
+.plan h4 {
+  margin: 14px 0 4px;
+}
+.perms {
+  margin: 0;
+  padding-left: 18px;
+}
+.state {
+  display: inline-block;
+  padding: 0 8px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  font-size: 12px;
+}
+.state.active {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.state.failed,
+.state.incompatible,
+.state.blocked {
+  color: var(--error);
+  border-color: var(--error);
+}
+.state.disabled {
+  color: var(--muted);
+}
+.warn {
+  color: var(--warn);
+}
+.history {
+  list-style: none;
+  padding: 0;
+}
+.history li {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--line);
+}
+button.danger {
+  color: var(--error);
+}
+.plugin-settings {
+  display: grid;
+  gap: 10px;
+}
+.plugin-settings label {
+  display: grid;
+  gap: 2px;
+}
+.plugin-settings label.check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.plugin-group {
+  margin-bottom: 12px;
+}
+.plugin-group h3 {
+  margin-top: 0;
+}
+.external-tab {
+  padding: 16px 20px;
+  overflow: auto;
+}

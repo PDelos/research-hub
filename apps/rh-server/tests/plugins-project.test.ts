@@ -105,6 +105,7 @@ test("the v0 tabs come from built-in plugins and follow their enablement", async
       "charter:rh.charter",
       "runs:rh.runs-ui",
       "settings:rh.settings-ui",
+      "plugins:rh.plugins-ui",
     ]);
     await kernel.setEnabled("rh.runs-ui", false);
     assert.ok(!tabs().some((t) => t.startsWith("runs:")));

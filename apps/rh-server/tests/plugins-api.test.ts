@@ -50,7 +50,7 @@ test("the API lists plugins and their contributions, and /v1/info reports the ke
     const c = await client.contributions();
     assert.deepEqual(
       c.tabs.map((t) => t.id),
-      ["feed", "library", "kb", "charter", "runs", "settings"],
+      ["feed", "library", "kb", "charter", "runs", "settings", "plugins"],
     );
     assert.equal(c.viewer.active?.id, "obsidian");
     assert.deepEqual(c.viewer.options.map((o) => o.id).toSorted(), ["library", "obsidian"]);
@@ -142,6 +142,37 @@ test("the history lists every change with its actor, and rollback restores an ea
     assert.match((await client.pluginHistory())[0].message, /^roll back to [0-9a-f]{7} /);
     await rejects(client.rollbackPlugins("deadbeef"), "not_found", /No commit deadbeef/);
     await rejects(client.rollbackPlugins("not-a-commit"), "invalid", /commit must be/);
+  } finally {
+    await server.stop();
+  }
+});
+
+test("a plugin waiting for its view starts when the UI opens the tab, and its UI module is served", async () => {
+  const server = await startTestServer();
+  try {
+    const { client } = server;
+    await client.approveInstall((await client.prepareInstall({ folder: join(FIXTURES, "acme.reading-list") })).planId);
+    assert.equal((await client.plugin("acme.reading-list")).state, "inactive");
+    const tab = (await client.contributions()).tabs.find((t) => t.id === "reading-list")!;
+    assert.deepEqual(tab, {
+      id: "reading-list",
+      title: "Reading list",
+      view: "acme-reading-list",
+      order: 35,
+      pluginId: "acme.reading-list",
+      builtin: false,
+      script: "/plugins/acme.reading-list/reading-list.js",
+    });
+    await client.openView("reading-list");
+    assert.equal((await client.plugin("acme.reading-list")).state, "active");
+
+    const script = await fetch(`${server.url}${tab.script}`);
+    assert.equal(script.status, 200);
+    assert.match(await script.text(), /customElements\.define\("acme-reading-list"/);
+    assert.equal((await fetch(`${server.url}/plugins/acme.reading-list/../rh-plugin.json`)).status, 404);
+    await client.setPluginEnabled("acme.reading-list", false);
+    assert.equal((await fetch(`${server.url}${tab.script}`)).status, 404);
+    assert.ok(!(await client.contributions()).tabs.some((t) => t.id === "reading-list"));
   } finally {
     await server.stop();
   }

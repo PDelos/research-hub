@@ -529,7 +529,7 @@ be disabled or swapped (for example for the Library viewer).
 Router** (plugin tabs as routes, replacing the hand-made hash router) and **Pinia** (shared state as plugins add
 views) in v1-0; **plugin UIs mount as Web Components** (custom elements with the hub's CSS variables, like VS
 Code's webviews), so plugin authors and agents can use any framework or none; **Playwright** for UI tests and
-screenshots (replacing `scripts/screenshot.mjs`); no component library, the hub's own tokens keep one look.
+screenshots (`npm run test:ui`; it replaced `scripts/screenshot.mjs` in v1-0); no component library, the hub's own tokens keep one look.
 
 ---
 
