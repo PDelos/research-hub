@@ -33,5 +33,11 @@
   - Verified 2026-10-26: server 222/222, jev 34 (+1 live, skipped), durable-agent 24/24, UI 13/13; check 0 errors;
     audit 0; `scripts/e2e-offline.sh` PASS with the tsx server, the bundle (`E2E_BUNDLE=1`) and inside the light
     image (`E2E_IMAGE=research-hub:lite`), now including a nightly run, a digest, a comment and an undo.
-- [ ] 6.2 Images: build `research-hub:latest` (lite) and `research-hub:obsidian`; record sizes; start `proteins` on the image the user wants (ask; default the Obsidian add-on so nothing changes for it) and check the cycle status and digest in the container
+- [x] 6.2 Images: build `research-hub:latest` (lite) and `research-hub:obsidian`; record sizes; start `proteins` on the image the user wants (ask; default the Obsidian add-on so nothing changes for it) and check the cycle status and digest in the container
+  - Verified 2026-10-26: `research-hub:latest` (light) 232 MB on disk / 82 MB download; `research-hub:obsidian` 297 MB
+    / 89 MB. `proteins` backed up (`data-backup-v1-0-2026-10-26`) and moved to the Obsidian add-on image so nothing
+    changes for it: healthy, migration 7 applied, everything intact (charter v1, 7 cards, 3 knowledge-base papers,
+    409 Jev and 24 embedding calls, $0.037248), Obsidian running, the Digest tab present, cycle status and schedule
+    (nightly 02:00) served, no errors. The project is paused (since 2026-10-25 22:17 UTC), so its cycle runs are
+    recorded as skipped until it is resumed; left paused for the user to decide.
 - [ ] 6.3 README (light image and add-on, the daily cycle, the Digest tab, undo), PLAN/EVOLUTION status
