@@ -96,6 +96,9 @@ expect "comment saved" "$(curl -s -X POST "$U/digests/$DIG/comments" "${H[@]}" -
 SWAP=$(curl -s "$U/plugins/history?limit=500" "${H[@]}" | j "[h['id'] for h in d if h['message'] == 'configure rh.kb: kb.viewer'][0]")
 curl -s -X POST "$U/plugins/undo" "${H[@]}" -d "{\"commit\":\"$SWAP\"}" > /dev/null
 expect "undo of the viewer choice" "$(curl -s "$U/plugins/history" "${H[@]}" | j "d[0]['message']")" "undo: configure rh.kb: kb.viewer"
+# The harness (v1-2): a replay of past sweeps and the Quality view.
+expect "replay (one sweep: too little)" "$(curl -s -X POST "$U/harness/replay" "${H[@]}" -d '{"variant":{"cardsPerSweep":5}}' | j "d['report']['verdict']")" "not enough data"
+expect "quality: sweeps over time" "$(curl -s "$U/harness/quality" "${H[@]}" | j "len(d['overTime'])")" 1
 expect "rolled back" "$(curl -s -X POST "$U/plugins/rollback" "${H[@]}" -d "{\"commit\":\"$INIT\"}" | j "[p['state'] for p in d['plugins'] if p['id'] == 'acme.sample'][0]")" disabled
 expect "viewer after rollback" "$(viewer)" library
 [ -n "${E2E_IMAGE:-}" ] && docker logs "$CONTAINER" >> "$LOG" 2>&1

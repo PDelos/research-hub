@@ -5,7 +5,7 @@ durable agent (built on [pi-durable](https://github.com/earendil-works/pi)) that
 [Jev](https://openrouter.ai/docs/guides/community/jev) make the bulk decisions, present a few paper cards a day,
 learn from your 👎/👍/⭐ and grow an Obsidian-compatible knowledge base. A new theme is a new container.
 
-**Status: v1.1 (light image and the daily cycle).** v0 built the durable agent, Jev client, live stream, browser UI and containers (v0.0),
+**Status: v1.2 (the harness).** v0 built the durable agent, Jev client, live stream, browser UI and containers (v0.0),
 the brief, charter and schedule (v0.1), paper search with representations (v0.2), the daily sweep with paper cards
 (v0.3), learning from your judgments (v0.4) and the knowledge base with the real Obsidian interface (v0.5). v1.0 turns
 all of it into **plugins, like VS Code**: a small kernel and a plugin for every feature, which you can enable,
@@ -148,6 +148,20 @@ A status line on the Feed and the Digest says where the cycle stands: the last s
 and the next sweep, nightly run and digest. **Undo** reverses one change and keeps later ones (it is refused, with
 the reason, when a later change touched the same setting). Cards per sweep and exploration picks are plugin
 settings, so their changes are listed and undoable too.
+
+## Quality: the harness
+
+The hub measures itself on your judgments. A **replay** applies other sweep settings (gate thresholds
+`relevanceMin`/`worthMin`, `rankWeights`, `cardsPerSweep`, `explorationPicks`) to past sweeps from their stored
+scores (no searches, no paid calls) and compares the cards it would have shown with the current settings: nDCG
+(⭐ 2, 👍 1, 👎 0), precision@5 and recall of ⭐, with a 95 % interval on the most recent sweeps (held out) and a
+verdict: better, worse, inconclusive, or not enough data (under 3 sweeps with judged cards).
+
+Papers you never judged get a label from the **judge** (the Jev command `would-like`, using your research questions
+and recent judgments), but only while it agrees with your own verdicts in at least 70 % of 20+ cases; it is
+recalibrated and labels new papers every night within $0.20 a day. The **Quality** tab shows the judge's
+agreement, your cards over time and every replay; the digest summarizes them; and you can ask the desk "would 10
+cards a day be better?". The harness is part of the core: no plugin or upgrade can change how things are measured.
 
 ## The knowledge base
 
@@ -321,6 +335,7 @@ curl -s -X POST -H "authorization: Bearer $RH_API_TOKEN" -H 'content-type: appli
 | `GET /v1/scheduled-runs` · `POST /v1/runs/{sweep,nightly,review}` | Run log (requested, skipped with reason) · run now (review = the digest) |
 | `GET /v1/cycle` | Where the daily cycle stands: last sweep, cards waiting, next sweep, nightly run and digest |
 | `GET /v1/digests[/:id]` · `POST /v1/digests/:id/comments` | Weekly digests · comment on a section (`section`, `text`) |
+| `GET /v1/harness/quality` · `GET /v1/harness/replays` · `POST /v1/harness/replay` | The judge's agreement and quality over time · replays · replay a variant (`variant`) |
 | `GET /v1/cards` · `GET /v1/cards/:id` | The Feed (cards grouped by sweep, newest first) · one card with score details |
 | `GET /v1/sweeps[/:id]` | Sweeps with phases, counts, papers by status and the cost split |
 | `GET/PUT /v1/sweep-settings` | Cards per sweep (1 to 15, default 7) |

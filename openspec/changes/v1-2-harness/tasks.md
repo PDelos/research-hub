@@ -17,5 +17,7 @@
 
 ## 5. Integration
 
-- [ ] 5.1 All tests, checks, audit, offline e2e (a replay and the Quality view), UI tests, bundle and light image
-- [ ] 5.2 README, PLAN/EVOLUTION status; archive
+- [x] 5.1 All tests, checks, audit, offline e2e (a replay and the Quality view), UI tests, bundle and light image
+  - Verified 2026-10-26: server 230/230, jev 34 (+1 live, skipped), durable-agent 24/24, UI 16/16; check 0 errors;
+    audit 0; offline e2e PASS (tsx, bundle, light image; now with a replay and the Quality view); image 232 MB.
+- [x] 5.2 README, PLAN/EVOLUTION status; archive
