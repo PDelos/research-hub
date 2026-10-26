@@ -11,7 +11,8 @@ import type { Logger } from "../logger.ts";
 import type { RhApi } from "./api.ts";
 import { dependents as dependentsOf, resolve, type GraphNode } from "./graph.ts";
 import type { PluginManifest } from "./manifest.ts";
-import { builtinEntry, type Discovery, type DiscoveredPlugin } from "./registry.ts";
+import { BUILTIN_MODULES } from "./builtins.ts";
+import { BUILTIN_PLUGINS_DIR, builtinEntry, type Discovery, type DiscoveredPlugin } from "./registry.ts";
 import { resolveSettings, SettingsInvalid, validateSettings } from "./settings.ts";
 import type { Actor, Lockfile, PluginState } from "./state.ts";
 
@@ -518,6 +519,9 @@ export class PluginKernel {
 
 export async function defaultLoad(plugin: DiscoveredPlugin): Promise<PluginModule> {
   if (!plugin.manifest.main) return {};
+  // The hub's own built-ins come from the static map (bundled); others are imported from their folder.
+  const builtin = plugin.builtin ? BUILTIN_MODULES[plugin.manifest.id] : undefined;
+  if (builtin && plugin.dir === join(BUILTIN_PLUGINS_DIR, plugin.manifest.id)) return builtin();
   return (await import(pathToFileURL(join(plugin.dir, plugin.manifest.main)).href)) as PluginModule;
 }
 

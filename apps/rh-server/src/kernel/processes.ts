@@ -4,10 +4,8 @@
 // 10 s; a process that stayed up a minute starts afresh).
 import { spawn, type ChildProcess } from "node:child_process";
 import { createServer } from "node:net";
-import { join } from "node:path";
 import type { Logger } from "../logger.ts";
-
-const LOOPBACK = join(import.meta.dirname, "..", "kb", "loopback.cjs");
+import { LOOPBACK_PRELOAD } from "../paths.ts";
 
 export type ProcessState = "starting" | "running" | "crashed" | "stopped";
 
@@ -44,7 +42,7 @@ export class Supervisor {
     const o = this.options;
     this.port ??= await freePort();
     this.state = "starting";
-    const child = spawn(process.execPath, ["--require", LOOPBACK, o.entry, ...(o.args ?? [])], {
+    const child = spawn(process.execPath, ["--require", LOOPBACK_PRELOAD, o.entry, ...(o.args ?? [])], {
       cwd: o.cwd,
       env: { PATH: process.env.PATH ?? "", HOME: o.home, PORT: String(this.port), ...o.env },
       stdio: ["ignore", "pipe", "pipe"],

@@ -3,12 +3,13 @@
 // manifests are reported with their problems instead of stopping the hub.
 import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
+import { APP_DIR } from "../paths.ts";
 import { contributionProblems } from "./contributions.ts";
 import { engineProblem, loadManifest, ManifestInvalid, type PluginManifest } from "./manifest.ts";
 import { initiallyEnabled } from "./settings.ts";
 import type { LockEntry } from "./state.ts";
 
-export const BUILTIN_PLUGINS_DIR = join(import.meta.dirname, "..", "..", "plugins");
+export const BUILTIN_PLUGINS_DIR = join(APP_DIR, "plugins");
 
 export interface DiscoveredPlugin {
   manifest: PluginManifest;

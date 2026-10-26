@@ -139,3 +139,13 @@ test("the desk may call a declared tool only while its plugin is available; unde
   available = false;
   assert.deepEqual(desk.deskTools(), ["recent_cards", "judge_card", "search_kb", "query_kb"]);
 });
+
+test("every built-in plugin with code is in the static module map the bundle uses", async () => {
+  const { readdirSync, existsSync } = await import("node:fs");
+  const { BUILTIN_MODULES } = await import("../src/kernel/builtins.ts");
+  const { BUILTIN_PLUGINS_DIR } = await import("../src/kernel/registry.ts");
+  const withCode = readdirSync(BUILTIN_PLUGINS_DIR).filter((id) =>
+    existsSync(join(BUILTIN_PLUGINS_DIR, id, "main.ts")),
+  );
+  assert.deepEqual(Object.keys(BUILTIN_MODULES).toSorted(), withCode.toSorted());
+});

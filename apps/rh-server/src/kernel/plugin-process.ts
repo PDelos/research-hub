@@ -5,11 +5,10 @@
 import { fork, type ChildProcess } from "node:child_process";
 import { join } from "node:path";
 import type { Logger } from "../logger.ts";
+import { PLUGIN_RUNNER as RUNNER } from "../paths.ts";
 import type { RhApi } from "./api.ts";
 import type { PluginContext, PluginModule } from "./lifecycle.ts";
 import type { DiscoveredPlugin } from "./registry.ts";
-
-const RUNNER = join(import.meta.dirname, "plugin-runner.mjs");
 
 /** Every rh function a plugin process may call (paths into RhApi). */
 export const RH_PATHS = [

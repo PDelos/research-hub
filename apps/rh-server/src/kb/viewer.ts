@@ -18,6 +18,7 @@ import { createServer } from "node:net";
 import { join } from "node:path";
 import { gunzipSync } from "node:zlib";
 import type { Logger } from "../logger.ts";
+import { LOOPBACK_PRELOAD } from "../paths.ts";
 
 export type ViewerState = "disabled" | "unavailable" | "starting" | "running" | "crashed";
 
@@ -47,8 +48,6 @@ export interface KbViewerOptions {
   restartDelays?: number[];
   readyTimeoutMs?: number;
 }
-
-const LOOPBACK = join(import.meta.dirname, "loopback.cjs");
 
 export class KbViewer {
   private child?: ChildProcess;
@@ -114,7 +113,7 @@ export class KbViewer {
       IGNIS_OBSIDIAN_PIN: o.obsidianVersion,
       NODE_ENV: "production",
     };
-    const child = spawn(process.execPath, ["--require", LOOPBACK, server], {
+    const child = spawn(process.execPath, ["--require", LOOPBACK_PRELOAD, server], {
       cwd: o.ignisDir,
       env,
       stdio: ["ignore", "pipe", "pipe"],

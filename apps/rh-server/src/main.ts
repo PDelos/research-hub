@@ -2,12 +2,13 @@
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { ConfigError, loadConfig, secretsOf } from "./config.ts";
+import { REPO_ROOT } from "./paths.ts";
 import { createLogger } from "./logger.ts";
 import { DataDirOwned } from "./owner.ts";
 import { PortInUse, startServer, type Server } from "./server.ts";
 import { packageVersion, VERSION } from "./version.ts";
 
-const envFile = process.env.RH_ENV_FILE ?? resolve(import.meta.dirname, "../../../.env");
+const envFile = process.env.RH_ENV_FILE ?? resolve(REPO_ROOT, ".env");
 if (envFile !== "none" && existsSync(envFile)) process.loadEnvFile(envFile);
 
 let config;

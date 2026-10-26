@@ -1,5 +1,6 @@
 // Configuration from the environment only. Live mode needs OPENROUTER_API_KEY and fails closed without it;
 // offline mode (RH_MODE=offline) uses a faux model and mock Jev and needs no keys at all.
+import { APP_DIR, REPO_ROOT } from "./paths.ts";
 import { randomBytes } from "node:crypto";
 import { resolve, join } from "node:path";
 import { jobModelsFromEnv, type Job } from "@rh/durable-agent";
@@ -72,9 +73,7 @@ export class ConfigError extends Error {
 
 export const PROJECT_NAME = /^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/;
 
-const APP_DIR = resolve(import.meta.dirname, "..");
-/** Relative paths in configuration resolve against the repository root, whatever directory npm runs in. */
-const REPO_ROOT = resolve(APP_DIR, "../..");
+// Relative paths in configuration resolve against the repository root, whatever directory npm runs in.
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const projectName = env.RH_PROJECT_NAME?.trim() || "research";
