@@ -4,7 +4,7 @@
 
 ## 2. Replays
 
-- [ ] 2.1 `src/harness`: features of past sweeps, replay (gate, rank, exploration), labels, metrics (nDCG@n, precision@5, recall of ⭐, coverage), held-out split, seeded paired bootstrap, verdicts; verify unit tests with a synthetic history (a known-better variant wins, a worse one loses, too little data, estimated papers counted, no paid calls)
+- [x] 2.1 `src/harness`: features of past sweeps, replay (gate, rank, exploration), labels, metrics (nDCG@n, precision@5, recall of ⭐, coverage), held-out split, seeded paired bootstrap, verdicts; verify unit tests with a synthetic history (a known-better variant wins, a worse one loses, too little data, estimated papers counted, no paid calls)
 
 ## 3. The judge
 
