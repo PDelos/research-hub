@@ -13,6 +13,14 @@ import type { PapersExports } from "../rh.papers/main.ts";
 import type { SweepExports } from "../rh.sweep/main.ts";
 import { Judge, type Calibration } from "./judge.ts";
 import { SLOTS, type SlotInfo } from "../../src/harness/slots.ts";
+import {
+  loadSample,
+  SampleUnavailable,
+  type DatasetIo,
+  type RetrievalSample,
+} from "../../src/harness/benchmarks/datasets.ts";
+import { facetsTask, retrievalTask, type TaskResult } from "../../src/harness/benchmarks/runner.ts";
+import type { EmbedderExports } from "../rh.papers/main.ts";
 
 export interface StoredReplay {
   id: number;
@@ -54,7 +62,11 @@ export interface SlotView extends SlotInfo {
   last: BenchmarkRecord | null;
 }
 
+export class BenchmarkInvalid extends Error {}
+
 export interface HarnessExports extends AgentHooks {
+  /** Run a slot's preset on the active implementation ({}) or a candidate, and store the result. */
+  runBenchmark(slot: string, candidate?: Record<string, unknown>): Promise<BenchmarkRecord>;
   /** The slot catalog with what is active, the alternatives and the last benchmark of each. */
   slots(): SlotView[];
   benchmarks(slot?: string, limit?: number): BenchmarkRecord[];
@@ -147,8 +159,186 @@ export async function activate(context: PluginContext): Promise<HarnessExports> 
       createdAt: r.created_at,
     }));
   const plugins = () => host.services.contributions;
+  const datasetIo: DatasetIo = {
+    offline: host.offline,
+    fetchBytes: async (url) => {
+      const res = await rh.http.request(url, { timeoutMs: 300_000, budgetMs: 600_000, attempts: 2 });
+      if (!res.ok) throw new Error(`downloading ${url} failed: HTTP ${res.status}`);
+      return new Uint8Array(await res.arrayBuffer());
+    },
+    readCache: (name) => (rh.files.exists("storage", name) ? rh.files.read("storage", name) : undefined),
+    writeCache: (name, content) => rh.files.write("storage", name, content),
+  };
+  const costSince = (since: string) =>
+    Number(
+      (
+        db
+          .prepare(
+            "SELECT (SELECT COALESCE(SUM(cost_usd), 0) FROM embedding_calls WHERE created_at >= ?) + (SELECT COALESCE(SUM(CASE WHEN cost_source IN ('reported','estimated') THEN cost_usd END), 0) FROM jev_calls WHERE created_at >= ?) c",
+          )
+          .get(since, since) as { c: number }
+      ).c,
+    );
+  /** The project's own task: each research question ranks your liked papers (on its question) among others. */
+  const yourStars = (): Pick<RetrievalSample, "queries" | "docs" | "relevant"> => {
+    const charter = db
+      .prepare("SELECT body_json FROM charters WHERE status = 'approved' ORDER BY version DESC LIMIT 1")
+      .get() as { body_json: string } | undefined;
+    const questions = charter ? (JSON.parse(charter.body_json).questions as { id: string; text: string }[]) : [];
+    const liked = db
+      .prepare(
+        "SELECT p.id, p.title, p.abstract, c.matched_question q FROM judgments j JOIN cards c ON c.id = j.card_id JOIN papers p ON p.id = j.paper_id WHERE j.verdict IN ('up', 'star')",
+      )
+      .all() as { id: number; title: string; abstract: string | null; q: string | null }[];
+    const likedIds = new Set(liked.map((l) => Number(l.id)));
+    const others = (
+      db.prepare("SELECT id, title, abstract FROM papers ORDER BY id DESC LIMIT 400").all() as {
+        id: number;
+        title: string;
+        abstract: string | null;
+      }[]
+    )
+      .filter((p) => !likedIds.has(Number(p.id)))
+      .slice(0, 200);
+    const text = (p: { title: string; abstract: string | null }) => `${p.title}. ${p.abstract ?? ""}`.slice(0, 2_000);
+    const relevant: Record<string, string[]> = {};
+    for (const l of liked) if (l.q) (relevant[l.q] ??= []).push(String(l.id));
+    return {
+      queries: questions.filter((q) => relevant[q.id]?.length).map((q) => ({ id: q.id, text: q.text })),
+      docs: [...liked, ...others].map((p) => ({ id: String(p.id), text: text(p) })),
+      relevant,
+    };
+  };
+  const record = (
+    slot: string,
+    preset: string,
+    candidate: Record<string, unknown>,
+    result: BenchmarkResult,
+    costUsd: number,
+  ): BenchmarkRecord => {
+    const createdAt = new Date().toISOString();
+    const r = db
+      .prepare(
+        `INSERT INTO ${benchmarksTable} (slot, preset, candidate_json, result_json, cost_usd, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
+      )
+      .run(slot, preset, JSON.stringify(candidate), JSON.stringify(result), costUsd, createdAt);
+    context.log.info("harness.benchmark", { slot, candidate, value: result.value, costUsd });
+    return { id: Number(r.lastInsertRowid), slot, preset, candidate, result, costUsd, createdAt };
+  };
+  const mean = (tasks: TaskResult[]) => {
+    const v = tasks.map((t) => t.value).filter((x): x is number => x !== null);
+    return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null;
+  };
+  const sampleTask = async (
+    name: "scidocs" | "litsearch",
+    embed: (t: string[]) => Promise<Float32Array[]>,
+  ): Promise<TaskResult> => {
+    try {
+      return await retrievalTask(name, (await loadSample(name, datasetIo)).sample, embed);
+    } catch (error) {
+      if (error instanceof SampleUnavailable || error instanceof Error)
+        return { task: name, metric: "nDCG@10", value: null, items: 0, note: error.message };
+      throw error;
+    }
+  };
   const exports: HarnessExports = {
     benchmarks,
+    async runBenchmark(slotId, candidate = {}) {
+      const slot = SLOTS.find((s) => s.id === slotId);
+      if (!slot) throw new BenchmarkInvalid(`No slot ${slotId}`);
+      if (!slot.preset) throw new BenchmarkInvalid(`The ${slot.title} slot has no benchmark preset yet`);
+      const started = new Date().toISOString();
+      if (slotId === "ranking") {
+        const r = await exports.replay(candidate as Variant, "benchmark");
+        return record(
+          "ranking",
+          "ranking",
+          candidate,
+          {
+            tasks: [
+              {
+                task: "replay",
+                metric: "held-out nDCG difference",
+                value: r.report.heldOut.diff,
+                items: r.report.sweeps.labelled,
+              },
+            ],
+            value: r.report.heldOut.diff,
+            label: r.report.verdict,
+          },
+          0,
+        );
+      }
+      if (slotId === "judge") {
+        const c = await judge.calibrate();
+        return record(
+          "judge",
+          "judge",
+          {},
+          {
+            tasks: [{ task: "your judged cards", metric: "agreement", value: c.agreement, items: c.cases }],
+            value: c.agreement,
+            label: c.trusted ? "trusted" : "not trusted",
+          },
+          costSince(started),
+        );
+      }
+      if (slotId === "embedder") {
+        const model = candidate.model;
+        const dims = candidate.dims;
+        if (model !== undefined && (typeof model !== "string" || !/^[a-z0-9-]+\/[\w.:-]+$/i.test(model)))
+          throw new BenchmarkInvalid("model must be an OpenRouter model id like google/gemini-embedding-2");
+        if (dims !== undefined && (!Number.isInteger(dims) || (dims as number) < 32 || (dims as number) > 4096))
+          throw new BenchmarkInvalid("dims must be a whole number from 32 to 4096");
+        const choice = host.services.contributions.activeContribution("papers.embedder", {});
+        const provider = await host.exportsOf<EmbedderExports>(choice?.pluginId ?? "rh.embedder-openrouter");
+        const embedder = provider.createEmbedder({
+          ledger: papers.embeddingLedger,
+          ...(typeof model === "string" ? { model } : {}),
+          ...(typeof dims === "number" ? { dims } : {}),
+        });
+        const embed = (t: string[]) => embedder.embed(t);
+        const tasks = [
+          await sampleTask("scidocs", embed),
+          await sampleTask("litsearch", embed),
+          await retrievalTask("your-stars", yourStars(), embed),
+        ];
+        const value = mean(tasks);
+        return record(
+          "embedder",
+          "embedder",
+          { model: embedder.model, dims: embedder.dims, ...(model ? { candidate: true } : {}) },
+          { tasks, value, label: value === null ? "no result" : `nDCG@10 ${value.toFixed(3)}` },
+          costSince(started),
+        );
+      }
+      // facets
+      let task: TaskResult;
+      try {
+        task = await facetsTask((await loadSample("pubmed-rct", datasetIo)).sample, (title, sentences) =>
+          papers.facets.labelSentences(title, sentences),
+        );
+      } catch (error) {
+        task = {
+          task: "pubmed-rct",
+          metric: "macro-F1",
+          value: null,
+          items: 0,
+          note: error instanceof Error ? error.message : String(error),
+        };
+      }
+      return record(
+        "facets",
+        "facets",
+        { labeler: "Jev abstract-facets" },
+        {
+          tasks: [task],
+          value: task.value,
+          label: task.value === null ? "no result" : `macro-F1 ${task.value.toFixed(3)}`,
+        },
+        costSince(started),
+      );
+    },
     slots() {
       const { options } = host;
       const alternatives = (slot: string) =>

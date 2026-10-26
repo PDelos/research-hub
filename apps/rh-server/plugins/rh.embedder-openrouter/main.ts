@@ -11,13 +11,13 @@ export function activate(context: PluginContext): EmbedderExports {
   const { options } = host;
   const { embedModel, embedDims } = options.papers;
   return {
-    createEmbedder: ({ ledger }) =>
+    createEmbedder: ({ ledger, model = embedModel, dims = embedDims }) =>
       options.offline || !options.openrouterKey
-        ? new FakeEmbedder(embedDims, ledger)
+        ? new FakeEmbedder(dims, ledger)
         : new OpenRouterEmbedder({
             apiKey: options.openrouterKey,
-            model: embedModel,
-            dims: embedDims,
+            model,
+            dims,
             ledger,
             http: new PoliteHttp({ fetch: options.paperFetch, log: host.log }),
           }),

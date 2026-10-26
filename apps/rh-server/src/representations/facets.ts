@@ -102,6 +102,33 @@ export class FacetLabeler {
     return out;
   }
 
+  /**
+   * Label given sentences without storing them (the facet benchmark, v1-3): the same command, policy and size cap as
+   * label(); the call is recorded in the Jev ledger with `extra.purpose`.
+   */
+  async labelSentences(title: string, sentences: string[], purpose = "benchmark"): Promise<Facet[]> {
+    if (!sentences.length) return [];
+    const { included, vars } = this.fit(title, sentences);
+    const rendered = renderCommand(this.command, vars);
+    try {
+      const result = await this.options.decide(rendered.state, rendered.questions, { model: rendered.model });
+      this.options.ledger.record(result, { command: this.command.name, version: this.version, extra: { purpose } });
+      return sentences.map((_, index) => {
+        const answer = index < included.length ? result.answers[`facet_${index}`] : undefined;
+        if (!answer || answer.type !== "choice") return "other";
+        return answer.confidence >= this.minConfidence ? (answer.choice as Facet) : "other";
+      });
+    } catch (error) {
+      this.options.ledger.fail(error, {
+        command: this.command.name,
+        version: this.version,
+        questions: included.length,
+        extra: { purpose },
+      });
+      throw error;
+    }
+  }
+
   private fit(title: string, sentences: string[]) {
     let included = sentences;
     for (;;) {

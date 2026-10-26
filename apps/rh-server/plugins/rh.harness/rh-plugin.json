@@ -45,6 +45,6 @@
   },
   "permissions": {
     "budgetUsdPerDay": 0.2,
-    "network": ["openrouter.ai"]
+    "network": ["openrouter.ai", "huggingface.co"]
   }
 }

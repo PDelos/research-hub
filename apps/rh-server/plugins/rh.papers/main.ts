@@ -12,7 +12,8 @@ import type { DecisionExports } from "../rh.decision-jev/main.ts";
 
 /** What a plugin contributing papers.embedder exports. */
 export interface EmbedderExports {
-  createEmbedder(context: { ledger: EmbeddingLedger }): Embedder;
+  /** The configured embedder, or (v1-3) one for a candidate model and size, e.g. for the slot's benchmark. */
+  createEmbedder(context: { ledger: EmbeddingLedger; model?: string; dims?: number }): Embedder;
 }
 
 /** What a plugin contributing a non-built-in papers.source exports: a client per contributed id. */

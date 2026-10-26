@@ -6,7 +6,7 @@
 
 - [x] 2.1 The slot catalog and `GET /v1/slots` (active, alternatives, preset, last result); verify tests
 - [x] 2.2 Datasets and fixed samples (downloads through `rh.http`, Parquet and JSONL, seeded, cached, offline handling); verify tests with fixture files served by a fake fetch
-- [ ] 2.3 The runner and presets (embedder, facets, judge, ranking), results stored, `POST /v1/slots/:id/benchmark`; verify offline tests with fixture samples, including a candidate embedder
+- [x] 2.3 The runner and presets (embedder, facets, judge, ranking), results stored, `POST /v1/slots/:id/benchmark`; verify offline tests with fixture samples, including a candidate embedder
 
 ## 3. Attribution
 
