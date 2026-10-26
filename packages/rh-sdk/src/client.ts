@@ -8,6 +8,11 @@ import type {
   KbNote,
   KbPaper,
   KbSearchHit,
+  CycleStatus,
+  DigestComment,
+  DigestSection,
+  DigestSummary,
+  DigestView,
   PluginContributionsView,
   PluginDetails,
   PluginHistoryEntry,
@@ -156,6 +161,13 @@ export class HubClient {
     this.call<{ commit: string | null; plugins: string[]; history: PluginHistoryEntry[] }>("POST", "/plugins/undo", {
       commit,
     });
+  // The daily cycle (v1.1)
+  cycle = () => this.call<CycleStatus>("GET", "/cycle");
+  digests = (limit = 20) => this.call<DigestSummary[]>("GET", `/digests?limit=${limit}`);
+  digest = (id: number) => this.call<DigestView>("GET", `/digests/${id}`);
+  commentDigest = (id: number, section: DigestSection, text: string) =>
+    this.call<DigestComment>("POST", `/digests/${id}/comments`, { section, text });
+
   /** Tell the hub a tab was opened, so plugins activated by onView:<tab> start. */
   openView = (tab: string) => this.call<void>("POST", `/plugins/views/${encodeURIComponent(tab)}/open`, {});
 

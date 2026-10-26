@@ -24,7 +24,7 @@
 ## 5. The cycle
 
 - [x] 5.1 Exploration picks in the rank phase (cosine to liked papers, recorded, `exploration` on cards); verify tests for a pick, no pick without judgments, and `explorationPicks: 0`
-- [ ] 5.2 The `rh.digest` plugin: nightly figures, the weekly digest (sections of D5, no LLM call), comments with `digest.comment` events, cycle status, `GET /v1/cycle`, `GET /v1/digests[/:id]`, `POST /v1/digests/:id/comments`; verify tests for a simulated offline week (7 sweeps, 7 nightly runs, 1 digest, each once), digest contents and carried-forward comments
+- [x] 5.2 The `rh.digest` plugin: nightly figures, the weekly digest (sections of D5, no LLM call), comments with `digest.comment` events, cycle status, `GET /v1/cycle`, `GET /v1/digests[/:id]`, `POST /v1/digests/:id/comments`; verify tests for a simulated offline week (7 sweeps, 7 nightly runs, 1 digest, each once), digest contents and carried-forward comments
 - [ ] 5.3 UI: the Digest tab (sections, changes with Undo, comments), the cycle status line, the Exploration badge on cards; verify `npm run build`, Playwright tests (digest renders, undo from the digest, comment saved) and light/dark screenshots
 
 ## 6. Integration

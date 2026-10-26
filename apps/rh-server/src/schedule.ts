@@ -75,7 +75,7 @@ function shiftDate(p: { y: number; m: number; d: number }, days: number) {
   const t = new Date(Date.UTC(p.y, p.m - 1, p.d + days));
   return { y: t.getUTCFullYear(), m: t.getUTCMonth() + 1, d: t.getUTCDate(), weekday: t.getUTCDay() };
 }
-function isoWeek(p: { y: number; m: number; d: number }): string {
+export function isoWeek(p: { y: number; m: number; d: number }): string {
   const t = new Date(Date.UTC(p.y, p.m - 1, p.d));
   const day = t.getUTCDay() || 7;
   t.setUTCDate(t.getUTCDate() + 4 - day);

@@ -5,6 +5,7 @@ import type { PluginModule } from "./lifecycle.ts";
 export const BUILTIN_MODULES: Record<string, () => Promise<PluginModule>> = {
   "rh.charter": () => import("../../plugins/rh.charter/main.ts") as Promise<PluginModule>,
   "rh.decision-jev": () => import("../../plugins/rh.decision-jev/main.ts") as Promise<PluginModule>,
+  "rh.digest": () => import("../../plugins/rh.digest/main.ts") as Promise<PluginModule>,
   "rh.desk": () => import("../../plugins/rh.desk/main.ts") as Promise<PluginModule>,
   "rh.embedder-openrouter": () => import("../../plugins/rh.embedder-openrouter/main.ts") as Promise<PluginModule>,
   "rh.feedback": () => import("../../plugins/rh.feedback/main.ts") as Promise<PluginModule>,

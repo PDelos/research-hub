@@ -8,6 +8,7 @@ import type { Logger } from "../logger.ts";
 import type { OpenProjectOptions } from "../project.ts";
 import type { Telemetry } from "../telemetry.ts";
 import type { KernelServices } from "./api.ts";
+import type { HistoryEntry } from "./state.ts";
 import type { PluginContext } from "./lifecycle.ts";
 
 export interface BuiltinHost {
@@ -24,6 +25,8 @@ export interface BuiltinHost {
   observe: Extension;
   /** Activate another plugin and get its exports (for extension point contributions). */
   exportsOf<T>(id: string): Promise<T>;
+  /** Every change to the plugin state, newest first (the digest lists them with undo). */
+  pluginHistory(limit?: number): Promise<HistoryEntry[]>;
 }
 
 export function hostOf(context: PluginContext): BuiltinHost {

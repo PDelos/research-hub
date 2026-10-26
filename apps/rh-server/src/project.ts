@@ -170,7 +170,7 @@ export async function openProject(options: OpenProjectOptions): Promise<ProjectR
     // First-start enablement follows the configuration (RH_KB_VIEWER may come from the .env file).
     env: { ...process.env, RH_KB_VIEWER: options.kbViewer?.enabled === false ? "off" : "on" },
     ...(options.paperFetch ? { fetch: options.paperFetch } : {}),
-    builtinHost: (services, exportsOf): BuiltinHost => ({
+    builtinHost: (services, exportsOf, pluginState): BuiltinHost => ({
       name,
       dir,
       db,
@@ -182,6 +182,7 @@ export async function openProject(options: OpenProjectOptions): Promise<ProjectR
       services,
       observe,
       exportsOf,
+      pluginHistory: (limit = 100) => pluginState.history(limit),
     }),
   });
   const { catalog } = await plugins.exportsOf<ProviderExports>("rh.provider-openrouter");

@@ -51,7 +51,7 @@ test("the API lists plugins and their contributions, and /v1/info reports the ke
     const c = await client.contributions();
     assert.deepEqual(
       c.tabs.map((t) => t.id),
-      ["feed", "library", "kb", "charter", "runs", "settings", "plugins"],
+      ["feed", "digest", "library", "kb", "charter", "runs", "settings", "plugins"],
     );
     assert.equal(c.viewer.active?.id, "library");
     assert.deepEqual(c.viewer.options.map((o) => o.id).toSorted(), ["library", "obsidian"]);

@@ -495,3 +495,60 @@ export interface KbSearchHit {
   title: string;
   excerpt: string;
 }
+
+// ---------------------------------------------------------------- the daily cycle (v1.1)
+
+export interface CycleStatus {
+  lastSweep: { id: number; status: string; cards: number; startedAt: string; endedAt: string | null } | null;
+  /** Cards of the last sweep without a judgment yet. */
+  waiting: number;
+  next: { sweep: string | null; nightly: string | null; review: string | null; timeZone: string };
+  lastNightly: { at: string } | null;
+  lastDigest: { id: number; week: string; createdAt: string } | null;
+}
+
+export type DigestSection = "cycle" | "judgments" | "exploration" | "knowledgeBase" | "cost" | "changes" | "general";
+
+export interface DigestBody {
+  week: string;
+  from: string;
+  to: string;
+  cycle: { sweeps: { id: number; status: string; startedAt: string; cards: number }[]; nightlyRuns: number };
+  judgments: {
+    up: number;
+    down: number;
+    star: number;
+    total: number;
+    /** Cards from this week's sweeps still waiting for a judgment. */
+    waiting: number;
+    precision: { sweepId: number; startedAt: string; judged: number; good: number; precision: number | null }[];
+  };
+  exploration: { picks: { sweepId: number; paperId: number; title: string; verdict: string | null }[] };
+  knowledgeBase: { added: { stem: string; title: string }[] };
+  cost: { modelUsd: number; jevUsd: number; embeddingUsd: number; totalUsd: number };
+  changes: { id: string; time: string; message: string; actor: string }[];
+  /** What you wrote on the previous digest. */
+  lastComments: { section: string; text: string; createdAt: string }[];
+}
+
+export interface DigestComment {
+  id: number;
+  section: string;
+  text: string;
+  createdAt: string;
+}
+
+export interface DigestView extends DigestBody {
+  id: number;
+  createdAt: string;
+  comments: DigestComment[];
+}
+
+export interface DigestSummary {
+  id: number;
+  week: string;
+  from: string;
+  to: string;
+  createdAt: string;
+  comments: number;
+}

@@ -100,6 +100,7 @@ test("the v0 tabs come from built-in plugins and follow their enablement", async
     const tabs = () => contributions.tabs().map((t) => `${t.id}:${t.pluginId}`);
     assert.deepEqual(tabs(), [
       "feed:rh.sweep",
+      "digest:rh.digest",
       "library:rh.kb",
       "kb:rh.kb",
       "charter:rh.charter",
