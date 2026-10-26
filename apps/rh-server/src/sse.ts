@@ -1,5 +1,5 @@
 // GET /v1/stream: one server-sent event stream per viewer. hello, then agent.snapshot and agent.batch for the
-// project's root conversation, plus agent.state and usage whenever a commit changes them. Pings every 15 s and ends
+// project's root conversation, plus agent.state and usage whenever a commit changes them, and plugin states. Pings every 15 s and ends
 // a stream buffering over 2 MB so a slow viewer reconnects to a fresh snapshot. Closing a stream never aborts work.
 // Adapted from disler/pi-durable-news-agent.
 import type { Request, Response } from "express";
@@ -161,6 +161,10 @@ export class StreamHub {
     sse.onClose(project.feedback.onChange(() => state()));
     sse.onClose(() => state.cancel());
     await state.now();
+    // Plugin states (v1-0): sent once, then on every change, so tabs follow enable and disable without a reload.
+    const kernel = project.plugins.kernel;
+    sse.sendIfChanged("plugins", { type: "plugins", plugins: kernel.list() });
+    sse.onClose(kernel.onChange((plugins) => sse.sendIfChanged("plugins", { type: "plugins", plugins })));
     void req;
   }
 

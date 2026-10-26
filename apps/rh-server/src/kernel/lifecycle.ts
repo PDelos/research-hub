@@ -34,6 +34,8 @@ export interface PluginContext {
   readonly log: Logger;
   /** The kernel API. */
   readonly rh: RhApi;
+  /** Built-in plugins only: the project's v0 objects they wrap (see builtin.ts). */
+  readonly host?: unknown;
 }
 
 export interface PluginModule {
@@ -50,6 +52,8 @@ export interface KernelOptions {
   env?: NodeJS.ProcessEnv;
   /** Load a plugin's code; by default its `main` module is imported. */
   load?: (plugin: DiscoveredPlugin) => Promise<PluginModule>;
+  /** Handed to built-in plugins as `context.host`. */
+  builtinHost?: unknown;
   /** The `rh` API handed to a plugin; what it registers goes into `subscriptions` (disposed on deactivate). */
   api?: (plugin: DiscoveredPlugin, subscriptions: Disposable[]) => RhApi;
 }
@@ -110,6 +114,17 @@ export class PluginKernel {
   async start(): Promise<void> {
     const lock = this.options.state.current();
     const missing = [...this.records.values()].filter((r) => r.plugin.builtin && !lock.plugins[r.plugin.manifest.id]);
+    const forced = [...this.records.values()].filter(
+      (r) => r.plugin.builtin && r.plugin.manifest.required && lock.plugins[r.plugin.manifest.id]?.enabled === false,
+    );
+    if (forced.length)
+      await this.options.state.update(
+        (l) => {
+          for (const r of forced) l.plugins[r.plugin.manifest.id].enabled = true;
+        },
+        `re-enable required ${forced.map((r) => r.plugin.manifest.id).join(", ")}`,
+        "kernel",
+      );
     const stale = [...this.records.values()].filter(
       (r) =>
         r.plugin.builtin &&
@@ -211,6 +226,7 @@ export class PluginKernel {
         log,
         // Without an API factory (unit tests of the lifecycle) plugins get no `rh`.
         rh: this.options.api?.(r.plugin, subscriptions) as RhApi,
+        ...(r.plugin.builtin && this.options.builtinHost !== undefined ? { host: this.options.builtinHost } : {}),
       };
       const result = await Promise.race([
         Promise.resolve(module.activate?.(context)),
@@ -281,9 +297,14 @@ export class PluginKernel {
    * unless `cascade` confirms disabling them too.
    */
   async setEnabled(id: string, enabled: boolean, options: { actor?: Actor; cascade?: boolean } = {}): Promise<void> {
-    if (!this.records.has(id)) throw new PluginUnavailable(id, "not installed");
+    const record = this.records.get(id);
+    if (!record) throw new PluginUnavailable(id, "not installed");
+    if (!enabled && record.plugin.builtin && record.plugin.manifest.required)
+      throw new PluginUnavailable(id, "the hub needs it, so it cannot be disabled");
     const lock = this.options.state.current();
     const affected = enabled ? [] : dependentsOf(this.nodes(), id).filter((d) => lock.plugins[d]?.enabled);
+    const requiredDependent = affected.find((d) => this.records.get(d)?.plugin.manifest.required);
+    if (requiredDependent) throw new PluginUnavailable(id, `${requiredDependent} needs it, so it cannot be disabled`);
     if (affected.length && !options.cascade) throw new HasDependents(id, affected);
     const ids = [id, ...affected];
     await this.options.state.update(

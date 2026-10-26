@@ -34,6 +34,8 @@ export interface PluginManifest {
   contributes: Record<string, unknown>;
   /** Plugin id → semver range. */
   dependencies: Record<string, string>;
+  /** Built-ins only: the hub needs this plugin, so it cannot be disabled. */
+  required?: boolean;
   permissions: PluginPermissions;
 }
 
@@ -61,6 +63,7 @@ const schema = {
     activationEvents: { type: "array", items: { type: "string", pattern: ACTIVATION }, uniqueItems: true },
     contributes: { type: "object" },
     dependencies: { type: "object", additionalProperties: { type: "string", minLength: 1 } },
+    required: { type: "boolean" },
     permissions: {
       type: "object",
       additionalProperties: false,

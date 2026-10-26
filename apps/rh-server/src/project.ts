@@ -15,7 +15,7 @@ import {
   type DurableHarness,
   type ModelCatalog,
 } from "@rh/durable-agent";
-import { JevLedger, loadCommand, runCommand, type Decide, type JevClient } from "@rh/jev";
+import type { Decide, JevClient, JevLedger } from "@rh/jev";
 import { createAgents, type Agents } from "./agents.ts";
 import { Brief, Charters, ProjectState, ScopingQuestions } from "./charter.ts";
 import { CharterWriter } from "./charter-writer.ts";
@@ -38,6 +38,10 @@ import { paperTools } from "./papers/tool.ts";
 import { ensureVectorTables, openProjectDb, Settings, type Db, type SelfCheck } from "./db.ts";
 import type { Logger } from "./logger.ts";
 import { Telemetry } from "./telemetry.ts";
+import type { BuiltinHost } from "./kernel/builtin.ts";
+import { startPluginHost, type PluginHost } from "./kernel/host.ts";
+import type { DecisionExports } from "../plugins/rh.decision-jev/main.ts";
+import type { ProviderExports } from "../plugins/rh.provider-openrouter/main.ts";
 
 /**
  * v0.0 first stored the project in <data>/projects/default/. Move those files to <data>/ once, so an existing
@@ -93,6 +97,8 @@ export interface ProjectRuntime {
   readonly ingest: Ingest;
   readonly kbIndex: KbIndex;
   readonly kbViewer: KbViewer;
+  /** The project's plugins: kernel, contributions and state (v1-0). */
+  readonly plugins: PluginHost;
   /** Create the vault and refresh charter.md after a charter approval. */
   syncVault(): void;
   readonly cardWriter: CardWriter;
@@ -110,7 +116,7 @@ export interface ProjectRuntime {
   close(): Promise<void>;
 }
 
-export async function openProject(options: {
+export interface OpenProjectOptions {
   name: string;
   dataDir: string;
   promptsDir: string;
@@ -131,8 +137,10 @@ export async function openProject(options: {
   /** Tests: answer Jev questions with this instead of the Jev client. */
   decide?: Decide;
   kbViewer?: { enabled: boolean; dir: string; obsidianVersion: string; restartDelays?: number[] };
-}): Promise<ProjectRuntime> {
-  const { name, catalog, log } = options;
+}
+
+export async function openProject(options: OpenProjectOptions): Promise<ProjectRuntime> {
+  const { name, log } = options;
   const dir = options.dataDir;
   mkdirSync(dir, { recursive: true });
   migrateLegacyLayout(dir, log);
@@ -141,6 +149,27 @@ export async function openProject(options: {
   const settings = new Settings(db);
   const telemetry = new Telemetry(db);
   const plog = log;
+  // Plugins first: built-in plugins provide the services below (design D8).
+  const plugins = await startPluginHost({
+    dataDir: dir,
+    db,
+    vaultDir: join(dir, "vault"),
+    log: plog,
+    ...(options.paperFetch ? { fetch: options.paperFetch } : {}),
+    builtinHost: (services): BuiltinHost => ({
+      name,
+      dir,
+      db,
+      settings,
+      telemetry,
+      log: plog,
+      offline: options.offline,
+      options,
+      services,
+    }),
+  });
+  const { catalog } = await plugins.exportsOf<ProviderExports>("rh.provider-openrouter");
+  const jevPlugin = await plugins.exportsOf<DecisionExports>("rh.decision-jev");
   const observe = observability({
     event: (e) =>
       plog[e.level === "debug" ? "debug" : e.level](`agent.${e.event}`, {
@@ -164,9 +193,7 @@ export async function openProject(options: {
     observe,
   });
   const scheduler = new Scheduler({ db, settings, state, charters, defaults: options.schedule, log: plog });
-  const jevLedger = new JevLedger((record) => telemetry.jevCall(record));
-  const decide: Decide = options.decide ?? ((s, q, o) => options.jev.systemOne(s, q, o));
-  const jevDir = join(options.promptsDir, "jev");
+  const { ledger: jevLedger, decide, jevDir } = jevPlugin;
   // Before the harness opens: a resumed search_papers call may need it during replay.
   const papers = new PaperService({
     db,
@@ -350,6 +377,7 @@ export async function openProject(options: {
     ingest,
     kbIndex,
     kbViewer,
+    plugins,
     syncVault() {
       syncVault();
       kbIndex.start();
@@ -365,24 +393,7 @@ export async function openProject(options: {
       settings.set("compaction", compaction);
       return { ...compaction };
     },
-    async jevPing(text = "Good morning, research desk!") {
-      const cmd = loadCommand("ping", jevDir);
-      try {
-        const { result } = await runCommand(cmd, { text }, decide);
-        jevLedger.record(result, { command: cmd.name, version: cmd.version });
-        const answer = result.answers.greeting as { noul: number };
-        return {
-          provider: result.meta.provider,
-          model: result.meta.resolvedModel,
-          elapsedMs: result.meta.elapsedMs,
-          cost: result.meta.cost,
-          greeting: answer.noul,
-        };
-      } catch (error) {
-        jevLedger.fail(error, { command: cmd.name, version: cmd.version, questions: 1 });
-        throw error;
-      }
-    },
+    jevPing: (text) => jevPlugin.ping(text),
     async close() {
       scheduler.stop();
       await ingest.close();
@@ -393,6 +404,7 @@ export async function openProject(options: {
       await papers.close();
       stopProjector();
       await harness.close();
+      await plugins.stop();
       db.close();
       plog.info("project.closed", {});
     },

@@ -1,0 +1,92 @@
+// The plugin host of one project (design D2, D3, D7): discovery of built-in and installed plugins, the git-backed
+// plugin state in $RH_DATA_DIR/plugins, the kernel with its rh API, and the contribution registry. openProject
+// starts it before anything else, so built-in plugins provide the v0 services the project exposes.
+import { join } from "node:path";
+import type { Db } from "../db.ts";
+import type { Logger } from "../logger.ts";
+import { createRhApi, EventBus, ScheduleRegistry, type KernelServices } from "./api.ts";
+import { ContributionRegistry } from "./contributions.ts";
+import { PluginKernel } from "./lifecycle.ts";
+import { Budgets } from "./permissions.ts";
+import { discover, initialPlugins, type Discovery } from "./registry.ts";
+import { PluginState } from "./state.ts";
+
+export interface PluginHostOptions {
+  dataDir: string;
+  db: Db;
+  vaultDir: string;
+  log: Logger;
+  env?: NodeJS.ProcessEnv;
+  /** Built-in plugins folder (default apps/rh-server/plugins). */
+  builtinDir?: string;
+  /** What built-in plugins receive as `context.host`, given the kernel services. */
+  builtinHost?: (services: KernelServices) => unknown;
+  fetch?: typeof fetch;
+  activationTimeoutMs?: number;
+}
+
+export interface PluginHost {
+  readonly kernel: PluginKernel;
+  readonly contributions: ContributionRegistry;
+  readonly services: KernelServices;
+  readonly discovery: Discovery;
+  readonly state: PluginState;
+  /** What an active plugin's activate returned. */
+  exportsOf<T>(id: string): Promise<T>;
+  stop(): Promise<void>;
+}
+
+export async function startPluginHost(options: PluginHostOptions): Promise<PluginHost> {
+  const env = options.env ?? process.env;
+  const log = options.log.child({ component: "plugins" });
+  const state = new PluginState(options.dataDir);
+  const discovery = discover({
+    ...(options.builtinDir ? { builtinDir: options.builtinDir } : {}),
+    installedDir: join(state.dir, "installed"),
+  });
+  for (const invalid of discovery.invalid) log.warn("plugin.invalid", { dir: invalid.dir, problems: invalid.problems });
+  await state.open(() => initialPlugins(discovery, env));
+  const events = new EventBus(log);
+  const services: KernelServices = {
+    db: options.db,
+    vaultDir: options.vaultDir,
+    storageRoot: join(state.dir, "data"),
+    env,
+    log,
+    events,
+    budgets: new Budgets(options.db, {
+      onExceeded: (pluginId, limitUsd) => {
+        log.warn("plugin.budget_exceeded", { plugin: pluginId, limitUsd });
+        events.emit("budget.exceeded", { pluginId, limitUsd });
+      },
+    }),
+    contributions: undefined as unknown as ContributionRegistry,
+    schedules: new ScheduleRegistry(),
+    ...(options.fetch ? { fetch: options.fetch } : {}),
+    providers: {},
+  };
+  const kernel = new PluginKernel({
+    discovery,
+    state,
+    log,
+    env,
+    ...(options.activationTimeoutMs ? { activationTimeoutMs: options.activationTimeoutMs } : {}),
+    builtinHost: options.builtinHost?.(services),
+    api: (plugin, subscriptions) => createRhApi(plugin, services, subscriptions),
+  });
+  const contributions = new ContributionRegistry(kernel, discovery);
+  services.contributions = contributions;
+  await kernel.start();
+  for (const p of kernel.list())
+    if (p.state === "failed" || p.state === "blocked" || p.state === "incompatible")
+      log.warn("plugin.unavailable", { plugin: p.id, state: p.state, reason: p.reason });
+  return {
+    kernel,
+    contributions,
+    services,
+    discovery,
+    state,
+    exportsOf: <T>(id: string) => kernel.activate(id) as Promise<T>,
+    stop: () => kernel.stop(),
+  };
+}

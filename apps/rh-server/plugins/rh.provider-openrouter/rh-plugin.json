@@ -1,0 +1,11 @@
+{
+  "id": "rh.provider-openrouter",
+  "version": "1.0.0",
+  "displayName": "OpenRouter models",
+  "description": "The language models every agent uses, through OpenRouter (a scripted local model in offline mode). Provides rh.models to other plugins.",
+  "engines": { "research-hub": "^1.0.0" },
+  "main": "main.ts",
+  "required": true,
+  "activationEvents": ["onStartup"],
+  "permissions": { "network": ["openrouter.ai"], "secrets": ["OPENROUTER_API_KEY"] }
+}
