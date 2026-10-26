@@ -595,9 +595,12 @@ Budget caps per project (daily/monthly) stop new sweeps and notify when reached.
 
 **v0 is complete (2026-10-25)**: all six layers below are archived. **v1-0 is complete (2026-10-26)**: the kernel
 and all of v0 as VS Code-style plugins (what it built: EVOLUTION.md §2.5). **What comes next is planned in
-[EVOLUTION.md §6](EVOLUTION.md)**: `v1-0-plugin-core` ✅ →
-`v1-1-harness` → `v1-2-fulltext-and-facets` → `v1-3-knowledge-loop` → `v1-4-upgrades` (the Upgrades tab:
-idea → test → proof → implement, you decide at every gate) → `v1-5-engineer` → `v1-6-fine-tuning` → `v1-7-mcp`.
+[EVOLUTION.md §0 and §6](EVOLUTION.md)** (revised 2026-10-26: core loop first, human on the loop):
+`v1-1-lite-daily-cycle` (a light image, Obsidian as an add-on, the daily cycle orchestrated with a weekly digest and
+a "What changed" feed with undo) → `v1-2-harness` (replays on your judgments, a judge calibrated on your verdicts) →
+`v1-3-self-improvement` (nightly error analysis, fixes proven on held-out judgments and applied with undo,
+exploration picks) → `v1-4-knowledge-loop` (charter and new-question proposals). Full text, the Upgrades tab, the
+engineer, fine-tuning and MCP come later.
 
 v0 was built bottom-up; each layer is one OpenSpec change that depends only on the layers below it and
 is applied, tested and archived before the next starts. All six v0 changes exist in `openspec/changes/`

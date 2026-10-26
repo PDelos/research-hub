@@ -16,10 +16,12 @@ disable, configure, swap, install and roll back per project (see [Plugins](#plug
 A small **kernel** (plugin discovery, the per-project plugin state, the durable agent runtime, the database, HTTP,
 permissions and budgets) runs **plugins**: paper sources, the embedder, the decision engine, the charter, sweep,
 feedback, the research desk, the knowledge base and its viewers, and the UI tabs. Each has an `rh-plugin.json`
-manifest, activates only when needed and declares what it may reach. Next (planned in [EVOLUTION.md](EVOLUTION.md)):
-a harness to compare setups (v1-1), full text and facet vectors (v1-2), a charter that evolves with your interests
-(v1-3), and an **Upgrades** tab (v1-4) that suggests improvements found on the internet; you choose what to test, the
-agent tests it beside what runs now and returns a proof report, and you decide whether to implement it.
+manifest, activates only when needed and declares what it may reach. Next (planned in
+[EVOLUTION.md](EVOLUTION.md) §0 and §6): the goal is a **daily cycle that runs itself**: agents sweep, rank and
+explain papers, analyze what you disliked or missed every night, replay candidate fixes on your past judgments and
+apply the ones that clearly win (each with undo), and send a weekly digest you read and comment on. You only read,
+judge and give opinions. Steps: a lighter image with the orchestrated cycle (v1-1), the replay harness (v1-2),
+self-improvement (v1-3), then charter and new-question proposals (v1-4).
 
 ## Quick start (offline, no keys)
 

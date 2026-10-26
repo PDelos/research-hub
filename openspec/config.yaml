@@ -7,8 +7,8 @@ context: |
   = one research project (one theme); a new theme is a new container, never a second project inside one.
   The project's proactive pi-durable agent sweeps papers daily, presents a few paper cards, learns from
   the user's 👎/👍/⭐ + reason, and grows an Obsidian-compatible vault (the KB), viewable in the browser
-  through Ignis bundled in the same container. A weekly review proposes improvements; nothing changes
-  without user approval.
+  through the Library view or the optional Obsidian add-on. The goal (EVOLUTION.md §0): a daily cycle that runs
+  itself and keeps improving its finding loop, while the user only reads, judges and comments.
 
   Fixed decisions:
   - Fresh codebase. The durable-agent and jev packages are vendored from
@@ -18,9 +18,9 @@ context: |
     explicitly replaces them.
   - v0 (complete) was built as a pyramid: v0-0-skeleton -> v0-1-project-setup -> v0-2-paper-sources ->
     v0-3-daily-sweep -> v0-4-feedback -> v0-5-knowledge-vault. v1 follows EVOLUTION.md §6, in order:
-    v1-0-plugin-core -> v1-1-harness -> v1-2-fulltext-and-facets -> v1-3-knowledge-loop -> v1-4-upgrades
-    -> v1-5-engineer -> v1-6-fine-tuning -> v1-7-mcp. Apply and archive each
-    before the next. A change must not add requirements to a capability owned by an earlier change except as
+    v1-0-plugin-core (done) -> v1-1-lite-daily-cycle -> v1-2-harness -> v1-3-self-improvement ->
+    v1-4-knowledge-loop; full text, the Upgrades tab, the engineer, fine-tuning and MCP come later. Apply and
+    archive each before the next. A change must not add requirements to a capability owned by an earlier change except as
     MODIFIED deltas.
   - Plugin architecture (from v1-0, EVOLUTION.md §2): a small kernel and plugins for every feature, modeled on
     VS Code extensions. Each plugin has an rh-plugin.json manifest (id, version, engines.research-hub,
@@ -32,7 +32,11 @@ context: |
     agent-written code runs in a separate plugin host with declared permissions; process plugins (Python
     tools, MCP servers, Ignis) are supervised child processes. Plugin state per project lives in
     data/plugins (a git repo with plugins.lock.json); every change is a commit and can be rolled back.
-  - Product upgrades go through the Upgrades tab (EVOLUTION.md §3): idea (found by a scout on the internet:
+  - Autonomy (EVOLUTION.md §0): fixes to the finding loop (queries, thresholds, weights, Jev/prompt wording,
+    embedder choice) that win on the harness's held-out judgments are applied automatically as plugin-state
+    commits and listed in the "What changed" feed and the weekly digest with one-click undo. Never experiment on
+    the live feed. Charter changes, noticeable cost increases and outside upgrades wait for the user's approval.
+  - Product upgrades from outside go through the Upgrades tab (EVOLUTION.md §3, later): idea (found by a scout on the internet:
     web search through OpenRouter, arXiv, release feeds, model catalogs) -> the user asks for a test -> the
     agent tests the candidate beside the current plugin on the same inputs -> a proof report (metrics with
     confidence intervals, side-by-side examples, a pairwise judge with swapped positions, optional user
@@ -50,7 +54,8 @@ context: |
     pi-durable is experimental: all direct usage stays inside packages/durable-agent.
   - Express 5 API + SSE; Vue 3 UI built with Vite+. One Docker container per project, data in its own /data
     volume; every helper process (e.g. the Ignis viewer) runs inside that container, supervised by the
-    hub, reachable only through the hub. Routes carry no project segment.
+    hub, reachable only through the hub. The default image stays light (target under 300 MB: the server
+    bundled, no unused SDKs); heavy optional parts (Obsidian/Ignis, Python tools) are add-on images. Routes carry no project segment.
   - Project containers never interfere: data-directory ownership lock, own port, own compose name
     (rh-<name>), own host name (<name>.localhost), resource limits, staggered sweep times. Containers
     never talk to each other.

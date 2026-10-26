@@ -2,11 +2,43 @@
 
 > How the Research Hub becomes a set of installable plugins that its own agents keep improving: the **knowledge
 > loop** improves *what* the project searches for and knows; the **product loop** improves *how* the hub works
-> (embedders, extractors, prompts, rankers) through benchmarks, experiments and A/B tests. Humans verify; agents
-> do the work. Companion to `PLAN.md` (the v0 system as built) — this file plans everything after v0.
+> (embedders, extractors, prompts, rankers) through replays on the user's own judgments. Agents do the work; the
+> human reads, judges and gives opinions. Companion to `PLAN.md` (the v0 system as built) — this file plans everything after v0.
 
 Written 2026-10-25, after v0 was completed. Revised the same day: product upgrades run through an **Upgrades tab** where the human decides at every
-gate (idea → test → proof → implement), and **the whole hub is plug-and-play**, not only the pipeline.
+gate (idea → test → proof → implement), and **the whole hub is plug-and-play**, not only the pipeline. **Revised
+2026-10-26 after v1-0 (§0):** the goal is a self-running daily cycle with the human *on* the loop; winning fixes to
+the finding loop apply automatically with undo; the order is now core loop first.
+
+---
+
+## 0. The goal: a daily cycle the human only reads and judges (decided 2026-10-26)
+
+The whole project exists for one loop: **agents find, rank and explain papers every day and keep making that
+better; the human only reads, judges and gives opinions.** Every opinion (a 👎/👍/⭐ with a reason, a comment on
+the weekly digest) becomes evidence the system improves on. Research behind this design (2026-10-26):
+personalized paper recommenders (Scholar Inbox, PaperFlow) learn from thumbs and keep a few **exploration** picks
+against filter bubbles and interest drift; LLM teams run an **eval flywheel** (error analysis of real failures
+first, then checks for those failures, an automatic judge **calibrated on the human's own verdicts**, the human
+spot-checks); reflective prompt optimizers (GEPA) improve prompts from failure traces without training; surveys of
+autonomous research agents name the **verification gap** (unverified self-reported gains) as the main weakness, so
+every claimed improvement here must come with numbers on held-out judgments.
+
+**The cycle (one orchestrated workflow per project):**
+
+| When | Who | What |
+|---|---|---|
+| Morning | agents | Sweep → gates → ranking → ~7 cards, one of them an **exploration** pick outside the usual interests (marked) |
+| Any time | **you** | Read cards; 👎/👍/⭐ with a reason when you like; ask the desk anything |
+| Nightly | agents | **Error analysis:** read 👎 reasons and the ⭐/👍 papers that ranked low, group them into failure modes, propose concrete fixes (a query, a gate threshold, a weight, a prompt or Jev wording, an embedder) |
+| Nightly | harness | **Replay** each fix on past sweeps against your judgments (held-out part included); score with intervals and cost |
+| Nightly | kernel | **Fixes that clearly win are applied** (a plugin-state commit), each with one-click **undo**; losers are recorded so they are not retried |
+| Weekly | agents → **you** | **Digest:** what changed and why (with the evidence), what was tried and lost, precision over time, the judge's agreement with you, charter and new-question proposals. Your comments on it feed the next round |
+
+**Autonomy (decided 2026-10-26):** fixes to the finding loop that win on the harness are applied automatically and
+listed with undo (nothing hidden: offline replays only, never experiments on your live feed). Charter changes,
+anything that raises the monthly cost noticeably, and product upgrades from outside (the Upgrades tab, §3) still
+wait for your OK. **Obsidian is an add-on** (a separate optional image layer); the default viewer is the Library.
 
 ---
 
@@ -182,6 +214,10 @@ behind an MCP server).
 
 ## 3. The product loop: the Upgrades tab
 
+> **Later (2026-10-26):** the Upgrades tab is for changes found *outside* the project (new models, methods, tools on
+> the internet) and keeps its gates. Fixes the system finds in its own daily cycle (§0) do not wait for it: they are
+> replayed on your judgments and applied with undo. The harness of 3.5 is built first, in `v1-2-harness`.
+
 The hub upgrades itself through one tab and one workflow. Ideas come from the **internet** (new state-of-the-art
 models, methods, tools and architectures for what the hub does), because the hub is meant for any research
 theme; a project's own knowledge base is only an extra source when its theme happens to be about the hub's own
@@ -303,26 +339,20 @@ before the next). Order chosen so that each step makes the next one cheaper.
 
 | Step | Change | Delivers | Done when |
 |---|---|---|---|
-| **1** ✅ 2026-10-26 | `v1-0-plugin-core` | The kernel; extension and contribution points for every area in 2.0 and 2.1; manifests, registry, lockfile in a per-project git repo, Plugins tab, install / enable / disable / uninstall / rollback; **all of v0 refactored into built-in plugins** (including the Obsidian viewer and the UI tabs) with no behavior change | All v0 tests pass unchanged; swapping the embedder re-embeds in the background; disabling the Obsidian viewer plugin removes its tab and process; rollback restores the previous lockfile |
-| **2** | `v1-1-harness` | Evaluation harness per slot; datasets from project history; LLM/Jev-labeled datasets; reports with intervals and cost; CLI and UI | The current embedder and Gemini Embedding 2 are compared on this project's data with a report |
-| **3** | `v1-2-fulltext-and-facets` | ⭐ → full text (`fulltext` plugins: arXiv HTML, Europe PMC XML, PDF text, Docling as a process plugin, native multimodal pages); facet summaries; full-text notes; junk-abstract repair; Gemini Embedding 2 as an `embedder` plugin | Notes of ⭐ papers fill all sections from full text; the harness compares the `fulltext` variants on the research benchmarks |
-| **4** | `v1-3-knowledge-loop` | Review, interests, charter proposals, new research questions (`question-finder` plugins), proposals inbox | A review proposes charter changes and research directions with evidence; approving one creates a charter version the next sweep uses |
-| **5** | `v1-4-upgrades` | The Upgrades tab and its workflow (idea → test → proof → implement → verify, your decision at each gate); the scout with web search through OpenRouter, arXiv, release feeds and model catalogs; the test agent running candidates beside the current plugins; proof reports (metrics with intervals, side-by-side examples, pairwise judge with swapped positions, your spot checks); implementing as a plugin swap; verification after 7 days with rollback; the product charter | The scout suggests a real upgrade from a web source, you ask for a test, the proof report compares it with the current plugin on this project's data, you implement it, and it can be rolled back |
-| **6** | `v1-5-engineer` | The engineer agent writing new plugin code for ideas that need it, in a sandbox, with contract tests, shown in the proof report | An idea that needs a new source or ranker is built by the agent, tested, proven and implemented on your approval |
-| **7** | `v1-6-fine-tuning` | Embedder fine-tuning with LLM and Jev supervision as an upgrade type (training as a process plugin) | A fine-tuned student goes through test and proof against the current embedder |
-| **8** | `v1-7-mcp` | Hub tools as an MCP server for outside agents; MCP servers installable as plugins | An outside agent searches the project's knowledge base through MCP |
+| **1** ✅ 2026-10-26 | `v1-0-plugin-core` | The kernel, all of v0 as built-in plugins, the Plugins tab, install with approval, rollback (§2.5) | All v0 tests pass unchanged; viewer swap and rollback work in the container |
+| **2** | `v1-1-lite-daily-cycle` | **A light image** (the server bundled into one file without unused SDKs; Obsidian/Ignis as an optional add-on image; Library the default viewer; target under 300 MB). **The daily cycle as one orchestrated workflow** (sweep → cards with an exploration pick → nightly analysis slot → weekly digest), a **"What changed" feed with undo**, and the **digest page** where you read and comment | The lite image runs a project end to end; the cycle runs on its own for a simulated week offline; the digest lists every change with undo and takes comments |
+| **3** | `v1-2-harness` | **Replays** of past sweeps against your judgments (train and held-out split), metrics (precision@k, recall of ⭐, nDCG, cost) with bootstrap intervals; a **judge calibrated on your verdicts** (agreement shown) that rates replayed papers you never saw; precision over time | A change to a gate threshold is replayed and scored with an interval; the judge's agreement with your verdicts is reported |
+| **4** | `v1-3-self-improvement` | **Nightly error analysis** (failure modes from 👎 reasons and missed ⭐), **candidate fixes** (queries, thresholds, weights, Jev/prompt wording through reflective optimization, embedder choice), **automatic adoption** of clear winners on the held-out set with undo, a memory of losers; **exploration picks** and their effect on drift | A seeded failure (e.g. a missing query) is found from your 👎 reasons, fixed, proven on held-out judgments, applied, shown in the digest, and undoable |
+| **5** | `v1-4-knowledge-loop` | Interests from your judgments, **charter proposals** and **new research questions** in the digest (you approve) | A digest proposes a charter change with evidence; approving it creates a charter version the next sweep uses |
+| **6** | later | Full text and facet vectors for ⭐ (was v1-2), the **Upgrades tab** with the web scout (was v1-4), the engineer agent (v1-5), fine-tuning (prompt optimization first, v1-6), MCP for outside agents (v1-7) | Planned again when the core loop runs |
 
-Steps 1–3 also make the research project's experiments runnable inside the hub; steps 4–8 add the autonomy.
 
-## 7. Decisions to confirm
+## 7. Decisions
 
-0. **Settled:** product upgrades go through the Upgrades tab with your decision at every gate (idea → test →
-   proof → implement); ideas come from the internet first; no hidden A/B tests. Everything is a plugin, including
-   the knowledge-base viewer and the UI (2.0). The Knowledge base tab opens as a graph.
-1. **Order:** plugin core first (recommended, since everything after is a plugin) vs. the knowledge loop first.
-2. **Default autonomy:** everything waits for approval at first; later the human can allow auto-adoption per slot
-   (suggested first candidates: config plugins with a significant win within budget).
-3. **Python inside the image** for process plugins (Docling, fine-tuning): adds about 1–1.5 GB to the image; the
-   alternative is optional sidecar images per heavy plugin.
-4. **Where training runs:** on this machine's GPU (Quadro P2000, 4 GB: enough for a 300M student, slowly) or a
-   rented GPU for occasional jobs.
+0. **Settled (2026-10-26):** the goal is the daily cycle of §0 with the human on the loop. Winning fixes to the
+   finding loop apply automatically with undo; charter changes, cost increases and outside upgrades wait for
+   approval. Obsidian is an optional add-on; the Library is the default viewer. The image must be light. Order:
+   core loop first (§6). Everything is a plugin (2.0); no hidden experiments on the live feed.
+1. **Python inside the image** for process plugins (Docling, fine-tuning): not in the default image; optional
+   add-on images per heavy plugin, like Obsidian.
+2. **Where training runs:** decided when fine-tuning is planned again (this machine's 4 GB GPU or a rented one).
