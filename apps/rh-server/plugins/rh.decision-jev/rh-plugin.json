@@ -3,14 +3,15 @@
   "version": "1.0.0",
   "displayName": "Jev decisions",
   "description": "Versioned Jev commands answer the hub's structured questions (relevance, facets, reasons…), recorded with their cost. Provides rh.decisions to other plugins.",
-  "engines": { "research-hub": "^1.0.0" },
+  "engines": {
+    "research-hub": "^1.0.0"
+  },
   "main": "main.ts",
   "required": true,
   "activationEvents": ["onStartup"],
   "contributes": {
     "jevCommands": [
       "../../prompt_engineering/jev/ping",
-      "../../prompt_engineering/jev/abstract-facets",
       "../../prompt_engineering/jev/importance",
       "../../prompt_engineering/jev/level",
       "../../prompt_engineering/jev/on-theme",
@@ -19,5 +20,8 @@
       "../../prompt_engineering/jev/worth-reading"
     ]
   },
-  "permissions": { "network": ["openrouter.ai"], "secrets": ["OPENROUTER_API_KEY"] }
+  "permissions": {
+    "network": ["openrouter.ai"],
+    "secrets": ["OPENROUTER_API_KEY"]
+  }
 }

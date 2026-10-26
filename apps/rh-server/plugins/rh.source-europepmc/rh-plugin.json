@@ -1,0 +1,10 @@
+{
+  "id": "rh.source-europepmc",
+  "version": "1.0.0",
+  "displayName": "Europe PMC",
+  "description": "Europe PMC, including bioRxiv and medRxiv preprints.",
+  "engines": { "research-hub": "^1.0.0" },
+  "activationEvents": ["onExtensionPoint:papers.source"],
+  "contributes": { "papers.source": [{ "id": "europepmc", "title": "Europe PMC" }] },
+  "permissions": { "network": ["www.ebi.ac.uk"] }
+}

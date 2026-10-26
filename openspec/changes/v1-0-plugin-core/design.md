@@ -87,10 +87,9 @@ version and cannot be uninstalled, only disabled (unless required).
 |---|---|---|---|
 | `rh.provider-openrouter` | model catalog, faux | `models.provider` | settings: models per job |
 | `rh.decision-jev` | Jev client, ledger, mock | `decision.engine` | settings: Jev model |
-| `rh.papers` | papers/ (store, search, cache, http) | `papers.source`, `papers.enricher` | chat tool `search_papers` |
-| `rh.source-arxiv`, `-openalex`, `-europepmc`, `-semanticscholar` | sources/ | | `papers.source` (+ enricher for OpenAlex) |
-| `rh.representations` | representations/ | `papers.embedder` | |
-| `rh.embedder-openrouter` | embed.ts | | `papers.embedder` |
+| `rh.papers` | papers/ (store, search, cache, http) and representations/ (facets, vectors, citations) | `papers.source`, `papers.enricher`, `papers.embedder` | chat tool `search_papers`, Jev `abstract-facets` |
+| `rh.source-arxiv`, `-openalex`, `-europepmc`, `-semanticscholar` | sources/ | | `papers.source` (+ `papers.enricher` for OpenAlex); declarative, no code |
+| `rh.embedder-openrouter` | embed.ts | | `papers.embedder` (creates the embedder rh.papers uses) |
 | `rh.charter` | charter, charter writer | | tab Charter, agent, prompts |
 | `rh.schedule` | scheduler | | settings, Settings section |
 | `rh.sweep` | sweep, cards, card writer, scores | `sweep.phase` | tab Feed, Runs section, Jev commands, agent, prompts |
@@ -100,6 +99,12 @@ version and cannot be uninstalled, only disabled (unless required).
 | `rh.viewer-library` | new (reuses the Library view) | | `kb.viewer` (library) |
 | `rh.desk` | agents, desk prompt | | the root agent and chat |
 | `rh.settings-ui`, `rh.runs-ui` | Settings and Runs tabs | | tabs |
+Representations stay inside `rh.papers` in v1-0 because the paper service ties search, storage and vectors
+together; v1-2 (full text and facets) splits them into `rh.representations`. A search queries the built-in source
+clients whose `papers.source` contributions are enabled plus any client a plugin exports as `sources[id]`, and
+enriches only while an enabled plugin contributes the `openalex` enricher. Core built-ins (provider, decision
+engine, papers, the embedder until a second one exists, charter, schedule, sweep, feedback, desk, knowledge base)
+are `required`: they can be configured but not disabled.
 Each built-in plugin is a folder `apps/rh-server/plugins/<id>/` with its `rh-plugin.json` and an activation module
 that wraps the existing v0 modules, which stay in `src/` for now (so every v0 test keeps its imports and assertions;
 moving the files physically is a later cleanup and changes nothing for plugins). Chat tools of lazily activated

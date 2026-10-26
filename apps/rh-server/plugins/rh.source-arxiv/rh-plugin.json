@@ -1,0 +1,10 @@
+{
+  "id": "rh.source-arxiv",
+  "version": "1.0.0",
+  "displayName": "arXiv",
+  "description": "Preprints from arXiv (computer science, quantitative biology, statistics…).",
+  "engines": { "research-hub": "^1.0.0" },
+  "activationEvents": ["onExtensionPoint:papers.source"],
+  "contributes": { "papers.source": [{ "id": "arxiv", "title": "arXiv" }] },
+  "permissions": { "network": ["export.arxiv.org"] }
+}

@@ -59,6 +59,11 @@ export interface PaperSearchOptions {
   log?: Logger;
   /** Replace the source clients (tests). */
   sources?: PaperSource[];
+  /**
+   * The sources taking part in a search (v1-0: the enabled papers.source contributions): built-in clients by name,
+   * plus clients contributed by plugins. All built-ins when absent.
+   */
+  selected?: () => Promise<{ builtin: ReadonlySet<string>; extra: PaperSource[]; enrich: boolean }>;
 }
 
 export class PaperSearch {
@@ -91,8 +96,10 @@ export class PaperSearch {
       budgetMs: request.budgetMs ?? 60_000,
     };
 
+    const chosen = this.options.selected ? await this.options.selected() : undefined;
+    const active = chosen ? [...this.sources.filter((x) => chosen.builtin.has(x.name)), ...chosen.extra] : this.sources;
     const settled = await Promise.all(
-      this.sources.map(async (source) => {
+      active.map(async (source) => {
         try {
           return { source: source.name, results: await source.search(q) };
         } catch (error) {
@@ -109,7 +116,10 @@ export class PaperSearch {
       count: s.results.length,
       ...(s.error ? { error: s.error } : {}),
     }));
-    if (!this.options.s2ApiKey && !this.options.sources)
+    for (const source of this.sources)
+      if (chosen && !chosen.builtin.has(source.name))
+        reports.push({ source: source.name, status: "skipped", count: 0, error: "its plugin is disabled" });
+    if (!this.options.s2ApiKey && !this.options.sources && (!chosen || chosen.builtin.has("semanticscholar")))
       reports.push({ source: "semanticscholar", status: "skipped", count: 0, error: "no S2_API_KEY" });
 
     // Store in rank order across sources (1st of each, then 2nd of each, ...), so the best of every source leads.
@@ -131,7 +141,11 @@ export class PaperSearch {
       }
 
     const ids = [...rank.keys()];
-    const enrichment = request.enrich === false ? { done: 0, pending: 0 } : await this.enrich(ids, q.budgetMs);
+    // Enrichment uses OpenAlex; without an enabled enricher the records stay as the sources gave them.
+    const enrichment =
+      request.enrich === false || (chosen && !chosen.enrich)
+        ? { done: 0, pending: 0 }
+        : await this.enrich(ids, q.budgetMs);
     const papers = ids
       .map((id) => this.options.store.get(id))
       .filter((p): p is Paper => !!p && inWindow(p.publishedAt, request.since, request.until))

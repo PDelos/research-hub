@@ -17,6 +17,8 @@ export interface BuiltinHost {
   offline: boolean;
   options: OpenProjectOptions;
   services: KernelServices;
+  /** Activate another plugin and get its exports (for extension point contributions). */
+  exportsOf<T>(id: string): Promise<T>;
 }
 
 export function hostOf(context: PluginContext): BuiltinHost {

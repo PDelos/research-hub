@@ -19,8 +19,8 @@ export interface PluginHostOptions {
   env?: NodeJS.ProcessEnv;
   /** Built-in plugins folder (default apps/rh-server/plugins). */
   builtinDir?: string;
-  /** What built-in plugins receive as `context.host`, given the kernel services. */
-  builtinHost?: (services: KernelServices) => unknown;
+  /** What built-in plugins receive as `context.host`, given the kernel services and a way to reach other plugins. */
+  builtinHost?: (services: KernelServices, exportsOf: <T>(id: string) => Promise<T>) => unknown;
   fetch?: typeof fetch;
   activationTimeoutMs?: number;
 }
@@ -65,13 +65,14 @@ export async function startPluginHost(options: PluginHostOptions): Promise<Plugi
     ...(options.fetch ? { fetch: options.fetch } : {}),
     providers: {},
   };
-  const kernel = new PluginKernel({
+  const exportsOf = <T>(id: string) => kernel.activate(id) as Promise<T>;
+  const kernel: PluginKernel = new PluginKernel({
     discovery,
     state,
     log,
     env,
     ...(options.activationTimeoutMs ? { activationTimeoutMs: options.activationTimeoutMs } : {}),
-    builtinHost: options.builtinHost?.(services),
+    builtinHost: options.builtinHost?.(services, exportsOf),
     api: (plugin, subscriptions) => createRhApi(plugin, services, subscriptions),
   });
   const contributions = new ContributionRegistry(kernel, discovery);
@@ -86,7 +87,7 @@ export async function startPluginHost(options: PluginHostOptions): Promise<Plugi
     services,
     discovery,
     state,
-    exportsOf: <T>(id: string) => kernel.activate(id) as Promise<T>,
+    exportsOf,
     stop: () => kernel.stop(),
   };
 }

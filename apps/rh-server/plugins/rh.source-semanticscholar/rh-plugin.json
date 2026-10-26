@@ -1,0 +1,10 @@
+{
+  "id": "rh.source-semanticscholar",
+  "version": "1.0.0",
+  "displayName": "Semantic Scholar",
+  "description": "Semantic Scholar (needs S2_API_KEY; skipped without it).",
+  "engines": { "research-hub": "^1.0.0" },
+  "activationEvents": ["onExtensionPoint:papers.source"],
+  "contributes": { "papers.source": [{ "id": "semanticscholar", "title": "Semantic Scholar" }] },
+  "permissions": { "network": ["api.semanticscholar.org"] }
+}

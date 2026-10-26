@@ -21,7 +21,7 @@ import { Brief, Charters, ProjectState, ScopingQuestions } from "./charter.ts";
 import { CharterWriter } from "./charter-writer.ts";
 import type { PapersConfig, ScheduleDefaults } from "./config.ts";
 import { Scheduler } from "./schedule.ts";
-import { PaperService } from "./papers/service.ts";
+import type { PaperService } from "./papers/service.ts";
 import { PaperDecisions } from "./sweep/decisions.ts";
 import { SweepRunner } from "./sweep/sweep.ts";
 import { CardStore } from "./sweep/cards.ts";
@@ -41,6 +41,7 @@ import { Telemetry } from "./telemetry.ts";
 import type { BuiltinHost } from "./kernel/builtin.ts";
 import { startPluginHost, type PluginHost } from "./kernel/host.ts";
 import type { DecisionExports } from "../plugins/rh.decision-jev/main.ts";
+import type { PapersExports } from "../plugins/rh.papers/main.ts";
 import type { ProviderExports } from "../plugins/rh.provider-openrouter/main.ts";
 
 /**
@@ -156,7 +157,7 @@ export async function openProject(options: OpenProjectOptions): Promise<ProjectR
     vaultDir: join(dir, "vault"),
     log: plog,
     ...(options.paperFetch ? { fetch: options.paperFetch } : {}),
-    builtinHost: (services): BuiltinHost => ({
+    builtinHost: (services, exportsOf): BuiltinHost => ({
       name,
       dir,
       db,
@@ -166,6 +167,7 @@ export async function openProject(options: OpenProjectOptions): Promise<ProjectR
       offline: options.offline,
       options,
       services,
+      exportsOf,
     }),
   });
   const { catalog } = await plugins.exportsOf<ProviderExports>("rh.provider-openrouter");
@@ -195,18 +197,7 @@ export async function openProject(options: OpenProjectOptions): Promise<ProjectR
   const scheduler = new Scheduler({ db, settings, state, charters, defaults: options.schedule, log: plog });
   const { ledger: jevLedger, decide, jevDir } = jevPlugin;
   // Before the harness opens: a resumed search_papers call may need it during replay.
-  const papers = new PaperService({
-    db,
-    settings,
-    config: options.papers,
-    offline: options.offline,
-    openrouterKey: options.openrouterKey,
-    jevDir,
-    decide: decide,
-    jevLedger,
-    log: plog,
-    fetch: options.paperFetch,
-  });
+  const { papers } = await plugins.exportsOf<PapersExports>("rh.papers");
   const feedback = new Feedback({ db, charters, log: plog });
   feedback.replay();
   const vault = new Vault(join(dir, "vault"), {

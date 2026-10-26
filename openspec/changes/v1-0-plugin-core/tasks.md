@@ -18,7 +18,7 @@
 ## 2. Built-in plugins (v0 moved, behavior unchanged)
 
 - [x] 2.1 Start the plugin kernel in each project (state open, discovery, `onStartup`, stop at shutdown, the stream's `plugins` frame) and move models and Jev into `rh.provider-openrouter` and `rh.decision-jev`; verify the v0 agent, Jev and startup tests pass unchanged and the stream sends `plugins`
-- [ ] 2.2 Move papers, sources and representations into `rh.papers`, `rh.source-*`, `rh.representations`, `rh.embedder-openrouter`; verify the v0 paper and representation tests pass unchanged and a disabled Semantic Scholar plugin sends no request
+- [x] 2.2 Move papers, sources and representations into `rh.papers` (representations included until v1-2), `rh.source-*`, `rh.embedder-openrouter`; verify the v0 paper and representation tests pass unchanged and a disabled Semantic Scholar plugin sends no request
 - [ ] 2.3 Move charter, schedule, sweep, cards, feedback and the desk into their plugins; verify the v0 charter, schedule, sweep, card and feedback tests pass unchanged
 - [ ] 2.4 Move the knowledge base into `rh.kb` (offers `kb.store`, `kb.viewer`), the viewer into `rh.viewer-obsidian`, and add `rh.viewer-library`; verify the v0 vault, ingest, search and viewer tests pass unchanged and the swap scenario (Obsidian ↔ Library, process stops and restarts)
 

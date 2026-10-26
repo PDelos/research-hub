@@ -10,7 +10,7 @@ import { FacetLabeler } from "../representations/facets.ts";
 import { PaperVectors, type RepresentResult } from "../representations/vectors.ts";
 import { PoliteHttp } from "./http.ts";
 import { offlinePaperFetch } from "./offline.ts";
-import { PaperSearch, type SearchRequest, type SearchResult } from "./search.ts";
+import { PaperSearch, type PaperSearchOptions, type SearchRequest, type SearchResult } from "./search.ts";
 import { MetadataCache, PaperStore } from "./store.ts";
 
 export interface FindResult extends SearchResult {
@@ -29,7 +29,10 @@ export interface PaperServiceOptions {
   log: Logger;
   /** Overrides for tests: the fetch used by paper sources (and live embeddings), or the embedder. */
   fetch?: typeof fetch;
-  embedder?: Embedder;
+  /** The embedder, or how to make one with the service's ledger (v1-0: from the active papers.embedder plugin). */
+  embedder?: Embedder | ((context: { ledger: EmbeddingLedger }) => Embedder);
+  /** Which sources take part in a search (v1-0: the enabled papers.source contributions). */
+  selectedSources?: PaperSearchOptions["selected"];
 }
 
 export class PaperService {
@@ -40,6 +43,8 @@ export class PaperService {
   readonly vectors: PaperVectors;
   readonly citations: Citations;
   readonly embeddingLedger: EmbeddingLedger;
+  /** Paced HTTP for sources (plugins contributing sources use it too). */
+  readonly http: PoliteHttp;
   private catchingUp?: Promise<void>;
   private closed = false;
 
@@ -63,9 +68,13 @@ export class PaperService {
       http,
       s2ApiKey: offline ? undefined : config.s2ApiKey,
       log,
+      ...(options.selectedSources ? { selected: options.selectedSources } : {}),
     });
+    this.http = http;
     const embedder =
-      options.embedder ??
+      (typeof options.embedder === "function"
+        ? options.embedder({ ledger: this.embeddingLedger })
+        : options.embedder) ??
       (offline || !options.openrouterKey
         ? new FakeEmbedder(config.embedDims, this.embeddingLedger)
         : new OpenRouterEmbedder({

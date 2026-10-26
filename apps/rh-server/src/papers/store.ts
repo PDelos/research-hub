@@ -4,8 +4,10 @@
 import { bind, nowIso, VECTOR_KINDS, type Db } from "../db.ts";
 import { ID_KINDS, normalizeIds, normalizeTitle, type IdKind, type PaperIds } from "./normalize.ts";
 
-export type SourceName = "arxiv" | "openalex" | "europepmc" | "semanticscholar";
-export const SOURCE_NAMES: readonly SourceName[] = ["arxiv", "openalex", "europepmc", "semanticscholar"];
+export type BuiltinSourceName = "arxiv" | "openalex" | "europepmc" | "semanticscholar";
+/** A built-in source, or one a plugin contributes to papers.source (v1-0). */
+export type SourceName = BuiltinSourceName | (string & {});
+export const SOURCE_NAMES: readonly BuiltinSourceName[] = ["arxiv", "openalex", "europepmc", "semanticscholar"];
 export type Enrichment = "pending" | "done" | "missing";
 
 /** One result as a source client returns it, already normalized. */
