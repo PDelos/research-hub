@@ -151,6 +151,11 @@ export class HubClient {
   uninstallPlugin = (id: string, deleteData = false) =>
     this.call<void>("DELETE", `/plugins/${encodeURIComponent(id)}${deleteData ? "?deleteData=true" : ""}`);
   rollbackPlugins = (commit: string) => this.call<PluginList>("POST", "/plugins/rollback", { commit });
+  /** Undo one change (later changes stay); a conflict means a later change touched the same setting. */
+  undoPluginChange = (commit: string) =>
+    this.call<{ commit: string | null; plugins: string[]; history: PluginHistoryEntry[] }>("POST", "/plugins/undo", {
+      commit,
+    });
   /** Tell the hub a tab was opened, so plugins activated by onView:<tab> start. */
   openView = (tab: string) => this.call<void>("POST", `/plugins/views/${encodeURIComponent(tab)}/open`, {});
 

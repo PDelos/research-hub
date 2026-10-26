@@ -179,3 +179,45 @@ test("a plugin waiting for its view starts when the UI opens the tab, and its UI
     await server.stop();
   }
 });
+
+test("undo reverses one change and keeps later ones; a later change to the same setting blocks it", async () => {
+  const server = await startTestServer();
+  try {
+    const { client } = server;
+    await client.setSweepSettings({ cardsPerSweep: 9 });
+    const first = (await client.pluginHistory())[0];
+    assert.equal(first.message, "configure rh.sweep: cardsPerSweep");
+    await client.setPluginEnabled("rh.source-europepmc", false);
+
+    const undone = await client.undoPluginChange(first.id);
+    assert.deepEqual(undone.plugins, ["rh.sweep"]);
+    assert.equal(undone.history[0].message, "undo: configure rh.sweep: cardsPerSweep");
+    assert.equal((await client.sweepSettings()).cardsPerSweep, 7);
+    assert.equal((await client.plugin("rh.source-europepmc")).state, "disabled", "the later change stays");
+
+    await client.setSweepSettings({ cardsPerSweep: 4 });
+    const a = (await client.pluginHistory())[0];
+    await client.setSweepSettings({ cardsPerSweep: 5 });
+    await rejects(
+      client.undoPluginChange(a.id),
+      "conflict",
+      /a later change touched the same setting \(rh\.sweep\.settings\.cardsPerSweep\)/,
+    );
+    assert.equal((await client.sweepSettings()).cardsPerSweep, 5, "nothing changed");
+
+    // Undoing an uninstall is refused without a trace (its files are gone); undoing an install disables the plugin.
+    await client.approveInstall((await client.prepareInstall({ folder: join(FIXTURES, "acme.needs-arxiv") })).planId);
+    await client.uninstallPlugin("acme.needs-arxiv");
+    const uninstall = (await client.pluginHistory())[0];
+    assert.equal(uninstall.message, "uninstall acme.needs-arxiv");
+    await rejects(client.undoPluginChange(uninstall.id), "conflict", /no longer installed; install it again/);
+    assert.equal((await client.pluginHistory())[0].id, uninstall.id, "a refused undo writes nothing");
+    await client.approveInstall((await client.prepareInstall({ folder: join(FIXTURES, "acme.needs-arxiv") })).planId);
+    await client.undoPluginChange((await client.pluginHistory())[0].id);
+    assert.equal((await client.plugin("acme.needs-arxiv")).state, "disabled");
+    const init = (await client.pluginHistory(500)).at(-1)!;
+    await rejects(client.undoPluginChange(init.id), "conflict", /the first state has nothing before it/);
+  } finally {
+    await server.stop();
+  }
+});

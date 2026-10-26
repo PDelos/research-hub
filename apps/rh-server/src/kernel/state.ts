@@ -38,6 +38,28 @@ export interface HistoryEntry {
   actor: Actor;
 }
 
+/** An undo that would overwrite a later change (or has nothing to restore). */
+export class UndoRefused extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "UndoRefused";
+  }
+}
+
+/** A lockfile as flat paths: "<id>" (presence), "<id>.enabled|version|source|hash", "<id>.settings.<key>". */
+function flatten(lock: Lockfile): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const [id, e] of Object.entries(lock.plugins)) {
+    out.set(id, "present");
+    out.set(`${id}.enabled`, JSON.stringify(e.enabled));
+    out.set(`${id}.version`, JSON.stringify(e.version));
+    out.set(`${id}.source`, JSON.stringify(e.source));
+    if (e.hash !== undefined) out.set(`${id}.hash`, JSON.stringify(e.hash));
+    for (const [k, v] of Object.entries(e.settings)) out.set(`${id}.settings.${k}`, JSON.stringify(v));
+  }
+  return out;
+}
+
 export class PluginState {
   readonly dir: string;
   private lock?: Lockfile;
@@ -130,6 +152,81 @@ export class PluginState {
       actor,
     );
     return { id: commit, lock: this.current() };
+  }
+
+  /**
+   * Reverse only what commit `id` changed (design v1-1 D6), as a new commit "undo: <message>". Refused with
+   * UndoRefused when a later change touched the same thing, or for the first state.
+   */
+  async revert(
+    id: string,
+    actor: Actor = "user",
+    /** Called with the state the undo would produce; throw to refuse it before anything is written. */
+    guard?: (next: Lockfile) => void,
+  ): Promise<{ id: string | undefined; lock: Lockfile; plugins: string[] }> {
+    const oid = await git.expandOid({ fs, dir: this.dir, oid: id });
+    const [entry] = await git.log({ fs, dir: this.dir, ref: oid, depth: 1 });
+    const parent = entry.commit.parent[0];
+    if (!parent) throw new UndoRefused("the first state has nothing before it to go back to");
+    const before = flatten(await this.at(parent));
+    const after = flatten(await this.at(oid));
+    const changed = [...new Set([...before.keys(), ...after.keys()])].filter((k) => before.get(k) !== after.get(k));
+    if (!changed.length) throw new UndoRefused("this change did not change the plugins");
+    const message = entry.commit.message.trim();
+    const commit = await this.update(
+      (lock) => {
+        const now = flatten(lock);
+        const touched = changed.filter((k) => now.get(k) !== after.get(k));
+        if (touched.length)
+          throw new UndoRefused(
+            `a later change touched the same setting (${touched.slice(0, 3).join(", ")}); undo that first`,
+          );
+        const beforeLock = new Map(Object.entries(this.snapshotOf(before)));
+        for (const key of changed) {
+          const [pluginId, field, ...rest] = key.split(".");
+          // Plugin ids contain a dot (publisher.name): re-join the id.
+          const pid = `${pluginId}.${field}`;
+          const sub = rest[0];
+          if (sub === undefined) {
+            // Presence: the plugin was added or removed by the change.
+            if (before.has(pid)) lock.plugins[pid] = structuredClone(beforeLock.get(pid)!);
+            else delete lock.plugins[pid];
+            continue;
+          }
+          const entryNow = lock.plugins[pid];
+          if (!entryNow) continue;
+          const old = before.get(key);
+          if (sub === "settings") {
+            const name = rest.slice(1).join(".");
+            if (old === undefined) delete entryNow.settings[name];
+            else entryNow.settings[name] = JSON.parse(old);
+          } else if (old === undefined) delete (entryNow as unknown as Record<string, unknown>)[sub];
+          else (entryNow as unknown as Record<string, unknown>)[sub] = JSON.parse(old);
+        }
+        guard?.(lock);
+      },
+      `undo: ${message}`,
+      actor,
+    );
+    const plugins = [...new Set(changed.map((k) => k.split(".").slice(0, 2).join(".")))];
+    return { id: commit, lock: this.current(), plugins };
+  }
+
+  /** Rebuild lock entries from flat paths (for restoring a removed plugin). */
+  private snapshotOf(flat: Map<string, string>): Record<string, LockEntry> {
+    const out: Record<string, LockEntry> = {};
+    for (const [key, value] of flat) {
+      const parts = key.split(".");
+      const pid = `${parts[0]}.${parts[1]}`;
+      if (parts.length === 2) {
+        out[pid] ??= { version: "", source: { kind: "builtin" }, enabled: false, settings: {} };
+        continue;
+      }
+      const entry = (out[pid] ??= { version: "", source: { kind: "builtin" }, enabled: false, settings: {} });
+      if (parts[2] === "settings") entry.settings[parts.slice(3).join(".")] = JSON.parse(value);
+      else (entry as unknown as Record<string, unknown>)[parts[2]] = JSON.parse(value);
+    }
+    return out;
   }
 
   private async commit(message: string, actor: Actor, files: string[]): Promise<string> {

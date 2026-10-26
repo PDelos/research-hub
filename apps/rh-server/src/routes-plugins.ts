@@ -11,7 +11,7 @@ import type { Hub } from "./hub.ts";
 import { contributionsOf } from "./kernel/contributions.ts";
 import { dependents } from "./kernel/graph.ts";
 import { InstallRefused } from "./kernel/install.ts";
-import { HasDependents, PluginUnavailable, SettingsInvalid } from "./kernel/lifecycle.ts";
+import { HasDependents, PluginUnavailable, SettingsInvalid, UndoRefused } from "./kernel/lifecycle.ts";
 import { KERNEL_API_VERSION } from "./kernel/manifest.ts";
 import { settingsProperties } from "./kernel/settings.ts";
 import type { KbExports } from "../plugins/rh.kb/main.ts";
@@ -29,6 +29,7 @@ function fault(error: unknown): never {
       error.dependents,
     );
   if (error instanceof PluginUnavailable) throw new ApiFault("conflict", error.message);
+  if (error instanceof UndoRefused) throw new ApiFault("conflict", error.message);
   throw error;
 }
 
@@ -197,6 +198,15 @@ export function pluginRoutes(hub: Hub): Router {
       throw error;
     }
     res.json(list());
+  });
+
+  // Undo one change from the history; later changes stay (refused when a later change touched the same thing).
+  r.post("/v1/plugins/undo", async (req, res) => {
+    const commit = req.body?.commit;
+    if (typeof commit !== "string" || !/^[0-9a-f]{4,40}$/.test(commit))
+      throw invalid("commit must be a commit id from the history");
+    const result = await host().kernel.undo(commit).catch(fault);
+    res.json({ commit: result.id ?? null, plugins: result.plugins, history: await host().state.history(20) });
   });
 
   r.post("/v1/plugins/install", async (req, res) => {

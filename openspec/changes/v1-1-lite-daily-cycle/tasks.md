@@ -19,7 +19,7 @@
 
 ## 4. Undo
 
-- [ ] 4.1 `PluginState.revert(commit)` and kernel undo with conflict refusal; `POST /v1/plugins/undo` and the SDK method; verify tests for undoing one of two changes, a refused conflicting undo, and undo of an install
+- [x] 4.1 `PluginState.revert(commit)` and kernel undo with conflict refusal; `POST /v1/plugins/undo` and the SDK method; verify tests for undoing one of two changes, a refused conflicting undo, and undo of an install
 
 ## 5. The cycle
 

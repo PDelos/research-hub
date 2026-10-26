@@ -14,7 +14,7 @@ import type { PluginManifest } from "./manifest.ts";
 import { BUILTIN_MODULES } from "./builtins.ts";
 import { BUILTIN_PLUGINS_DIR, builtinEntry, type Discovery, type DiscoveredPlugin } from "./registry.ts";
 import { resolveSettings, SettingsInvalid, validateSettings } from "./settings.ts";
-import type { Actor, Lockfile, PluginState } from "./state.ts";
+import { UndoRefused, type Actor, type Lockfile, type PluginState } from "./state.ts";
 
 export interface Disposable {
   dispose(): void | Promise<void>;
@@ -67,7 +67,7 @@ export interface KernelOptions {
   api?: (plugin: DiscoveredPlugin, subscriptions: Disposable[]) => RhApi;
 }
 
-export { SettingsInvalid };
+export { SettingsInvalid, UndoRefused };
 
 export class PluginUnavailable extends Error {
   constructor(
@@ -407,6 +407,22 @@ export class PluginKernel {
       actor,
     );
     await this.apply();
+  }
+
+  /**
+   * Undo one change (a commit) and re-apply the state; later changes stay. Restoring a plugin whose files are gone
+   * (an uninstall) is refused: install it again instead.
+   */
+  async undo(commitId: string, actor: Actor = "user"): Promise<{ id: string | undefined; plugins: string[] }> {
+    const preview = await this.options.state.at(commitId).catch(() => undefined);
+    if (!preview) throw new UndoRefused(`no change ${commitId}`);
+    const result = await this.options.state.revert(commitId, actor, (next) => {
+      const missing = Object.keys(next.plugins).filter((id) => !this.records.has(id));
+      if (missing.length)
+        throw new UndoRefused(`${missing.join(", ")} is no longer installed; install it again instead`);
+    });
+    await this.apply();
+    return { id: result.id, plugins: result.plugins };
   }
 
   /** Roll the plugin state back to commit `commitId` and re-apply it. */
