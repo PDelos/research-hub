@@ -35,6 +35,10 @@
 
 ## 5. Integration
 
-- [ ] 5.1 Run all tests, check, check:jev, check:env, lint, audit; offline end to end: disable and enable the viewer, swap to the Library viewer, install the sample external plugin and use its chat tool, roll back
+- [x] 5.1 Run all tests, check, check:jev, check:env, lint, audit; offline end to end: disable and enable the viewer, swap to the Library viewer, install the sample external plugin and use its chat tool, roll back
+  - Verified 2026-10-26: server 213/213, jev 34 (+1 live, skipped), durable-agent 24/24, UI (Playwright, system
+    Chromium) 8/8; `npm run check` 0 errors; `npm audit` 0 vulnerabilities; `scripts/e2e-offline.sh` PASS with the
+    plugin steps (viewer disabled at first start by RH_KB_VIEWER=off → enabled → swapped to Library → disabled; sample
+    plugin installed; after a restart the desk called its `sample_echo` tool; rollback to the first state).
 - [ ] 5.2 Docker: rebuild the image, start the existing `proteins` project on it (first-start lockfile, nothing lost), and repeat the swap and rollback in the container; record the results
 - [ ] 5.3 Update `README.md` (plugins, the Plugins tab, writing a plugin with a minimal example manifest) and EVOLUTION.md if decisions changed

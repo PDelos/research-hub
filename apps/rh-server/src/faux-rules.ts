@@ -1,6 +1,7 @@
 // Scripted replies for offline mode and tests. The charter writer gets a deterministic charter built from the brief:
 // on the first draft it asks two scoping questions, then saves; a revision moves answers mentioning "out of scope"
-// into outOfScope. Everything else falls through to the faux model's echo.
+// into outOfScope. The desk searches, judges and calls tools when told to. Everything else falls through to the
+// faux model's echo.
 import { call, say, type FauxRule } from "@rh/durable-agent";
 
 const words = (text: string) =>
@@ -176,6 +177,22 @@ export const librarianRule: FauxRule = (turn) => {
   return call("link_note", { concepts: concept ? [concept] : ["research"], questions: question ? [question] : [] });
 };
 
+/** The offline desk calls a named tool when told to: "use sample_echo {"text": "hi"}" (plugin tools, offline). */
+export const deskToolRule: FauxRule = (turn) => {
+  if (turn.sections["charter-writer"] || turn.sections["card-writer"] || turn.sections["librarian"]) return undefined;
+  const m = turn.lastUser.match(/^use\s+([a-z][a-z0-9_]*)\s*(\{.*\})?\s*$/is);
+  if (!m) return undefined;
+  const result = turn.results.find((r) => r.name === m[1]);
+  if (result) return say(result.text);
+  let args: Record<string, unknown> = {};
+  try {
+    args = m[2] ? JSON.parse(m[2]) : {};
+  } catch {
+    return say(`The arguments for ${m[1]} are not valid JSON.`);
+  }
+  return call(m[1], args);
+};
+
 /** Default scripted rules for offline mode. */
 export const offlineRules: FauxRule[] = [
   charterWriterRule,
@@ -183,4 +200,5 @@ export const offlineRules: FauxRule[] = [
   librarianRule,
   deskJudgeRule,
   deskSearchRule,
+  deskToolRule,
 ];
