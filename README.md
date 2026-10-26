@@ -23,7 +23,9 @@ manifest, activates only when needed and declares what it may reach. Next (plann
 explain papers, analyze what you disliked or missed every night, replay candidate fixes on your past judgments and
 apply the ones that clearly win (each with undo), and send a weekly digest you read and comment on. You only read,
 judge and give opinions. Steps: a lighter image with the orchestrated cycle (v1-1), the replay harness (v1-2),
-self-improvement (v1-3), then charter and new-question proposals (v1-4).
+self-improvement (v1-2), plugins grouped as core, slots with fixed benchmark presets, add-ons and preferences (v1-3), the weekly upgrade
+of one slot or a scout for add-ons (v1-4), then charter and new-question proposals (v1-5). Not everything can
+change: the core (including the harness that measures everything) never does; see EVOLUTION.md §0.1.
 
 ## Quick start (offline, no keys)
 

@@ -42,6 +42,48 @@ wait for your OK. **Obsidian is an add-on** (a separate optional image layer); t
 
 ---
 
+### 0.1 What may change, and how it is judged (decided 2026-10-26)
+
+Improvement is not open-ended. Every part of the hub is in exactly one of four kinds, declared in its plugin
+manifest (`kind`, `topic`, and for slots `benchmark`), and the Plugins tab groups plugins by topic and kind:
+
+| Kind | Meaning | How a change is judged | In the Plugins tab |
+|---|---|---|---|
+| **Core** | Never a plugin you can change: the kernel (loader, lockfile, history and undo, permissions, budgets), the agent runtime, the database, the API and UI shell, the daily cycle (scheduler, nightly run, digest), your judgments and comments, the charter store, the markdown vault as the source of truth, and **the harness** (replays, judge calibration, benchmark presets, metrics, verdict rules) | Not changeable by plugins or upgrades; changed only by a new hub version | One collapsed group "Core (cannot be changed)" |
+| **Slot** | One active plugin per slot, replaceable by an alternative | A **fixed benchmark preset** per slot (public benchmarks and/or replays on your judgments) and its primary metric; a candidate replaces the active plugin only if it wins on the preset | One line per slot: the active plugin, its alternatives, the last benchmark result; "replace", never "turn off" |
+| **Add-on** | Any number active; each adds something (a paper source, an enricher, an integration, a tab, a desk tool, an MCP server) | Reasoning and **usage attribution** ("this source brought 14 cards this month, you liked 6"), shown in the digest; you keep or remove it | Active add-ons with on/off, and "Available" ones from the scout |
+| **Preference** | One active, chosen by taste (the knowledge-base viewer, later themes) | Your choice; no benchmark | A simple picker |
+
+**The slots and their presets:**
+
+| Topic | Slot | Active today | Benchmark preset (primary metric) |
+|---|---|---|---|
+| Finding papers | **Ranking and gating** (gate thresholds, rank weights, cards per sweep, exploration picks) | rank formula + Jev gates | Replays on your judgments (v1-2): nDCG@n, held-out interval. No public benchmark measures your taste |
+| Understanding papers | **Embedder** | Qwen3-Embedding-8B (OpenRouter) | SCIDOCS (BEIR, citation prediction), LitSearch (papers from research questions), plus: do your ⭐ papers rank near each other and your questions (nDCG@10) |
+| Understanding papers | **Facet labeler** (background / method / result sentences) | Jev `abstract-facets` | PubMed 200k RCT and CSAbstruct (sentence roles; macro-F1) |
+| Ranking | **Judge** | Jev `would-like` | Agreement with your verdicts (accuracy, kappa) |
+| Knowledge base | **Knowledge-base search** | SQLite FTS5 | SciFact, NFCorpus (BEIR; nDCG@10), plus your questions to the desk |
+| Understanding papers | **Full-text extraction** (later) | none yet | OmniDocBench; the research project's OfficeQA and UNIDOC-BENCH |
+| Agents and models | **Model per job** (card writer, librarian, desk) | free model | Small task sets per job, judged pairwise with swapped positions, plus your ratings |
+
+Public benchmarks run on **small cached samples** (a few hundred queries each) so a run costs cents, and the same
+sample is used every week so results compare. Add-ons by topic: Finding papers (arXiv, OpenAlex, Europe PMC,
+Semantic Scholar; candidates PubMed, bioRxiv by date, proceedings), Enrichment (OpenAlex; candidate Crossref),
+Integrations (Zotero/BibTeX, notifications, extra tabs, desk tools, MCP servers).
+
+### 0.2 The weekly upgrade
+
+Each week the agent does one of two things, and the digest reports it:
+
+1. **Improve one slot.** It picks the slot with the weakest numbers or the one your comments point at, searches
+   the internet only for candidates for **that slot**, runs the slot's **fixed preset** on the candidate and on the
+   active plugin, and reports. Changes of **settings** that win (thresholds, weights) are applied with undo; **new
+   plugins** that win (another embedding model) are proposed with their numbers and installed when you approve.
+2. **Scout add-ons.** It looks for add-ons worth having (new paper-source APIs, enrichers, integrations) and lists
+   them with its reasoning; you install the ones you want, and usage attribution then shows their worth.
+
+The agent never chooses freely what to optimize, never changes the core, and never changes how a slot is measured.
+
 ## 1. The idea in one picture
 
 ```
@@ -92,6 +134,8 @@ agents, is a plugin that can be installed, swapped or removed. The design follow
 | Pipeline | the slots in 2.1 | | |
 
 ### 2.1 Pipeline slots
+
+> Superseded in detail by §0.1 (2026-10-26): the slots, their benchmark presets and what is core.
 
 The paper pipeline's extension points (the v0 code is refactored into the first built-in plugins without
 changing behavior):
@@ -285,6 +329,9 @@ watch or ignore. The scout and the test agent read it; you edit it.
 
 ### 3.5 Benchmarks (the harness)
 
+> Decided 2026-10-26 (§0.1): the harness is core; each slot has a fixed preset; candidates are only ever compared on
+> their slot's preset.
+
 Every slot has a harness: datasets, metrics and a report generator, used by the test agent. Datasets come from
 the project's history (gathered papers with Jev decisions and your judgments, ⭐ full texts, questions and
 relevant notes), from labels written and relabeled by a strong model and Jev (the Gecko recipe, spot-checked), and
@@ -341,14 +388,19 @@ before the next). Order chosen so that each step makes the next one cheaper.
 |---|---|---|---|
 | **1** ✅ 2026-10-26 | `v1-0-plugin-core` | The kernel, all of v0 as built-in plugins, the Plugins tab, install with approval, rollback (§2.5) | All v0 tests pass unchanged; viewer swap and rollback work in the container |
 | **2** ✅ 2026-10-26 | `v1-1-lite-daily-cycle` | **A light image** (the server bundled into one file without unused SDKs; Obsidian/Ignis as an optional add-on image; Library the default viewer; target under 300 MB). **The daily cycle as one orchestrated workflow** (sweep → cards with an exploration pick → nightly analysis slot → weekly digest), a **"What changed" feed with undo**, and the **digest page** where you read and comment | The lite image runs a project end to end; the cycle runs on its own for a simulated week offline; the digest lists every change with undo and takes comments |
-| **3** | `v1-2-harness` | **Replays** of past sweeps against your judgments (train and held-out split), metrics (precision@k, recall of ⭐, nDCG, cost) with bootstrap intervals; a **judge calibrated on your verdicts** (agreement shown) that rates replayed papers you never saw; precision over time | A change to a gate threshold is replayed and scored with an interval; the judge's agreement with your verdicts is reported |
-| **4** | `v1-3-self-improvement` | **Nightly error analysis** (failure modes from 👎 reasons and missed ⭐), **candidate fixes** (queries, thresholds, weights, Jev/prompt wording through reflective optimization, embedder choice), **automatic adoption** of clear winners on the held-out set with undo, a memory of losers; **exploration picks** and their effect on drift | A seeded failure (e.g. a missing query) is found from your 👎 reasons, fixed, proven on held-out judgments, applied, shown in the digest, and undoable |
-| **5** | `v1-4-knowledge-loop` | Interests from your judgments, **charter proposals** and **new research questions** in the digest (you approve) | A digest proposes a charter change with evidence; approving it creates a charter version the next sweep uses |
-| **6** | later | Full text and facet vectors for ⭐ (was v1-2), the **Upgrades tab** with the web scout (was v1-4), the engineer agent (v1-5), fine-tuning (prompt optimization first, v1-6), MCP for outside agents (v1-7) | Planned again when the core loop runs |
+| **3** | `v1-2-harness` | **Replays** of past sweeps against your judgments (train and held-out split), nDCG, precision@5, recall of ⭐ with bootstrap intervals; a **judge calibrated on your verdicts**; the Quality view. This is the preset of the Ranking slot | A change to a gate threshold is replayed and scored with an interval; the judge's agreement with your verdicts is reported |
+| **4** | `v1-3-slots-and-benchmarks` | The **classification** of §0.1 in every manifest (kind, topic, benchmark); the **Plugins tab grouped by topic and kind** (core collapsed, slots with alternatives, add-ons on/off); **benchmark presets** and a runner on cached public samples (first: Embedder with SCIDOCS + LitSearch samples, Facet labeler with PubMed RCT); **usage attribution** for add-ons in the digest | The embedder and facet presets run offline on cached samples and report their metric; the Plugins tab shows the four kinds; the digest shows per-source attribution |
+| **5** | `v1-4-weekly-upgrade` | The weekly upgrade of §0.2: nightly error analysis and slot choice, web search for candidates of one slot, the slot's preset on candidate vs active, settings winners applied with undo, plugin winners proposed; add-on scouting; a memory of what lost | A seeded weakness in the Ranking slot is found, a better setting is proven on held-out judgments and applied with undo; a candidate embedder is benchmarked and proposed; a new source is suggested with reasoning |
+| **6** | `v1-5-knowledge-loop` | Interests from your judgments, **charter proposals** and **new research questions** in the digest (you approve) | A digest proposes a charter change with evidence; approving it creates a charter version the next sweep uses |
+| **7** | later | Full text and facet vectors for ⭐ (its slot preset: OmniDocBench and the research benchmarks), the engineer agent, fine-tuning (prompt optimization first), MCP for outside agents | Planned again when the loops run |
 
 
 ## 7. Decisions
 
+0. **Settled (2026-10-26, later the same day):** what may change is fixed by §0.1 (core, slots with benchmark
+   presets, add-ons judged by attribution, preferences); the harness is core; the weekly upgrade (§0.2) improves
+   one slot on its preset or scouts add-ons, never something chosen freely. Public benchmarks run on small cached
+   samples stored per project.
 0. **Settled (2026-10-26):** the goal is the daily cycle of §0 with the human on the loop. Winning fixes to the
    finding loop apply automatically with undo; charter changes, cost increases and outside upgrades wait for
    approval. Obsidian is an optional add-on; the Library is the default viewer. The image must be light. Order:
