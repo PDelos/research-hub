@@ -30,6 +30,7 @@ COPY packages/jev/package.json packages/jev/
 COPY packages/rh-sdk/package.json packages/rh-sdk/
 COPY apps/rh-server/package.json apps/rh-server/
 COPY apps/rh-client-browser/package.json apps/rh-client-browser/
+# The browser client's packages are all build-time (bundled into dist), so none of them is installed here.
 RUN npm ci --omit=dev --no-audit --no-fund
 
 # 3. Runtime: sources run with tsx, the built UI, a non-root user, and /data.

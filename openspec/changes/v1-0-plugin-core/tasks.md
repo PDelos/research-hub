@@ -40,5 +40,15 @@
     Chromium) 8/8; `npm run check` 0 errors; `npm audit` 0 vulnerabilities; `scripts/e2e-offline.sh` PASS with the
     plugin steps (viewer disabled at first start by RH_KB_VIEWER=off → enabled → swapped to Library → disabled; sample
     plugin installed; after a restart the desk called its `sample_echo` tool; rollback to the first state).
-- [ ] 5.2 Docker: rebuild the image, start the existing `proteins` project on it (first-start lockfile, nothing lost), and repeat the swap and rollback in the container; record the results
+- [x] 5.2 Docker: rebuild the image, start the existing `proteins` project on it (first-start lockfile, nothing lost), and repeat the swap and rollback in the container; record the results
+  - Verified 2026-10-26: image `research-hub:v1-0` (Node 26.12.1, 607 MB; the browser client's packages became
+    build-time dependencies, so Vite, Vue Router's build plugins and TypeScript no longer reach the runtime image,
+    which was 648 MB). `proteins` backed up first (`projects/proteins/data-backup-v0.5-2026-10-26`, byte-identical,
+    394 files; the old image kept as `research-hub:v0.5`), then started on the new image: healthy, pi-durable 1.4.0,
+    kernel API 1.0.0, first-start lockfile with all 19 built-ins enabled (one kernel commit); nothing lost (charter
+    v1, 7 cards, 1 sweep, 3 knowledge-base papers, 5 runs, 409 Jev and 24 embedding calls, $0.037248, the same
+    conversation; vault and brief byte-identical); Obsidian running. In the container: disabling the Obsidian viewer
+    stopped Ignis and the Library took over; enabling started it again; swapping to Library stopped it ("the Library
+    viewer is active"), swapping back restarted it; rollback to the first state re-applied it as a new commit
+    (Obsidian active). No errors in the log.
 - [ ] 5.3 Update `README.md` (plugins, the Plugins tab, writing a plugin with a minimal example manifest) and EVOLUTION.md if decisions changed
