@@ -69,3 +69,52 @@ test("the slot catalog lists each slot with its active implementation, alternati
     await server.stop();
   }
 });
+
+test("each source is credited with the cards it brought and the ones you liked, in the API and the digest", async () => {
+  const { validateCharter } = await import("../src/charter.ts");
+  const { cardWriterRule } = await import("../src/faux-rules.ts");
+  const { sampleCharter } = await import("./fixtures/charter.ts");
+  const { choice, noul, score, scripted } = await import("./fixtures/jev-answers.ts");
+  const { arxivOnlyFetch, fakePapers } = await import("./fixtures/sweep-env.ts");
+  const { until } = await import("./helpers.ts");
+  const server = await startTestServer({
+    hub: {
+      ticker: false,
+      fauxRules: [cardWriterRule],
+      jevDecide: scripted((id: string, _c: string, q: any) =>
+        id === "relevance"
+          ? score(0.6, 5)
+          : id === "matched_question"
+            ? choice("Q1", Object.keys(q.criteria))
+            : id === "kind"
+              ? choice("survey", Object.keys(q.criteria))
+              : id === "worth"
+                ? noul(0.9)
+                : undefined,
+      ).decide,
+      paperFetch: arxivOnlyFetch(fakePapers(8)),
+    },
+  });
+  try {
+    const p = server.hub.project;
+    p.brief.write("# x");
+    p.charters.saveDraft(validateCharter(sampleCharter()), "agent");
+    p.charters.approve();
+    p.scheduler.trigger("sweep");
+    await until(() => p.sweeps.list().length === 1, 10_000, "sweep");
+    await p.sweeps.settled(p.sweeps.list(1)[0].id, 30_000);
+    const cards = (await server.client.cards()).groups[0].cards;
+    await server.client.judge(cards[0].id, "star");
+    await server.client.judge(cards[1].id, "up");
+    await server.client.judge(cards[2].id, "down");
+    assert.deepEqual(await server.client.attribution(), [
+      { source: "arxiv", pluginId: "rh.source-arxiv", cards: cards.length, liked: 2 },
+    ]);
+    const digest = await (
+      await p.plugins.exportsOf<import("../plugins/rh.digest/main.ts").DigestExports>("rh.digest")
+    ).buildDigest();
+    assert.deepEqual(digest.sources, [{ source: "arxiv", pluginId: "rh.source-arxiv", cards: cards.length, liked: 2 }]);
+  } finally {
+    await server.stop();
+  }
+});

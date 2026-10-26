@@ -21,6 +21,8 @@ import {
 } from "../../src/harness/benchmarks/datasets.ts";
 import { facetsTask, retrievalTask, type TaskResult } from "../../src/harness/benchmarks/runner.ts";
 import type { EmbedderExports } from "../rh.papers/main.ts";
+import type { SourceAttribution } from "@rh/sdk";
+import { sourceAttribution } from "../../src/harness/attribution.ts";
 
 export interface StoredReplay {
   id: number;
@@ -65,6 +67,8 @@ export interface SlotView extends SlotInfo {
 export class BenchmarkInvalid extends Error {}
 
 export interface HarnessExports extends AgentHooks {
+  /** What each paper source brought in the period (default: the last 30 days). */
+  attribution(from?: string, to?: string): SourceAttribution[];
   /** Run a slot's preset on the active implementation ({}) or a candidate, and store the result. */
   runBenchmark(slot: string, candidate?: Record<string, unknown>): Promise<BenchmarkRecord>;
   /** The slot catalog with what is active, the alternatives and the last benchmark of each. */
@@ -241,7 +245,18 @@ export async function activate(context: PluginContext): Promise<HarnessExports> 
       throw error;
     }
   };
+  const sourceOwner = (source: string) => {
+    for (const c of host.services.contributions.declaredContributions("papers.source"))
+      if (c.id === source) return c.pluginId;
+    return null;
+  };
   const exports: HarnessExports = {
+    attribution(
+      from = new Date(Date.now() - 30 * 86_400_000).toISOString(),
+      to = new Date(Date.now() + 1000).toISOString(),
+    ) {
+      return sourceAttribution(db, from, to, sourceOwner);
+    },
     benchmarks,
     async runBenchmark(slotId, candidate = {}) {
       const slot = SLOTS.find((s) => s.id === slotId);

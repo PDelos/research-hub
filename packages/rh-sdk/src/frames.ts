@@ -528,6 +528,7 @@ export type DigestSection =
   | "exploration"
   | "knowledgeBase"
   | "quality"
+  | "sources"
   | "cost"
   | "changes"
   | "general";
@@ -552,6 +553,8 @@ export interface DigestBody {
   changes: { id: string; time: string; message: string; actor: string }[];
   /** What you wrote on the previous digest. */
   lastComments: { section: string; text: string; createdAt: string }[];
+  /** What each paper source brought this week (v1.3). */
+  sources?: SourceAttribution[];
   /** The harness (v1.2): the judge's agreement with you and the week's replays. */
   quality?: {
     judge: { agreement: number | null; cases: number; trusted: boolean } | null;

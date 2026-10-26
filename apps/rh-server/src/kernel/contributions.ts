@@ -324,6 +324,13 @@ export class ContributionRegistry {
       .filter((t) => !options.desk || t.desk !== false);
   }
 
+  /** Contributions to a point from every discovered plugin, whatever its state (e.g. to name a source's owner). */
+  declaredContributions(point: string): (PointContribution & { pluginId: string })[] {
+    return [...this.discovery.plugins.values()].flatMap((p) =>
+      (contributionsOf(p.manifest).points[point] ?? []).map((c) => ({ ...c, pluginId: p.manifest.id })),
+    );
+  }
+
   /** Available plugins that fill a slot (kind slot), for the slot catalog. */
   slotPlugins(slot: string): { id: string; displayName: string }[] {
     return this.plugins()

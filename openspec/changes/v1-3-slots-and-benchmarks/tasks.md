@@ -10,7 +10,7 @@
 
 ## 3. Attribution
 
-- [ ] 3.1 Per-source attribution, `GET /v1/attribution`, the digest's Sources section; verify tests
+- [x] 3.1 Per-source attribution, `GET /v1/attribution`, the digest's Sources section; verify tests
 
 ## 4. UI
 

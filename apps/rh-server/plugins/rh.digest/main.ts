@@ -17,6 +17,7 @@ export const DIGEST_SECTIONS: readonly DigestSection[] = [
   "exploration",
   "knowledgeBase",
   "quality",
+  "sources",
   "cost",
   "changes",
   "general",
@@ -190,6 +191,7 @@ export function activate(context: PluginContext): DigestExports {
       try {
         const harness = await host.exportsOf<HarnessExports>("rh.harness");
         const q = harness.quality();
+        body.sources = harness.attribution(from, to);
         body.quality = {
           judge: q.judge ? { agreement: q.judge.agreement, cases: q.judge.cases, trusted: q.judge.trusted } : null,
           replays: harness

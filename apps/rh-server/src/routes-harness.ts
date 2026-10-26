@@ -15,6 +15,10 @@ export function harnessRoutes(hub: Hub): Router {
   r.get("/v1/harness/replays", async (req, res) => {
     res.json((await harness()).replays(Math.min(int(req.query.limit, "limit", 50), 200)));
   });
+  r.get("/v1/attribution", async (req, res) => {
+    const days = Math.min(Math.max(int(req.query.days, "days", 30), 1), 365);
+    res.json((await harness()).attribution(new Date(Date.now() - days * 86_400_000).toISOString()));
+  });
   r.get("/v1/slots", async (_req, res) => void res.json((await harness()).slots()));
   r.get("/v1/slots/benchmarks", async (req, res) => {
     const slot = typeof req.query.slot === "string" ? req.query.slot : undefined;
