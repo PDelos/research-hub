@@ -35,7 +35,7 @@ The dedupe phase SHALL drop papers already presented as cards, judged, or reject
 - **THEN** it is dropped in dedupe and Jev is not called for it
 
 ### Requirement: Jev gate
-Every new paper SHALL be judged by Jev on title and abstract with `on-theme` (relevance score, matched research question), `paper-kind` and `worth-reading`; papers below `relevance_min` (default 0.45) or `worth_min` (default 0.35) SHALL be rejected with the reason stored.
+Every new paper SHALL be judged by Jev on title and abstract with `on-theme` (relevance score, matched research question), `paper-kind` and `worth-reading`; papers below `relevanceMin` (an `rh.sweep` setting, default the command's `relevance_min` 0.45) or `worthMin` (default the command's `worth_min` 0.35) SHALL be rejected with the reason stored.
 
 #### Scenario: Off-topic paper
 - **WHEN** Jev scores a paper's relevance at 0.2
@@ -44,6 +44,10 @@ Every new paper SHALL be judged by Jev on title and abstract with `on-theme` (re
 #### Scenario: Review band
 - **WHEN** a paper's relevance falls within the review band (0.45 to 0.55)
 - **THEN** it passes the gate flagged `borderline`, and the flag is shown if it becomes a card
+
+#### Scenario: Threshold setting
+- **WHEN** `relevanceMin` is set to 0.5
+- **THEN** the next sweep rejects a paper with relevance 0.48 with reason "below relevance_min 0.5"
 
 ### Requirement: Jev input is data
 Paper text sent to Jev SHALL be treated as data: every command instruction SHALL say so, and text inside a paper SHALL NOT change thresholds, tools or settings.
@@ -60,7 +64,7 @@ Papers that pass the gate SHALL be enriched (metadata, embedding) and given a le
 - **THEN** it is enriched and leveled, for example as foundational
 
 ### Requirement: Ranking
-Survivors SHALL be ranked by Jev `importance` combined with Jev relevance, question weight, level fit (orientation favors foundational and core) and freshness, and the top N (default 7, range 1 to 15) SHALL become candidates.
+Survivors SHALL be ranked by Jev `importance` combined with Jev relevance, question weight, level fit (orientation favors foundational and core) and freshness, weighted by the `rh.sweep` setting `rankWeights` (default importance 0.4, relevance 0.2, question 0.15, level 0.15, freshness 0.1), and the top N (default 7, range 1 to 15) SHALL become candidates.
 
 #### Scenario: Card cap
 - **WHEN** 30 papers survive the gate and N is 7
