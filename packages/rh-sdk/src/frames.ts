@@ -223,12 +223,27 @@ export interface PluginInstallPlan {
   contributions: PluginContributionsDetail;
 }
 
+export type PluginKind = "core" | "slot" | "addon" | "preference";
+export type PluginTopic =
+  | "finding"
+  | "understanding"
+  | "ranking"
+  | "knowledge"
+  | "agents"
+  | "integrations"
+  | "interface";
+
 export interface PluginSummary {
   id: string;
   version: string;
   displayName: string;
   description?: string;
   builtin: boolean;
+  /** What may change (v1.3): core never; a slot is replaced; add-ons and preferences are chosen. */
+  kind: PluginKind;
+  topic: PluginTopic;
+  /** For kind slot: the slot it fills. */
+  slot?: string;
   state: PluginRunState;
   /** Why the plugin is not active (blocked, incompatible) or the error that made it fail. */
   reason?: string;

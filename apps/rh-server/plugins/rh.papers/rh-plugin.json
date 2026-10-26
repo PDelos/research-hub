@@ -2,29 +2,51 @@
   "id": "rh.papers",
   "version": "1.0.0",
   "displayName": "Papers",
+  "kind": "core",
+  "topic": "finding",
   "description": "Finds papers across the enabled sources, stores and enriches them, and represents each one (facets, vectors, citations) for similarity search.",
-  "engines": { "research-hub": "^1.0.0" },
+  "engines": {
+    "research-hub": "^1.0.0"
+  },
   "main": "main.ts",
   "required": true,
   "activationEvents": ["onStartup", "onChatTool:search_papers"],
-  "dependencies": { "rh.decision-jev": "^1.0.0" },
+  "dependencies": {
+    "rh.decision-jev": "^1.0.0"
+  },
   "contributes": {
     "extensionPoints": {
       "papers.source": {
         "description": "A paper source searched by every sweep and by search_papers. Built-in ids: arxiv, openalex, europepmc, semanticscholar; other ids are served by the contributing plugin's exported sources[id].",
         "cardinality": "many",
-        "schema": { "required": ["id", "title"], "properties": { "title": { "type": "string" } } }
+        "schema": {
+          "required": ["id", "title"],
+          "properties": {
+            "title": {
+              "type": "string"
+            }
+          }
+        }
       },
       "papers.enricher": {
         "description": "Completes stored records (venue, citations, references) after a search.",
         "cardinality": "many",
-        "schema": { "required": ["id"] }
+        "schema": {
+          "required": ["id"]
+        }
       },
       "papers.embedder": {
         "description": "Turns paper text into vectors; changing it re-computes vectors in the background.",
         "cardinality": "one",
         "default": "openrouter",
-        "schema": { "required": ["id", "title"], "properties": { "title": { "type": "string" } } }
+        "schema": {
+          "required": ["id", "title"],
+          "properties": {
+            "title": {
+              "type": "string"
+            }
+          }
+        }
       }
     },
     "jevCommands": ["../../prompt_engineering/jev/abstract-facets"],
@@ -36,9 +58,18 @@
           "type": "object",
           "required": ["query"],
           "properties": {
-            "query": { "type": "string", "description": "Search terms, at most 200 characters; quote phrases" },
-            "since": { "type": "string", "description": "Only papers published on or after this date (YYYY-MM-DD)" },
-            "limit": { "type": "number", "description": "Number of results" }
+            "query": {
+              "type": "string",
+              "description": "Search terms, at most 200 characters; quote phrases"
+            },
+            "since": {
+              "type": "string",
+              "description": "Only papers published on or after this date (YYYY-MM-DD)"
+            },
+            "limit": {
+              "type": "number",
+              "description": "Number of results"
+            }
           }
         }
       }

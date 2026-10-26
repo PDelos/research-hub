@@ -2,9 +2,22 @@
   "id": "rh.source-arxiv",
   "version": "1.0.0",
   "displayName": "arXiv",
+  "kind": "addon",
+  "topic": "finding",
   "description": "Preprints from arXiv (computer science, quantitative biology, statistics…).",
-  "engines": { "research-hub": "^1.0.0" },
+  "engines": {
+    "research-hub": "^1.0.0"
+  },
   "activationEvents": ["onExtensionPoint:papers.source"],
-  "contributes": { "papers.source": [{ "id": "arxiv", "title": "arXiv" }] },
-  "permissions": { "network": ["export.arxiv.org"] }
+  "contributes": {
+    "papers.source": [
+      {
+        "id": "arxiv",
+        "title": "arXiv"
+      }
+    ]
+  },
+  "permissions": {
+    "network": ["export.arxiv.org"]
+  }
 }

@@ -2,8 +2,21 @@
   "id": "rh.runs-ui",
   "version": "1.0.0",
   "displayName": "Runs",
+  "kind": "addon",
+  "topic": "interface",
   "description": "The Runs tab: every agent run, Jev call and embedding with its cost.",
-  "engines": { "research-hub": "^1.0.0" },
+  "engines": {
+    "research-hub": "^1.0.0"
+  },
   "activationEvents": [],
-  "contributes": { "tabs": [{ "id": "runs", "title": "Runs", "view": "runs", "order": 50 }] }
+  "contributes": {
+    "tabs": [
+      {
+        "id": "runs",
+        "title": "Runs",
+        "view": "runs",
+        "order": 50
+      }
+    ]
+  }
 }

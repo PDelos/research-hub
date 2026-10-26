@@ -2,8 +2,12 @@
   "id": "rh.harness",
   "version": "1.0.0",
   "displayName": "Harness",
+  "kind": "core",
+  "topic": "ranking",
   "description": "Measures the finding loop on your own judgments: replays past sweeps with other settings (no new paid calls), labels papers you did not judge with a judge that must agree with you first, and reports the result with an interval and a verdict.",
-  "engines": { "research-hub": "^1.0.0" },
+  "engines": {
+    "research-hub": "^1.0.0"
+  },
   "main": "main.ts",
   "required": true,
   "activationEvents": ["onStartup", "onChatTool:replay_variant"],
@@ -13,7 +17,14 @@
     "rh.sweep": "^1.0.0"
   },
   "contributes": {
-    "tabs": [{ "id": "quality", "title": "Quality", "view": "quality", "order": 16 }],
+    "tabs": [
+      {
+        "id": "quality",
+        "title": "Quality",
+        "view": "quality",
+        "order": 16
+      }
+    ],
     "jevCommands": ["jev/would-like"],
     "chatTools": [
       {
@@ -32,5 +43,8 @@
       }
     ]
   },
-  "permissions": { "budgetUsdPerDay": 0.2, "network": ["openrouter.ai"] }
+  "permissions": {
+    "budgetUsdPerDay": 0.2,
+    "network": ["openrouter.ai"]
+  }
 }

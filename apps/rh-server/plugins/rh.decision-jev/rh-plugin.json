@@ -2,6 +2,8 @@
   "id": "rh.decision-jev",
   "version": "1.0.0",
   "displayName": "Jev decisions",
+  "kind": "core",
+  "topic": "ranking",
   "description": "Versioned Jev commands answer the hub's structured questions (relevance, facets, reasons…), recorded with their cost. Provides rh.decisions to other plugins.",
   "engines": {
     "research-hub": "^1.0.0"

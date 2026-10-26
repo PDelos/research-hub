@@ -2,8 +2,20 @@
   "id": "rh.viewer-library",
   "version": "1.0.0",
   "displayName": "Library viewer",
+  "kind": "preference",
+  "topic": "knowledge",
   "description": "Shows the knowledge base with the hub's own Library view (note list, search and reading pane): light, no extra process.",
-  "engines": { "research-hub": "^1.0.0" },
+  "engines": {
+    "research-hub": "^1.0.0"
+  },
   "activationEvents": ["onExtensionPoint:kb.viewer"],
-  "contributes": { "kb.viewer": [{ "id": "library", "title": "Library", "view": "library" }] }
+  "contributes": {
+    "kb.viewer": [
+      {
+        "id": "library",
+        "title": "Library",
+        "view": "library"
+      }
+    ]
+  }
 }

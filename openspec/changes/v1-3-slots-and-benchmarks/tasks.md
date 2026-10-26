@@ -1,6 +1,6 @@
 ## 1. Classification
 
-- [ ] 1.1 Manifest `kind`, `topic`, `slot`; classify all built-ins; refuse installing core; expose in the plugins API and SDK; verify tests
+- [x] 1.1 Manifest `kind`, `topic`, `slot`; classify all built-ins; refuse installing core; expose in the plugins API and SDK; verify tests
 
 ## 2. Slots and benchmarks
 

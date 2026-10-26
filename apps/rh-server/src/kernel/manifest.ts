@@ -10,6 +10,15 @@ export const KERNEL_API_VERSION = "1.0.0";
 export const MANIFEST_FILE = "rh-plugin.json";
 
 export type ActivationEvent = string;
+export type PluginKind = "core" | "slot" | "addon" | "preference";
+export type PluginTopic =
+  | "finding"
+  | "understanding"
+  | "ranking"
+  | "knowledge"
+  | "agents"
+  | "integrations"
+  | "interface";
 
 export interface PluginPermissions {
   /** Hosts the plugin may reach (exact names; "*.example.org" for subdomains). */
@@ -36,6 +45,11 @@ export interface PluginManifest {
   dependencies: Record<string, string>;
   /** Built-ins only: the hub needs this plugin, so it cannot be disabled. */
   required?: boolean;
+  /** What may change (EVOLUTION.md §0.1): core (never), slot (one active, benchmarked), add-on, preference. */
+  kind: PluginKind;
+  topic: PluginTopic;
+  /** For kind slot: which slot it fills (e.g. "embedder"). */
+  slot?: string;
   permissions: PluginPermissions;
 }
 
@@ -64,6 +78,9 @@ const schema = {
     contributes: { type: "object" },
     dependencies: { type: "object", additionalProperties: { type: "string", minLength: 1 } },
     required: { type: "boolean" },
+    kind: { enum: ["core", "slot", "addon", "preference"] },
+    topic: { enum: ["finding", "understanding", "ranking", "knowledge", "agents", "integrations", "interface"] },
+    slot: { type: "string", pattern: "^[a-z][a-z0-9-]*$" },
     permissions: {
       type: "object",
       additionalProperties: false,
@@ -118,6 +135,7 @@ export function parseManifest(raw: unknown, where = MANIFEST_FILE): PluginManife
     const range = m.engines?.["research-hub"];
     if (typeof range === "string" && !semver.validRange(range))
       problems.push(`engines.research-hub: "${range}" is not a version range`);
+    if (m.kind === "slot" && !m.slot) problems.push("slot: required for a plugin of kind slot");
     for (const [id, r] of Object.entries(m.dependencies ?? {}))
       if (!semver.validRange(r)) problems.push(`dependencies.${id}: "${r}" is not a version range`);
   }
@@ -125,6 +143,8 @@ export function parseManifest(raw: unknown, where = MANIFEST_FILE): PluginManife
   return {
     ...(m as PluginManifest),
     contributes: m.contributes ?? {},
+    kind: m.kind ?? "addon",
+    topic: m.topic ?? "integrations",
     dependencies: m.dependencies ?? {},
     permissions: m.permissions ?? {},
   };

@@ -2,9 +2,22 @@
   "id": "rh.settings-ui",
   "version": "1.0.0",
   "displayName": "Settings",
+  "kind": "core",
+  "topic": "interface",
   "description": "The Settings tab: models, schedule, context compaction and each plugin's settings.",
-  "engines": { "research-hub": "^1.0.0" },
+  "engines": {
+    "research-hub": "^1.0.0"
+  },
   "required": true,
   "activationEvents": [],
-  "contributes": { "tabs": [{ "id": "settings", "title": "Settings", "view": "settings", "order": 60 }] }
+  "contributes": {
+    "tabs": [
+      {
+        "id": "settings",
+        "title": "Settings",
+        "view": "settings",
+        "order": 60
+      }
+    ]
+  }
 }

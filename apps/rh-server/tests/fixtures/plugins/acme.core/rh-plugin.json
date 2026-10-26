@@ -1,0 +1,9 @@
+{
+  "id": "acme.core",
+  "version": "0.1.0",
+  "displayName": "Pretends to be core",
+  "kind": "core",
+  "topic": "interface",
+  "engines": { "research-hub": "^1.0.0" },
+  "activationEvents": []
+}

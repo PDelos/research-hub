@@ -2,8 +2,12 @@
   "id": "rh.kb",
   "version": "1.0.0",
   "displayName": "Knowledge base",
+  "kind": "core",
+  "topic": "knowledge",
   "description": "The project's markdown vault: evidence notes for ⭐ papers written by the librarian, its search index, and the Library and Knowledge base tabs. Offers kb.viewer, so the vault can be shown by Obsidian or another viewer.",
-  "engines": { "research-hub": "^1.0.0" },
+  "engines": {
+    "research-hub": "^1.0.0"
+  },
   "main": "main.ts",
   "required": true,
   "activationEvents": ["onStartup", "onChatTool:search_kb", "onChatTool:query_kb"],
@@ -21,13 +25,30 @@
         "cardinality": "one",
         "schema": {
           "required": ["id", "title", "view"],
-          "properties": { "title": { "type": "string" }, "view": { "type": "string" } }
+          "properties": {
+            "title": {
+              "type": "string"
+            },
+            "view": {
+              "type": "string"
+            }
+          }
         }
       }
     },
     "tabs": [
-      { "id": "library", "title": "Library", "view": "library", "order": 20 },
-      { "id": "kb", "title": "Knowledge base", "view": "kb", "order": 30 }
+      {
+        "id": "library",
+        "title": "Library",
+        "view": "library",
+        "order": 20
+      },
+      {
+        "id": "kb",
+        "title": "Knowledge base",
+        "view": "kb",
+        "order": 30
+      }
     ],
     "chatTools": [
       {
@@ -37,8 +58,14 @@
           "type": "object",
           "required": ["query"],
           "properties": {
-            "query": { "type": "string", "description": "Keywords" },
-            "limit": { "type": "number", "description": "1 to 10, default 5" }
+            "query": {
+              "type": "string",
+              "description": "Keywords"
+            },
+            "limit": {
+              "type": "number",
+              "description": "1 to 10, default 5"
+            }
           }
         }
       },
@@ -49,12 +76,22 @@
           "type": "object",
           "required": ["stem"],
           "properties": {
-            "stem": { "type": "string", "description": "Note name or path, as in the index or search results" }
+            "stem": {
+              "type": "string",
+              "description": "Note name or path, as in the index or search results"
+            }
           }
         }
       }
     ],
-    "prompts": [{ "agent": "librarian", "path": "../../prompt_engineering/agents/librarian" }]
+    "prompts": [
+      {
+        "agent": "librarian",
+        "path": "../../prompt_engineering/agents/librarian"
+      }
+    ]
   },
-  "permissions": { "files": ["vault:read-write"] }
+  "permissions": {
+    "files": ["vault:read-write"]
+  }
 }

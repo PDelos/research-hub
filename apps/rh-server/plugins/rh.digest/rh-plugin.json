@@ -2,8 +2,12 @@
   "id": "rh.digest",
   "version": "1.0.0",
   "displayName": "Daily cycle and digest",
+  "kind": "core",
+  "topic": "interface",
   "description": "Runs the daily cycle: records each night's figures and builds the weekly digest (the week's sweeps, judgments, exploration picks, new notes, cost and every change with undo), where you read and comment.",
-  "engines": { "research-hub": "^1.0.0" },
+  "engines": {
+    "research-hub": "^1.0.0"
+  },
   "main": "main.ts",
   "required": true,
   "activationEvents": ["onStartup"],
@@ -15,6 +19,13 @@
     "rh.kb": "^1.0.0"
   },
   "contributes": {
-    "tabs": [{ "id": "digest", "title": "Digest", "view": "digest", "order": 15 }]
+    "tabs": [
+      {
+        "id": "digest",
+        "title": "Digest",
+        "view": "digest",
+        "order": 15
+      }
+    ]
   }
 }

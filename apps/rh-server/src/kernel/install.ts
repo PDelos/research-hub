@@ -98,6 +98,7 @@ export class PluginInstaller {
       }
       const problems = contributionProblems(manifest, dir);
       if (manifest.required) problems.push("required: only built-in plugins can be required");
+      if (manifest.kind === "core") problems.push("kind: only the hub's own plugins are core");
       if (manifest.main && !existsSync(join(dir, manifest.main)))
         problems.push(`main: ${manifest.main} does not exist`);
       if (problems.length) throw new InstallRefused("the plugin is invalid", problems);

@@ -2,12 +2,21 @@
   "id": "rh.desk",
   "version": "1.0.0",
   "displayName": "Research desk",
+  "kind": "core",
+  "topic": "agents",
   "description": "The research desk: the project's chat agent. It may call the chat tools enabled plugins offer to the desk.",
-  "engines": { "research-hub": "^1.0.0" },
+  "engines": {
+    "research-hub": "^1.0.0"
+  },
   "main": "main.ts",
   "required": true,
   "activationEvents": ["onStartup"],
   "contributes": {
-    "prompts": [{ "agent": "research-desk", "path": "../../prompt_engineering/agents/research-desk" }]
+    "prompts": [
+      {
+        "agent": "research-desk",
+        "path": "../../prompt_engineering/agents/research-desk"
+      }
+    ]
   }
 }

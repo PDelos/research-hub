@@ -2,6 +2,8 @@
   "id": "rh.sweep",
   "version": "1.0.0",
   "displayName": "Daily sweep and cards",
+  "kind": "core",
+  "topic": "finding",
   "description": "The daily sweep: gathers papers for the charter's questions, gates and ranks them with Jev, and writes the day's cards (Relevance, Trust, Value).",
   "engines": {
     "research-hub": "^1.0.0"

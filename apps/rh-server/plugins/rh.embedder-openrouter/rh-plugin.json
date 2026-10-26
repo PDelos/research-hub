@@ -2,11 +2,26 @@
   "id": "rh.embedder-openrouter",
   "version": "1.0.0",
   "displayName": "OpenRouter embeddings",
+  "kind": "slot",
+  "topic": "understanding",
+  "slot": "embedder",
   "description": "Embeds papers with an OpenRouter embedding model (RH_EMBED_MODEL, RH_EMBED_DIMS); offline, a deterministic local stand-in.",
-  "engines": { "research-hub": "^1.0.0" },
+  "engines": {
+    "research-hub": "^1.0.0"
+  },
   "main": "main.ts",
   "required": true,
   "activationEvents": ["onExtensionPoint:papers.embedder"],
-  "contributes": { "papers.embedder": [{ "id": "openrouter", "title": "OpenRouter embeddings" }] },
-  "permissions": { "network": ["openrouter.ai"], "secrets": ["OPENROUTER_API_KEY"] }
+  "contributes": {
+    "papers.embedder": [
+      {
+        "id": "openrouter",
+        "title": "OpenRouter embeddings"
+      }
+    ]
+  },
+  "permissions": {
+    "network": ["openrouter.ai"],
+    "secrets": ["OPENROUTER_API_KEY"]
+  }
 }

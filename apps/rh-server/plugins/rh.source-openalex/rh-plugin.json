@@ -2,12 +2,27 @@
   "id": "rh.source-openalex",
   "version": "1.0.0",
   "displayName": "OpenAlex",
+  "kind": "addon",
+  "topic": "finding",
   "description": "OpenAlex works, and enrichment of every stored record (venue, citations, references).",
-  "engines": { "research-hub": "^1.0.0" },
+  "engines": {
+    "research-hub": "^1.0.0"
+  },
   "activationEvents": ["onExtensionPoint:papers.source", "onExtensionPoint:papers.enricher"],
   "contributes": {
-    "papers.source": [{ "id": "openalex", "title": "OpenAlex" }],
-    "papers.enricher": [{ "id": "openalex" }]
+    "papers.source": [
+      {
+        "id": "openalex",
+        "title": "OpenAlex"
+      }
+    ],
+    "papers.enricher": [
+      {
+        "id": "openalex"
+      }
+    ]
   },
-  "permissions": { "network": ["api.openalex.org"] }
+  "permissions": {
+    "network": ["api.openalex.org"]
+  }
 }
