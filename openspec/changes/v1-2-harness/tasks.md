@@ -8,7 +8,7 @@
 
 ## 3. The judge
 
-- [ ] 3.1 Jev command `would-like` (locked), labels cache, calibration (agreement, kappa, trusted rule), nightly labelling within the budget through `rh.decisions`; verify tests with scripted Jev (calibrated and uncalibrated judges, budget stop, cache reuse)
+- [x] 3.1 Jev command `would-like` (locked), labels cache, calibration (agreement, kappa, trusted rule), nightly labelling within the budget through `rh.decisions`; verify tests with scripted Jev (calibrated and uncalibrated judges, budget stop, cache reuse)
 
 ## 4. Plugin, API, UI
 

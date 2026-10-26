@@ -5,7 +5,9 @@ import type { PluginContext } from "../../src/kernel/lifecycle.ts";
 import { CardWriter } from "../../src/sweep/card-writer.ts";
 import { CardStore } from "../../src/sweep/cards.ts";
 import { PaperDecisions } from "../../src/sweep/decisions.ts";
-import { SweepRunner, type RankWeights } from "../../src/sweep/sweep.ts";
+import { DEFAULT_RANK_WEIGHTS, SweepRunner, type RankWeights } from "../../src/sweep/sweep.ts";
+import { DEFAULT_SETTINGS, type SweepSettings, type Variant } from "../../src/harness/replay.ts";
+import { SettingsInvalid, validateSettings } from "../../src/kernel/settings.ts";
 import type { CharterExports } from "../rh.charter/main.ts";
 import type { DecisionExports } from "../rh.decision-jev/main.ts";
 import type { FeedbackExports } from "../rh.feedback/main.ts";
@@ -15,6 +17,10 @@ import type { ScheduleExports } from "../rh.schedule/main.ts";
 import { migrateExploration, pickExploration } from "./exploration.ts";
 
 export interface SweepExports extends AgentHooks {
+  /** The settings the next sweep uses, defaults filled in (the harness replays against these). */
+  currentSettings(): SweepSettings;
+  /** Throw SettingsInvalid unless the variant is a valid change of these settings. */
+  validateVariant(variant: Variant): void;
   decisions: PaperDecisions;
   sweeps: SweepRunner;
   cards: CardStore;
@@ -93,7 +99,26 @@ export function activate(context: PluginContext): SweepExports {
       if (run.kind === "sweep" && runSweeps) sweeps.pickUp();
     }),
   });
+  const policyOf = (command: "on-theme" | "worth-reading") =>
+    decisions.command(command).policy as Record<string, number>;
+  const currentSettings = (): SweepSettings => ({
+    relevanceMin: (context.settings.relevanceMin as number | undefined) ?? policyOf("on-theme").relevance_min,
+    worthMin: (context.settings.worthMin as number | undefined) ?? policyOf("worth-reading").worth_min,
+    rankWeights: (context.settings.rankWeights as RankWeights | undefined) ?? DEFAULT_RANK_WEIGHTS,
+    cardsPerSweep: sweeps.cardsPerSweep(),
+    explorationPicks: context.settings.explorationPicks as number,
+  });
   return {
+    currentSettings,
+    validateVariant: (variant) => {
+      const unknown = Object.keys(variant).filter((k) => !(k in DEFAULT_SETTINGS));
+      if (unknown.length)
+        throw new SettingsInvalid(
+          context.id,
+          unknown.map((k) => `${k}: not a sweep setting a replay can change`),
+        );
+      validateSettings(context.manifest, { ...context.settings, ...variant });
+    },
     decisions,
     sweeps,
     cards,

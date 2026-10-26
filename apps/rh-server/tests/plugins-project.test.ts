@@ -101,6 +101,7 @@ test("the v0 tabs come from built-in plugins and follow their enablement", async
     assert.deepEqual(tabs(), [
       "feed:rh.sweep",
       "digest:rh.digest",
+      "quality:rh.harness",
       "library:rh.kb",
       "kb:rh.kb",
       "charter:rh.charter",

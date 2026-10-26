@@ -225,9 +225,11 @@ export function activate(context: PluginContext): DigestExports {
     const work = (async () => {
       try {
         // Periods use the real time (the records carry it); the slot names the night or the week.
-        if (run.kind === "nightly")
+        if (run.kind === "nightly") {
           exports.recordNight(Date.now(), run.slot.startsWith("nightly:") ? run.slot.slice(8) : undefined);
-        else await exports.buildDigest(Date.now(), run.slot.startsWith("review:") ? run.slot.slice(7) : undefined);
+          // The night's work of other plugins (the harness labels and recalibrates here).
+          rh.events.emit("cycle.nightly", { runId: run.id, slot: run.slot });
+        } else await exports.buildDigest(Date.now(), run.slot.startsWith("review:") ? run.slot.slice(7) : undefined);
         scheduler.mark(run.id, "done");
       } catch (error) {
         const reason = error instanceof Error ? error.message : String(error);

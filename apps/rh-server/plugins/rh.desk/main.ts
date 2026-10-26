@@ -24,12 +24,8 @@ export function activate(context: PluginContext): DeskExports {
   const deskTools = () => {
     const declared = contributions.declaredChatTools();
     const available = new Set(contributions.chatTools({ desk: true }).map((t) => t.name));
-    const external = contributions
-      .chatTools({ desk: true })
-      .filter((t) => !t.builtin)
-      .map((t) => t.name);
-    // Tools no plugin declares (added by tests or extensions) keep v0 behavior: allowed when listed.
-    return [...DESK_TOOLS.filter((name) => !declared.has(name) || available.has(name)), ...external];
+    // The v0 list (tools no plugin declares keep v0 behavior), then every tool an available plugin offers the desk.
+    return [...new Set([...DESK_TOOLS.filter((name) => !declared.has(name) || available.has(name)), ...available])];
   };
   const pluginTools = () =>
     defineExtension({
