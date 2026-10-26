@@ -1060,3 +1060,40 @@ button.danger {
 .cycle-status {
   margin: 4px 0 8px;
 }
+
+/* Quality (v1.2) */
+.quality {
+  padding: 16px 20px 40px;
+  overflow: auto;
+}
+.replays {
+  list-style: none;
+  padding: 0;
+}
+.replays li {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line);
+}
+.badge.verdict-better {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.badge.verdict-worse {
+  color: var(--error);
+  border-color: var(--error);
+}
+.plugin-settings textarea {
+  font:
+    12px/1.4 ui-monospace,
+    monospace;
+}
+
+/* Many tabs: keep labels on one line and let the bar scroll. */
+.tabs {
+  overflow-x: auto;
+  flex-wrap: nowrap;
+}
+.tabs button {
+  white-space: nowrap;
+  flex: none;
+}

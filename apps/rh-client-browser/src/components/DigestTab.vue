@@ -19,6 +19,7 @@ const sections: { id: DigestSection; title: string }[] = [
   { id: "judgments", title: "Your judgments" },
   { id: "exploration", title: "Exploration picks" },
   { id: "knowledgeBase", title: "Knowledge base" },
+  { id: "quality", title: "Quality" },
   { id: "cost", title: "Cost" },
   { id: "changes", title: "What changed" },
   { id: "general", title: "Anything else" },
@@ -153,6 +154,20 @@ async function undo(commit: string, message: string) {
           <p v-if="!digest.knowledgeBase.added.length" class="muted">No new notes.</p>
           <ul class="small">
             <li v-for="n in digest.knowledgeBase.added" :key="n.stem">{{ n.title }}</li>
+          </ul>
+        </template>
+        <template v-else-if="sec.id === 'quality'">
+          <p v-if="!digest.quality?.judge" class="muted">The judge has not been calibrated yet.</p>
+          <p v-else>
+            The judge agrees with you in {{ pct(digest.quality.judge.agreement) }} of
+            {{ digest.quality.judge.cases }} cases ({{ digest.quality.judge.trusted ? "trusted" : "not trusted yet" }}).
+          </p>
+          <ul class="small">
+            <li v-for="r in digest.quality?.replays ?? []" :key="r.id">
+              {{ Object.keys(r.variant).join(", ") || "current settings" }}: <strong>{{ r.verdict }}</strong> ({{
+                r.heldOutDiff >= 0 ? "+" : ""
+              }}{{ r.heldOutDiff.toFixed(2) }} nDCG)
+            </li>
           </ul>
         </template>
         <template v-else-if="sec.id === 'cost'">

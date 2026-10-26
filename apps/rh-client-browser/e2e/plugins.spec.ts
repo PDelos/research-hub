@@ -20,6 +20,7 @@ test("the tab bar comes from the plugins, and a plugin's own tab renders as a cu
   await expect(tabs(page)).toHaveText([
     "Feed",
     "Digest",
+    "Quality",
     "Library",
     "Knowledge base",
     "Reading list",

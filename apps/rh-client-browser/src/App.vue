@@ -10,6 +10,7 @@ import FeedView from "./components/FeedView.vue";
 import KnowledgeTab from "./components/KnowledgeTab.vue";
 import LibraryTab from "./components/LibraryTab.vue";
 import PluginsTab from "./components/PluginsTab.vue";
+import QualityTab from "./components/QualityTab.vue";
 import RunsView from "./components/RunsView.vue";
 import SettingsTab from "./components/SettingsTab.vue";
 import TopBar from "./components/TopBar.vue";
@@ -20,6 +21,7 @@ import { usePlugins } from "./stores/plugins.ts";
 const views = {
   feed: FeedView,
   digest: DigestTab,
+  quality: QualityTab,
   library: LibraryTab,
   charter: CharterTab,
   runs: RunsView,

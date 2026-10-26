@@ -15,11 +15,18 @@ const emit = defineEmits<{ saved: [] }>();
 const plugins = usePlugins();
 const form = ref<Record<string, unknown>>({});
 const problems = ref<string[]>([]);
+/** Object and array settings are edited as JSON. */
+const json = ref<Record<string, string>>({});
 const saved = ref("");
 watch(
   () => props.values,
   // A choice that is not saved shows as "" (Automatic, for the viewer).
-  (v) => (form.value = Object.fromEntries(Object.keys(props.properties).map((k) => [k, v[k] ?? ""]))),
+  (v) => {
+    form.value = Object.fromEntries(Object.keys(props.properties).map((k) => [k, v[k] ?? ""]));
+    json.value = Object.fromEntries(
+      Object.keys(props.properties).map((k) => [k, v[k] === undefined ? "" : JSON.stringify(v[k], null, 1)]),
+    );
+  },
   { immediate: true, deep: true },
 );
 /** Choices for a property: its enum, or the contributions to the extension point it selects (kb.viewer). */
@@ -46,6 +53,14 @@ async function save() {
   for (const key of Object.keys(props.properties)) {
     const before = props.values[key] ?? "";
     let value = form.value[key];
+    if (props.properties[key].type === "object" || props.properties[key].type === "array") {
+      try {
+        value = json.value[key].trim() ? JSON.parse(json.value[key]) : "";
+      } catch {
+        problems.value = [`${key}: not valid JSON`];
+        return;
+      }
+    }
     const type = props.properties[key].type;
     if ((type === "integer" || type === "number") && typeof value === "string" && value.trim() !== "")
       value = Number(value);
@@ -75,6 +90,12 @@ async function save() {
         <select v-if="choices[key]" v-model="form[key]">
           <option v-for="c in choices[key]" :key="String(c.value)" :value="c.value">{{ c.label }}</option>
         </select>
+        <textarea
+          v-else-if="p.type === 'object' || p.type === 'array'"
+          v-model="json[key]"
+          rows="3"
+          spellcheck="false"
+        />
         <input
           v-else
           v-model="form[key]"
