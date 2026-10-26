@@ -21,6 +21,8 @@
     "ajv": "^8.20.0",
     "express": "5.3.0",
     "fast-xml-parser": "^5.11.2",
+    "hyparquet": "1.31.5",
+    "hyparquet-compressors": "1.1.2",
     "isomorphic-git": "^1.44.4",
     "semver": "^7.8.5",
     "sqlite-vec": "0.1.9",
@@ -28,6 +30,7 @@
   },
   "devDependencies": {
     "@types/express": "5.0.6",
-    "@types/semver": "^7.8.0"
+    "@types/semver": "^7.8.0",
+    "hyparquet-writer": "0.17.0"
   }
 }
