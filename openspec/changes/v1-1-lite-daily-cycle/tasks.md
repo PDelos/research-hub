@@ -29,6 +29,9 @@
 
 ## 6. Integration
 
-- [ ] 6.1 All tests, checks, audit, the offline e2e (now including a nightly run, a digest, a comment and an undo) and the UI tests
+- [x] 6.1 All tests, checks, audit, the offline e2e (now including a nightly run, a digest, a comment and an undo) and the UI tests
+  - Verified 2026-10-26: server 222/222, jev 34 (+1 live, skipped), durable-agent 24/24, UI 13/13; check 0 errors;
+    audit 0; `scripts/e2e-offline.sh` PASS with the tsx server, the bundle (`E2E_BUNDLE=1`) and inside the light
+    image (`E2E_IMAGE=research-hub:lite`), now including a nightly run, a digest, a comment and an undo.
 - [ ] 6.2 Images: build `research-hub:latest` (lite) and `research-hub:obsidian`; record sizes; start `proteins` on the image the user wants (ask; default the Obsidian add-on so nothing changes for it) and check the cycle status and digest in the container
 - [ ] 6.3 README (light image and add-on, the daily cycle, the Digest tab, undo), PLAN/EVOLUTION status

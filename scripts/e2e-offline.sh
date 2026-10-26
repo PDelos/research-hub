@@ -85,6 +85,17 @@ stop
 start
 REPLY=$(curl -s -X POST "$U/chat" "${H[@]}" -d '{"content":"use sample_echo {\"text\": \"from the desk\"}","waitMs":20000}' | j "(d.get('answer') or {}).get('text')")
 expect "plugin chat tool (desk)" "$REPLY" "echo from the desk"
+# The daily cycle (v1-1): a nightly run, a digest, a comment on it, and an undo of one change.
+curl -s -X POST "$U/runs/nightly" "${H[@]}" -d '{}' > /dev/null
+for _ in $(seq 1 40); do n=$(curl -s "$U/cycle" "${H[@]}" | j "1 if d['lastNightly'] else 0"); [ "$n" = 1 ] && break; sleep 0.25; done
+expect "nightly run recorded" "$n" 1
+curl -s -X POST "$U/runs/review" "${H[@]}" -d '{}' > /dev/null
+for _ in $(seq 1 40); do DIG=$(curl -s "$U/digests" "${H[@]}" | j "d[0]['id'] if d else ''"); [ -n "$DIG" ] && break; sleep 0.25; done
+expect "digest lists the sweep" "$(curl -s "$U/digests/$DIG" "${H[@]}" | j "len(d['cycle']['sweeps'])")" 1
+expect "comment saved" "$(curl -s -X POST "$U/digests/$DIG/comments" "${H[@]}" -d '{"section":"judgments","text":"more methods papers"}' | j "d['section']")" judgments
+SWAP=$(curl -s "$U/plugins/history?limit=500" "${H[@]}" | j "[h['id'] for h in d if h['message'] == 'configure rh.kb: kb.viewer'][0]")
+curl -s -X POST "$U/plugins/undo" "${H[@]}" -d "{\"commit\":\"$SWAP\"}" > /dev/null
+expect "undo of the viewer choice" "$(curl -s "$U/plugins/history" "${H[@]}" | j "d[0]['message']")" "undo: configure rh.kb: kb.viewer"
 expect "rolled back" "$(curl -s -X POST "$U/plugins/rollback" "${H[@]}" -d "{\"commit\":\"$INIT\"}" | j "[p['state'] for p in d['plugins'] if p['id'] == 'acme.sample'][0]")" disabled
 expect "viewer after rollback" "$(viewer)" library
 [ -n "${E2E_IMAGE:-}" ] && docker logs "$CONTAINER" >> "$LOG" 2>&1
