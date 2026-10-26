@@ -18,6 +18,7 @@ import type { ProjectRuntime } from "./project.ts";
 import { agentState } from "./state.ts";
 import type { StreamHub } from "./sse.ts";
 import { packageVersion, VERSION } from "./version.ts";
+import { KERNEL_API_VERSION } from "./kernel/manifest.ts";
 
 const MAX_MESSAGE = 100_000;
 
@@ -48,6 +49,8 @@ export function routes(hub: Hub, streams: StreamHub): Router {
       jevModel: hub.config.mode === "offline" ? "mock" : hub.config.jevModel,
       uptimeMs: Date.now() - hub.startedAt,
       kbViewer: hub.project.kbViewer.status(),
+      kernelApi: KERNEL_API_VERSION,
+      plugins: hub.project.plugins.kernel.list().map(({ id, version, state }) => ({ id, version, state })),
     };
     res.json(info);
   });

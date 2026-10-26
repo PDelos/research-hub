@@ -8,6 +8,12 @@ import type {
   KbNote,
   KbPaper,
   KbSearchHit,
+  PluginContributionsView,
+  PluginDetails,
+  PluginHistoryEntry,
+  PluginInstallPlan,
+  PluginInstallSource,
+  PluginList,
   PrecisionPoint,
   Verdict,
   WeightView,
@@ -62,7 +68,9 @@ export class HubClient {
     const json = text ? JSON.parse(text) : undefined;
     if (!res.ok) {
       const e = json?.error ?? {};
-      throw new RhError((e.code as ErrorCode) ?? "internal", e.message ?? `HTTP ${res.status}`, res.status);
+      throw new RhError((e.code as ErrorCode) ?? "internal", e.message ?? `HTTP ${res.status}`, res.status, {
+        details: e.details,
+      });
     }
     return json as T;
   }
@@ -116,6 +124,29 @@ export class HubClient {
   kbSearch = (query: string, limit = 8) =>
     this.call<KbSearchHit[]>("GET", `/kb/search?q=${encodeURIComponent(query)}&limit=${limit}`);
   triggerRun = (kind: "sweep" | "review") => this.call<ScheduledRun>("POST", `/runs/${kind}`, {});
+
+  // Plugins (v1.0)
+  plugins = () => this.call<PluginList>("GET", "/plugins");
+  plugin = (id: string) => this.call<PluginDetails>("GET", `/plugins/${encodeURIComponent(id)}`);
+  contributions = () => this.call<PluginContributionsView>("GET", "/plugins/contributions");
+  pluginHistory = (limit = 100) => this.call<PluginHistoryEntry[]>("GET", `/plugins/history?limit=${limit}`);
+  /** Prepare an install: returns what the plugin contributes and asks for; nothing changes until approved. */
+  prepareInstall = (source: PluginInstallSource) =>
+    this.call<PluginInstallPlan>("POST", "/plugins/install", { source });
+  approveInstall = (planId: string) =>
+    this.call<PluginDetails>("POST", `/plugins/install/${encodeURIComponent(planId)}/approve`, {});
+  cancelInstall = (planId: string) => this.call<void>("DELETE", `/plugins/install/${encodeURIComponent(planId)}`);
+  /** Disabling a plugin others depend on fails (conflict, details: the dependents) unless `cascade`. */
+  setPluginEnabled = (id: string, enabled: boolean, cascade = false) =>
+    this.call<PluginDetails>("POST", `/plugins/${encodeURIComponent(id)}/${enabled ? "enable" : "disable"}`, {
+      cascade,
+    });
+  /** Change settings (null removes a saved value); invalid values fail with the setting and the rule. */
+  setPluginSettings = (id: string, values: Record<string, unknown>) =>
+    this.call<PluginDetails>("PUT", `/plugins/${encodeURIComponent(id)}/settings`, { values });
+  uninstallPlugin = (id: string, deleteData = false) =>
+    this.call<void>("DELETE", `/plugins/${encodeURIComponent(id)}${deleteData ? "?deleteData=true" : ""}`);
+  rollbackPlugins = (commit: string) => this.call<PluginList>("POST", "/plugins/rollback", { commit });
 
   /** Follow the project's stream until the signal aborts. */
   async *stream(signal?: AbortSignal): AsyncGenerator<Frame> {

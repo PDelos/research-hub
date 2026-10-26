@@ -1,0 +1,9 @@
+{
+  "id": "acme.needs-arxiv",
+  "version": "0.1.0",
+  "displayName": "Needs arXiv",
+  "description": "A declarative test plugin that depends on the arXiv source.",
+  "engines": { "research-hub": "^1.0.0" },
+  "activationEvents": [],
+  "dependencies": { "rh.source-arxiv": "^1.0.0" }
+}

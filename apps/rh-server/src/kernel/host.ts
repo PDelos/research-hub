@@ -85,9 +85,10 @@ export async function startPluginHost(options: PluginHostOptions): Promise<Plugi
     env,
     ...(options.activationTimeoutMs ? { activationTimeoutMs: options.activationTimeoutMs } : {}),
     builtinHost: options.builtinHost?.(services, exportsOf),
-    // Built-ins run in the kernel's process; every other plugin in its own restricted process (design D6).
+    // Built-ins run in the kernel's process; other plugins with code in their own restricted process (design D6).
     load: async (plugin) =>
-      plugin.builtin
+      // A plugin without code (declarative contributions only) needs no process.
+      plugin.builtin || !plugin.manifest.main
         ? defaultLoad(plugin)
         : externalModule(plugin, {
             log,

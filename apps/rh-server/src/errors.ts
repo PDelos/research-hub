@@ -29,6 +29,8 @@ export class ApiFault extends Error {
   constructor(
     readonly code: ErrorCode,
     message: string,
+    /** Sent as error.details (the problems of a refused install, the dependents of a plugin). */
+    readonly details?: unknown,
   ) {
     super(message);
     this.status = STATUS[code];
@@ -55,7 +57,13 @@ export function errorMiddleware(log: Logger): ErrorRequestHandler {
       fault = new ApiFault("internal", "Internal error");
     }
     if (res.headersSent) return void res.end();
-    res.status(fault.status).json({ error: { code: fault.code, message: fault.message } });
+    res.status(fault.status).json({
+      error: {
+        code: fault.code,
+        message: fault.message,
+        ...(fault.details === undefined ? {} : { details: fault.details }),
+      },
+    });
   };
 }
 

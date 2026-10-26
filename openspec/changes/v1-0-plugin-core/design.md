@@ -126,11 +126,16 @@ plugin settings; the HTTP API keeps its routes; the data folder layout is unchan
 Existing projects (the running `proteins` project) start with every built-in plugin enabled.
 
 ### D10. API routes
-`GET /v1/plugins` (list with state), `GET /v1/plugins/:id` (manifest, contributions, permissions, settings,
-history), `POST /v1/plugins/install` (`{ source }`, returns what needs approval), `POST /v1/plugins/:id/approve`,
-`POST /v1/plugins/:id/enable|disable`, `PUT /v1/plugins/:id/settings`, `DELETE /v1/plugins/:id`
-(`?deleteData=true`), `GET /v1/plugins/history`, `POST /v1/plugins/rollback` (`{ commit }`),
-`GET /v1/plugins/contributions`; SSE `plugins` frame on change.
+`GET /v1/plugins` (list with state, the kernel API version, invalid plugin folders), `GET /v1/plugins/:id` (manifest,
+contributions, permissions, settings with their schema, dependents, problems, history), `GET
+/v1/plugins/contributions` (tabs, the kb.viewer choice, settings grouped by plugin), `POST /v1/plugins/install`
+(`{ source: { folder } | { git, ref? } }`, returns the plan to approve), `POST /v1/plugins/install/:planId/approve`,
+`DELETE /v1/plugins/install/:planId` (cancel), `POST /v1/plugins/:id/enable|disable` (`{ cascade }`; a conflict
+lists the dependents in `error.details`), `PUT /v1/plugins/:id/settings` (`{ values }`, null removes; invalid values
+list the problems in `error.details`), `DELETE /v1/plugins/:id` (`?deleteData=true`), `GET /v1/plugins/history`,
+`POST /v1/plugins/rollback` (`{ commit }`); `/v1/info` adds `kernelApi` and each plugin's version and state; SSE
+`plugins` frame on change. External plugins' UI modules are served at `/plugins/<id>/…` (only beside the manifest's
+`browser` entry, never for a disabled plugin).
 
 ### D11. Stack upgrade (task group 0, before the refactor)
 - **Node 26 LTS** (LTS from 2026-10-28) in the image and `engines`; Node 24 is in maintenance.
