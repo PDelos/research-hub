@@ -1,0 +1,35 @@
+{
+  "id": "rh.feedback",
+  "version": "1.0.0",
+  "displayName": "Feedback",
+  "description": "Your 👎 👍 ⭐ judgments and reasons on cards; reasons become ranking weights, and ⭐ queues a paper for the knowledge base.",
+  "engines": { "research-hub": "^1.0.0" },
+  "main": "main.ts",
+  "required": true,
+  "activationEvents": ["onStartup", "onChatTool:recent_cards", "onChatTool:judge_card"],
+  "dependencies": { "rh.charter": "^1.0.0", "rh.decision-jev": "^1.0.0", "rh.papers": "^1.0.0" },
+  "contributes": {
+    "jevCommands": ["../../prompt_engineering/jev/reason-parse"],
+    "chatTools": [
+      {
+        "name": "recent_cards",
+        "description": "The latest sweep's cards with their positions, ids and judgments.",
+        "parameters": { "type": "object", "properties": {} }
+      },
+      {
+        "name": "judge_card",
+        "description": "Record the user's verdict on a card (up, down or star) with their reason.",
+        "parameters": {
+          "type": "object",
+          "required": ["verdict"],
+          "properties": {
+            "verdict": { "type": "string", "description": "up, down or star" },
+            "position": { "type": "number", "description": "Position in the latest sweep, 1 = first card" },
+            "card_id": { "type": "number", "description": "The card id (from recent_cards)" },
+            "reason": { "type": "string", "description": "The user's reason in their words" }
+          }
+        }
+      }
+    ]
+  }
+}

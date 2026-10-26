@@ -1,10 +1,10 @@
 // Built-in plugin rh.papers: the paper facade (search, store, enrichment, representations). It offers the
 // papers.source, papers.enricher and papers.embedder extension points: a search queries the sources whose plugins
 // are enabled, and vectors come from the active embedder plugin.
-import type { Extension } from "@earendil-works/pi-durable";
-import { hostOf } from "../../src/kernel/builtin.ts";
+import { hostOf, type AgentHooks } from "../../src/kernel/builtin.ts";
 import type { PluginContext } from "../../src/kernel/lifecycle.ts";
 import { PaperService } from "../../src/papers/service.ts";
+import { paperTools } from "../../src/papers/tool.ts";
 import type { PaperSource } from "../../src/papers/sources/types.ts";
 import { SOURCE_NAMES } from "../../src/papers/store.ts";
 import type { Embedder, EmbeddingLedger } from "../../src/representations/embed.ts";
@@ -20,10 +20,8 @@ export interface SourceExports {
   sources?: Record<string, PaperSource>;
 }
 
-export interface PapersExports {
+export interface PapersExports extends AgentHooks {
   papers: PaperService;
-  /** pi-durable extensions for the agents (the desk adds them when it opens the conversation runtime). */
-  agentExtensions: Extension[];
 }
 
 const BUILTIN_SOURCES = new Set<string>(SOURCE_NAMES);
@@ -67,5 +65,5 @@ export async function activate(context: PluginContext): Promise<PapersExports> {
     },
   });
   context.subscriptions.push({ dispose: () => papers.close() });
-  return { papers, agentExtensions: [] };
+  return { papers, agentExtensions: [paperTools(() => papers)], ready: () => papers.start() };
 }

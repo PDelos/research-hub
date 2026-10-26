@@ -16,33 +16,36 @@ import {
   type ModelCatalog,
 } from "@rh/durable-agent";
 import type { Decide, JevClient, JevLedger } from "@rh/jev";
-import { createAgents, type Agents } from "./agents.ts";
-import { Brief, Charters, ProjectState, ScopingQuestions } from "./charter.ts";
-import { CharterWriter } from "./charter-writer.ts";
 import type { PapersConfig, ScheduleDefaults } from "./config.ts";
-import { Scheduler } from "./schedule.ts";
+import type { Agents } from "./agents.ts";
+import type { Brief, Charters, ProjectState, ScopingQuestions } from "./charter.ts";
+import type { CharterWriter } from "./charter-writer.ts";
+import type { Scheduler } from "./schedule.ts";
+import type { PaperDecisions } from "./sweep/decisions.ts";
+import type { SweepRunner } from "./sweep/sweep.ts";
+import type { CardStore } from "./sweep/cards.ts";
+import type { Feedback } from "./feedback/feedback.ts";
+import type { ReasonParser } from "./feedback/reasons.ts";
+import type { CardWriter } from "./sweep/card-writer.ts";
 import type { PaperService } from "./papers/service.ts";
-import { PaperDecisions } from "./sweep/decisions.ts";
-import { SweepRunner } from "./sweep/sweep.ts";
-import { CardStore } from "./sweep/cards.ts";
-import { Feedback } from "./feedback/feedback.ts";
-import { ReasonParser } from "./feedback/reasons.ts";
-import { feedbackTools } from "./feedback/tools.ts";
 import { Vault } from "./kb/vault.ts";
 import { Ingest } from "./kb/ingest.ts";
 import { KbIndex } from "./kb/search.ts";
 import { KbViewer } from "./kb/viewer.ts";
 import { kbTools } from "./kb/tools.ts";
-import { CardWriter } from "./sweep/card-writer.ts";
-import { paperTools } from "./papers/tool.ts";
 import { ensureVectorTables, openProjectDb, Settings, type Db, type SelfCheck } from "./db.ts";
 import type { Logger } from "./logger.ts";
 import { Telemetry } from "./telemetry.ts";
-import type { BuiltinHost } from "./kernel/builtin.ts";
+import type { AgentHooks, BuiltinHost } from "./kernel/builtin.ts";
 import { startPluginHost, type PluginHost } from "./kernel/host.ts";
+import type { CharterExports } from "../plugins/rh.charter/main.ts";
 import type { DecisionExports } from "../plugins/rh.decision-jev/main.ts";
+import type { DeskExports } from "../plugins/rh.desk/main.ts";
+import type { FeedbackExports } from "../plugins/rh.feedback/main.ts";
 import type { PapersExports } from "../plugins/rh.papers/main.ts";
 import type { ProviderExports } from "../plugins/rh.provider-openrouter/main.ts";
+import type { ScheduleExports } from "../plugins/rh.schedule/main.ts";
+import type { SweepExports } from "../plugins/rh.sweep/main.ts";
 
 /**
  * v0.0 first stored the project in <data>/projects/default/. Move those files to <data>/ once, so an existing
@@ -150,6 +153,14 @@ export async function openProject(options: OpenProjectOptions): Promise<ProjectR
   const settings = new Settings(db);
   const telemetry = new Telemetry(db);
   const plog = log;
+  const observe = observability({
+    event: (e) =>
+      plog[e.level === "debug" ? "debug" : e.level](`agent.${e.event}`, {
+        conversationId: e.conversationId,
+        taskId: e.taskId,
+        ...e.data,
+      }),
+  });
   // Plugins first: built-in plugins provide the services below (design D8).
   const plugins = await startPluginHost({
     dataDir: dir,
@@ -167,39 +178,20 @@ export async function openProject(options: OpenProjectOptions): Promise<ProjectR
       offline: options.offline,
       options,
       services,
+      observe,
       exportsOf,
     }),
   });
   const { catalog } = await plugins.exportsOf<ProviderExports>("rh.provider-openrouter");
   const jevPlugin = await plugins.exportsOf<DecisionExports>("rh.decision-jev");
-  const observe = observability({
-    event: (e) =>
-      plog[e.level === "debug" ? "debug" : e.level](`agent.${e.event}`, {
-        conversationId: e.conversationId,
-        taskId: e.taskId,
-        ...e.data,
-      }),
-  });
-  const brief = new Brief(dir);
-  const charters = new Charters(db);
-  const questions = new ScopingQuestions(db);
-  const state = new ProjectState(settings, brief, charters);
-  const charterWriter = new CharterWriter({
-    settings,
-    charters,
-    questions,
-    brief,
-    catalog,
-    promptsDir: options.promptsDir,
-    log: plog,
-    observe,
-  });
-  const scheduler = new Scheduler({ db, settings, state, charters, defaults: options.schedule, log: plog });
-  const { ledger: jevLedger, decide, jevDir } = jevPlugin;
+  const { brief, charters, questions, state, charterWriter } = await plugins.exportsOf<CharterExports>("rh.charter");
+  const { scheduler } = await plugins.exportsOf<ScheduleExports>("rh.schedule");
+  const { ledger: jevLedger } = jevPlugin;
   // Before the harness opens: a resumed search_papers call may need it during replay.
   const { papers } = await plugins.exportsOf<PapersExports>("rh.papers");
-  const feedback = new Feedback({ db, charters, log: plog });
-  feedback.replay();
+  const { feedback, reasons } = await plugins.exportsOf<FeedbackExports>("rh.feedback");
+  const { decisions, sweeps, cards, cardWriter } = await plugins.exportsOf<SweepExports>("rh.sweep");
+  const desk = await plugins.exportsOf<DeskExports>("rh.desk");
   const vault = new Vault(join(dir, "vault"), {
     templateDir: join(dirname(options.promptsDir), "vault-template"),
     settings,
@@ -213,44 +205,6 @@ export async function openProject(options: OpenProjectOptions): Promise<ProjectR
     vault.writeCharter(approved.charter, approved.version!);
   };
   syncVault();
-  const decisions = new PaperDecisions({
-    db,
-    jevDir,
-    decide,
-    ledger: jevLedger,
-    taste: () =>
-      feedback
-        .recent(8)
-        .map((j) => ({ title: j.title, verdict: j.verdict, ...(j.reason ? { reason: j.reason.slice(0, 200) } : {}) })),
-  });
-  const reasons = new ReasonParser({ db, jevDir, decide, ledger: jevLedger, log: plog });
-  // Classify reasons after each judgment (in the background; a Jev failure leaves them pending for the next one).
-  feedback.onChange(() => void reasons.parsePending());
-  const sweeps = new SweepRunner({
-    db,
-    settings,
-    charters,
-    papers,
-    decisions,
-    log: plog,
-    judged: () => feedback.count(),
-    judgedPaper: (paperId) => feedback.isJudged(paperId),
-    weight: (kind, key, fallback) => feedback.weight(kind, key, fallback),
-  });
-  const cards = new CardStore(db);
-  const cardWriter = new CardWriter({
-    db,
-    cards,
-    runner: sweeps,
-    papers,
-    decisions,
-    charters,
-    catalog,
-    promptsDir: options.promptsDir,
-    log: plog,
-    observe,
-  });
-  sweeps.setCardStage(cardWriter);
   const kbIndex = new KbIndex({ db, vault, log: plog });
   const kbViewer = new KbViewer({
     enabled: options.kbViewer?.enabled ?? false,
@@ -277,22 +231,19 @@ export async function openProject(options: OpenProjectOptions): Promise<ProjectR
   });
   // A new ⭐ (or any judgment change) may queue a knowledge-base request.
   feedback.onChange(() => ingest.pickUp());
-  const runSweeps = options.runSweeps !== false;
-  const unsubscribeSweeps = scheduler.onRequested((run) => {
-    if (run.kind === "sweep" && runSweeps) sweeps.pickUp();
-  });
-  const agents = createAgents({
-    promptsDir: options.promptsDir,
-    projectName: name,
+  // The agent runtime (owned by the kernel, design D2): every active plugin's agent extensions.
+  const hooks: AgentHooks[] = [];
+  for (const p of plugins.kernel.list())
+    if (p.state === "active") hooks.push(await plugins.exportsOf<AgentHooks>(p.id));
+  const agents = desk.createAgents({
     extra: [
       observe,
-      paperTools(() => papers),
-      feedbackTools(() => ({ cards, feedback, store: papers.store })),
+      ...hooks.flatMap((h) => h?.agentExtensions ?? []),
       kbTools(() => ({ vault, index: kbIndex })),
       ...(options.extensions ?? []),
     ],
-    separate: [charterWriter.extension, cardWriter.extension, ingest.extension],
-    deskTools: options.deskTools,
+    separate: [...hooks.flatMap((h) => h?.separateExtensions ?? []), ingest.extension],
+    ...(options.deskTools ? { deskTools: options.deskTools } : {}),
   });
   const compaction: CompactionSetting = settings.get("compaction", { points: DEFAULT_POINTS, enabled: true });
   let window = 1_000_000;
@@ -328,15 +279,12 @@ export async function openProject(options: OpenProjectOptions): Promise<ProjectR
   };
   window = (await model()).window;
   harness.harness.resume();
-  charterWriter.attach(harness.harness, ctx);
-  cardWriter.attach(harness.harness, ctx);
+  for (const h of hooks) h?.attach?.(harness.harness, ctx);
   ingest.attach(harness.harness, ctx);
   ingest.pickUp();
   kbIndex.start();
   void kbViewer.start();
-  papers.start();
-  if (runSweeps) sweeps.pickUp();
-  void reasons.parsePending();
+  for (const h of hooks) h?.ready?.();
 
   plog.info("project.opened", { dir, rootConversation: root.id, model: (await model()).id, check });
 
@@ -390,7 +338,6 @@ export async function openProject(options: OpenProjectOptions): Promise<ProjectR
       await ingest.close();
       kbIndex.stop();
       await kbViewer.stop();
-      unsubscribeSweeps();
       await sweeps.close();
       await papers.close();
       stopProjector();

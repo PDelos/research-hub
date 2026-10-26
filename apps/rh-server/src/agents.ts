@@ -19,7 +19,8 @@ export function createAgents(options: {
   extra?: Extension[];
   /** Installed in the registry but not selected by the chat conversation (e.g. the charter writer). */
   separate?: Extension[];
-  deskTools?: readonly string[];
+  /** The desk's allowed tools: a list, or a function read at every call (v1-0: follows plugin states). */
+  deskTools?: readonly string[] | (() => readonly string[]);
 }): Agents {
   const prompt = loadPrompt(join(options.promptsDir, "agents"), "research-desk", "SYSTEM_PROMPT.md", {
     project_name: options.projectName,

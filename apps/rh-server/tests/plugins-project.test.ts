@@ -92,3 +92,39 @@ test("the stream sends plugin states", async () => {
     await server.stop();
   }
 });
+
+test("the v0 tabs come from built-in plugins and follow their enablement", async () => {
+  const server = await startTestServer();
+  try {
+    const { contributions, kernel } = server.hub.project.plugins;
+    const tabs = () => contributions.tabs().map((t) => `${t.id}:${t.pluginId}`);
+    assert.deepEqual(tabs(), ["feed:rh.sweep", "charter:rh.charter", "runs:rh.runs-ui", "settings:rh.settings-ui"]);
+    await kernel.setEnabled("rh.runs-ui", false);
+    assert.ok(!tabs().some((t) => t.startsWith("runs:")));
+    await kernel.setEnabled("rh.runs-ui", true);
+    assert.ok(tabs().includes("runs:rh.runs-ui"));
+    await assert.rejects(kernel.setEnabled("rh.settings-ui", false), /cannot be disabled/);
+  } finally {
+    await server.stop();
+  }
+});
+
+test("the desk may call a declared tool only while its plugin is available; undeclared tools keep v0 behavior", async () => {
+  const { activate } = await import("../plugins/rh.desk/main.ts");
+  let available = true;
+  const host = {
+    name: "p",
+    options: { promptsDir: "" },
+    services: {
+      contributions: {
+        declaredChatTools: () => new Set(["search_papers", "recent_cards"]),
+        chatTools: () =>
+          available ? [{ name: "search_papers" }, { name: "recent_cards" }] : [{ name: "recent_cards" }],
+      },
+    },
+  };
+  const desk = activate({ id: "rh.desk", host } as never);
+  assert.deepEqual(desk.deskTools(), ["search_papers", "recent_cards", "judge_card", "search_kb", "query_kb"]);
+  available = false;
+  assert.deepEqual(desk.deskTools(), ["recent_cards", "judge_card", "search_kb", "query_kb"]);
+});

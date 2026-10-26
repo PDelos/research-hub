@@ -1,0 +1,29 @@
+{
+  "id": "rh.sweep",
+  "version": "1.0.0",
+  "displayName": "Daily sweep and cards",
+  "description": "The daily sweep: gathers papers for the charter's questions, gates and ranks them with Jev, and writes the day's cards (Relevance, Trust, Value).",
+  "engines": { "research-hub": "^1.0.0" },
+  "main": "main.ts",
+  "required": true,
+  "activationEvents": ["onStartup"],
+  "dependencies": {
+    "rh.provider-openrouter": "^1.0.0",
+    "rh.decision-jev": "^1.0.0",
+    "rh.papers": "^1.0.0",
+    "rh.charter": "^1.0.0",
+    "rh.schedule": "^1.0.0",
+    "rh.feedback": "^1.0.0"
+  },
+  "contributes": {
+    "tabs": [{ "id": "feed", "title": "Feed", "view": "feed", "order": 10 }],
+    "jevCommands": [
+      "../../prompt_engineering/jev/worth-reading",
+      "../../prompt_engineering/jev/importance",
+      "../../prompt_engineering/jev/level",
+      "../../prompt_engineering/jev/on-theme",
+      "../../prompt_engineering/jev/paper-kind"
+    ],
+    "prompts": [{ "agent": "card-writer", "path": "../../prompt_engineering/agents/card-writer" }]
+  }
+}

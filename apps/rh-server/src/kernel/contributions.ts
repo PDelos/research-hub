@@ -318,6 +318,13 @@ export class ContributionRegistry {
       .filter((t) => !options.desk || t.desk !== false);
   }
 
+  /** Every chat tool name any discovered plugin declares, whatever its state. */
+  declaredChatTools(): Set<string> {
+    return new Set(
+      [...this.discovery.plugins.values()].flatMap((p) => contributionsOf(p.manifest).chatTools.map((t) => t.name)),
+    );
+  }
+
   /** Jev command name → its folder, across available plugins. */
   jevCommands(): Map<string, string> {
     const out = new Map<string, string>();

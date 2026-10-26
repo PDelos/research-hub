@@ -1,0 +1,15 @@
+{
+  "id": "rh.charter",
+  "version": "1.0.0",
+  "displayName": "Charter",
+  "description": "The project brief, the scoping questions and the versioned research charter the charter writer drafts for approval.",
+  "engines": { "research-hub": "^1.0.0" },
+  "main": "main.ts",
+  "required": true,
+  "activationEvents": ["onStartup"],
+  "dependencies": { "rh.provider-openrouter": "^1.0.0" },
+  "contributes": {
+    "tabs": [{ "id": "charter", "title": "Charter", "view": "charter", "order": 40 }],
+    "prompts": [{ "agent": "charter-writer", "path": "../../prompt_engineering/agents/charter-writer" }]
+  }
+}

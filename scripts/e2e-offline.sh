@@ -10,7 +10,7 @@ LOG="$DATA/server.log"
 cleanup() { [ -n "${PID:-}" ] && kill "$PID" 2>/dev/null; wait "$PID" 2>/dev/null || true; rm -rf "$DATA"; }
 trap cleanup EXIT
 (cd "$ROOT" && RH_ENV_FILE=none RH_MODE=offline RH_DATA_DIR="$DATA/data" RH_PORT="$PORT" RH_KB_VIEWER=off \
-  node --import tsx apps/rh-server/src/main.ts > "$LOG" 2>&1) &
+  exec node --import tsx apps/rh-server/src/main.ts > "$LOG" 2>&1) &
 PID=$!
 for _ in $(seq 1 60); do curl -sf "http://127.0.0.1:$PORT/v1/health" > /dev/null && break; sleep 0.5; done
 U="http://localhost:$PORT/ui/v1"

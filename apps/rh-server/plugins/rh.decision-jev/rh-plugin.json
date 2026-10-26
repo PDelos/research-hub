@@ -10,15 +10,7 @@
   "required": true,
   "activationEvents": ["onStartup"],
   "contributes": {
-    "jevCommands": [
-      "../../prompt_engineering/jev/ping",
-      "../../prompt_engineering/jev/importance",
-      "../../prompt_engineering/jev/level",
-      "../../prompt_engineering/jev/on-theme",
-      "../../prompt_engineering/jev/paper-kind",
-      "../../prompt_engineering/jev/reason-parse",
-      "../../prompt_engineering/jev/worth-reading"
-    ]
+    "jevCommands": ["../../prompt_engineering/jev/ping"]
   },
   "permissions": {
     "network": ["openrouter.ai"],

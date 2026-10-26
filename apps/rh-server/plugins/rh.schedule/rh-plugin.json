@@ -1,0 +1,11 @@
+{
+  "id": "rh.schedule",
+  "version": "1.0.0",
+  "displayName": "Schedule",
+  "description": "Runs the daily sweep and other recurring work at the project's chosen times (RH_SWEEP_* defaults).",
+  "engines": { "research-hub": "^1.0.0" },
+  "main": "main.ts",
+  "required": true,
+  "activationEvents": ["onStartup"],
+  "dependencies": { "rh.charter": "^1.0.0" }
+}
