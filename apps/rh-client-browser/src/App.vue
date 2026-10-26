@@ -4,6 +4,7 @@ import { useRoute, useRouter } from "vue-router";
 import AgentColumn from "./components/AgentColumn.vue";
 import BriefScreen from "./components/BriefScreen.vue";
 import CharterTab from "./components/CharterTab.vue";
+import DigestTab from "./components/DigestTab.vue";
 import ExternalTab from "./components/ExternalTab.vue";
 import FeedView from "./components/FeedView.vue";
 import KnowledgeTab from "./components/KnowledgeTab.vue";
@@ -18,6 +19,7 @@ import { usePlugins } from "./stores/plugins.ts";
 // Built-in views by the id plugins name in their tab contributions; external plugins bring custom elements.
 const views = {
   feed: FeedView,
+  digest: DigestTab,
   library: LibraryTab,
   charter: CharterTab,
   runs: RunsView,

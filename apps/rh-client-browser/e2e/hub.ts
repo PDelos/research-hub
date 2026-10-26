@@ -8,6 +8,7 @@ import { loadConfig } from "../../rh-server/src/config.ts";
 import { createLogger } from "../../rh-server/src/logger.ts";
 import { startServer } from "../../rh-server/src/server.ts";
 import { sampleCharter } from "../../rh-server/tests/fixtures/charter.ts";
+import type { DigestExports } from "../../rh-server/plugins/rh.digest/main.ts";
 
 const server = join(import.meta.dirname, "../../rh-server");
 const FIXTURE_PLUGINS = join(server, "tests/fixtures/plugins");
@@ -34,6 +35,9 @@ p.charters.approve();
 p.syncVault();
 const { installer } = p.plugins;
 await installer.confirm((await installer.prepare({ folder: join(FIXTURE_PLUGINS, "acme.reading-list") })).planId);
+// One change and a digest, so the Digest tab has something to show (and to undo).
+await p.plugins.kernel.configure("rh.sweep", { cardsPerSweep: 5 });
+await (await p.plugins.exportsOf<DigestExports>("rh.digest")).buildDigest();
 console.log(`ui test hub on ${running.url} (data ${dir})`);
 
 const stop = async () => {

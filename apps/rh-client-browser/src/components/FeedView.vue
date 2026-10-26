@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import CycleStatus from "./CycleStatus.vue";
 import { computed, onMounted, ref } from "vue";
 import { ago, usd, type CardDetail, type CardView, type Verdict } from "@rh/sdk";
 import { client, refreshFeed, store } from "../store.ts";
@@ -108,6 +109,7 @@ const authors = (a: string[]) => (a.length > 3 ? `${a.slice(0, 3).join(", ")} et
         Run sweep now
       </button>
     </div>
+    <CycleStatus />
 
     <div v-if="!store.feed.length" class="empty">
       <h2>No papers yet</h2>

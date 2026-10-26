@@ -1,7 +1,7 @@
 // The plugins store (Pinia): what the enabled plugins contribute (tabs, the knowledge-base viewer, settings) and the
 // plugin list. The stream's `plugins` frame refreshes it, so tabs follow enable and disable without a reload.
 import { defineStore } from "pinia";
-import type { PluginContributionsView, PluginSummary } from "@rh/sdk";
+import type { PluginContributionsView, PluginHistoryEntry, PluginSummary } from "@rh/sdk";
 import { client } from "../store.ts";
 
 /** Which plugins could run: when it changes, so may the tabs, the viewer choice and the settings. */
@@ -15,6 +15,7 @@ export const usePlugins = defineStore("plugins", {
     plugins: [] as PluginSummary[],
     kernelApi: "",
     invalid: [] as { dir: string; problems: string[] }[],
+    history: [] as PluginHistoryEntry[],
     error: "",
   }),
   getters: {
@@ -33,6 +34,9 @@ export const usePlugins = defineStore("plugins", {
       } catch (e) {
         this.error = e instanceof Error ? e.message : String(e);
       }
+    },
+    async loadHistory() {
+      this.history = await client.pluginHistory(200);
     },
     /** States from the stream; contributions follow when the set of available plugins changed. */
     applyFrame(plugins: PluginSummary[]) {

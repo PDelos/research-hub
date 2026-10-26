@@ -1011,3 +1011,52 @@ button.danger {
   color: var(--accent);
   border-color: var(--accent);
 }
+
+/* Digest (v1.1) */
+.digest {
+  padding: 16px 20px 40px;
+  overflow: auto;
+}
+.digest-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+.digest-section {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 10px 16px;
+  margin: 12px 0;
+}
+.digest-section h3 {
+  margin: 4px 0 6px;
+}
+.changes {
+  list-style: none;
+  padding: 0;
+}
+.changes li {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--line);
+}
+.comments {
+  list-style: none;
+  padding: 0;
+  color: var(--muted);
+}
+.comment-form {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}
+.comment-form input {
+  flex: 1;
+  min-width: 0;
+}
+.cycle-status {
+  margin: 4px 0 8px;
+}
