@@ -5,21 +5,42 @@
 # (fake model, mock Jev, synthetic sources).
 # Usage: scripts/e2e-offline.sh [port]   (needs the UI built: npm run build -w rh-client-browser)
 #        E2E_BUNDLE=1 scripts/e2e-offline.sh   runs the bundled server (npm run pack -w rh-server) with plain node
+#        E2E_IMAGE=research-hub:lite scripts/e2e-offline.sh   runs the hub in a container of that image
 set -euo pipefail
 PORT="${1:-4899}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 DATA="$(mktemp -d)"
 LOG="$DATA/server.log"
 if [ -n "${E2E_BUNDLE:-}" ]; then ENTRY=(apps/rh-server/dist/server.mjs); else ENTRY=(--import tsx apps/rh-server/src/main.ts); fi
+FIXTURES="$ROOT/apps/rh-server/tests/fixtures/plugins"
+CONTAINER="rh-e2e-$PORT"
 start() {
-  (cd "$ROOT" && RH_ENV_FILE=none RH_MODE=offline RH_DATA_DIR="$DATA/data" RH_PORT="$PORT" RH_KB_VIEWER=off \
-    exec node "${ENTRY[@]}" >> "$LOG" 2>&1) &
-  PID=$!
-  for _ in $(seq 1 60); do curl -sf "http://127.0.0.1:$PORT/v1/health" > /dev/null && return; sleep 0.5; done
-  echo "the hub did not start (log: $LOG)"; exit 1
+  if [ -n "${E2E_IMAGE:-}" ]; then
+    mkdir -p "$DATA/data" && chmod 777 "$DATA/data"
+    docker run -d --name "$CONTAINER" -e RH_MODE=offline -e RH_KB_VIEWER=off -e RH_ALLOWED_HOSTS="localhost:$PORT" \
+      -v "$DATA/data:/data" -v "$ROOT/apps/rh-server/tests/fixtures/plugins:/fixtures:ro" \
+      -p "127.0.0.1:$PORT:4850" "$E2E_IMAGE" > /dev/null
+    FIXTURES=/fixtures
+  else
+    (cd "$ROOT" && RH_ENV_FILE=none RH_MODE=offline RH_DATA_DIR="$DATA/data" RH_PORT="$PORT" RH_KB_VIEWER=off \
+      exec node "${ENTRY[@]}" >> "$LOG" 2>&1) &
+    PID=$!
+  fi
+  for _ in $(seq 1 90); do curl -sf "http://127.0.0.1:$PORT/v1/health" > /dev/null && return; sleep 0.5; done
+  echo "the hub did not start (log: $LOG)"
+  [ -n "${E2E_IMAGE:-}" ] && docker logs "$CONTAINER" 2>&1 | tail -5
+  exit 1
 }
-stop() { [ -n "${PID:-}" ] && kill "$PID" 2>/dev/null; wait "$PID" 2>/dev/null || true; PID=; }
-cleanup() { stop; rm -rf "$DATA"; }
+stop() {
+  if [ -n "${E2E_IMAGE:-}" ]; then
+    docker stop -t 10 "$CONTAINER" > /dev/null 2>&1 || true
+    docker logs "$CONTAINER" >> "$LOG" 2>&1 || true
+    docker rm -f "$CONTAINER" > /dev/null 2>&1 || true
+  else
+    [ -n "${PID:-}" ] && kill "$PID" 2>/dev/null; wait "$PID" 2>/dev/null || true; PID=
+  fi
+}
+cleanup() { stop; rm -rf "$DATA" 2>/dev/null || docker run --rm -v "$DATA:/d" debian:trixie-slim rm -rf /d/data > /dev/null 2>&1; rm -rf "$DATA"; }
 trap cleanup EXIT
 start
 U="http://localhost:$PORT/ui/v1"
@@ -58,7 +79,7 @@ expect "active viewer" "$(viewer)" obsidian
 curl -s -X PUT "$U/plugins/rh.kb/settings" "${H[@]}" -d '{"values":{"kb.viewer":"library"}}' > /dev/null
 expect "viewer swapped" "$(viewer)" library
 expect "viewer plugin disabled" "$(toggle rh.viewer-obsidian disable)" disabled
-PLAN=$(curl -s -X POST "$U/plugins/install" "${H[@]}" -d "{\"source\":{\"folder\":\"$ROOT/apps/rh-server/tests/fixtures/plugins/acme.sample\"}}" | j "d['planId']")
+PLAN=$(curl -s -X POST "$U/plugins/install" "${H[@]}" -d "{\"source\":{\"folder\":\"$FIXTURES/acme.sample\"}}" | j "d['planId']")
 expect "sample plugin installed" "$(curl -s -X POST "$U/plugins/install/$PLAN/approve" "${H[@]}" -d '{}' | j "d['state']")" active
 stop
 start
@@ -66,5 +87,6 @@ REPLY=$(curl -s -X POST "$U/chat" "${H[@]}" -d '{"content":"use sample_echo {\"t
 expect "plugin chat tool (desk)" "$REPLY" "echo from the desk"
 expect "rolled back" "$(curl -s -X POST "$U/plugins/rollback" "${H[@]}" -d "{\"commit\":\"$INIT\"}" | j "[p['state'] for p in d['plugins'] if p['id'] == 'acme.sample'][0]")" disabled
 expect "viewer after rollback" "$(viewer)" library
+[ -n "${E2E_IMAGE:-}" ] && docker logs "$CONTAINER" >> "$LOG" 2>&1
 expect "errors in the server log" "$(grep -c '"level":"error"' "$LOG" || true)" 0
 [ "$FAILED" = 0 ] && echo "PASS" || { echo "FAIL (log: $LOG)"; trap - EXIT; stop; exit 1; }

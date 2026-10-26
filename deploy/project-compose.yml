@@ -3,8 +3,10 @@
 name: rh-__NAME__
 services:
   research-hub:
-    image: research-hub:latest
-    build: __REPO__
+    image: research-hub:__IMAGE__
+    build:
+      context: __REPO__
+      target: __TARGET__
     env_file: .env
     environment:
       RH_HOST: 0.0.0.0

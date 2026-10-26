@@ -2,7 +2,11 @@
 
 - [x] 1.1 Resolve every on-disk path from one `appDir()`; reach built-in plugin code through a static module map; verify all tests pass and the offline e2e passes
 - [x] 1.2 Bundle the server with `vp pack` (tsdown) into `apps/rh-server/dist/server.mjs` with only `sqlite-vec` external and the unused provider SDKs left out; verify the bundle starts offline, chats, sweeps and serves the UI
-- [ ] 1.3 Dockerfile stages `lite` (default, `RH_KB_VIEWER=off`) and `obsidian` (adds Ignis); `new-project.sh --obsidian`; verify the lite image is under 300 MB and runs the offline e2e inside the container
+- [x] 1.3 Dockerfile stages `lite` (default, `RH_KB_VIEWER=off`) and `obsidian` (adds Ignis); `new-project.sh --obsidian`; verify the lite image is under 300 MB and runs the offline e2e inside the container
+  - Verified 2026-10-26: `research-hub:lite` 232 MB on disk (82 MB download; v1-0 was 465 MB / 118 MB) on a
+    minimal runtime (Debian trixie-slim + the node binary + libatomic1; the bundle and data files add 5.5 MB);
+    `research-hub:obsidian` 297 MB on disk. (`docker images` on this machine adds the compressed copy: 325 / 401
+    MB.) `E2E_IMAGE=research-hub:lite scripts/e2e-offline.sh` PASS inside the container, restart included.
 
 ## 2. Viewer choice
 

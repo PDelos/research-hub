@@ -1,12 +1,14 @@
-# Research Hub: one container serving the API, the built UI and the knowledge-base viewer (Ignis, a supervised
-# child process on loopback, reached through the hub at /kb/) on port 4850. Data lives in the /data volume.
+# Research Hub: one container per research project, serving the API and the built UI on port 4850; data lives in
+# the /data volume. Two images (design v1-1 D2):
+#   docker build -t research-hub .                               the light default (Library viewer, under 300 MB)
+#   docker build --target obsidian -t research-hub:obsidian .    adds the Obsidian viewer (Ignis) as an add-on
 # syntax=docker/dockerfile:1
 
-# 0. The knowledge-base viewer: a pinned Ignis release (AGPL-3.0, run unmodified as a separate program). It contains
-#    no Obsidian code; the hub downloads the pinned Obsidian package from Obsidian's official release on first start.
+# 0. The knowledge-base viewer for the add-on: a pinned Ignis release (AGPL-3.0, run unmodified as a separate
+#    program). It contains no Obsidian code; the hub downloads the pinned Obsidian package on first start.
 FROM nobbe/ignis:0.8.18 AS ignis
 
-# 1. Build: install everything, type-check and build the UI.
+# 1. Build: install everything, type-check and build the UI, bundle the server into apps/rh-server/dist.
 FROM node:26-slim AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
@@ -19,41 +21,55 @@ COPY apps/rh-client-browser/package.json apps/rh-client-browser/
 RUN npm ci --no-audit --no-fund
 COPY packages ./packages
 COPY apps ./apps
-RUN npm run build -w rh-client-browser
+COPY vite.config.ts ./
+RUN npm run build -w rh-client-browser && npm run pack -w rh-server
 
-# 2. Production dependencies only.
+# 2. Runtime dependencies: only what the bundle leaves external (sqlite-vec, a native SQLite extension).
 FROM node:26-slim AS deps
-WORKDIR /app
-COPY package.json package-lock.json ./
-COPY packages/durable-agent/package.json packages/durable-agent/
-COPY packages/jev/package.json packages/jev/
-COPY packages/rh-sdk/package.json packages/rh-sdk/
-COPY apps/rh-server/package.json apps/rh-server/
-COPY apps/rh-client-browser/package.json apps/rh-client-browser/
-# The browser client's packages are all build-time (bundled into dist), so none of them is installed here.
-RUN npm ci --omit=dev --no-audit --no-fund
+WORKDIR /deps
+COPY package-lock.json ./
+RUN node -e "const l=require('./package-lock.json');require('fs').writeFileSync('package.json',JSON.stringify({private:true,dependencies:{'sqlite-vec':l.packages['node_modules/sqlite-vec'].version}}))" \
+  && npm install --omit=dev --no-audit --no-fund --no-package-lock
 
-# 3. Runtime: sources run with tsx, the built UI, a non-root user, and /data.
-FROM node:26-slim
+# 3. A minimal runtime: Debian slim with only the node binary from the build image (no npm, npx, corepack or
+#    headers, which the bundled server never uses), plus libatomic, the one library node needs beyond slim Debian.
+FROM debian:trixie-slim AS runtime
+RUN apt-get update && apt-get install -y --no-install-recommends libatomic1 && rm -rf /var/lib/apt/lists/* \
+  && groupadd --gid 1000 node && useradd --uid 1000 --gid node --shell /bin/sh --create-home node
+COPY --from=build /usr/local/bin/node /usr/local/bin/node
+
+# 4. The light image: the bundled server, its data files (prompts, Jev commands, plugin manifests, the vault
+#    template, two helper scripts), the built UI, a non-root user and /data. The Library is the viewer.
+FROM runtime AS lite
 ENV NODE_ENV=production \
     RH_HOST=0.0.0.0 \
     RH_PORT=4850 \
     RH_DATA_DIR=/data \
     RH_ENV_FILE=none \
-    RH_KB_VIEWER_DIR=/opt/ignis
+    RH_KB_VIEWER=off
 WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/package.json ./package.json
-COPY config ./config
-COPY packages ./packages
-COPY apps/rh-server ./apps/rh-server
+COPY package.json ./package.json
+COPY --from=deps /deps/node_modules ./node_modules
+COPY --from=build /app/apps/rh-server/dist ./apps/rh-server/dist
+COPY apps/rh-server/plugins ./apps/rh-server/plugins
+COPY apps/rh-server/prompt_engineering ./apps/rh-server/prompt_engineering
+COPY apps/rh-server/vault-template ./apps/rh-server/vault-template
+COPY apps/rh-server/src/kernel/plugin-runner.mjs ./apps/rh-server/src/kernel/plugin-runner.mjs
+COPY apps/rh-server/src/kb/loopback.cjs ./apps/rh-server/src/kb/loopback.cjs
 COPY --from=build /app/apps/rh-client-browser/dist ./apps/rh-client-browser/dist
-COPY --from=build /app/apps/rh-client-browser/package.json ./apps/rh-client-browser/package.json
-COPY --from=ignis /app /opt/ignis
 RUN mkdir -p /data && chown node:node /data
 USER node
 VOLUME ["/data"]
 EXPOSE 4850
 HEALTHCHECK --interval=15s --timeout=5s --start-period=30s --retries=3 \
   CMD node -e "fetch('http://127.0.0.1:4850/v1/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
-CMD ["node", "--import", "tsx", "apps/rh-server/src/main.ts"]
+CMD ["node", "apps/rh-server/dist/server.mjs"]
+
+# 5. The Obsidian add-on: the light image plus Ignis, with the viewer on.
+FROM lite AS obsidian
+ENV RH_KB_VIEWER=on \
+    RH_KB_VIEWER_DIR=/opt/ignis
+COPY --from=ignis /app /opt/ignis
+
+# The default build is the light image.
+FROM lite

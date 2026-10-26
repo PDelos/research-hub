@@ -68,3 +68,21 @@ test("the sweep time wraps past midnight", () => {
     t.cleanup();
   }
 });
+
+test("a project uses the light image by default and the Obsidian add-on with --obsidian", () => {
+  const t = tempDir();
+  try {
+    assert.equal(run(["light", "--base", t.dir]).status, 0);
+    assert.equal(run(["notes", "--base", t.dir, "--obsidian"]).status, 0);
+    const light = readFileSync(join(t.dir, "light/docker-compose.yml"), "utf8");
+    const notes = readFileSync(join(t.dir, "notes/docker-compose.yml"), "utf8");
+    assert.match(light, /image: research-hub:latest/);
+    assert.match(light, /target: lite/);
+    assert.match(notes, /image: research-hub:obsidian/);
+    assert.match(notes, /target: obsidian/);
+    assert.equal(env(join(t.dir, "light/.env")).RH_KB_VIEWER, "off");
+    assert.equal(env(join(t.dir, "notes/.env")).RH_KB_VIEWER, "on");
+  } finally {
+    t.cleanup();
+  }
+});
