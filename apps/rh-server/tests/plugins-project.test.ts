@@ -98,7 +98,14 @@ test("the v0 tabs come from built-in plugins and follow their enablement", async
   try {
     const { contributions, kernel } = server.hub.project.plugins;
     const tabs = () => contributions.tabs().map((t) => `${t.id}:${t.pluginId}`);
-    assert.deepEqual(tabs(), ["feed:rh.sweep", "charter:rh.charter", "runs:rh.runs-ui", "settings:rh.settings-ui"]);
+    assert.deepEqual(tabs(), [
+      "feed:rh.sweep",
+      "library:rh.kb",
+      "kb:rh.kb",
+      "charter:rh.charter",
+      "runs:rh.runs-ui",
+      "settings:rh.settings-ui",
+    ]);
     await kernel.setEnabled("rh.runs-ui", false);
     assert.ok(!tabs().some((t) => t.startsWith("runs:")));
     await kernel.setEnabled("rh.runs-ui", true);

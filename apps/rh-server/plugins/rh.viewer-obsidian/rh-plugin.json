@@ -1,0 +1,22 @@
+{
+  "id": "rh.viewer-obsidian",
+  "version": "1.0.0",
+  "displayName": "Obsidian viewer",
+  "description": "Shows the knowledge base in the real Obsidian app (graph view first), served by Ignis inside the container on loopback and reached through the hub. Downloads the pinned Obsidian release once.",
+  "engines": { "research-hub": "^1.0.0" },
+  "main": "main.ts",
+  "activationEvents": ["onExtensionPoint:kb.viewer"],
+  "dependencies": { "rh.kb": "^1.0.0" },
+  "contributes": {
+    "kb.viewer": [{ "id": "obsidian", "title": "Obsidian", "view": "kb-obsidian" }],
+    "processes": [
+      {
+        "id": "ignis",
+        "title": "Ignis (Obsidian on the web), from RH_KB_VIEWER_DIR",
+        "entry": "$RH_KB_VIEWER_DIR/apps/ignis-server/server/index.js"
+      }
+    ],
+    "enablement": { "env": "RH_KB_VIEWER" }
+  },
+  "permissions": { "network": ["github.com", "objects.githubusercontent.com"], "files": ["vault:read-write"] }
+}

@@ -49,6 +49,8 @@ At start the kernel reads all manifests (no code), resolves dependencies (topolo
 registers every contribution, and activates only plugins whose events fired (`onStartup` at start). Activation is
 awaited with a 10 s timeout; failures mark the plugin `failed` with the error. Enabling or disabling at runtime
 activates or deactivates without a restart; contributions update and the UI is told through an SSE `plugins` frame.
+A settings change restarts the plugin unless it handles changes live through `context.onSettingsChange` (like VS
+Code's configuration events); `rh.kb` does, so switching the viewer never replaces the vault and index objects.
 
 ### D4. Contributions
 Kernel contribution points: `tabs` (id, title, order, view component), `settings` (JSON schema properties, defaults
@@ -94,8 +96,8 @@ version and cannot be uninstalled, only disabled (unless required).
 | `rh.schedule` | scheduler | | settings, Settings section |
 | `rh.sweep` | sweep, cards, card writer, scores | `sweep.phase` | tab Feed, Runs section, Jev commands, agent, prompts |
 | `rh.feedback` | feedback, reasons, tools | | chat tools `recent_cards`, `judge_card`, Jev `reason-parse` |
-| `rh.kb` | vault, ingest, search, KB tools | `kb.store`, `kb.viewer` | tab Library, chat tools `search_kb`, `query_kb`, librarian |
-| `rh.viewer-obsidian` | viewer, proxy, loopback, Knowledge tab | | `kb.viewer` (obsidian), tab Knowledge base, process `ignis` |
+| `rh.kb` | vault, ingest, search, KB tools | `kb.viewer` (`kb.store` later, when a second store exists) | tabs Library and Knowledge base, chat tools `search_kb`, `query_kb`, librarian |
+| `rh.viewer-obsidian` | viewer supervisor (pause/resume), loopback | | `kb.viewer` (obsidian), process `ignis`, enablement `RH_KB_VIEWER` |
 | `rh.viewer-library` | new (reuses the Library view) | | `kb.viewer` (library) |
 | `rh.desk` | agents, desk prompt | | the root agent and chat |
 | `rh.settings-ui`, `rh.runs-ui` | Settings and Runs tabs | | tabs |

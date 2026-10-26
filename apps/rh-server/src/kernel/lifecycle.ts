@@ -26,7 +26,13 @@ export interface PluginContext {
   readonly dir: string;
   /** The plugin's storage folder, data/plugins/data/<id>/ (not version-controlled). */
   readonly storageDir: string;
+  /** The plugin's current settings (read again after a change). */
   readonly settings: Readonly<Record<string, unknown>>;
+  /**
+   * Handle setting changes while running. Without a handler, a settings change restarts the plugin (deactivate,
+   * activate); with one, the handler gets the new settings and the plugin keeps running.
+   */
+  onSettingsChange(handler: (settings: Readonly<Record<string, unknown>>) => void | Promise<void>): Disposable;
   /** Disposed in reverse order when the plugin is deactivated. */
   readonly subscriptions: Disposable[];
   /** What each dependency's `activate` returned, by plugin id. */
@@ -90,8 +96,10 @@ interface Record_ {
   exports?: unknown;
   activatedAt?: string;
   activation?: Promise<unknown>;
-  /** The settings the plugin was activated with, to notice changes on re-apply. */
+  /** The settings the plugin last saw, to notice changes on re-apply. */
   settingsJson?: string;
+  /** Live settings handlers registered through context.onSettingsChange. */
+  settingsHandlers?: Set<(settings: Readonly<Record<string, unknown>>) => void | Promise<void>>;
 }
 
 function matches(events: string[], event: string): boolean {
@@ -215,12 +223,23 @@ export class PluginKernel {
       const module = await (this.options.load ?? defaultLoad)(r.plugin);
       const subscriptions: Disposable[] = [];
       mkdirSync(storageDir, { recursive: true });
+      const handlers = new Set<(settings: Readonly<Record<string, unknown>>) => void | Promise<void>>();
+      r.settingsHandlers = handlers;
+      const current = () => this.settings(manifest.id);
       context = {
         id: manifest.id,
         manifest,
         dir,
         storageDir,
-        settings: structuredClone(settings),
+        get settings() {
+          return current();
+        },
+        onSettingsChange(handler) {
+          handlers.add(handler);
+          const subscription = { dispose: () => void handlers.delete(handler) };
+          subscriptions.push(subscription);
+          return subscription;
+        },
         subscriptions,
         exports,
         log,
@@ -286,6 +305,7 @@ export class PluginKernel {
       exports: undefined,
       activatedAt: undefined,
       settingsJson: undefined,
+      settingsHandlers: undefined,
     });
     this.activeOrder.splice(this.activeOrder.indexOf(id), 1);
     log.info("plugin.deactivated", {});
@@ -324,7 +344,23 @@ export class PluginKernel {
     for (const id of this.activeOrder.toReversed()) {
       const entry = lock.plugins[id];
       const r = this.records.get(id)!;
-      if (!entry?.enabled || JSON.stringify(this.settings(id)) !== r.settingsJson) await this.deactivate(id);
+      if (!entry?.enabled) {
+        await this.deactivate(id);
+        continue;
+      }
+      const settings = this.settings(id);
+      const json = JSON.stringify(settings);
+      if (json === r.settingsJson) continue;
+      if (r.settingsHandlers?.size) {
+        r.settingsJson = json;
+        for (const handler of r.settingsHandlers) {
+          try {
+            await handler(settings);
+          } catch (error) {
+            this.options.log.warn("plugin.settings_handler_failed", { plugin: id, error: String(error) });
+          }
+        }
+      } else await this.deactivate(id);
     }
     // A failed plugin gets a fresh chance once it is enabled again or reconfigured.
     for (const r of this.records.values()) if (r.state === "failed") this.set(r, "inactive");

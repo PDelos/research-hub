@@ -1,0 +1,61 @@
+{
+  "id": "rh.kb",
+  "version": "1.0.0",
+  "displayName": "Knowledge base",
+  "description": "The project's markdown vault: evidence notes for ⭐ papers written by the librarian, its search index, and the Library and Knowledge base tabs. Offers kb.viewer, so the vault can be shown by Obsidian or another viewer.",
+  "engines": { "research-hub": "^1.0.0" },
+  "main": "main.ts",
+  "required": true,
+  "activationEvents": ["onStartup", "onChatTool:search_kb", "onChatTool:query_kb"],
+  "dependencies": {
+    "rh.provider-openrouter": "^1.0.0",
+    "rh.papers": "^1.0.0",
+    "rh.charter": "^1.0.0",
+    "rh.feedback": "^1.0.0",
+    "rh.sweep": "^1.0.0"
+  },
+  "contributes": {
+    "extensionPoints": {
+      "kb.viewer": {
+        "description": "What the Knowledge base tab shows. One is active at a time (the rh.kb setting kb.viewer).",
+        "cardinality": "one",
+        "default": "obsidian",
+        "schema": {
+          "required": ["id", "title", "view"],
+          "properties": { "title": { "type": "string" }, "view": { "type": "string" } }
+        }
+      }
+    },
+    "tabs": [
+      { "id": "library", "title": "Library", "view": "library", "order": 20 },
+      { "id": "kb", "title": "Knowledge base", "view": "kb", "order": 30 }
+    ],
+    "chatTools": [
+      {
+        "name": "search_kb",
+        "description": "Keyword search over the knowledge base notes.",
+        "parameters": {
+          "type": "object",
+          "required": ["query"],
+          "properties": {
+            "query": { "type": "string", "description": "Keywords" },
+            "limit": { "type": "number", "description": "1 to 10, default 5" }
+          }
+        }
+      },
+      {
+        "name": "query_kb",
+        "description": "Read one knowledge base note.",
+        "parameters": {
+          "type": "object",
+          "required": ["stem"],
+          "properties": {
+            "stem": { "type": "string", "description": "Note name or path, as in the index or search results" }
+          }
+        }
+      }
+    ],
+    "prompts": [{ "agent": "librarian", "path": "../../prompt_engineering/agents/librarian" }]
+  },
+  "permissions": { "files": ["vault:read-write"] }
+}

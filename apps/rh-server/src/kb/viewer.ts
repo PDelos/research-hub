@@ -31,6 +31,8 @@ export interface ViewerStatus {
 
 export interface KbViewerOptions {
   enabled: boolean;
+  /** Why a disabled viewer is off (default: RH_KB_VIEWER=off). */
+  disabledReason?: string;
   /** Ignis checkout or image copy (contains apps/ignis-server/server/index.js). */
   ignisDir: string;
   /** $RH_DATA_DIR/kb-viewer: Ignis data, the Obsidian package, the vaults folder. */
@@ -60,7 +62,7 @@ export class KbViewer {
 
   constructor(private readonly options: KbViewerOptions) {
     this.state = options.enabled ? "unavailable" : "disabled";
-    this.reason = options.enabled ? "not started yet" : "RH_KB_VIEWER=off";
+    this.reason = options.enabled ? "not started yet" : (options.disabledReason ?? "RH_KB_VIEWER=off");
   }
 
   status(): ViewerStatus {
@@ -152,6 +154,23 @@ export class KbViewer {
       });
       child.kill("SIGTERM");
     });
+  }
+
+  /** Stop the viewer for now (another viewer is active, or its plugin is being disabled); resume() starts it again. */
+  async pause(reason: string): Promise<void> {
+    await this.stop();
+    this.state = "disabled";
+    this.reason = reason;
+  }
+
+  /** Start again after pause(). */
+  async resume(): Promise<void> {
+    if (!this.options.enabled || !this.stopping) return this.start();
+    this.stopping = false;
+    this.restarts = 0;
+    this.state = "unavailable";
+    this.reason = "not started yet";
+    return this.start();
   }
 
   private unavailable(reason: string): void {

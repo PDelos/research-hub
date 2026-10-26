@@ -1,7 +1,7 @@
 // The project runtime: the data directory, project.sqlite (app + telemetry), the pi-durable
 // harness on agent.sqlite with the research-desk root conversation, the telemetry projector and Jev recording.
 import { existsSync, mkdirSync, readdirSync, renameSync, rmdirSync, rmSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import type { Context } from "@earendil-works/chord";
 import type { Conversation, Extension } from "@earendil-works/pi-durable";
 import {
@@ -28,11 +28,10 @@ import type { Feedback } from "./feedback/feedback.ts";
 import type { ReasonParser } from "./feedback/reasons.ts";
 import type { CardWriter } from "./sweep/card-writer.ts";
 import type { PaperService } from "./papers/service.ts";
-import { Vault } from "./kb/vault.ts";
-import { Ingest } from "./kb/ingest.ts";
-import { KbIndex } from "./kb/search.ts";
-import { KbViewer } from "./kb/viewer.ts";
-import { kbTools } from "./kb/tools.ts";
+import type { Vault } from "./kb/vault.ts";
+import type { Ingest } from "./kb/ingest.ts";
+import type { KbIndex } from "./kb/search.ts";
+import type { KbViewer } from "./kb/viewer.ts";
 import { ensureVectorTables, openProjectDb, Settings, type Db, type SelfCheck } from "./db.ts";
 import type { Logger } from "./logger.ts";
 import { Telemetry } from "./telemetry.ts";
@@ -42,6 +41,7 @@ import type { CharterExports } from "../plugins/rh.charter/main.ts";
 import type { DecisionExports } from "../plugins/rh.decision-jev/main.ts";
 import type { DeskExports } from "../plugins/rh.desk/main.ts";
 import type { FeedbackExports } from "../plugins/rh.feedback/main.ts";
+import type { KbExports } from "../plugins/rh.kb/main.ts";
 import type { PapersExports } from "../plugins/rh.papers/main.ts";
 import type { ProviderExports } from "../plugins/rh.provider-openrouter/main.ts";
 import type { ScheduleExports } from "../plugins/rh.schedule/main.ts";
@@ -167,6 +167,8 @@ export async function openProject(options: OpenProjectOptions): Promise<ProjectR
     db,
     vaultDir: join(dir, "vault"),
     log: plog,
+    // First-start enablement follows the configuration (RH_KB_VIEWER may come from the .env file).
+    env: { ...process.env, RH_KB_VIEWER: options.kbViewer?.enabled === false ? "off" : "on" },
     ...(options.paperFetch ? { fetch: options.paperFetch } : {}),
     builtinHost: (services, exportsOf): BuiltinHost => ({
       name,
@@ -192,57 +194,15 @@ export async function openProject(options: OpenProjectOptions): Promise<ProjectR
   const { feedback, reasons } = await plugins.exportsOf<FeedbackExports>("rh.feedback");
   const { decisions, sweeps, cards, cardWriter } = await plugins.exportsOf<SweepExports>("rh.sweep");
   const desk = await plugins.exportsOf<DeskExports>("rh.desk");
-  const vault = new Vault(join(dir, "vault"), {
-    templateDir: join(dirname(options.promptsDir), "vault-template"),
-    settings,
-    log: plog,
-  });
-  /** Create the vault and refresh charter.md once a charter is approved (user edits to charter.md win). */
-  const syncVault = () => {
-    const approved = charters.approved();
-    if (!approved) return;
-    vault.ensure();
-    vault.writeCharter(approved.charter, approved.version!);
-  };
-  syncVault();
-  const kbIndex = new KbIndex({ db, vault, log: plog });
-  const kbViewer = new KbViewer({
-    enabled: options.kbViewer?.enabled ?? false,
-    ignisDir: options.kbViewer?.dir ?? "/opt/ignis",
-    stateDir: join(dir, "kb-viewer"),
-    vaultDir: vault.dir,
-    projectName: name,
-    obsidianVersion: options.kbViewer?.obsidianVersion ?? "1.14.4",
-    offline: options.offline,
-    log: plog.child({ component: "kb-viewer" }),
-    restartDelays: options.kbViewer?.restartDelays,
-  });
-  const ingest = new Ingest({
-    db,
-    vault,
-    store: papers.store,
-    cards,
-    feedback,
-    charters,
-    catalog,
-    promptsDir: options.promptsDir,
-    log: plog,
-    observe,
-  });
-  // A new ⭐ (or any judgment change) may queue a knowledge-base request.
-  feedback.onChange(() => ingest.pickUp());
+  const kb = await plugins.exportsOf<KbExports>("rh.kb");
+  const { vault, kbIndex, ingest } = kb;
   // The agent runtime (owned by the kernel, design D2): every active plugin's agent extensions.
   const hooks: AgentHooks[] = [];
   for (const p of plugins.kernel.list())
     if (p.state === "active") hooks.push(await plugins.exportsOf<AgentHooks>(p.id));
   const agents = desk.createAgents({
-    extra: [
-      observe,
-      ...hooks.flatMap((h) => h?.agentExtensions ?? []),
-      kbTools(() => ({ vault, index: kbIndex })),
-      ...(options.extensions ?? []),
-    ],
-    separate: [...hooks.flatMap((h) => h?.separateExtensions ?? []), ingest.extension],
+    extra: [observe, ...hooks.flatMap((h) => h?.agentExtensions ?? []), ...(options.extensions ?? [])],
+    separate: hooks.flatMap((h) => h?.separateExtensions ?? []),
     ...(options.deskTools ? { deskTools: options.deskTools } : {}),
   });
   const compaction: CompactionSetting = settings.get("compaction", { points: DEFAULT_POINTS, enabled: true });
@@ -280,10 +240,6 @@ export async function openProject(options: OpenProjectOptions): Promise<ProjectR
   window = (await model()).window;
   harness.harness.resume();
   for (const h of hooks) h?.attach?.(harness.harness, ctx);
-  ingest.attach(harness.harness, ctx);
-  ingest.pickUp();
-  kbIndex.start();
-  void kbViewer.start();
   for (const h of hooks) h?.ready?.();
 
   plog.info("project.opened", { dir, rootConversation: root.id, model: (await model()).id, check });
@@ -315,14 +271,12 @@ export async function openProject(options: OpenProjectOptions): Promise<ProjectR
     vault,
     ingest,
     kbIndex,
-    kbViewer,
-    plugins,
-    syncVault() {
-      syncVault();
-      kbIndex.start();
-      ingest.pickUp();
-      void kbViewer.start();
+    // The active viewer can change at runtime (kb.viewer): always the current one.
+    get kbViewer() {
+      return kb.kbViewer();
     },
+    plugins,
+    syncVault: () => kb.syncVault(),
     cardWriter,
     model,
     compaction: () => ({ ...compaction, window }),
@@ -337,7 +291,7 @@ export async function openProject(options: OpenProjectOptions): Promise<ProjectR
       scheduler.stop();
       await ingest.close();
       kbIndex.stop();
-      await kbViewer.stop();
+      await kb.kbViewer().stop();
       await sweeps.close();
       await papers.close();
       stopProjector();
