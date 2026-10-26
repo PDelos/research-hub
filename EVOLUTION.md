@@ -157,6 +157,29 @@ behind an MCP server).
 
 ---
 
+### 2.5 What v1-0 built (2026-10-26)
+
+- **Kernel** (`apps/rh-server/src/kernel/`): manifests with field-level errors, discovery, dependency resolution,
+  lazy activation with a 10 s limit, the `rh` API 1.0.0 with permission and budget enforcement, the plugin state in
+  a per-project git repository with history and rollback, install with approval, and external plugins in their own
+  Node process (permission model, no network except declared hosts through `rh.http`, no secrets).
+- **19 built-in plugins** (`apps/rh-server/plugins/`) wrap the v0 code with no behavior change (every v0 test
+  passes unchanged). Core ones are `required` (configurable, not disablable); sources, viewers and the Runs tab can
+  be turned off.
+- **Extension points that exist now:** `papers.source` (many), `papers.enricher` (many), `papers.embedder` (one),
+  offered by `rh.papers`; `kb.viewer` (one), offered by `rh.kb`. The others in 2.0 and 2.1 (`kb.store`,
+  `sweep.phase`, `fulltext`, `summarizer`, `notify`, `io`, …) are added when their second implementation arrives,
+  so each point is designed against two real cases. Models and decisions reach plugins through `rh.models` and
+  `rh.decisions` (the provider plugins register them).
+- **Representations** stay inside `rh.papers` until v1-2 splits them out with full-text facets.
+- **The UI** builds its tabs, the viewer choice and the plugin settings from contributions; external plugins bring
+  tabs as custom elements. A plugin's settings change is applied live when it handles it (`onSettingsChange`),
+  otherwise by restarting the plugin. An installed plugin's chat tools reach the desk from the next start.
+- **"Done when" for step 1:** all v0 tests pass unchanged ✅; disabling the Obsidian viewer stops its process and
+  the Library takes over ✅ (the Knowledge base tab stays, showing the active viewer); rollback restores an earlier
+  lockfile ✅. Swapping the embedder re-embeds through v0's model-change path; there is one embedder plugin until
+  Gemini Embedding 2 arrives in v1-2, which will exercise it.
+
 ## 3. The product loop: the Upgrades tab
 
 The hub upgrades itself through one tab and one workflow. Ideas come from the **internet** (new state-of-the-art
@@ -280,7 +303,7 @@ before the next). Order chosen so that each step makes the next one cheaper.
 
 | Step | Change | Delivers | Done when |
 |---|---|---|---|
-| **1** | `v1-0-plugin-core` | The kernel; extension and contribution points for every area in 2.0 and 2.1; manifests, registry, lockfile in a per-project git repo, Plugins tab, install / enable / disable / uninstall / rollback; **all of v0 refactored into built-in plugins** (including the Obsidian viewer and the UI tabs) with no behavior change | All v0 tests pass unchanged; swapping the embedder re-embeds in the background; disabling the Obsidian viewer plugin removes its tab and process; rollback restores the previous lockfile |
+| **1** ✅ 2026-10-26 | `v1-0-plugin-core` | The kernel; extension and contribution points for every area in 2.0 and 2.1; manifests, registry, lockfile in a per-project git repo, Plugins tab, install / enable / disable / uninstall / rollback; **all of v0 refactored into built-in plugins** (including the Obsidian viewer and the UI tabs) with no behavior change | All v0 tests pass unchanged; swapping the embedder re-embeds in the background; disabling the Obsidian viewer plugin removes its tab and process; rollback restores the previous lockfile |
 | **2** | `v1-1-harness` | Evaluation harness per slot; datasets from project history; LLM/Jev-labeled datasets; reports with intervals and cost; CLI and UI | The current embedder and Gemini Embedding 2 are compared on this project's data with a report |
 | **3** | `v1-2-fulltext-and-facets` | ⭐ → full text (`fulltext` plugins: arXiv HTML, Europe PMC XML, PDF text, Docling as a process plugin, native multimodal pages); facet summaries; full-text notes; junk-abstract repair; Gemini Embedding 2 as an `embedder` plugin | Notes of ⭐ papers fill all sections from full text; the harness compares the `fulltext` variants on the research benchmarks |
 | **4** | `v1-3-knowledge-loop` | Review, interests, charter proposals, new research questions (`question-finder` plugins), proposals inbox | A review proposes charter changes and research directions with evidence; approving one creates a charter version the next sweep uses |

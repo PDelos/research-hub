@@ -5,23 +5,25 @@ durable agent (built on [pi-durable](https://github.com/earendil-works/pi)) that
 [Jev](https://openrouter.ai/docs/guides/community/jev) make the bulk decisions, present a few paper cards a day,
 learn from your 👎/👍/⭐ and grow an Obsidian-compatible knowledge base. A new theme is a new container.
 
-**Status: v0.5 (v0 complete).** Durable agent, Jev client, live stream, browser UI and container setup (v0.0), the project's
-brief, charter and schedule (v0.1), paper search with paper representations (v0.2), the daily sweep with paper cards
-(v0.3), judging with learning from your feedback (v0.4), and the knowledge base with the real Obsidian interface
-inside the hub (v0.5). What comes after v0 is in `PLAN.md` §17.
+**Status: v1.0 (plugin core).** v0 built the durable agent, Jev client, live stream, browser UI and containers (v0.0),
+the brief, charter and schedule (v0.1), paper search with representations (v0.2), the daily sweep with paper cards
+(v0.3), learning from your judgments (v0.4) and the knowledge base with the real Obsidian interface (v0.5). v1.0 turns
+all of it into **plugins, like VS Code**: a small kernel and a plugin for every feature, which you can enable,
+disable, configure, swap, install and roll back per project (see [Plugins](#plugins)).
 
 ## Architecture and what comes next
 
-v0 is one server with fixed features. Next (planned in [EVOLUTION.md](EVOLUTION.md), first step
-`v1-0-plugin-core`), the hub becomes **plugins, like VS Code**: a small kernel and a plugin for every feature
-(paper sources, embedders, agents, UI tabs, the Obsidian viewer), each with an `rh-plugin.json` manifest, lazy
-activation and declared permissions, so you can install, swap and remove them per project. An **Upgrades** tab then
-suggests improvements found on the internet (new models, methods, tools); you choose which to test, the agent
-tests them against what runs now and returns a proof report, and you decide whether to implement each one.
+A small **kernel** (plugin discovery, the per-project plugin state, the durable agent runtime, the database, HTTP,
+permissions and budgets) runs **plugins**: paper sources, the embedder, the decision engine, the charter, sweep,
+feedback, the research desk, the knowledge base and its viewers, and the UI tabs. Each has an `rh-plugin.json`
+manifest, activates only when needed and declares what it may reach. Next (planned in [EVOLUTION.md](EVOLUTION.md)):
+a harness to compare setups (v1-1), full text and facet vectors (v1-2), a charter that evolves with your interests
+(v1-3), and an **Upgrades** tab (v1-4) that suggests improvements found on the internet; you choose what to test, the
+agent tests it beside what runs now and returns a proof report, and you decide whether to implement it.
 
 ## Quick start (offline, no keys)
 
-Needs Node 24 or newer.
+Needs Node 26 or newer.
 
 ```bash
 npm install
@@ -145,6 +147,89 @@ edited it.
   AGPL-3.0 and runs unmodified; Obsidian is downloaded from its official release on first start and is not part of
   this project or its image.
 
+## Plugins
+
+Every feature is a plugin; the **Plugins** tab lists them with their state (active, ready, disabled, failed,
+blocked, incompatible), what each adds (tabs, chat tools, commands, Jev commands, agents, processes, extension
+points), what it may reach (hosts, files, secrets, a daily budget), its settings and its history.
+
+| Plugin | What it does | Can you turn it off? |
+|---|---|---|
+| `rh.provider-openrouter`, `rh.decision-jev` | Models for every agent; Jev decisions | no (the hub needs them) |
+| `rh.papers`, `rh.embedder-openrouter` | Search, storage, enrichment, representations; the embedder | no |
+| `rh.source-arxiv`, `-openalex`, `-europepmc`, `-semanticscholar` | Paper sources (OpenAlex also enriches) | yes: the next search skips it |
+| `rh.charter`, `rh.schedule`, `rh.sweep`, `rh.feedback`, `rh.desk` | Charter, schedule, sweep and cards, judgments, the research desk | no |
+| `rh.kb` | The vault, its index, the librarian, the Library and Knowledge base tabs | no |
+| `rh.viewer-obsidian`, `rh.viewer-library` | What the Knowledge base tab shows (Obsidian, or the Library view) | yes |
+| `rh.runs-ui`, `rh.settings-ui`, `rh.plugins-ui` | The Runs, Settings and Plugins tabs | Runs only |
+
+- **Enable, disable, configure:** changes apply at once, without a restart; disabling a plugin others need first
+  lists them and asks. Plugin settings appear under Settings (defaults come from the environment, so `.env` keeps
+  working); invalid values are refused with the setting and the rule.
+- **Swap the viewer:** the `rh.kb` setting *Knowledge base viewer* picks Obsidian or the Library view; the Obsidian
+  process stops while another viewer is active. `RH_KB_VIEWER=off` at a project's first start leaves the Obsidian
+  plugin disabled.
+- **Install** from a git URL or a folder on the server: the hub shows what the plugin adds and asks for, and installs
+  only after you approve. Installed plugins run in their own process under Node's permission model: no network
+  except the hosts they declare (through the hub), only their own folder and storage, no secrets they did not
+  declare. A crash or hang fails that plugin only. **Uninstall** keeps its data unless you tick "also delete its data".
+- **History and rollback:** every change is a commit in `$RH_DATA_DIR/plugins/` (a git repository with
+  `plugins.lock.json`), with who made it; "Restore this state" re-applies any earlier state.
+
+## Writing a plugin
+
+A plugin is a folder with an `rh-plugin.json` and, if it has code, an ES module:
+
+```json
+{
+  "id": "acme.pubmed",
+  "version": "0.1.0",
+  "displayName": "PubMed",
+  "engines": { "research-hub": "^1.0.0" },
+  "main": "main.mjs",
+  "activationEvents": ["onExtensionPoint:papers.source", "onChatTool:pubmed_count"],
+  "contributes": {
+    "papers.source": [{ "id": "pubmed", "title": "PubMed" }],
+    "chatTools": [
+      {
+        "name": "pubmed_count",
+        "description": "How many PubMed papers match a query.",
+        "parameters": { "type": "object", "required": ["query"], "properties": { "query": { "type": "string" } } }
+      }
+    ]
+  },
+  "permissions": { "network": ["eutils.ncbi.nlm.nih.gov"] }
+}
+```
+
+```js
+// main.mjs: rh calls are asynchronous (the plugin runs in its own process).
+export async function activate({ rh }) {
+  const search = (term) =>
+    rh.http.json(`https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&retmode=json&term=${encodeURIComponent(term)}`);
+  await rh.agents.registerChatTool("pubmed_count", async ({ query }) => (await search(query)).esearchresult.count);
+  return {
+    // A papers.source contribution is served by the exported client with its id.
+    sources: { pubmed: { name: "pubmed", search: async (q) => [/* SourcePaper records for q.query */] } },
+  };
+}
+```
+
+- **Activation events:** `onStartup`, `onView:<tab>`, `onCommand:<id>`, `onChatTool:<name>`,
+  `onExtensionPoint:<point>`, `onSchedule:<kind>`; code runs only after one fires.
+- **Contributions:** `tabs`, `settings` (JSON schema properties, `env` for an environment default), `commands`,
+  `chatTools`, `jevCommands`, `prompts`, `processes`, `enablement`, and contributions to extension points other
+  plugins offer (`papers.source`, `papers.enricher`, `papers.embedder`, `kb.viewer`). A plugin can offer its own
+  points under `extensionPoints` (cardinality one or many).
+- **A tab of its own:** add `"browser": "ui/view.js"` and a tab whose `view` is a custom element name
+  (`acme-view`); the module defines the element, which receives `rhClient` (the hub's API client) and inherits the
+  hub's CSS variables (`--ink`, `--muted`, `--line`, `--accent`…), so it follows light and dark mode.
+- **The `rh` API (1.0.0):** `db` (own tables `p_<plugin>__*`, numbered migrations), `files` (storage, the vault if
+  declared), `http`, `secrets`, `models`, `embeddings`, `decisions`, `agents`, `commands`, `scheduler`, `events`,
+  `processes`, `ui`. Paid calls count against `permissions.budgetUsdPerDay`.
+- Try it: Plugins → Install a plugin → Folder on the server. Examples: `apps/rh-server/tests/fixtures/plugins/`
+  (`acme.sample` with a chat tool and a paper source, `acme.reading-list` with a tab).
+
 ## Projects with Docker
 
 Every research theme is its own container with its own data folder, port and name:
@@ -189,7 +274,7 @@ curl -s -X POST -H "authorization: Bearer $RH_API_TOKEN" -H 'content-type: appli
 | Route | What |
 |---|---|
 | `GET /v1/health` | Open. Project name, version, mode, providers |
-| `GET /v1/info` | Models per job, Jev model, pi-durable version |
+| `GET /v1/info` | Models per job, Jev model, pi-durable version, kernel API version, plugins with versions and states |
 | `GET /v1/agent` | Agent state: model, context, busy, compaction |
 | `POST /v1/chat` | Send a message (`content`, optional `requestId`, `waitMs`) |
 | `GET /v1/stream` | Server-sent events: snapshot, then deltas |
@@ -212,25 +297,31 @@ curl -s -X POST -H "authorization: Bearer $RH_API_TOKEN" -H 'content-type: appli
 | `GET /v1/weights` · `GET /v1/feedback/precision` | Effective weights with charter values · precision@5 per sweep |
 | `GET /v1/kb/papers` · `/v1/kb/notes/:stem` · `/v1/kb/search?q=` | Knowledge-base papers · one note (properties and body) · vault search |
 | `/kb/` (browser, same origin) | The embedded Obsidian viewer, proxied to the bundled Ignis |
+| `GET /v1/plugins` · `GET /v1/plugins/:id` | Plugins with state, the kernel API version · one plugin's contributions, permissions, settings, history |
+| `GET /v1/plugins/contributions` | Tabs, the knowledge-base viewer choice, settings grouped by plugin |
+| `POST /v1/plugins/install` · `/install/:planId/approve` · `DELETE /install/:planId` | Prepare an install (`source`: `folder` or `git`) · approve · cancel |
+| `POST /v1/plugins/:id/enable` · `/disable` | Enable · disable (`cascade` to take dependents along) |
+| `PUT /v1/plugins/:id/settings` · `DELETE /v1/plugins/:id` | Change settings (`values`, null removes) · uninstall (`?deleteData=true`) |
+| `GET /v1/plugins/history` · `POST /v1/plugins/rollback` | Every change · restore an earlier state (`commit`) |
 
 ## Development
 
 ```bash
 npm test               # every workspace's tests, offline (fake model, mock Jev)
-npm run check          # type-check everything
-npm run check:jev      # Jev command wording vs. commands.lock.json
-npm run check:env      # every env var read in code is documented in .env.example
-npm run lint
+npm run check          # vp check (formatting, lint, types) + workspace type checks + check:jev + check:env
+npm run test:ui        # Playwright UI tests and light/dark screenshots, offline (uses the system Chromium if any)
+scripts/e2e-offline.sh # the whole flow through the UI proxy, plugins included, in about a minute
+npm run lint           # vp lint;  npm run fmt: vp fmt
 ```
 
-From `v1-0-plugin-core` the toolchain becomes **Vite+** (`vp`): `vp check` (formatting, linting and type checks,
-all enforced), `vp test`, `vp build`, `vp dev`, with one config. The stack moves to Node 26 LTS, TypeScript 6.0,
-Vue Router 5, Pinia 4, Playwright 1.64 and pi-durable 1.4.0 (see PLAN.md §0).
+The toolchain is **Vite+** (`vp`: Vite, Vitest, Oxlint, Oxfmt) with one root `vite.config.ts`, on Node 26 LTS and
+TypeScript 6.0; the UI is Vue 3.5 with Vue Router 5 and Pinia 4; the agent runtime is pi-durable 1.4.0.
 
 Changing a Jev command's questions or policy requires bumping its `version` and running `npm run lock:jev`.
 
 Layout: `packages/durable-agent` and `packages/jev` are vendored from
 [pi-durable-news-agent](https://github.com/disler/pi-durable-news-agent) (see `NOTICE.md`); `packages/rh-sdk` holds
-wire types, the stream reducer and a client; `apps/rh-server` is the server; `apps/rh-client-browser` the UI;
+wire types, the stream reducer and a client; `apps/rh-server` is the server (the kernel in `src/kernel/`, the built-in plugins in `plugins/`);
+`apps/rh-client-browser` the UI;
 `new-project.sh` and `deploy/` set up project containers. Specs and planned changes live in `openspec/`
 (OpenSpec), the overall plan in `PLAN.md`.

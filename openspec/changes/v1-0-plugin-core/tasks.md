@@ -51,4 +51,4 @@
     stopped Ignis and the Library took over; enabling started it again; swapping to Library stopped it ("the Library
     viewer is active"), swapping back restarted it; rollback to the first state re-applied it as a new commit
     (Obsidian active). No errors in the log.
-- [ ] 5.3 Update `README.md` (plugins, the Plugins tab, writing a plugin with a minimal example manifest) and EVOLUTION.md if decisions changed
+- [x] 5.3 Update `README.md` (plugins, the Plugins tab, writing a plugin with a minimal example manifest) and EVOLUTION.md if decisions changed

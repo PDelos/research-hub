@@ -593,8 +593,9 @@ Budget caps per project (daily/monthly) stop new sweeps and notify when reached.
 
 ## 17. Build pyramid (OpenSpec changes)
 
-**v0 is complete (2026-10-25)**: all six layers below are archived. **What comes next is planned in
-[EVOLUTION.md §6](EVOLUTION.md)**: `v1-0-plugin-core` (the kernel and all of v0 as VS Code-style plugins) →
+**v0 is complete (2026-10-25)**: all six layers below are archived. **v1-0 is complete (2026-10-26)**: the kernel
+and all of v0 as VS Code-style plugins (what it built: EVOLUTION.md §2.5). **What comes next is planned in
+[EVOLUTION.md §6](EVOLUTION.md)**: `v1-0-plugin-core` ✅ →
 `v1-1-harness` → `v1-2-fulltext-and-facets` → `v1-3-knowledge-loop` → `v1-4-upgrades` (the Upgrades tab:
 idea → test → proof → implement, you decide at every gate) → `v1-5-engineer` → `v1-6-fine-tuning` → `v1-7-mcp`.
 
