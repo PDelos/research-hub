@@ -654,3 +654,39 @@ export interface HarnessQuality {
   labels: { judged: number; judge: number };
   replays: StoredReplay[];
 }
+
+// ---------------------------------------------------------------- slots and benchmarks (v1.3)
+
+export interface BenchmarkResultView {
+  tasks: { task: string; metric: string; value: number | null; items: number; note?: string }[];
+  value: number | null;
+  label: string;
+}
+
+export interface BenchmarkRecord {
+  id: number;
+  slot: string;
+  preset: string;
+  candidate: Record<string, unknown>;
+  result: BenchmarkResultView;
+  costUsd: number;
+  createdAt: string;
+}
+
+export interface SlotView {
+  id: string;
+  title: string;
+  topic: PluginTopic;
+  description: string;
+  preset: { id: string; title: string; tasks: string[]; metric: string } | null;
+  active: { name: string; pluginId: string; detail?: Record<string, unknown> };
+  alternatives: { pluginId: string; name: string }[];
+  last: BenchmarkRecord | null;
+}
+
+export interface SourceAttribution {
+  source: string;
+  pluginId: string | null;
+  cards: number;
+  liked: number;
+}

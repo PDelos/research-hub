@@ -15,6 +15,8 @@ export function harnessRoutes(hub: Hub): Router {
   r.get("/v1/harness/replays", async (req, res) => {
     res.json((await harness()).replays(Math.min(int(req.query.limit, "limit", 50), 200)));
   });
+  r.get("/v1/slots", async (_req, res) => void res.json((await harness()).slots()));
+
   r.post("/v1/harness/replay", async (req, res) => {
     try {
       res.json(await (await harness()).replay(req.body?.variant, "user"));

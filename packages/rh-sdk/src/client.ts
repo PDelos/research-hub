@@ -8,7 +8,10 @@ import type {
   KbNote,
   KbPaper,
   KbSearchHit,
+  BenchmarkRecord,
   CycleStatus,
+  SlotView,
+  SourceAttribution,
   HarnessQuality,
   HarnessVariant,
   StoredReplay,
@@ -176,6 +179,15 @@ export class HubClient {
   replays = (limit = 50) => this.call<StoredReplay[]>("GET", `/harness/replays?limit=${limit}`);
   /** Replay past sweeps with other sweep settings; no new searches or paid calls. */
   replay = (variant: HarnessVariant) => this.call<StoredReplay>("POST", "/harness/replay", { variant });
+
+  // Slots and benchmarks (v1.3)
+  slots = () => this.call<SlotView[]>("GET", "/slots");
+  /** Run a slot's benchmark preset on the active implementation ({}) or a candidate (e.g. { model }). */
+  runBenchmark = (slot: string, candidate: Record<string, unknown> = {}) =>
+    this.call<BenchmarkRecord>("POST", `/slots/${encodeURIComponent(slot)}/benchmark`, { candidate });
+  benchmarks = (slot?: string) =>
+    this.call<BenchmarkRecord[]>("GET", `/slots/benchmarks${slot ? `?slot=${encodeURIComponent(slot)}` : ""}`);
+  attribution = (days = 30) => this.call<SourceAttribution[]>("GET", `/attribution?days=${days}`);
 
   /** Tell the hub a tab was opened, so plugins activated by onView:<tab> start. */
   openView = (tab: string) => this.call<void>("POST", `/plugins/views/${encodeURIComponent(tab)}/open`, {});

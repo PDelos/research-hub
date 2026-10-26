@@ -48,3 +48,24 @@ test("a plugin claiming to be core is refused; installed plugins default to add-
     await server.stop();
   }
 });
+
+test("the slot catalog lists each slot with its active implementation, alternatives and preset", async () => {
+  const server = await startTestServer();
+  try {
+    const slots = await server.client.slots();
+    assert.deepEqual(
+      slots.map((s) => s.id),
+      ["ranking", "embedder", "facets", "judge", "kb-search", "models"],
+    );
+    const embedder = slots.find((s) => s.id === "embedder")!;
+    assert.equal(embedder.active.pluginId, "rh.embedder-openrouter");
+    assert.match(embedder.active.name, /dimensions/);
+    assert.equal(embedder.preset?.title, "SCIDOCS, LitSearch, your stars");
+    assert.equal(embedder.last, null);
+    assert.deepEqual(embedder.alternatives, []);
+    assert.equal(slots.find((s) => s.id === "kb-search")!.preset, null);
+    assert.equal(slots.find((s) => s.id === "ranking")!.active.detail?.cardsPerSweep, 7);
+  } finally {
+    await server.stop();
+  }
+});

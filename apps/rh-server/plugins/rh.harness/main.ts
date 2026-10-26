@@ -12,6 +12,7 @@ import { SettingsInvalid } from "../../src/kernel/settings.ts";
 import type { PapersExports } from "../rh.papers/main.ts";
 import type { SweepExports } from "../rh.sweep/main.ts";
 import { Judge, type Calibration } from "./judge.ts";
+import { SLOTS, type SlotInfo } from "../../src/harness/slots.ts";
 
 export interface StoredReplay {
   id: number;
@@ -29,7 +30,34 @@ export interface Quality {
   replays: StoredReplay[];
 }
 
+export interface BenchmarkRecord {
+  id: number;
+  slot: string;
+  preset: string;
+  /** What was measured: the active implementation ({}) or a candidate (e.g. { model }). */
+  candidate: Record<string, unknown>;
+  result: BenchmarkResult;
+  costUsd: number;
+  createdAt: string;
+}
+
+export interface BenchmarkResult {
+  tasks: { task: string; metric: string; value: number | null; items: number; note?: string }[];
+  /** The preset's headline number (mean over tasks). */
+  value: number | null;
+  label: string;
+}
+
+export interface SlotView extends SlotInfo {
+  active: { name: string; pluginId: string; detail?: Record<string, unknown> };
+  alternatives: { pluginId: string; name: string }[];
+  last: BenchmarkRecord | null;
+}
+
 export interface HarnessExports extends AgentHooks {
+  /** The slot catalog with what is active, the alternatives and the last benchmark of each. */
+  slots(): SlotView[];
+  benchmarks(slot?: string, limit?: number): BenchmarkRecord[];
   replay(variant: Variant, requestedBy?: string): Promise<StoredReplay>;
   replays(limit?: number): StoredReplay[];
   quality(): Quality;
@@ -63,8 +91,14 @@ export async function activate(context: PluginContext): Promise<HarnessExports> 
   const { papers } = context.exports["rh.papers"] as PapersExports;
   const judge = new Judge(rh, db, { trust_min_agreement: 0.7, trust_min_cases: 20 });
   const replaysTable = rh.db.table("replays");
+  const benchmarksTable = rh.db.table("benchmarks");
   rh.db.migrate([
     ...judge.migrations(),
+    {
+      version: 3,
+      sql: `CREATE TABLE ${benchmarksTable} (id INTEGER PRIMARY KEY, slot TEXT NOT NULL, preset TEXT NOT NULL,
+              candidate_json TEXT NOT NULL, result_json TEXT NOT NULL, cost_usd REAL NOT NULL, created_at TEXT NOT NULL)`,
+    },
     {
       version: 2,
       sql: `CREATE TABLE ${replaysTable} (id INTEGER PRIMARY KEY, variant_json TEXT NOT NULL, report_json TEXT NOT NULL,
@@ -90,7 +124,85 @@ export async function activate(context: PluginContext): Promise<HarnessExports> 
     return { user: userLabels(db), ...(judgeLabels ? { judge: judgeLabels } : {}) };
   };
 
+  const benchmarks = (slot?: string, limit = 20): BenchmarkRecord[] =>
+    (
+      db
+        .prepare(`SELECT * FROM ${benchmarksTable} ${slot ? "WHERE slot = ?" : ""} ORDER BY id DESC LIMIT ?`)
+        .all(...(slot ? [slot, limit] : [limit])) as {
+        id: number;
+        slot: string;
+        preset: string;
+        candidate_json: string;
+        result_json: string;
+        cost_usd: number;
+        created_at: string;
+      }[]
+    ).map((r) => ({
+      id: Number(r.id),
+      slot: r.slot,
+      preset: r.preset,
+      candidate: JSON.parse(r.candidate_json),
+      result: JSON.parse(r.result_json),
+      costUsd: r.cost_usd,
+      createdAt: r.created_at,
+    }));
+  const plugins = () => host.services.contributions;
   const exports: HarnessExports = {
+    benchmarks,
+    slots() {
+      const { options } = host;
+      const alternatives = (slot: string) =>
+        plugins()
+          .slotPlugins(slot)
+          .map((p) => ({ pluginId: p.id, name: p.displayName }));
+      const replay0 = exports.replays(1)[0];
+      const active: Record<string, SlotView["active"]> = {
+        ranking: { name: "Rank formula and Jev gates", pluginId: "rh.sweep", detail: { ...sweep.currentSettings() } },
+        embedder: {
+          name: `${options.papers.embedModel} (${options.papers.embedDims} dimensions)`,
+          pluginId: "rh.embedder-openrouter",
+          detail: { model: options.papers.embedModel, dims: options.papers.embedDims },
+        },
+        facets: { name: "Jev abstract-facets", pluginId: "rh.papers" },
+        judge: { name: "Jev would-like", pluginId: "rh.harness", detail: { ...judge.latestCalibration() } },
+        "kb-search": { name: "SQLite full-text search", pluginId: "rh.kb" },
+        models: {
+          name: "OpenRouter models per job",
+          pluginId: "rh.provider-openrouter",
+          detail: { ...options.catalog.jobs },
+        },
+      };
+      return SLOTS.map((slot) => {
+        let last = benchmarks(slot.id, 1)[0] ?? null;
+        if (slot.id === "ranking" && replay0)
+          last = {
+            id: replay0.id,
+            slot: "ranking",
+            preset: "ranking",
+            candidate: replay0.variant as Record<string, unknown>,
+            result: {
+              tasks: [
+                {
+                  task: "replay",
+                  metric: "held-out nDCG difference",
+                  value: replay0.report.heldOut.diff,
+                  items: replay0.report.sweeps.labelled,
+                },
+              ],
+              value: replay0.report.heldOut.diff,
+              label: replay0.report.verdict,
+            },
+            costUsd: 0,
+            createdAt: replay0.createdAt,
+          };
+        return {
+          ...slot,
+          active: active[slot.id],
+          alternatives: alternatives(slot.id).filter((a) => a.pluginId !== active[slot.id].pluginId),
+          last,
+        };
+      });
+    },
     judge,
     async replay(variant, requestedBy = "user") {
       if (!variant || typeof variant !== "object" || Array.isArray(variant))

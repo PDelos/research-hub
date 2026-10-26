@@ -324,6 +324,13 @@ export class ContributionRegistry {
       .filter((t) => !options.desk || t.desk !== false);
   }
 
+  /** Available plugins that fill a slot (kind slot), for the slot catalog. */
+  slotPlugins(slot: string): { id: string; displayName: string }[] {
+    return this.plugins()
+      .filter((p) => p.manifest.kind === "slot" && p.manifest.slot === slot)
+      .map((p) => ({ id: p.id, displayName: p.manifest.displayName }));
+  }
+
   /** Every chat tool name any discovered plugin declares, whatever its state. */
   declaredChatTools(): Set<string> {
     return new Set(
