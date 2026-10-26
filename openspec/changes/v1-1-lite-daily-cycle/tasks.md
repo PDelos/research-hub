@@ -10,7 +10,7 @@
 
 ## 2. Viewer choice
 
-- [ ] 2.1 `rh.kb` chooses the active viewer (saved setting, else Obsidian when it can run, else Library); the contributions route and UI use it; the idle Obsidian viewer says why; verify tests for the light-image fallback, an explicit choice and the existing swap tests
+- [x] 2.1 `rh.kb` chooses the active viewer (saved setting, else Obsidian when it can run, else Library); the contributions route and UI use it; the idle Obsidian viewer says why; verify tests for the light-image fallback, an explicit choice and the existing swap tests
 
 ## 3. Scheduler and the sweep's settings
 

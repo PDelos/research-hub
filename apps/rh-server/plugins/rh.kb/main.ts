@@ -20,6 +20,8 @@ import type { SweepExports } from "../rh.sweep/main.ts";
 export interface ViewerImpl {
   /** The supervised viewer process, when the viewer has one (its status is the project's kbViewer). */
   kbViewer?: KbViewer;
+  /** Whether it can run here (an add-on may be missing from the image), and why not. */
+  usable(): { ok: boolean; reason?: string };
   show(): void | Promise<void>;
   hide(reason: string): void | Promise<void>;
 }
@@ -31,7 +33,7 @@ export interface KbExports extends AgentHooks {
   /** Create the vault and refresh charter.md after a charter approval, then (re)start what depends on it. */
   syncVault(): void;
   registerViewer(id: string, impl: ViewerImpl): Disposable;
-  /** The active kb.viewer contribution. */
+  /** The active kb.viewer contribution: the saved choice, else Obsidian when it can run, else the Library. */
   activeViewer(): (PointContribution & { pluginId: string }) | undefined;
   /** The Obsidian viewer's supervisor, or a disabled one saying why there is none. */
   kbViewer(): KbViewer;
@@ -79,7 +81,11 @@ export function activate(context: PluginContext): KbExports {
   const viewers = new Map<string, ViewerImpl>();
   let ready = false;
   let fallback: KbViewer | undefined;
-  const activeViewer = () => contributions.activeContribution("kb.viewer", context.settings);
+  const activeViewer = () => {
+    const saved = context.savedSettings["kb.viewer"];
+    const automatic = viewers.get("obsidian")?.usable().ok ? "obsidian" : "library";
+    return contributions.activeContribution("kb.viewer", { "kb.viewer": saved ?? automatic });
+  };
   /** Show the active viewer and pause the others (once the project is ready); one switch at a time. */
   let switching: Promise<void> = Promise.resolve();
   const applyViewer = () => {
@@ -88,7 +94,8 @@ export function activate(context: PluginContext): KbExports {
       await contributions.contributionsTo("kb.viewer", { activate: true });
       const active = activeViewer();
       for (const [id, impl] of viewers)
-        if (id === active?.id) await impl.show();
+        // A viewer that cannot run here is still asked to start, so it reports why (e.g. no Ignis in this image).
+        if (id === active?.id || !impl.usable().ok) await impl.show();
         else await impl.hide(`the ${active?.title ?? "selected"} viewer is active`);
     });
     switching = switching.catch((error) => context.log.warn("kb.viewer_switch_failed", { error: String(error) }));

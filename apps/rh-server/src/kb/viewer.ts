@@ -92,7 +92,10 @@ export class KbViewer {
     const o = this.options;
     if (!o.enabled || this.stopping || this.child || this.state === "starting") return;
     const server = join(o.ignisDir, "apps", "ignis-server", "server", "index.js");
-    if (!existsSync(server)) return this.unavailable(`Ignis is not installed at ${o.ignisDir} (set RH_KB_VIEWER_DIR)`);
+    if (!existsSync(server))
+      return this.unavailable(
+        `Ignis is not installed in this image (looked in ${o.ignisDir}; use the research-hub:obsidian image or set RH_KB_VIEWER_DIR)`,
+      );
     if (!existsSync(o.vaultDir)) return this.unavailable("there is no vault yet (approve a charter first)");
     this.state = "starting";
     this.reason = undefined;

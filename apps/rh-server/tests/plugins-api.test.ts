@@ -40,7 +40,8 @@ test("the API lists plugins and their contributions, and /v1/info reports the ke
       ["search_kb", "query_kb"],
     );
     assert.equal(kb.contributions.extensionPoints["kb.viewer"].cardinality, "one");
-    assert.equal(kb.settings.values["kb.viewer"], "obsidian");
+    // No viewer chosen: automatic (Obsidian only where Ignis is installed; not in this test environment).
+    assert.equal(kb.settings.values["kb.viewer"], undefined);
     assert.ok(kb.dependents.includes("rh.viewer-obsidian"));
     // Never activated, yet fully described.
     const s2 = await client.plugin("rh.source-semanticscholar");
@@ -52,7 +53,7 @@ test("the API lists plugins and their contributions, and /v1/info reports the ke
       c.tabs.map((t) => t.id),
       ["feed", "library", "kb", "charter", "runs", "settings", "plugins"],
     );
-    assert.equal(c.viewer.active?.id, "obsidian");
+    assert.equal(c.viewer.active?.id, "library");
     assert.deepEqual(c.viewer.options.map((o) => o.id).toSorted(), ["library", "obsidian"]);
     assert.ok(c.settings.some((g) => g.pluginId === "rh.kb" && "kb.viewer" in g.properties));
     await rejects(client.plugin("acme.nothing"), "not_found", /No plugin acme\.nothing/);
@@ -115,7 +116,8 @@ test("enable and disable ask before taking dependents along; required plugins st
     assert.equal(library.settings.values["kb.viewer"], "library");
     assert.equal((await client.contributions()).viewer.active?.id, "library");
     const reset = await client.setPluginSettings("rh.kb", { "kb.viewer": null });
-    assert.equal(reset.settings.values["kb.viewer"], "obsidian");
+    assert.equal(reset.settings.values["kb.viewer"], undefined);
+    assert.equal((await client.contributions()).viewer.active?.id, "library");
   } finally {
     await server.stop();
   }

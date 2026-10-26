@@ -14,6 +14,7 @@ import { InstallRefused } from "./kernel/install.ts";
 import { HasDependents, PluginUnavailable, SettingsInvalid } from "./kernel/lifecycle.ts";
 import { KERNEL_API_VERSION } from "./kernel/manifest.ts";
 import { settingsProperties } from "./kernel/settings.ts";
+import type { KbExports } from "../plugins/rh.kb/main.ts";
 
 const ID = /^[a-z0-9][a-z0-9-]*\.[a-z0-9][a-z0-9-]*$/;
 
@@ -117,10 +118,10 @@ export function pluginRoutes(hub: Hub): Router {
 
   r.get("/v1/plugins", (_req, res) => void res.json(list()));
 
-  r.get("/v1/plugins/contributions", (_req, res) => {
+  r.get("/v1/plugins/contributions", async (_req, res) => {
     const { kernel, contributions, discovery } = host();
     const viewers = contributions.extensionPoints().has("kb.viewer")
-      ? contributions.activeContribution("kb.viewer", kernel.settings("rh.kb"))
+      ? (await host().exportsOf<KbExports>("rh.kb")).activeViewer()
       : undefined;
     const options = [...discovery.plugins.values()].flatMap((p) =>
       kernel.available().includes(p.manifest.id)

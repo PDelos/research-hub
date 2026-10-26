@@ -17,9 +17,8 @@
   "contributes": {
     "extensionPoints": {
       "kb.viewer": {
-        "description": "What the Knowledge base tab shows. One is active at a time (the rh.kb setting kb.viewer).",
+        "description": "What the Knowledge base tab shows. Without a choice: Obsidian when it can run here, else the Library.",
         "cardinality": "one",
-        "default": "obsidian",
         "schema": {
           "required": ["id", "title", "view"],
           "properties": { "title": { "type": "string" }, "view": { "type": "string" } }

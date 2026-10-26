@@ -1,5 +1,6 @@
 // Built-in plugin rh.viewer-obsidian: the kb.viewer contribution "obsidian". It supervises Ignis (the v0 viewer
 // supervisor) while it is the active viewer, and pauses it otherwise or when the plugin is disabled.
+import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { KbViewer } from "../../src/kb/viewer.ts";
 import { hostOf } from "../../src/kernel/builtin.ts";
@@ -10,9 +11,10 @@ export function activate(context: PluginContext): void {
   const host = hostOf(context);
   const { options } = host;
   const kb = context.exports["rh.kb"] as KbExports;
+  const ignisDir = options.kbViewer?.dir ?? "/opt/ignis";
   const kbViewer = new KbViewer({
     enabled: options.kbViewer?.enabled ?? false,
-    ignisDir: options.kbViewer?.dir ?? "/opt/ignis",
+    ignisDir,
     stateDir: join(host.dir, "kb-viewer"),
     vaultDir: kb.vault.dir,
     projectName: host.name,
@@ -24,6 +26,12 @@ export function activate(context: PluginContext): void {
   context.subscriptions.push(
     kb.registerViewer("obsidian", {
       kbViewer,
+      usable: () =>
+        !(options.kbViewer?.enabled ?? false)
+          ? { ok: false, reason: "RH_KB_VIEWER=off" }
+          : existsSync(join(ignisDir, "apps", "ignis-server", "server", "index.js"))
+            ? { ok: true }
+            : { ok: false, reason: "Ignis is not installed in this image" },
       show: () => kbViewer.resume(),
       hide: (reason) => kbViewer.pause(reason),
     }),

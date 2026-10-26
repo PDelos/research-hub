@@ -18,7 +18,8 @@ const problems = ref<string[]>([]);
 const saved = ref("");
 watch(
   () => props.values,
-  (v) => (form.value = { ...v }),
+  // A choice that is not saved shows as "" (Automatic, for the viewer).
+  (v) => (form.value = Object.fromEntries(Object.keys(props.properties).map((k) => [k, v[k] ?? ""]))),
   { immediate: true, deep: true },
 );
 /** Choices for a property: its enum, or the contributions to the extension point it selects (kb.viewer). */
@@ -27,7 +28,10 @@ const choices = computed(() => {
   for (const [key, p] of Object.entries(props.properties)) {
     if (p.enum) out[key] = p.enum.map((v) => ({ value: v, label: String(v) }));
     else if (key === "kb.viewer")
-      out[key] = (plugins.contributions?.viewer.options ?? []).map((o) => ({ value: o.id, label: o.title }));
+      out[key] = [
+        { value: "", label: "Automatic (Obsidian when this image has it, else Library)" },
+        ...(plugins.contributions?.viewer.options ?? []).map((o) => ({ value: o.id, label: o.title })),
+      ];
   }
   return out;
 });
@@ -40,7 +44,7 @@ async function save() {
   saved.value = "";
   const changes: Record<string, unknown> = {};
   for (const key of Object.keys(props.properties)) {
-    const before = props.values[key];
+    const before = props.values[key] ?? "";
     let value = form.value[key];
     const type = props.properties[key].type;
     if ((type === "integer" || type === "number") && typeof value === "string" && value.trim() !== "")

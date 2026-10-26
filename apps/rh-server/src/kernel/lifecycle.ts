@@ -29,6 +29,8 @@ export interface PluginContext {
   readonly storageDir: string;
   /** The plugin's current settings (read again after a change). */
   readonly settings: Readonly<Record<string, unknown>>;
+  /** Only the values the project saved (no defaults): to tell "chosen" from "automatic". */
+  readonly savedSettings: Readonly<Record<string, unknown>>;
   /**
    * Handle setting changes while running. Without a handler, a settings change restarts the plugin (deactivate,
    * activate); with one, the handler gets the new settings and the plugin keeps running.
@@ -227,6 +229,7 @@ export class PluginKernel {
       const handlers = new Set<(settings: Readonly<Record<string, unknown>>) => void | Promise<void>>();
       r.settingsHandlers = handlers;
       const current = () => this.settings(manifest.id);
+      const saved = () => structuredClone(this.options.state.current().plugins[manifest.id]?.settings ?? {});
       context = {
         id: manifest.id,
         manifest,
@@ -234,6 +237,9 @@ export class PluginKernel {
         storageDir,
         get settings() {
           return current();
+        },
+        get savedSettings() {
+          return saved();
         },
         onSettingsChange(handler) {
           handlers.add(handler);

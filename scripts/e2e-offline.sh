@@ -75,7 +75,7 @@ viewer() { curl -s "$U/plugins/contributions" "${H[@]}" | j "(d['viewer']['activ
 INIT=$(curl -s "$U/plugins/history?limit=500" "${H[@]}" | j "d[-1]['id']")
 expect "viewer plugin (RH_KB_VIEWER=off)" "$(state rh.viewer-obsidian)" disabled
 expect "viewer plugin enabled" "$(toggle rh.viewer-obsidian enable)" active
-expect "active viewer" "$(viewer)" obsidian
+expect "active viewer (Obsidian cannot run)" "$(viewer)" library
 curl -s -X PUT "$U/plugins/rh.kb/settings" "${H[@]}" -d '{"values":{"kb.viewer":"library"}}' > /dev/null
 expect "viewer swapped" "$(viewer)" library
 expect "viewer plugin disabled" "$(toggle rh.viewer-obsidian disable)" disabled
