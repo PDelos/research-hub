@@ -9,12 +9,14 @@ import { isoWeek, localParts, type ScheduledRun } from "../../src/schedule.ts";
 import type { FeedbackExports } from "../rh.feedback/main.ts";
 import type { ScheduleExports } from "../rh.schedule/main.ts";
 import { buildDigest } from "./digest.ts";
+import type { HarnessExports } from "../rh.harness/main.ts";
 
 export const DIGEST_SECTIONS: readonly DigestSection[] = [
   "cycle",
   "judgments",
   "exploration",
   "knowledgeBase",
+  "quality",
   "cost",
   "changes",
   "general",
@@ -184,6 +186,29 @@ export function activate(context: PluginContext): DigestExports {
           : [],
         precision: feedback.precision(60),
       });
+      // The harness's view of the week, when it runs (it is a separate plugin).
+      try {
+        const harness = await host.exportsOf<HarnessExports>("rh.harness");
+        const q = harness.quality();
+        body.quality = {
+          judge: q.judge ? { agreement: q.judge.agreement, cases: q.judge.cases, trusted: q.judge.trusted } : null,
+          replays: harness
+            .replays(200)
+            .filter((r) => r.createdAt >= from && r.createdAt < to)
+            .map((r) => ({
+              id: r.id,
+              variant: r.variant as Record<string, unknown>,
+              verdict: r.report.verdict,
+              heldOutDiff: r.report.heldOut.diff,
+              low: r.report.heldOut.low,
+              high: r.report.heldOut.high,
+              requestedBy: r.requestedBy,
+              createdAt: r.createdAt,
+            })),
+        };
+      } catch {
+        // No harness: the digest goes without its quality section.
+      }
       const r = db
         .prepare(
           `INSERT INTO ${T.digests} (week, period_from, period_to, body_json, created_at) VALUES (?, ?, ?, ?, ?)`,

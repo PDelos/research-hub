@@ -4,7 +4,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { HarnessExports } from "../plugins/rh.harness/main.ts";
 import { validateCharter } from "../src/charter.ts";
-import { cardWriterRule } from "../src/faux-rules.ts";
+import { cardWriterRule, deskToolRule } from "../src/faux-rules.ts";
+import type { DigestExports } from "../plugins/rh.digest/main.ts";
 import { sampleCharter } from "./fixtures/charter.ts";
 import { choice, noul, score, scripted } from "./fixtures/jev-answers.ts";
 import { arxivOnlyFetch, fakePapers } from "./fixtures/sweep-env.ts";
@@ -31,7 +32,7 @@ async function project(judgeLikes: (title: string) => number) {
   const server = await startTestServer({
     hub: {
       ticker: false,
-      fauxRules: [cardWriterRule],
+      fauxRules: [cardWriterRule, deskToolRule],
       jevDecide: jev.decide,
       paperFetch: ((i: any, o: any) => arxivOnlyFetch(batches[batch])(i, o)) as typeof fetch,
     },
@@ -99,6 +100,36 @@ test("a judge that disagrees is not trusted: replays use only the user's verdict
     const r = await s.harness.replay({ cardsPerSweep: 5 });
     assert.equal(r.report.judgeUsed, false);
     assert.equal(s.harness.quality().judge?.trusted, false);
+  } finally {
+    await s.server.stop();
+  }
+});
+
+test("the harness API, the digest's quality section and the desk's replay_variant tool", async () => {
+  const s = await project((title) => (title.startsWith("Good") ? 0.9 : 0.1));
+  try {
+    const { client } = s.server;
+    await s.harness.night();
+    await assert.rejects(client.replay({ cardsPerSweep: 40 }), /cardsPerSweep: must be an integer from 1 to 15/);
+    await assert.rejects(client.replay({ colour: 1 } as never), /colour: not a sweep setting a replay can change/);
+    const stored = await client.replay({ relevanceMin: 0.5 });
+    assert.equal(stored.requestedBy, "user");
+    assert.equal(stored.report.current.relevanceMin, 0.45);
+    assert.equal(stored.report.candidate.relevanceMin, 0.5);
+    assert.equal((await client.replays())[0].id, stored.id);
+    const quality = await client.quality();
+    assert.equal(quality.judge?.trusted, true);
+    assert.equal(quality.overTime.length, 3);
+    assert.ok(quality.overTime.every((q) => q.ndcg !== undefined));
+
+    const digest = await (await s.p.plugins.exportsOf<DigestExports>("rh.digest")).buildDigest();
+    assert.equal(digest.quality?.judge?.trusted, true);
+    assert.ok(digest.quality?.replays.some((r) => r.id === stored.id));
+
+    const sent = await client.send('use replay_variant {"variant": {"cardsPerSweep": 5}}', { waitMs: 20_000 });
+    assert.equal(sent.status, "done");
+    assert.match(sent.answer!.text, /^(better|worse|inconclusive): nDCG/);
+    assert.equal((await client.replays())[0].requestedBy, "desk");
   } finally {
     await s.server.stop();
   }

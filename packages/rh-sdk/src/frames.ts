@@ -507,7 +507,15 @@ export interface CycleStatus {
   lastDigest: { id: number; week: string; createdAt: string } | null;
 }
 
-export type DigestSection = "cycle" | "judgments" | "exploration" | "knowledgeBase" | "cost" | "changes" | "general";
+export type DigestSection =
+  | "cycle"
+  | "judgments"
+  | "exploration"
+  | "knowledgeBase"
+  | "quality"
+  | "cost"
+  | "changes"
+  | "general";
 
 export interface DigestBody {
   week: string;
@@ -529,6 +537,20 @@ export interface DigestBody {
   changes: { id: string; time: string; message: string; actor: string }[];
   /** What you wrote on the previous digest. */
   lastComments: { section: string; text: string; createdAt: string }[];
+  /** The harness (v1.2): the judge's agreement with you and the week's replays. */
+  quality?: {
+    judge: { agreement: number | null; cases: number; trusted: boolean } | null;
+    replays: {
+      id: number;
+      variant: Record<string, unknown>;
+      verdict: string;
+      heldOutDiff: number;
+      low: number;
+      high: number;
+      requestedBy: string;
+      createdAt: string;
+    }[];
+  };
 }
 
 export interface DigestComment {
@@ -551,4 +573,69 @@ export interface DigestSummary {
   to: string;
   createdAt: string;
   comments: number;
+}
+
+// ---------------------------------------------------------------- the harness (v1.2)
+
+export interface SweepSettingsView {
+  relevanceMin: number;
+  worthMin: number;
+  rankWeights: { importance: number; relevance: number; question: number; level: number; freshness: number };
+  cardsPerSweep: number;
+  explorationPicks: number;
+}
+export type HarnessVariant = Partial<SweepSettingsView>;
+export type HarnessVerdict = "better" | "worse" | "inconclusive" | "not enough data";
+
+export interface HarnessMetrics {
+  ndcg?: number;
+  precision5?: number;
+  starRecall?: number;
+  coverage: number;
+}
+
+export interface ReplayReport {
+  variant: HarnessVariant;
+  current: SweepSettingsView;
+  candidate: SweepSettingsView;
+  sweeps: { total: number; labelled: number; heldOut: number };
+  perSweep: {
+    sweepId: number;
+    startedAt: string;
+    heldOut: boolean;
+    current: HarnessMetrics;
+    candidate: HarnessMetrics;
+  }[];
+  mean: { current: HarnessMetrics; candidate: HarnessMetrics };
+  train: { diff: number; n: number };
+  heldOut: { diff: number; low: number; high: number; n: number };
+  estimated: number;
+  judgeUsed: boolean;
+  verdict: HarnessVerdict;
+}
+
+export interface StoredReplay {
+  id: number;
+  variant: HarnessVariant;
+  requestedBy: string;
+  createdAt: string;
+  report: ReplayReport;
+}
+
+export interface JudgeCalibration {
+  cases: number;
+  agree: number;
+  agreement: number | null;
+  kappa: number | null;
+  trusted: boolean;
+  minAgreement: number;
+  minCases: number;
+  at: string;
+}
+
+export interface HarnessQuality {
+  judge: JudgeCalibration | null;
+  overTime: ({ sweepId: number; startedAt: string } & HarnessMetrics)[];
+  labels: { judged: number; judge: number };
+  replays: StoredReplay[];
 }

@@ -9,6 +9,9 @@ import type {
   KbPaper,
   KbSearchHit,
   CycleStatus,
+  HarnessQuality,
+  HarnessVariant,
+  StoredReplay,
   DigestComment,
   DigestSection,
   DigestSummary,
@@ -167,6 +170,12 @@ export class HubClient {
   digest = (id: number) => this.call<DigestView>("GET", `/digests/${id}`);
   commentDigest = (id: number, section: DigestSection, text: string) =>
     this.call<DigestComment>("POST", `/digests/${id}/comments`, { section, text });
+
+  // The harness (v1.2)
+  quality = () => this.call<HarnessQuality>("GET", "/harness/quality");
+  replays = (limit = 50) => this.call<StoredReplay[]>("GET", `/harness/replays?limit=${limit}`);
+  /** Replay past sweeps with other sweep settings; no new searches or paid calls. */
+  replay = (variant: HarnessVariant) => this.call<StoredReplay>("POST", "/harness/replay", { variant });
 
   /** Tell the hub a tab was opened, so plugins activated by onView:<tab> start. */
   openView = (tab: string) => this.call<void>("POST", `/plugins/views/${encodeURIComponent(tab)}/open`, {});
