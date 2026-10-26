@@ -5,7 +5,7 @@ import type { PluginContext } from "../../src/kernel/lifecycle.ts";
 import { CardWriter } from "../../src/sweep/card-writer.ts";
 import { CardStore } from "../../src/sweep/cards.ts";
 import { PaperDecisions } from "../../src/sweep/decisions.ts";
-import { SweepRunner } from "../../src/sweep/sweep.ts";
+import { SweepRunner, type RankWeights } from "../../src/sweep/sweep.ts";
 import type { CharterExports } from "../rh.charter/main.ts";
 import type { DecisionExports } from "../rh.decision-jev/main.ts";
 import type { FeedbackExports } from "../rh.feedback/main.ts";
@@ -60,6 +60,11 @@ export function activate(context: PluginContext): SweepExports {
         slots,
         picks: context.settings.explorationPicks as number,
       }),
+    knobs: () => ({
+      relevanceMin: context.settings.relevanceMin as number | undefined,
+      worthMin: context.settings.worthMin as number | undefined,
+      rankWeights: context.settings.rankWeights as RankWeights | undefined,
+    }),
     cardsPerSweep: () =>
       (context.savedSettings.cardsPerSweep as number | undefined) ??
       host.settings.get<number | undefined>("cards_per_sweep", undefined) ??

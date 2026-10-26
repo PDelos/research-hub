@@ -54,6 +54,51 @@
           "maximum": 2,
           "default": 1,
           "description": "Card slots given to papers least like the ones you liked (0 turns exploration off)."
+        },
+        "relevanceMin": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Gate: reject papers less relevant than this (default: the on-theme command's 0.45)."
+        },
+        "worthMin": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Gate: reject papers less worth reading than this (default: the worth-reading command's 0.35)."
+        },
+        "rankWeights": {
+          "type": "object",
+          "description": "Rank formula weights (default importance 0.4, relevance 0.2, question 0.15, level 0.15, freshness 0.1).",
+          "required": ["importance", "relevance", "question", "level", "freshness"],
+          "additionalProperties": false,
+          "properties": {
+            "importance": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "relevance": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "question": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "level": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "freshness": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          }
         }
       }
     }

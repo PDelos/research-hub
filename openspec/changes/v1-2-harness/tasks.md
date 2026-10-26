@@ -1,6 +1,6 @@
 ## 1. Knobs
 
-- [ ] 1.1 `rh.sweep` settings `relevanceMin`, `worthMin`, `rankWeights` read by the gate and rank phases (defaults unchanged); verify sweep tests unchanged and a threshold setting changing the next sweep's gate
+- [x] 1.1 `rh.sweep` settings `relevanceMin`, `worthMin`, `rankWeights` read by the gate and rank phases (defaults unchanged); verify sweep tests unchanged and a threshold setting changing the next sweep's gate
 
 ## 2. Replays
 

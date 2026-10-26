@@ -102,6 +102,8 @@ export interface SweepDeps {
    * the last slots (chosen from outside the top ones). None when absent.
    */
   explore?: (x: { sweepId: number; ranked: number[]; slots: number }) => number[];
+  /** Gate thresholds and rank weights from rh.sweep settings (v1-2); the commands' policies and defaults otherwise. */
+  knobs?: () => { relevanceMin?: number; worthMin?: number; rankWeights?: RankWeights };
 }
 
 // ---------------------------------------------------------------- plan
@@ -156,20 +158,38 @@ export function freshness(publishedAt: string | undefined, now: number): number 
   return Math.exp(-days / 365);
 }
 
-/** Rank score (design D3): importance first, then relevance, question weight, level fit and freshness. */
-export function rankScore(x: {
+export interface RankWeights {
   importance: number;
   relevance: number;
-  questionWeight: number;
-  levelFit: number;
+  question: number;
+  level: number;
   freshness: number;
-}): number {
+}
+export const DEFAULT_RANK_WEIGHTS: RankWeights = {
+  importance: 0.4,
+  relevance: 0.2,
+  question: 0.15,
+  level: 0.15,
+  freshness: 0.1,
+};
+
+/** Rank score (design D3): importance first, then relevance, question weight, level fit and freshness. */
+export function rankScore(
+  x: {
+    importance: number;
+    relevance: number;
+    questionWeight: number;
+    levelFit: number;
+    freshness: number;
+  },
+  w: RankWeights = DEFAULT_RANK_WEIGHTS,
+): number {
   return (
-    0.4 * x.importance +
-    0.2 * x.relevance +
-    0.15 * Math.min(1, x.questionWeight / 2) +
-    0.15 * x.levelFit +
-    0.1 * x.freshness
+    w.importance * x.importance +
+    w.relevance * x.relevance +
+    w.question * Math.min(1, x.questionWeight / 2) +
+    w.level * x.levelFit +
+    w.freshness * x.freshness
   );
 }
 
@@ -485,7 +505,10 @@ export class SweepRunner {
       relevance_min: number;
       review_band: [number, number];
     };
-    const worthPolicy = this.deps.decisions.command("worth-reading").policy as { worth_min: number };
+    const worthPolicy = { ...(this.deps.decisions.command("worth-reading").policy as { worth_min: number }) };
+    const knobs = this.deps.knobs?.() ?? {};
+    const relevanceMin = knobs.relevanceMin ?? onTheme.relevance_min;
+    if (knobs.worthMin !== undefined) worthPolicy.worth_min = knobs.worthMin;
     const pending = this.idsWith(sweep.id, "new");
     const update = this.deps.db.prepare(
       `UPDATE sweep_papers SET status = :status, reason = :reason, borderline = :borderline, relevance = :relevance,
@@ -498,9 +521,9 @@ export class SweepRunner {
       const worth = noulOf(answers["worth-reading"].worth);
       let status = "gated";
       let reason: string | null = null;
-      if (relevance < onTheme.relevance_min) {
+      if (relevance < relevanceMin) {
         status = "rejected";
-        reason = `below relevance_min ${onTheme.relevance_min} (relevance ${relevance.toFixed(2)})`;
+        reason = `below relevance_min ${relevanceMin} (relevance ${relevance.toFixed(2)})`;
       } else if (worth < worthPolicy.worth_min) {
         status = "rejected";
         reason = `below worth_min ${worthPolicy.worth_min} (worth ${worth.toFixed(2)})`;
@@ -595,6 +618,7 @@ export class SweepRunner {
       relevance: number;
     }[];
     const now = this.now();
+    const weights = this.deps.knobs?.().rankWeights ?? DEFAULT_RANK_WEIGHTS;
     const scored: { id: number; score: number }[] = [];
     let blocked = 0;
     const set = this.deps.db.prepare(
@@ -603,13 +627,16 @@ export class SweepRunner {
     for (const r of rows) {
       const paper = this.deps.papers.store.get(Number(r.paper_id))!;
       const score =
-        rankScore({
-          importance: r.importance ?? 0,
-          relevance: r.relevance ?? 0,
-          questionWeight: questionWeight(charter, r.matched_question ?? undefined),
-          levelFit: levelFit(r.level ?? "core", sweep.orientation),
-          freshness: sweep.orientation ? 0.5 : freshness(paper.publishedAt, now),
-        }) +
+        rankScore(
+          {
+            importance: r.importance ?? 0,
+            relevance: r.relevance ?? 0,
+            questionWeight: questionWeight(charter, r.matched_question ?? undefined),
+            levelFit: levelFit(r.level ?? "core", sweep.orientation),
+            freshness: sweep.orientation ? 0.5 : freshness(paper.publishedAt, now),
+          },
+          weights,
+        ) +
         0.05 * (this.sourceWeight(paper) - 1);
       if (paper.retracted) {
         set.run("blocked", "retracted", score, null, sweep.id, r.paper_id);
