@@ -8,6 +8,7 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import type { PluginRunState, PluginSummary } from "@rh/sdk";
 import type { Logger } from "../logger.ts";
+import type { RhApi } from "./api.ts";
 import { dependents as dependentsOf, resolve, type GraphNode } from "./graph.ts";
 import type { PluginManifest } from "./manifest.ts";
 import { builtinEntry, type Discovery, type DiscoveredPlugin } from "./registry.ts";
@@ -31,8 +32,8 @@ export interface PluginContext {
   /** What each dependency's `activate` returned, by plugin id. */
   readonly exports: Readonly<Record<string, unknown>>;
   readonly log: Logger;
-  /** The kernel API (task 1.5). */
-  readonly rh: unknown;
+  /** The kernel API. */
+  readonly rh: RhApi;
 }
 
 export interface PluginModule {
@@ -49,8 +50,8 @@ export interface KernelOptions {
   env?: NodeJS.ProcessEnv;
   /** Load a plugin's code; by default its `main` module is imported. */
   load?: (plugin: DiscoveredPlugin) => Promise<PluginModule>;
-  /** The `rh` API handed to a plugin (task 1.5). */
-  api?: (plugin: DiscoveredPlugin) => unknown;
+  /** The `rh` API handed to a plugin; what it registers goes into `subscriptions` (disposed on deactivate). */
+  api?: (plugin: DiscoveredPlugin, subscriptions: Disposable[]) => RhApi;
 }
 
 export { SettingsInvalid };
@@ -197,6 +198,7 @@ export class PluginKernel {
     let context: PluginContext | undefined;
     try {
       const module = await (this.options.load ?? defaultLoad)(r.plugin);
+      const subscriptions: Disposable[] = [];
       mkdirSync(storageDir, { recursive: true });
       context = {
         id: manifest.id,
@@ -204,10 +206,11 @@ export class PluginKernel {
         dir,
         storageDir,
         settings: structuredClone(settings),
-        subscriptions: [],
+        subscriptions,
         exports,
         log,
-        rh: this.options.api?.(r.plugin),
+        // Without an API factory (unit tests of the lifecycle) plugins get no `rh`.
+        rh: this.options.api?.(r.plugin, subscriptions) as RhApi,
       };
       const result = await Promise.race([
         Promise.resolve(module.activate?.(context)),
