@@ -93,15 +93,19 @@ The viewer SHALL run as a separate process inside the project's container, super
 - **THEN** the hub restarts it within 10 seconds, chat and sweeps are unaffected, and the tab reconnects
 
 ### Requirement: Viewer is optional at runtime
-The viewer SHALL be a plugin contributing to the `kb.viewer` extension point; the hub SHALL keep working when it is disabled (as a plugin, or with `RH_KB_VIEWER=off` as the default) or not running: the tab SHALL show a short explanation and how to enable it, or the active alternative viewer, and the Library view SHALL still list and open notes.
+The viewer SHALL be a plugin contributing to the `kb.viewer` extension point; Obsidian SHALL be available only in the add-on image, and without an explicit choice the active viewer SHALL be Obsidian when it can run and the Library otherwise; the hub SHALL keep working when the Obsidian viewer is disabled (as a plugin, or with `RH_KB_VIEWER=off`) or not installed: the Knowledge base tab SHALL show the active viewer, and the Library view SHALL still list and open notes.
 
 #### Scenario: Viewer disabled
-- **WHEN** the Obsidian viewer plugin is disabled and the user opens the Knowledge base tab with no other viewer active
-- **THEN** the tab shows "The knowledge base viewer is off" with how to turn it on, and the Library still works
+- **WHEN** the Obsidian viewer plugin is disabled and the user opens the Knowledge base tab
+- **THEN** the tab shows the Library viewer, and the Library tab still works
 
 #### Scenario: Alternative viewer
 - **WHEN** the Library viewer is the active `kb.viewer`
 - **THEN** the Knowledge base tab shows it, and no Obsidian process runs
+
+#### Scenario: Light image
+- **WHEN** a project that used Obsidian starts on the light image without a saved viewer choice
+- **THEN** the Library is the active viewer and the Obsidian viewer reports "Ignis is not installed in this image"
 
 ### Requirement: Pinned viewer version
 The viewer SHALL run a pinned release, and the hub's health information SHALL report that version; upgrading SHALL be an explicit configuration change.
