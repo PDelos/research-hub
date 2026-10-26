@@ -38,7 +38,7 @@ test("migrations run once: reopening keeps data and the schema version", () => {
     first.db.close();
     const second = openProjectDb(path);
     assert.equal((second.db.prepare("SELECT value FROM settings WHERE key = 'k'").get() as any).value, "1");
-    assert.equal((second.db.prepare("PRAGMA user_version").get() as any).user_version, 6);
+    assert.equal((second.db.prepare("PRAGMA user_version").get() as any).user_version, 7);
     second.db.close();
   } finally {
     t.cleanup();
@@ -63,7 +63,7 @@ test("migration 2 upgrades a version-1 database and keeps its telemetry rows", a
     assert.equal((raw.prepare("PRAGMA user_version").get() as any).user_version, 1);
     raw.close();
     const second = openProjectDb(path);
-    assert.equal((second.db.prepare("PRAGMA user_version").get() as any).user_version, 6);
+    assert.equal((second.db.prepare("PRAGMA user_version").get() as any).user_version, 7);
     assert.equal(
       (second.db.prepare("SELECT text FROM agent_runs WHERE run_entry_id = 7").get() as any).text,
       "old run",
@@ -90,7 +90,7 @@ test("migration 3 upgrades a version-2 database and keeps its settings", async (
     );
     first.db.close();
     const second = openProjectDb(path);
-    assert.equal((second.db.prepare("PRAGMA user_version").get() as any).user_version, 6);
+    assert.equal((second.db.prepare("PRAGMA user_version").get() as any).user_version, 7);
     assert.ok(second.db.prepare("SELECT 1 FROM sqlite_master WHERE name = 'papers'").get());
     assert.equal((second.db.prepare("SELECT value FROM settings WHERE key = 'kept'").get() as any).value, '"yes"');
     second.db.close();
@@ -117,7 +117,7 @@ test("migration 6 upgrades a version-5 database: notes, search index, ingest att
       .run();
     first.db.close();
     const second = openProjectDb(path);
-    assert.equal((second.db.prepare("PRAGMA user_version").get() as any).user_version, 6);
+    assert.equal((second.db.prepare("PRAGMA user_version").get() as any).user_version, 7);
     for (const table of ["kb_notes", "kb_fts", "kb_files"])
       assert.ok(second.db.prepare("SELECT 1 FROM sqlite_master WHERE name = ?").get(table), table);
     const row = second.db.prepare("SELECT status, attempts FROM kb_requests WHERE paper_id = 1").get() as any;
@@ -139,7 +139,7 @@ test("migration 5 upgrades a version-4 database: judgments, weights, rule candid
     );
     first.db.close();
     const second = openProjectDb(path);
-    assert.equal((second.db.prepare("PRAGMA user_version").get() as any).user_version, 6);
+    assert.equal((second.db.prepare("PRAGMA user_version").get() as any).user_version, 7);
     for (const table of ["judgments", "weight_effects", "weights", "rule_candidates", "kb_requests"])
       assert.ok(second.db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(table), table);
     assert.ok(
@@ -164,7 +164,7 @@ test("migration 4 upgrades a version-3 database: sweep tables, categories and co
     );
     first.db.close();
     const second = openProjectDb(path);
-    assert.equal((second.db.prepare("PRAGMA user_version").get() as any).user_version, 6);
+    assert.equal((second.db.prepare("PRAGMA user_version").get() as any).user_version, 7);
     for (const table of ["sweeps", "sweep_papers", "paper_decisions", "cards"])
       assert.ok(second.db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(table), table);
     const columns = (table: string) =>

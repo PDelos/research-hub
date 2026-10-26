@@ -185,7 +185,7 @@ const authors = (a: string[]) => (a.length > 3 ? `${a.slice(0, 3).join(", ")} et
             >“{{ card.judgment.reason }}”<span
               v-if="card.judgment.ruleStatus === 'candidate'"
               class="badge"
-              title="Queued for the weekly review as a possible rule"
+              title="Queued for the weekly digest as a possible rule"
               >rule?</span
             ></span
           >

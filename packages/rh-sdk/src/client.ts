@@ -99,7 +99,11 @@ export class HubClient {
   retryCharter = () => this.call<CharterView>("POST", "/charter/retry", {});
   schedule = () => this.call<ScheduleSettings>("GET", "/schedule");
   setSchedule = (
-    patch: Partial<{ sweep: Partial<ScheduleSettings["sweep"]>; review: Partial<ScheduleSettings["review"]> }>,
+    patch: Partial<{
+      sweep: Partial<ScheduleSettings["sweep"]>;
+      nightly: Partial<ScheduleSettings["nightly"]>;
+      review: Partial<ScheduleSettings["review"]>;
+    }>,
   ) => this.call<ScheduleSettings>("PUT", "/schedule", patch);
   scheduledRuns = (limit = 100) => this.call<ScheduledRun[]>("GET", `/scheduled-runs?limit=${limit}`);
 
@@ -123,7 +127,7 @@ export class HubClient {
   kbNote = (stem: string) => this.call<KbNote>("GET", `/kb/notes/${encodeURIComponent(stem)}`);
   kbSearch = (query: string, limit = 8) =>
     this.call<KbSearchHit[]>("GET", `/kb/search?q=${encodeURIComponent(query)}&limit=${limit}`);
-  triggerRun = (kind: "sweep" | "review") => this.call<ScheduledRun>("POST", `/runs/${kind}`, {});
+  triggerRun = (kind: "sweep" | "nightly" | "review") => this.call<ScheduledRun>("POST", `/runs/${kind}`, {});
 
   // Plugins (v1.0)
   plugins = () => this.call<PluginList>("GET", "/plugins");

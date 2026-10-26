@@ -155,7 +155,7 @@ export function projectRoutes(hub: Hub): Router {
 
   r.post("/v1/runs/:kind", (req, res) => {
     const kind = req.params.kind;
-    if (kind !== "sweep" && kind !== "review") throw notFound(`No run kind ${kind}`);
+    if (kind !== "sweep" && kind !== "nightly" && kind !== "review") throw notFound(`No run kind ${kind}`);
     const run = p().scheduler.trigger(kind);
     res.status(run.status === "requested" ? 202 : 200).json(run);
   });

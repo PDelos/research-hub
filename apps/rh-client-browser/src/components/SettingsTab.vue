@@ -19,6 +19,8 @@ const days: { id: Weekday; label: string }[] = [
 const form = ref({
   sweepEnabled: true,
   sweepTime: "06:00",
+  nightlyEnabled: true,
+  nightlyTime: "02:00",
   reviewEnabled: true,
   reviewDay: "sun" as Weekday,
   reviewTime: "07:00",
@@ -30,6 +32,8 @@ const fill = () => {
   form.value = {
     sweepEnabled: s.sweep.enabled,
     sweepTime: s.sweep.time,
+    nightlyEnabled: s.nightly.enabled,
+    nightlyTime: s.nightly.time,
     reviewEnabled: s.review.enabled,
     reviewDay: s.review.weekday,
     reviewTime: s.review.time,
@@ -61,6 +65,7 @@ async function save() {
   try {
     store.schedule = await client.setSchedule({
       sweep: { enabled: form.value.sweepEnabled, time: form.value.sweepTime },
+      nightly: { enabled: form.value.nightlyEnabled, time: form.value.nightlyTime },
       review: { enabled: form.value.reviewEnabled, weekday: form.value.reviewDay, time: form.value.reviewTime },
     });
     saved.value = "Saved.";
@@ -70,16 +75,18 @@ async function save() {
   }
 }
 
-async function runNow(kind: "sweep" | "review") {
+const runLabel = { sweep: "Sweep", nightly: "Nightly run", review: "Digest" } as const;
+async function runNow(kind: "sweep" | "nightly" | "review") {
   const run = await client.triggerRun(kind);
-  saved.value = run.status === "requested" ? `${kind} requested.` : `${kind} skipped: ${run.reason}.`;
+  saved.value =
+    run.status === "requested" ? `${runLabel[kind]} requested.` : `${runLabel[kind]} skipped: ${run.reason}.`;
   await refreshSchedule();
 }
 </script>
 
 <template>
   <div class="settings">
-    <h2>Schedule</h2>
+    <h2>The daily cycle</h2>
     <p class="muted">
       Times are in {{ store.schedule?.timeZone ?? "UTC" }}. Saved settings take precedence over the container's
       defaults.
@@ -90,7 +97,12 @@ async function runNow(kind: "sweep" | "review") {
       <button class="ghost" @click="runNow('sweep')">Run now</button>
     </fieldset>
     <fieldset>
-      <label class="check"><input v-model="form.reviewEnabled" type="checkbox" /> Weekly review</label>
+      <label class="check"><input v-model="form.nightlyEnabled" type="checkbox" /> Nightly run</label>
+      <label>at <input v-model="form.nightlyTime" type="time" :disabled="!form.nightlyEnabled" /></label>
+      <button class="ghost" @click="runNow('nightly')">Run now</button>
+    </fieldset>
+    <fieldset>
+      <label class="check"><input v-model="form.reviewEnabled" type="checkbox" /> Weekly digest</label>
       <label
         >on
         <select v-model="form.reviewDay" :disabled="!form.reviewEnabled">
@@ -105,7 +117,8 @@ async function runNow(kind: "sweep" | "review") {
       <span class="muted">{{ saved }}</span>
     </div>
     <p class="muted small">
-      The weekly review arrives in a later version; for now a due review is recorded as requested.
+      Each morning's sweep brings new cards; the nightly run looks back at the day; the weekly digest (Digest tab) sums
+      up the week, lists every change with an undo, and takes your comments.
     </p>
 
     <h2>Cards</h2>

@@ -246,7 +246,8 @@ export interface ProjectOverview {
   hasDraft: boolean;
   charterRun: "running" | "done" | "failed" | null;
   paused: { since: string } | null;
-  next: { sweep: string | null; review: string | null; timeZone: string };
+  /** review is the weekly digest; nightly is the cycle's nightly run (v1.1). */
+  next: { sweep: string | null; nightly: string | null; review: string | null; timeZone: string };
   monthCostUsd: number;
 }
 
@@ -300,12 +301,17 @@ export type Weekday = "sun" | "mon" | "tue" | "wed" | "thu" | "fri" | "sat";
 export interface ScheduleSettings {
   timeZone: string;
   sweep: { enabled: boolean; time: string };
+  /** The nightly run of the daily cycle (v1.1). */
+  nightly: { enabled: boolean; time: string };
+  /** The weekly digest (stored as the review kind). */
   review: { enabled: boolean; weekday: Weekday; time: string };
 }
 
+export type RunKind = "sweep" | "nightly" | "review";
+
 export interface ScheduledRun {
   id: number;
-  kind: "sweep" | "review";
+  kind: RunKind;
   slot: string;
   slotAt: number | null;
   trigger: "scheduled" | "manual";

@@ -16,6 +16,8 @@ const TIME = /^([01]\d|2[0-3]):([0-5]\d)$/;
 export interface ScheduleDefaults {
   timeZone: string;
   sweepTime: string;
+  /** The nightly run of the daily cycle (RH_NIGHTLY_TIME, default 02:00). */
+  nightlyTime?: string;
   review: { weekday: Weekday; time: string };
 }
 
@@ -109,6 +111,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const sweepTime = env.RH_SWEEP_TIME?.trim() || "06:00";
   if (!TIME.test(sweepTime))
     throw new ConfigError(`RH_SWEEP_TIME must be HH:MM (24 h), got "${sweepTime}"`, "RH_SWEEP_TIME");
+  const nightlyTime = env.RH_NIGHTLY_TIME?.trim() || "02:00";
+  if (!TIME.test(nightlyTime))
+    throw new ConfigError(`RH_NIGHTLY_TIME must be HH:MM (24 h), got "${nightlyTime}"`, "RH_NIGHTLY_TIME");
   const reviewRaw = (env.RH_REVIEW_TIME?.trim() || "sun 07:00").toLowerCase();
   const [weekday, reviewTime] = reviewRaw.split(/\s+/);
   if (!WEEKDAYS.includes(weekday as Weekday) || !TIME.test(reviewTime ?? ""))
@@ -178,7 +183,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     promptsDir: join(APP_DIR, "prompt_engineering"),
     uiDir: resolve(REPO_ROOT, env.RH_UI_DIR?.trim() || "apps/rh-client-browser/dist"),
     allowedHosts,
-    schedule: { timeZone, sweepTime, review: { weekday: weekday as Weekday, time: reviewTime } },
+    schedule: { timeZone, sweepTime, nightlyTime, review: { weekday: weekday as Weekday, time: reviewTime } },
     papers,
     kbViewer,
   };

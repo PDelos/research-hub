@@ -200,6 +200,18 @@ const MIGRATIONS: string[] = [
   DROP TABLE kb_requests;
   ALTER TABLE kb_requests_v6 RENAME TO kb_requests;
   `,
+  // 7 (v1-1-lite-daily-cycle): the nightly run of the daily cycle joins the scheduled run kinds.
+  `
+  CREATE TABLE scheduled_runs_v7 (
+    id INTEGER PRIMARY KEY, kind TEXT NOT NULL CHECK (kind IN ('sweep', 'nightly', 'review')), slot TEXT NOT NULL,
+    slot_at INTEGER, trigger TEXT NOT NULL CHECK (trigger IN ('scheduled', 'manual')),
+    status TEXT NOT NULL CHECK (status IN ('requested', 'running', 'done', 'failed', 'skipped')),
+    reason TEXT, created_at TEXT NOT NULL, UNIQUE (kind, slot)
+  );
+  INSERT INTO scheduled_runs_v7 SELECT * FROM scheduled_runs;
+  DROP TABLE scheduled_runs;
+  ALTER TABLE scheduled_runs_v7 RENAME TO scheduled_runs;
+  `,
 ];
 
 export const VECTOR_KINDS = ["whole", "background", "method", "result"] as const;

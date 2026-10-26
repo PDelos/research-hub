@@ -84,21 +84,24 @@ function isoWeek(p: { y: number; m: number; d: number }): string {
   return `${t.getUTCFullYear()}-W${pad(week)}`;
 }
 
+export type RunKind = "sweep" | "nightly" | "review";
+export const RUN_KINDS: readonly RunKind[] = ["sweep", "nightly", "review"];
+
 export interface Slot {
-  kind: "sweep" | "review";
+  kind: RunKind;
   key: string;
   at: number;
 }
 
 const hm = (time: string) => time.split(":").map(Number) as [number, number];
 
-/** The sweep slot `back` days before the latest one that is due at `now`. */
-export function dailySlot(now: number, time: string, tz: string, back = 0): Slot {
+/** The daily (sweep or nightly) slot `back` days before the latest one that is due at `now`. */
+export function dailySlot(now: number, time: string, tz: string, back = 0, kind: "sweep" | "nightly" = "sweep"): Slot {
   const [hh, mm] = hm(time);
   let date = localParts(now, tz) as { y: number; m: number; d: number };
   if (zonedToUtc(date.y, date.m, date.d, hh, mm, tz) > now) date = shiftDate(date, -1);
   date = shiftDate(date, -back);
-  return { kind: "sweep", key: `sweep:${ymd(date)}`, at: zonedToUtc(date.y, date.m, date.d, hh, mm, tz) };
+  return { kind, key: `${kind}:${ymd(date)}`, at: zonedToUtc(date.y, date.m, date.d, hh, mm, tz) };
 }
 
 /** The review slot `back` weeks before the latest one that is due at `now`. */
@@ -117,6 +120,9 @@ export function weeklySlot(now: number, weekday: Weekday, time: string, tz: stri
 export interface ScheduleSettings {
   timeZone: string;
   sweep: { enabled: boolean; time: string };
+  /** The nightly run of the daily cycle. */
+  nightly: { enabled: boolean; time: string };
+  /** The weekly digest (stored as the review kind). */
   review: { enabled: boolean; weekday: Weekday; time: string };
 }
 
@@ -128,7 +134,7 @@ const TIME = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
 export interface ScheduledRun {
   id: number;
-  kind: "sweep" | "review";
+  kind: RunKind;
   slot: string;
   slotAt: number | null;
   trigger: "scheduled" | "manual";
@@ -178,6 +184,7 @@ export class Scheduler {
     return {
       timeZone: d.timeZone,
       sweep: { enabled: true, time: d.sweepTime, ...saved.sweep },
+      nightly: { enabled: true, time: d.nightlyTime ?? "02:00", ...saved.nightly },
       review: { enabled: true, weekday: d.review.weekday, time: d.review.time, ...saved.review },
     };
   }
@@ -186,15 +193,17 @@ export class Scheduler {
   setSchedule(patch: unknown): ScheduleSettings {
     const p = (patch ?? {}) as Record<string, any>;
     const current = this.schedule();
-    const next = { sweep: { ...current.sweep }, review: { ...current.review } };
-    if (p.sweep !== undefined) {
-      if (p.sweep.enabled !== undefined) {
-        if (typeof p.sweep.enabled !== "boolean") throw new ScheduleInvalid("sweep.enabled must be true or false");
-        next.sweep.enabled = p.sweep.enabled;
+    const next = { sweep: { ...current.sweep }, nightly: { ...current.nightly }, review: { ...current.review } };
+    for (const kind of ["sweep", "nightly"] as const) {
+      const part = p[kind];
+      if (part === undefined) continue;
+      if (part.enabled !== undefined) {
+        if (typeof part.enabled !== "boolean") throw new ScheduleInvalid(`${kind}.enabled must be true or false`);
+        next[kind].enabled = part.enabled;
       }
-      if (p.sweep.time !== undefined) {
-        if (!TIME.test(p.sweep.time)) throw new ScheduleInvalid("sweep.time must be HH:MM (24 h)");
-        next.sweep.time = p.sweep.time;
+      if (part.time !== undefined) {
+        if (!TIME.test(part.time)) throw new ScheduleInvalid(`${kind}.time must be HH:MM (24 h)`);
+        next[kind].time = part.time;
       }
     }
     if (p.review !== undefined) {
@@ -217,11 +226,11 @@ export class Scheduler {
     return this.schedule();
   }
 
-  private latest(kind: "sweep" | "review", now: number, back = 0): Slot {
+  private latest(kind: RunKind, now: number, back = 0): Slot {
     const s = this.schedule();
-    return kind === "sweep"
-      ? dailySlot(now, s.sweep.time, s.timeZone, back)
-      : weeklySlot(now, s.review.weekday, s.review.time, s.timeZone, back);
+    return kind === "review"
+      ? weeklySlot(now, s.review.weekday, s.review.time, s.timeZone, back)
+      : dailySlot(now, s[kind].time, s.timeZone, back, kind);
   }
 
   private record(
@@ -290,7 +299,7 @@ export class Scheduler {
   tick(now = Date.now()): ScheduledRun[] {
     const recorded: ScheduledRun[] = [];
     const schedule = this.schedule();
-    for (const kind of ["sweep", "review"] as const) {
+    for (const kind of RUN_KINDS) {
       if (!schedule[kind].enabled) continue;
       const slot = this.latest(kind, now);
       if (this.exists(kind, slot.key)) continue;
@@ -323,6 +332,13 @@ export class Scheduler {
     return run!;
   }
 
+  /** Record how a requested run went (the plugin that ran it calls this). */
+  mark(id: number, status: "running" | "done" | "failed", reason?: string): void {
+    this.deps.db
+      .prepare("UPDATE scheduled_runs SET status = ?, reason = COALESCE(?, reason) WHERE id = ?")
+      .run(status, reason ?? null, id);
+  }
+
   runs(limit = 100): ScheduledRun[] {
     return (this.deps.db.prepare("SELECT * FROM scheduled_runs ORDER BY id DESC LIMIT ?").all(limit) as any[]).map(
       toRun,
@@ -330,14 +346,14 @@ export class Scheduler {
   }
 
   /** The next scheduled time of each enabled kind, only while the project is active. */
-  next(now = Date.now()): { sweep: string | null; review: string | null; timeZone: string } {
+  next(now = Date.now()): { sweep: string | null; nightly: string | null; review: string | null; timeZone: string } {
     const schedule = this.schedule();
     const active = this.deps.state.status() === "active";
     const upcoming = (kind: Slot["kind"]) => {
       if (!active || !schedule[kind].enabled) return null;
       // The latest due slot one period ahead is the next slot: probe forward until it is after now.
       for (const ahead of [1, 2, 8]) {
-        const probe = now + (kind === "sweep" ? ahead * 86_400_000 : ahead * 7 * 86_400_000);
+        const probe = now + (kind === "review" ? ahead * 7 * 86_400_000 : ahead * 86_400_000);
         const slot = this.latest(kind, probe);
         if (slot.at > now) {
           let s = slot;
@@ -351,7 +367,12 @@ export class Scheduler {
       }
       return null;
     };
-    return { sweep: upcoming("sweep"), review: upcoming("review"), timeZone: schedule.timeZone };
+    return {
+      sweep: upcoming("sweep"),
+      nightly: upcoming("nightly"),
+      review: upcoming("review"),
+      timeZone: schedule.timeZone,
+    };
   }
 
   start(intervalMs = 60_000): void {

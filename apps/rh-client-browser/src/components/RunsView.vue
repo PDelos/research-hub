@@ -126,7 +126,7 @@ const counts = (c?: Record<string, number>) =>
         </li>
       </ul>
     </div>
-    <h3 class="section">Scheduled sweeps and reviews</h3>
+    <h3 class="section">Scheduled runs (sweeps, nightly runs, digests)</h3>
     <table>
       <thead>
         <tr>
