@@ -126,7 +126,10 @@ test("the desk may call a declared tool only while its plugin is available; unde
       contributions: {
         declaredChatTools: () => new Set(["search_papers", "recent_cards"]),
         chatTools: () =>
-          available ? [{ name: "search_papers" }, { name: "recent_cards" }] : [{ name: "recent_cards" }],
+          (available ? [{ name: "search_papers" }, { name: "recent_cards" }] : [{ name: "recent_cards" }]).map((t) => ({
+            ...t,
+            builtin: true,
+          })),
       },
     },
   };

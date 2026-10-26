@@ -100,7 +100,7 @@ const shapes = {
       additionalProperties: false,
       required: ["id", "title"],
       properties: {
-        id: { type: "string", pattern: "^[a-z0-9-]+(\\.[a-z0-9-]+)*$" },
+        id: { type: "string", pattern: "^[a-zA-Z0-9-]+(\\.[a-zA-Z0-9-]+)*$" },
         title: { type: "string", minLength: 1 },
       },
     },
@@ -290,11 +290,17 @@ export class ContributionRegistry {
   ) {}
 
   /** Plugins that can run, in discovery order (built-ins first). */
-  private plugins(): { id: string; manifest: PluginManifest; dir: string; c: Contributions }[] {
+  private plugins(): { id: string; manifest: PluginManifest; dir: string; builtin: boolean; c: Contributions }[] {
     const available = new Set(this.kernel.available());
     return [...this.discovery.plugins.values()]
       .filter((p) => available.has(p.manifest.id))
-      .map((p) => ({ id: p.manifest.id, manifest: p.manifest, dir: p.dir, c: contributionsOf(p.manifest) }));
+      .map((p) => ({
+        id: p.manifest.id,
+        manifest: p.manifest,
+        dir: p.dir,
+        builtin: p.builtin,
+        c: contributionsOf(p.manifest),
+      }));
   }
 
   tabs(): (TabContribution & { pluginId: string })[] {
@@ -310,10 +316,10 @@ export class ContributionRegistry {
   }
 
   /** Chat tools of available plugins (the first declaration of a name wins); `desk` limits to the desk's allow-list. */
-  chatTools(options: { desk?: boolean } = {}): (ChatToolContribution & { pluginId: string })[] {
+  chatTools(options: { desk?: boolean } = {}): (ChatToolContribution & { pluginId: string; builtin: boolean })[] {
     const seen = new Set<string>();
     return this.plugins()
-      .flatMap((p) => p.c.chatTools.map((t) => ({ ...t, pluginId: p.id })))
+      .flatMap((p) => p.c.chatTools.map((t) => ({ ...t, pluginId: p.id, builtin: p.builtin })))
       .filter((t) => !seen.has(t.name) && seen.add(t.name))
       .filter((t) => !options.desk || t.desk !== false);
   }

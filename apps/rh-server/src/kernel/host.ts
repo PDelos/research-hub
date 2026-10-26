@@ -6,10 +6,12 @@ import type { Db } from "../db.ts";
 import type { Logger } from "../logger.ts";
 import { createRhApi, EventBus, ScheduleRegistry, type KernelServices } from "./api.ts";
 import { ContributionRegistry } from "./contributions.ts";
-import { PluginKernel } from "./lifecycle.ts";
+import { defaultLoad, PluginKernel } from "./lifecycle.ts";
+import { externalModule } from "./plugin-process.ts";
 import { Budgets } from "./permissions.ts";
 import { discover, initialPlugins, type Discovery } from "./registry.ts";
-import { PluginState } from "./state.ts";
+import { PluginInstaller } from "./install.ts";
+import { hashFolder, PluginState } from "./state.ts";
 
 export interface PluginHostOptions {
   dataDir: string;
@@ -23,6 +25,8 @@ export interface PluginHostOptions {
   builtinHost?: (services: KernelServices, exportsOf: <T>(id: string) => Promise<T>) => unknown;
   fetch?: typeof fetch;
   activationTimeoutMs?: number;
+  /** Longest wait for an answer from an external plugin's process (default 30 s). */
+  pluginCallTimeoutMs?: number;
 }
 
 export interface PluginHost {
@@ -31,6 +35,7 @@ export interface PluginHost {
   readonly services: KernelServices;
   readonly discovery: Discovery;
   readonly state: PluginState;
+  readonly installer: PluginInstaller;
   /** What an active plugin's activate returned. */
   exportsOf<T>(id: string): Promise<T>;
   stop(): Promise<void>;
@@ -46,6 +51,13 @@ export async function startPluginHost(options: PluginHostOptions): Promise<Plugi
   });
   for (const invalid of discovery.invalid) log.warn("plugin.invalid", { dir: invalid.dir, problems: invalid.problems });
   await state.open(() => initialPlugins(discovery, env));
+  // An installed plugin whose files changed since it was approved does not run (tampering or a manual edit).
+  for (const plugin of discovery.plugins.values()) {
+    const locked = state.current().plugins[plugin.manifest.id];
+    if (plugin.builtin || !locked?.hash || plugin.incompatible) continue;
+    if (hashFolder(plugin.dir) !== locked.hash)
+      plugin.incompatible = "its files changed since it was installed; reinstall it";
+  }
   const events = new EventBus(log);
   const services: KernelServices = {
     db: options.db,
@@ -73,6 +85,15 @@ export async function startPluginHost(options: PluginHostOptions): Promise<Plugi
     env,
     ...(options.activationTimeoutMs ? { activationTimeoutMs: options.activationTimeoutMs } : {}),
     builtinHost: options.builtinHost?.(services, exportsOf),
+    // Built-ins run in the kernel's process; every other plugin in its own restricted process (design D6).
+    load: async (plugin) =>
+      plugin.builtin
+        ? defaultLoad(plugin)
+        : externalModule(plugin, {
+            log,
+            onFailure: (id, reason) => kernel.markFailed(id, reason),
+            ...(options.pluginCallTimeoutMs ? { callTimeoutMs: options.pluginCallTimeoutMs } : {}),
+          }),
     api: (plugin, subscriptions) => createRhApi(plugin, services, subscriptions),
   });
   const contributions = new ContributionRegistry(kernel, discovery);
@@ -81,9 +102,11 @@ export async function startPluginHost(options: PluginHostOptions): Promise<Plugi
   for (const p of kernel.list())
     if (p.state === "failed" || p.state === "blocked" || p.state === "incompatible")
       log.warn("plugin.unavailable", { plugin: p.id, state: p.state, reason: p.reason });
+  const installer = new PluginInstaller({ kernel, state, discovery, db: options.db, log });
   return {
     kernel,
     contributions,
+    installer,
     services,
     discovery,
     state,

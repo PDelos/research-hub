@@ -1,0 +1,30 @@
+{
+  "id": "acme.sample",
+  "version": "0.1.0",
+  "displayName": "Sample plugin",
+  "description": "A test plugin: a chat tool, a paper source, and commands that probe its sandbox.",
+  "engines": { "research-hub": "^1.0.0" },
+  "main": "main.mjs",
+  "activationEvents": ["onStartup"],
+  "contributes": {
+    "chatTools": [
+      {
+        "name": "sample_echo",
+        "description": "Echo a text back.",
+        "parameters": { "type": "object", "required": ["text"], "properties": { "text": { "type": "string" } } }
+      }
+    ],
+    "papers.source": [{ "id": "sample", "title": "Sample source" }],
+    "commands": [
+      { "id": "sample.env", "title": "List the environment" },
+      { "id": "sample.fetch", "title": "Fetch through rh.http" },
+      { "id": "sample.direct", "title": "Fetch directly" },
+      { "id": "sample.readEtc", "title": "Read a system file" },
+      { "id": "sample.remember", "title": "Store a text" },
+      { "id": "sample.recall", "title": "Read the stored text" },
+      { "id": "sample.crash", "title": "Exit the process" },
+      { "id": "sample.hang", "title": "Never answer" }
+    ]
+  },
+  "permissions": { "network": ["export.arxiv.org"] }
+}

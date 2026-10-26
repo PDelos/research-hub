@@ -408,6 +408,49 @@ export class PluginKernel {
     await this.apply();
   }
 
+  /**
+   * Mark a running plugin failed from outside (its process crashed or hung): what it registered is disposed, its
+   * dependents are deactivated and blocked, and the reason is shown. Enabling it again gives it a fresh start.
+   */
+  async markFailed(id: string, reason: string): Promise<void> {
+    const r = this.records.get(id);
+    if (!r || (r.state !== "active" && r.state !== "activating")) return;
+    const deps = new Set(dependentsOf(this.nodes(), id));
+    for (const dependent of this.activeOrder.filter((d) => deps.has(d)).toReversed())
+      await this.deactivateOne(dependent);
+    if (r.state === "active") {
+      const log = this.options.log.child({ plugin: id });
+      if (r.context) await dispose(undefined, r.context, log);
+      Object.assign(r, {
+        module: undefined,
+        context: undefined,
+        exports: undefined,
+        activatedAt: undefined,
+        settingsJson: undefined,
+        settingsHandlers: undefined,
+      });
+      this.activeOrder.splice(this.activeOrder.indexOf(id), 1);
+    }
+    this.options.log.warn("plugin.failed", { plugin: id, reason });
+    this.set(r, "failed", reason);
+    this.recompute();
+  }
+
+  /** Add a newly installed plugin (not active until enabled in the lockfile and its events fire). */
+  add(plugin: DiscoveredPlugin): void {
+    this.options.discovery.plugins.set(plugin.manifest.id, plugin);
+    this.records.set(plugin.manifest.id, { plugin, state: "inactive" });
+    this.recompute();
+  }
+
+  /** Remove an uninstalled plugin (deactivate it first). */
+  remove(id: string): void {
+    this.options.discovery.plugins.delete(id);
+    this.records.delete(id);
+    this.recompute();
+    this.emit();
+  }
+
   /** Deactivate every plugin, most recently activated first. */
   async stop(): Promise<void> {
     for (const id of this.activeOrder.toReversed()) await this.deactivateOne(id);
@@ -473,7 +516,7 @@ export class PluginKernel {
   }
 }
 
-async function defaultLoad(plugin: DiscoveredPlugin): Promise<PluginModule> {
+export async function defaultLoad(plugin: DiscoveredPlugin): Promise<PluginModule> {
   if (!plugin.manifest.main) return {};
   return (await import(pathToFileURL(join(plugin.dir, plugin.manifest.main)).href)) as PluginModule;
 }

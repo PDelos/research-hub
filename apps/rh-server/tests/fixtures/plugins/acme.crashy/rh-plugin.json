@@ -1,0 +1,8 @@
+{
+  "id": "acme.crashy",
+  "version": "0.1.0",
+  "displayName": "Crashy",
+  "engines": { "research-hub": "^1.0.0" },
+  "main": "main.mjs",
+  "activationEvents": ["onStartup"]
+}

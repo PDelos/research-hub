@@ -24,7 +24,7 @@
 
 ## 3. External plugins
 
-- [ ] 3.1 Implement the plugin host (child process with Node's permission model, clean environment, JSON-RPC `rh` proxy, crash and hang handling) and install from a folder or git URL with permission approval, uninstall with or without data; verify tests with a sample external plugin that adds a chat tool and a paper source, a crashing plugin, an undeclared host and no visible secrets
+- [x] 3.1 Implement the plugin host (child process with Node's permission model, clean environment, JSON-RPC `rh` proxy, crash and hang handling) and install from a folder or git URL with permission approval, uninstall with or without data; verify tests with a sample external plugin that adds a chat tool and a paper source, a crashing plugin, an undeclared host and no visible secrets
 - [ ] 3.2 Serve external UI entries and mount them as custom elements with the hub's tokens; verify a sample plugin tab renders and disappears when disabled
 
 ## 4. API and UI

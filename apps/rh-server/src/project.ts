@@ -201,7 +201,12 @@ export async function openProject(options: OpenProjectOptions): Promise<ProjectR
   for (const p of plugins.kernel.list())
     if (p.state === "active") hooks.push(await plugins.exportsOf<AgentHooks>(p.id));
   const agents = desk.createAgents({
-    extra: [observe, ...hooks.flatMap((h) => h?.agentExtensions ?? []), ...(options.extensions ?? [])],
+    extra: [
+      observe,
+      ...hooks.flatMap((h) => h?.agentExtensions ?? []),
+      desk.pluginTools(),
+      ...(options.extensions ?? []),
+    ],
     separate: hooks.flatMap((h) => h?.separateExtensions ?? []),
     ...(options.deskTools ? { deskTools: options.deskTools } : {}),
   });

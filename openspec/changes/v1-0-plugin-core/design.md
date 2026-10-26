@@ -75,6 +75,13 @@ run in one **plugin host** child process per plugin, started with Node's permiss
 processes, no addons, no worker threads) and a clean environment (no secrets); the `rh` API is a JSON-RPC proxy over
 stdio to the kernel, which enforces the declared network hosts, secrets and budgets on every call. Process plugins
 (`contributes.processes`) are supervised by the kernel (restart with backoff, loopback only).
+The plugin process gets no network at all (`--permission` without `--allow-net`): its requests go through
+`rh.http`, where the kernel checks the declared hosts. Kernel and plugin call each other over Node's IPC channel and
+functions cross as handles, so handlers, paper sources and disposables work both ways; every `rh` call is
+asynchronous on that side. A crash, or a call unanswered for 30 s, marks only that plugin failed (enabling it again
+starts a fresh process). The desk sees an external plugin's chat tools from the next start after installation
+(the agent runtime fixes its tools when it opens); enabling and disabling take effect at once. An installed
+plugin whose files no longer match the hash recorded at approval does not run.
 
 ### D7. Per-project plugin state
 `data/plugins/` is a git repository (isomorphic-git, no git binary needed in the image): `plugins.lock.json` (id,

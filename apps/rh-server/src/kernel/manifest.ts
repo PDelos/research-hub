@@ -40,7 +40,7 @@ export interface PluginManifest {
 }
 
 const ACTIVATION =
-  "^(\\*|onStartup|onView:[a-z0-9-]+|onCommand:[a-z0-9.-]+|onChatTool:[a-z0-9_]+|onExtensionPoint:[a-z0-9.-]+|onSchedule:[a-z0-9-]+)$";
+  "^(\\*|onStartup|onView:[a-z0-9-]+|onCommand:[a-zA-Z0-9.-]+|onChatTool:[a-z0-9_]+|onExtensionPoint:[a-z0-9.-]+|onSchedule:[a-z0-9-]+)$";
 
 const schema = {
   type: "object",

@@ -126,6 +126,7 @@ export interface KernelServices {
 // ---------------------------------------------------------------- the API
 
 export type FileScope = "storage" | "plugin" | "vault";
+export type SqlParam = string | number | bigint | null | Uint8Array;
 
 export interface RhApi {
   readonly version: string;
@@ -136,7 +137,12 @@ export interface RhApi {
     table(name: string): string;
     /** Apply the plugin's numbered migrations once each (recorded in plugin_migrations). */
     migrate(migrations: { version: number; sql: string }[]): number;
+    /** Built-ins only in practice (statements do not cross a process boundary). */
     prepare(sql: string): ReturnType<Db["prepare"]>;
+    /** Run a statement on the plugin's own tables. */
+    run(sql: string, ...params: SqlParam[]): { changes: number; lastInsertRowid: number };
+    all(sql: string, ...params: SqlParam[]): Record<string, unknown>[];
+    get(sql: string, ...params: SqlParam[]): Record<string, unknown> | undefined;
   };
   files: {
     read(scope: FileScope, path: string): string;
@@ -148,6 +154,7 @@ export interface RhApi {
     /** A paced, retried request to a declared host; `costUsd` (e.g. a paid search) counts against the budget. */
     request(url: string, options?: Partial<RequestOptions> & { costUsd?: number }): Promise<Response>;
     json<T>(url: string, options?: Partial<RequestOptions> & { costUsd?: number }): Promise<T>;
+    text(url: string, options?: Partial<RequestOptions> & { costUsd?: number }): Promise<string>;
   };
   secrets: { get(name: string): string | undefined };
   models: ModelsService;
@@ -186,6 +193,7 @@ const CREATES =
   /\bCREATE\s+(?:VIRTUAL\s+)?(?:TABLE|INDEX|UNIQUE\s+INDEX|TRIGGER|VIEW)\s+(?:IF\s+NOT\s+EXISTS\s+)?["`]?([A-Za-z0-9_]+)/gi;
 const TOUCHES =
   /\b(?:ALTER\s+TABLE|DROP\s+(?:TABLE|INDEX|TRIGGER|VIEW)(?:\s+IF\s+EXISTS)?|INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+["`]?([A-Za-z0-9_]+)/gi;
+const READS = /\b(?:FROM|JOIN)\s+["`]?([A-Za-z0-9_]+)/gi;
 
 export function createRhApi(plugin: DiscoveredPlugin, services: KernelServices, subscriptions: Disposable[]): RhApi {
   const { manifest } = plugin;
@@ -212,6 +220,14 @@ export function createRhApi(plugin: DiscoveredPlugin, services: KernelServices, 
     if (full !== root && !full.startsWith(root + sep))
       guard.deny("files", `${scope}:${path}`, `${id} may not reach ${path} outside its ${scope} folder`);
     return full;
+  };
+
+  /** Statements a plugin runs through rh.db may only read and change its own tables. */
+  const ownTables = (sql: string) => {
+    for (const re of [CREATES, TOUCHES, READS])
+      for (const match of sql.matchAll(re))
+        if (!match[1].startsWith(prefix))
+          guard.deny("db", match[1], `${id} may only use its own tables (${prefix}*), not ${match[1]}`);
   };
 
   const paid = async <T extends { costUsd: number }>(call: () => Promise<T>): Promise<T> => {
@@ -274,6 +290,19 @@ export function createRhApi(plugin: DiscoveredPlugin, services: KernelServices, 
         return applied;
       },
       prepare: (sql) => services.db.prepare(sql),
+      run(sql, ...params) {
+        ownTables(sql);
+        const r = services.db.prepare(sql).run(...params);
+        return { changes: Number(r.changes), lastInsertRowid: Number(r.lastInsertRowid) };
+      },
+      all(sql, ...params) {
+        ownTables(sql);
+        return services.db.prepare(sql).all(...params) as Record<string, unknown>[];
+      },
+      get(sql, ...params) {
+        ownTables(sql);
+        return services.db.prepare(sql).get(...params) as Record<string, unknown> | undefined;
+      },
     },
     files: {
       read: (scope, path) => readFileSync(file(scope, path, false), "utf8"),
@@ -303,6 +332,9 @@ export function createRhApi(plugin: DiscoveredPlugin, services: KernelServices, 
           headers: { accept: "application/json", ...options.headers },
         });
         return (await response.json()) as T;
+      },
+      async text(url, options = {}) {
+        return (await this.request(url, options)).text();
       },
     },
     secrets: {

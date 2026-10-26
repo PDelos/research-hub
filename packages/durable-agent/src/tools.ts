@@ -98,8 +98,10 @@ export async function once<T extends JsonValue>(
   return api.memo<T>(key, await fn(), ctx);
 }
 
-/** Block any tool outside `names` in conversations that select this hook's extension. */
-/** Block every tool call outside `names` (a list, or a function read at each call so the list can change). */
+/**
+ * Block any tool outside `names` in conversations that select this hook's extension (a list, or a function read at
+ * each call so the list can change).
+ */
 export function allowOnly(agent: string, names: readonly string[] | (() => readonly string[])): HookRegistration {
   return hook(ToolTask, {
     beforeTool: (call) =>
