@@ -35,6 +35,34 @@ p.charters.approve();
 p.syncVault();
 const { installer } = p.plugins;
 await installer.confirm((await installer.prepare({ folder: join(FIXTURE_PLUGINS, "acme.reading-list") })).planId);
+// Two charter proposals of the knowledge review, so the Digest and Charter tabs show them.
+await p.plugins.exportsOf("rh.knowledge");
+const seededAt = new Date().toISOString();
+const propose = p.db.prepare(
+  "INSERT INTO p_rh_knowledge__proposals (review_id, kind, change_key, change_json, evidence_json, status, base_version, created_at) VALUES (0, ?, ?, ?, ?, 'proposed', 1, ?)",
+);
+propose.run(
+  "add-question",
+  "add-question||ui",
+  JSON.stringify({
+    kind: "add-question",
+    text: "Do protein language models transfer to RNA?",
+    queries: ["RNA language model", "RNA structure transfer"],
+  }),
+  JSON.stringify({
+    summary: "Three papers you starred apply protein models to RNA.",
+    papers: [{ id: 1, title: "RNA-FM", verdict: "star" }],
+    score: 0.8,
+  }),
+  seededAt,
+);
+propose.run(
+  "add-out-of-scope",
+  "add-out-of-scope||clinical trials",
+  JSON.stringify({ kind: "add-out-of-scope", topic: "clinical trials" }),
+  JSON.stringify({ summary: "You marked 3 clinical papers off topic.", papers: [] }),
+  seededAt,
+);
 // One change and a digest, so the Digest tab has something to show (and to undo).
 await p.plugins.kernel.configure("rh.sweep", { cardsPerSweep: 5 });
 await (await p.plugins.exportsOf<DigestExports>("rh.digest")).buildDigest();

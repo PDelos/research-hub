@@ -12,6 +12,8 @@ import type {
   CycleStatus,
   SlotView,
   SourceAttribution,
+  KnowledgeProposal,
+  KnowledgeView,
   UpgradeFocus,
   UpgradeProposal,
   UpgradeSuggestion,
@@ -200,6 +202,15 @@ export class HubClient {
   approveProposal = (id: number) => this.call<UpgradeProposal>("POST", `/proposals/${id}/approve`, {});
   rejectProposal = (id: number) => this.call<UpgradeProposal>("POST", `/proposals/${id}/reject`, {});
   dismissSuggestion = (id: number) => this.call<UpgradeSuggestion>("POST", `/suggestions/${id}/dismiss`, {});
+
+  // The knowledge loop (v1.5)
+  knowledge = () => this.call<KnowledgeView>("GET", "/knowledge");
+  /** Start a knowledge review now (in the background). */
+  runKnowledgeReview = () => this.call<{ started: true }>("POST", "/knowledge/review", {});
+  approveKnowledge = (id: number) => this.call<KnowledgeProposal>("POST", `/knowledge/proposals/${id}/approve`, {});
+  rejectKnowledge = (id: number, reason?: string) =>
+    this.call<KnowledgeProposal>("POST", `/knowledge/proposals/${id}/reject`, reason ? { reason } : {});
+  undoKnowledge = (id: number) => this.call<KnowledgeProposal>("POST", `/knowledge/proposals/${id}/undo`, {});
 
   /** Tell the hub a tab was opened, so plugins activated by onView:<tab> start. */
   openView = (tab: string) => this.call<void>("POST", `/plugins/views/${encodeURIComponent(tab)}/open`, {});

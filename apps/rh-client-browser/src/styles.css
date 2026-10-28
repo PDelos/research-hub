@@ -1157,3 +1157,12 @@ button.danger {
 .quality a {
   color: var(--accent);
 }
+
+/* Charter proposals (v1.5) */
+.knowledge-proposals .evidence {
+  margin: 4px 0;
+  padding-left: 18px;
+}
+.knowledge-proposals .badge {
+  margin-left: 6px;
+}

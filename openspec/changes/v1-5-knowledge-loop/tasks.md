@@ -10,8 +10,8 @@
 
 ## 3. API and UI
 
-- [ ] 3.1 Routes `/v1/knowledge*`, SDK, the digest runs the review first and gains the section; verify API tests
-- [ ] 3.2 Digest section and the Charter tab's Proposals with Approve / Reject / Undo; verify build and Playwright tests
+- [x] 3.1 Routes `/v1/knowledge*`, SDK, the digest runs the review first and gains the section; verify API tests
+- [x] 3.2 Digest section and the Charter tab's Proposals with Approve / Reject / Undo; verify build and Playwright tests
 
 ## 4. Integration
 

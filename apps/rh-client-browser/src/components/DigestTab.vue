@@ -1,8 +1,9 @@
 <script setup lang="ts">
+import KnowledgeProposals from "./KnowledgeProposals.vue";
 // The weekly digest (spec daily-cycle: Weekly digest, Comments, What changed): what the cycle did this week, every
 // change with an undo, and a comment box per section. Reading and commenting is the user's whole job here.
 import { computed, onMounted, ref } from "vue";
-import { isRhError, type DigestSection, type DigestSummary, type DigestView } from "@rh/sdk";
+import { isRhError, type DigestSection, type DigestSummary, type DigestView, type KnowledgeProposal } from "@rh/sdk";
 import { client } from "../store.ts";
 import { usePlugins } from "../stores/plugins.ts";
 import CycleStatus from "./CycleStatus.vue";
@@ -22,6 +23,7 @@ const sections: { id: DigestSection; title: string }[] = [
   { id: "quality", title: "Quality" },
   { id: "sources", title: "Sources" },
   { id: "upgrade", title: "Weekly upgrade" },
+  { id: "charter", title: "Charter and questions" },
   { id: "cost", title: "Cost" },
   { id: "changes", title: "What changed" },
   { id: "general", title: "Anything else" },
@@ -39,7 +41,18 @@ const undone = computed(
 async function open(id: number) {
   error.value = "";
   digest.value = await client.digest(id);
+  await loadLive();
 }
+// The digest is a snapshot; a proposal's status is shown as it is now (approved from here or the Charter tab).
+const live = ref<Map<number, KnowledgeProposal>>(new Map());
+async function loadLive() {
+  try {
+    live.value = new Map((await client.knowledge()).proposals.map((p) => [p.id, p]));
+  } catch {
+    live.value = new Map();
+  }
+}
+const charterProposals = computed(() => (digest.value?.charter?.proposals ?? []).map((p) => live.value.get(p.id) ?? p));
 async function load() {
   list.value = await client.digests();
   if (list.value.length && !digest.value) await open(list.value[0].id);
@@ -200,6 +213,10 @@ async function undo(commit: string, message: string) {
               </template>
             </li>
           </ul>
+        </template>
+        <template v-else-if="sec.id === 'charter'">
+          <p v-for="n in digest.charter?.reviewNotes ?? []" :key="n" class="muted small">{{ n }}</p>
+          <KnowledgeProposals :proposals="charterProposals" @changed="loadLive" />
         </template>
         <template v-else-if="sec.id === 'cost'">
           <p>

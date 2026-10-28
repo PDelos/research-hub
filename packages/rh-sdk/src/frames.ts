@@ -530,6 +530,7 @@ export type DigestSection =
   | "quality"
   | "sources"
   | "upgrade"
+  | "charter"
   | "cost"
   | "changes"
   | "general";
@@ -569,6 +570,8 @@ export interface DigestBody {
       startedAt: string;
     }[];
   };
+  /** The knowledge review (v1.5): charter proposals open now or decided this week. */
+  charter?: { proposals: KnowledgeProposal[]; reviewNotes: string[] };
   /** The harness (v1.2): the judge's agreement with you and the week's replays. */
   quality?: {
     judge: { agreement: number | null; cases: number; trusted: boolean } | null;
@@ -761,4 +764,57 @@ export interface UpgradesView {
   runs: UpgradeRun[];
   proposals: UpgradeProposal[];
   suggestions: UpgradeSuggestion[];
+}
+
+// ---------------------------------------------------------------- the knowledge loop (v1.5)
+
+export interface KnowledgeChange {
+  kind: "weight" | "retire-question" | "drop-query" | "add-question" | "add-out-of-scope";
+  target?: string;
+  targetKind?: "question" | "query";
+  from?: number;
+  to?: number;
+  text?: string;
+  queries?: string[];
+  topic?: string;
+}
+
+export interface KnowledgeProposal {
+  id: number;
+  reviewId: number;
+  kind: KnowledgeChange["kind"];
+  change: KnowledgeChange;
+  title: string;
+  evidence: {
+    summary: string;
+    papers: { id: number; title: string; verdict: string | null; reason?: string | null }[];
+    score?: number;
+  };
+  status: "proposed" | "approved" | "rejected" | "stale" | "undone";
+  baseVersion: number;
+  appliedVersion: number | null;
+  reason: string | null;
+  createdAt: string;
+  decidedAt: string | null;
+}
+
+export interface KnowledgeReview {
+  id: number;
+  requestedBy: string;
+  report: {
+    charterVersion: number | null;
+    rules: number;
+    directions: { question: string; score: number | null; kept: boolean; note?: string }[];
+    outOfScope: { topic: string; kept: boolean; note?: string }[];
+    proposals: number[];
+    notes: string[];
+  };
+  costUsd: number;
+  createdAt: string;
+}
+
+export interface KnowledgeView {
+  running: boolean;
+  reviews: KnowledgeReview[];
+  proposals: KnowledgeProposal[];
 }

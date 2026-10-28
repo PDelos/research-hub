@@ -14,6 +14,7 @@ import { pluginRoutes } from "./routes-plugins.ts";
 import { cycleRoutes } from "./routes-cycle.ts";
 import { harnessRoutes } from "./routes-harness.ts";
 import { upgradeRoutes } from "./routes-upgrades.ts";
+import { knowledgeRoutes } from "./routes-knowledge.ts";
 import { StreamHub } from "./sse.ts";
 
 export function createHttpApp(hub: Hub) {
@@ -35,6 +36,7 @@ export function createHttpApp(hub: Hub) {
   http.use(cycleRoutes(hub));
   http.use(harnessRoutes(hub));
   http.use(upgradeRoutes(hub));
+  http.use(knowledgeRoutes(hub));
   const indexFile = join(config.uiDir, "index.html");
   if (existsSync(indexFile)) {
     // The page title names the project, so several project tabs are easy to tell apart.

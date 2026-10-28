@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
-import type { CharterBody } from "@rh/sdk";
+import { computed, onMounted, ref, watch } from "vue";
+import type { CharterBody, KnowledgeView } from "@rh/sdk";
 import BriefScreen from "./BriefScreen.vue";
+import KnowledgeProposals from "./KnowledgeProposals.vue";
 import { act, client, store } from "../store.ts";
 
 const view = computed(() => store.charter);
@@ -81,6 +82,35 @@ async function replaceBrief() {
   briefText.value = (await client.brief()).brief ?? "";
   replacingBrief.value = true;
 }
+
+// Proposals of the knowledge review (v1.5): open ones first, then the latest decided.
+const knowledge = ref<KnowledgeView>();
+const loadKnowledge = async () => {
+  try {
+    knowledge.value = await client.knowledge();
+  } catch {
+    // Without the knowledge plugin the section stays hidden.
+  }
+};
+onMounted(loadKnowledge);
+const proposals = computed(() => {
+  const all = knowledge.value?.proposals ?? [];
+  return [...all.filter((p) => p.status === "proposed"), ...all.filter((p) => p.status !== "proposed").slice(0, 5)];
+});
+const reviewing = ref(false);
+async function reviewNow() {
+  reviewing.value = true;
+  try {
+    await client.runKnowledgeReview();
+    for (let i = 0; i < 120; i++) {
+      await new Promise((r) => setTimeout(r, 1000));
+      await loadKnowledge();
+      if (!knowledge.value?.running) break;
+    }
+  } finally {
+    reviewing.value = false;
+  }
+}
 </script>
 
 <template>
@@ -155,7 +185,8 @@ async function replaceBrief() {
         <h3>Research questions</h3>
         <ol class="questions-list">
           <li v-for="q in shown.charter.questions" :key="q.id">
-            <span>{{ q.text }}</span> <span v-if="q.weight !== 1" class="muted">· weight {{ q.weight }}</span>
+            <span class="muted">{{ q.id }}</span> <span>{{ q.text }}</span>
+            <span v-if="q.weight !== 1" class="muted">· weight {{ q.weight }}</span>
           </li>
         </ol>
         <h3>Search queries</h3>
@@ -180,6 +211,21 @@ async function replaceBrief() {
         </template>
       </section>
       <p v-else-if="!running" class="muted">No charter yet.</p>
+
+      <section v-if="knowledge && view.approved" class="view" data-test="charter-proposals">
+        <div class="row">
+          <h3>Proposals</h3>
+          <span class="spacer" />
+          <button class="ghost small" :disabled="reviewing || knowledge.running" @click="reviewNow">
+            {{ reviewing || knowledge.running ? "Reviewing…" : "Review now" }}
+          </button>
+        </div>
+        <p class="muted small">
+          Before each weekly digest the hub reads your judgments, reasons and comments and proposes changes to the
+          charter with the evidence. Nothing changes until you approve; an approved change becomes the next version.
+        </p>
+        <KnowledgeProposals :proposals="proposals" @changed="loadKnowledge" />
+      </section>
     </template>
   </div>
 </template>

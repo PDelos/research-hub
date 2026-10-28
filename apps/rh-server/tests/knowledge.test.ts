@@ -176,3 +176,38 @@ test("rejected proposals are not proposed again; low-promise directions are drop
     await empty.server.stop();
   }
 });
+
+test("the API runs a review in the background, decides proposals, and the digest runs the review and lists them", async () => {
+  const s = await project();
+  try {
+    const { client } = s.server;
+    assert.deepEqual((await client.knowledge()).proposals, []);
+    assert.deepEqual(await client.runKnowledgeReview(), { started: true });
+    await until(
+      async () => !(await client.knowledge()).running && (await client.knowledge()).reviews.length > 0,
+      10_000,
+    );
+    const view = await client.knowledge();
+    const add = view.proposals.find((p) => p.kind === "add-question")!;
+    const oos = view.proposals.find((p) => p.kind === "add-out-of-scope")!;
+    assert.equal((await client.approveKnowledge(add.id)).status, "approved");
+    assert.equal((await client.rejectKnowledge(oos.id, "clinics are fine")).reason, "clinics are fine");
+    await assert.rejects(client.approveKnowledge(add.id), /is approved/);
+    await assert.rejects(client.approveKnowledge(999), /no proposal 999/);
+    assert.equal((await client.undoKnowledge(add.id)).status, "undone");
+    const charter = await client.charter();
+    assert.equal(charter.approved?.version, 3);
+
+    const digest = await s.server.hub.project.plugins
+      .exportsOf<import("../plugins/rh.digest/main.ts").DigestExports>("rh.digest")
+      .then((d) => d.buildDigest(Date.now() + 1000));
+    assert.equal((await client.knowledge()).reviews[0].requestedBy, "digest", "the digest ran a review first");
+    const listed = digest.charter!.proposals;
+    assert.ok(listed.some((p) => p.id === add.id && p.status === "undone"));
+    assert.ok(listed.some((p) => p.id === oos.id && p.status === "rejected"));
+    assert.ok(listed.some((p) => p.kind === "retire-question" && p.status === "proposed"));
+    await client.commentDigest(digest.id, "charter", "Good ideas");
+  } finally {
+    await s.server.stop();
+  }
+});

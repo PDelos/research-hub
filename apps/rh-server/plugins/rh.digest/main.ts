@@ -11,6 +11,7 @@ import type { ScheduleExports } from "../rh.schedule/main.ts";
 import { buildDigest } from "./digest.ts";
 import type { HarnessExports } from "../rh.harness/main.ts";
 import type { UpgradesExports } from "../rh.upgrades/main.ts";
+import type { KnowledgeExports } from "../rh.knowledge/main.ts";
 
 export const DIGEST_SECTIONS: readonly DigestSection[] = [
   "cycle",
@@ -20,6 +21,7 @@ export const DIGEST_SECTIONS: readonly DigestSection[] = [
   "quality",
   "sources",
   "upgrade",
+  "charter",
   "cost",
   "changes",
   "general",
@@ -177,6 +179,15 @@ export function activate(context: PluginContext): DigestExports {
           }
         ).n,
       );
+      // The knowledge review runs first (its model call is not the digest's), so its proposals are in this digest.
+      let knowledge: KnowledgeExports | undefined;
+      let reviewNotes: string[] = [];
+      try {
+        knowledge = await host.exportsOf<KnowledgeExports>("rh.knowledge");
+        reviewNotes = (await knowledge.review("digest")).report.notes;
+      } catch (error) {
+        context.log.warn("digest.knowledge_review_failed", { error: String(error) });
+      }
       const body = buildDigest({
         db,
         week: label,
@@ -238,6 +249,15 @@ export function activate(context: PluginContext): DigestExports {
       } catch {
         // No weekly upgrade plugin: no upgrade section.
       }
+      if (knowledge)
+        body.charter = {
+          proposals: knowledge
+            .proposals()
+            .filter(
+              (p) => p.status === "proposed" || (p.decidedAt !== null && p.decidedAt >= from && p.decidedAt < to),
+            ),
+          reviewNotes,
+        };
       const r = db
         .prepare(
           `INSERT INTO ${T.digests} (week, period_from, period_to, body_json, created_at) VALUES (?, ?, ?, ?, ?)`,
