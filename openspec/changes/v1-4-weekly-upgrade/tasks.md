@@ -1,7 +1,7 @@
 ## 1. Foundations
 
 - [x] 1.1 Embedder settings `model`/`dims` with env defaults, live change (`embedder.changed`), the delegating embedder in rh.papers with table resize, re-sync and catch-up; native-size embeddings for benchmarks; verify a live switch re-embeds without restart and existing tests pass
-- [ ] 1.2 `research` in rh.provider-openrouter (OpenRouter web plugin; unavailable offline unless a test fetch is injected); verify with a fake OpenRouter
+- [x] 1.2 `research` in rh.provider-openrouter (OpenRouter web plugin; unavailable offline unless a test fetch is injected); verify with a fake OpenRouter
 
 ## 2. The upgrade plugin
 
