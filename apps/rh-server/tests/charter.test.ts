@@ -172,3 +172,38 @@ test("lists sent as JSON-encoded strings are accepted; other non-lists name the 
     "concepts: must be a list (a JSON array), not string",
   ]);
 });
+
+test("an approved version keeps question ids: retiring one does not shift the others, a new one gets the next id", () => {
+  const s = store();
+  try {
+    s.charters.saveDraft(
+      validateCharter(sampleCharter({ questions: ["A?", "B?", "C?", "D?"].map((text) => ({ text })) })),
+      "agent",
+    );
+    s.charters.approve();
+    const open = s.charters.saveDraft(validateCharter(sampleCharter()), "user");
+    const v1 = s.charters.approved()!.charter;
+    const retired = s.charters.approveVersion({ ...v1, questions: v1.questions.filter((q) => q.id !== "Q2") }, "user");
+    assert.equal(retired.version, 2);
+    assert.deepEqual(
+      retired.charter.questions.map((q) => q.id),
+      ["Q1", "Q3", "Q4"],
+    );
+    const added = s.charters.approveVersion(
+      { ...retired.charter, questions: [...retired.charter.questions, { text: "E?" } as never] },
+      "user",
+    );
+    assert.deepEqual(
+      added.charter.questions.map((q) => `${q.id} ${q.text}`),
+      ["Q1 A?", "Q3 C?", "Q4 D?", "Q5 E?"],
+    );
+    assert.equal(s.charters.draft()?.id, open.id, "an open draft is untouched");
+    // Drafts are renumbered as before.
+    assert.deepEqual(
+      s.charters.saveDraft(added.charter, "user").charter.questions.map((q) => q.id),
+      ["Q1", "Q2", "Q3", "Q4"],
+    );
+  } finally {
+    s.db.close();
+  }
+});

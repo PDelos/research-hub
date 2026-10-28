@@ -1,0 +1,53 @@
+{
+  "id": "rh.knowledge",
+  "version": "1.0.0",
+  "displayName": "Knowledge review",
+  "kind": "core",
+  "topic": "knowledge",
+  "description": "Before each weekly digest, turns your judgments, reasons and comments into charter proposals with evidence (weights, questions and queries to retire, new research questions, out-of-scope topics); an approved proposal becomes the next charter version.",
+  "engines": { "research-hub": "^1.0.0" },
+  "main": "main.ts",
+  "required": true,
+  "activationEvents": ["onStartup"],
+  "dependencies": {
+    "rh.provider-openrouter": "^1.0.0",
+    "rh.decision-jev": "^1.0.0",
+    "rh.charter": "^1.0.0",
+    "rh.feedback": "^1.0.0",
+    "rh.kb": "^1.0.0"
+  },
+  "contributes": {
+    "jevCommands": ["jev/question-promise"],
+    "settings": {
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Run the knowledge review before each digest."
+        },
+        "windowDays": {
+          "type": "integer",
+          "minimum": 7,
+          "maximum": 180,
+          "default": 28,
+          "description": "Days of judgments and comments the review looks at."
+        },
+        "maxDirections": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 5,
+          "default": 3,
+          "description": "New research questions asked for per review."
+        },
+        "minPromise": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0.5,
+          "description": "Jev's promise score a new question needs."
+        }
+      }
+    }
+  },
+  "permissions": { "budgetUsdPerDay": 0.5 }
+}

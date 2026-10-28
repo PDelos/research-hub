@@ -12,6 +12,7 @@ export const BUILTIN_MODULES: Record<string, () => Promise<PluginModule>> = {
   "rh.harness": () => import("../../plugins/rh.harness/main.ts") as Promise<PluginModule>,
   "rh.upgrades": () => import("../../plugins/rh.upgrades/main.ts") as Promise<PluginModule>,
   "rh.kb": () => import("../../plugins/rh.kb/main.ts") as Promise<PluginModule>,
+  "rh.knowledge": () => import("../../plugins/rh.knowledge/main.ts") as Promise<PluginModule>,
   "rh.papers": () => import("../../plugins/rh.papers/main.ts") as Promise<PluginModule>,
   "rh.provider-openrouter": () => import("../../plugins/rh.provider-openrouter/main.ts") as Promise<PluginModule>,
   "rh.schedule": () => import("../../plugins/rh.schedule/main.ts") as Promise<PluginModule>,

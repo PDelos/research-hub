@@ -45,10 +45,12 @@ export class CharterInvalid extends Error {
 const isRecord = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v);
 
 /**
- * Validate and normalize a charter draft. Questions are renumbered Q1..Qn; weights default to 1. Every problem is
+ * Validate and normalize a charter draft. Questions are renumbered Q1..Qn (with `keepIds`, existing ids `Q<n>` are
+ * kept and new questions get the next free id, so retiring a question does not shift the others); weights default
+ * to 1. Every problem is
  * reported with the exact field and bound, e.g. "questions: 9 given, 3 to 7 allowed", so the agent can fix it.
  */
-export function validateCharter(input: unknown): Charter {
+export function validateCharter(input: unknown, options: { keepIds?: boolean } = {}): Charter {
   const problems: string[] = [];
   const body = isRecord(input) ? input : {};
   if (!isRecord(input)) problems.push("charter: must be an object");
@@ -90,10 +92,25 @@ export function validateCharter(input: unknown): Charter {
   const strings = (field: string, bounds: readonly [number, number]) =>
     list(field, bounds).map((v, i) => text(`${field}[${i + 1}]`, v, LIMITS.itemText));
 
-  const questions = list("questions", LIMITS.questions).map((q, i) => {
+  const rawQuestions = list("questions", LIMITS.questions);
+  const kept = new Set<string>();
+  if (options.keepIds)
+    for (const q of rawQuestions) {
+      const id = isRecord(q) && typeof q.id === "string" && /^Q[1-9]\d*$/.test(q.id) ? q.id : undefined;
+      if (id && !kept.has(id)) kept.add(id);
+    }
+  let next = Math.max(0, ...[...kept].map((id) => Number(id.slice(1))));
+  const seen = new Set<string>();
+  const questions = rawQuestions.map((q, i) => {
     const r = isRecord(q) ? q : { text: q };
+    let id = `Q${i + 1}`;
+    if (options.keepIds) {
+      const own = typeof r.id === "string" && kept.has(r.id) && !seen.has(r.id) ? r.id : undefined;
+      id = own ?? `Q${++next}`;
+      seen.add(id);
+    }
     return {
-      id: `Q${i + 1}`,
+      id,
       text: text(`questions[${i + 1}].text`, r.text, LIMITS.questionText),
       weight: weight(`questions[${i + 1}].weight`, r.weight),
     };
@@ -179,6 +196,22 @@ export class Charters {
       this.db.exec("ROLLBACK");
       throw error;
     }
+  }
+
+  /**
+   * Approve a charter as the next version directly (an approved knowledge proposal): question ids are kept, an open
+   * draft is left as it is.
+   */
+  approveVersion(charter: Charter, source: "agent" | "user"): CharterRecord {
+    const valid = validateCharter(charter, { keepIds: true });
+    const next = ((this.db.prepare("SELECT MAX(version) v FROM charters").get() as any).v ?? 0) + 1;
+    const now = nowIso();
+    this.db
+      .prepare(
+        "INSERT INTO charters (status, version, body_json, source, created_at, approved_at) VALUES ('approved', ?, ?, ?, ?, ?)",
+      )
+      .run(next, JSON.stringify(valid), source, now, now);
+    return this.version(next)!;
   }
 
   /** Approve the open draft as the next version. Returns undefined when there is no draft. */

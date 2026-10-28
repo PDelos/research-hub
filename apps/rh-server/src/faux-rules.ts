@@ -194,7 +194,58 @@ export const deskToolRule: FauxRule = (turn) => {
 };
 
 /** Default scripted rules for offline mode. */
+/**
+ * The offline knowledge review: one direction about the word most frequent in the liked papers' titles (not already
+ * in the charter's questions), motivated by up to 3 of them, and an out-of-scope topic when 2 or more 👎 papers are
+ * off topic (the word most frequent in their titles).
+ */
+export const knowledgeReviewRule: FauxRule = (turn) => {
+  if (!turn.system.includes("knowledge-review")) return undefined;
+  const prompt = turn.lastUser;
+  const lines = (heading: string) =>
+    section(prompt, heading)
+      .split("\n")
+      .map((l) => l.match(/^- #(\d+) (.*?)(?: \[[^\]]*\])?(?: \(([a-z-]+)\))?(?::.*)?$/))
+      .filter((m): m is RegExpMatchArray => !!m)
+      .map((m) => ({ id: Number(m[1]), title: m[2], kind: m[3] }));
+  const liked = lines("Liked papers (👍/⭐)");
+  const offTopic = lines("Disliked papers (👎)").filter((d) => d.kind === "off-topic");
+  const covered = section(prompt, "Charter").toLowerCase();
+  const top = (titles: string[], skip = "") => {
+    const counts = new Map<string, number>();
+    for (const t of titles)
+      for (const w of new Set(words(t))) if (w.length > 4 && !skip.includes(w)) counts.set(w, (counts.get(w) ?? 0) + 1);
+    return [...counts].toSorted((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0]?.[0];
+  };
+  const term = top(
+    liked.map((l) => l.title),
+    covered,
+  );
+  const directions = term
+    ? [
+        {
+          question: `What does recent work on ${term} add to the project's questions?`,
+          why: `${liked.length} papers you liked are about ${term}.`,
+          paperIds: liked.slice(0, 3).map((l) => l.id),
+          queries: [`${term} methods`, `${term} survey`],
+        },
+      ]
+    : [];
+  const topic = offTopic.length >= 2 ? top(offTopic.map((o) => o.title)) : undefined;
+  const outOfScope = topic
+    ? [
+        {
+          topic,
+          why: `You marked ${offTopic.length} papers off topic.`,
+          paperIds: offTopic.slice(0, 4).map((o) => o.id),
+        },
+      ]
+    : [];
+  return say(JSON.stringify({ directions, outOfScope }));
+};
+
 export const offlineRules: FauxRule[] = [
+  knowledgeReviewRule,
   charterWriterRule,
   cardWriterRule,
   librarianRule,
