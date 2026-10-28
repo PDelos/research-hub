@@ -336,6 +336,13 @@ Proposals are rows with `type`, `diff` (exact change), `evidence`, `status`. **A
 deterministically; **reject** with an optional reason (which also feeds `taste_examples`).
 Every decision is logged; accuracy is charted week over week on the project dashboard.
 
+**As built in v1-5 (2026-10-28):** the review is the `rh.knowledge` plugin and runs before each digest. It covers
+the interests, charter and new-questions phases with the evidence rules and one review-model call described in
+README "The knowledge loop" (sources: liked/disliked papers with reasons, digest comments, desk questions, unmatched
+liked papers, KB open questions). Not built yet: metrics/calibrate/curriculum phases as proposals, taste-rule
+clustering, field trends, same-method-different-problem, missing links and citation gaps (they need facet vectors
+and citation links in the KB).
+
 ### The charter evolves (with your approval)
 
 The charter is the project's statement of direction, so it never changes silently, but it is no longer fixed
@@ -496,7 +503,7 @@ so routes have no project segment. Built in v0: `/v1/{health,info,agent,chat,str
 jev/ping,project,brief,charter,schedule,scheduled-runs,cards,sweeps,sweep-settings,weights,feedback/precision,
 kb/papers,kb/notes,kb/search}`, `/v1/runs/{sweep,review}` (manual), `/v1/cards/:id/judgment`, and `/kb/` (the
 bundled Obsidian viewer). Built in v1: `/v1/plugins…` (v1-0), `/v1/cycle`, `/v1/digests…` (v1-1), `/v1/harness…` (v1-2), `/v1/slots…`,
-`/v1/attribution` (v1-3), `/v1/upgrades…`, `/v1/proposals…`, `/v1/suggestions…` (v1-4).
+`/v1/attribution` (v1-3), `/v1/upgrades…`, `/v1/proposals…`, `/v1/suggestions…` (v1-4), `/v1/knowledge…` (v1-5).
 
 **UI** (Vue 3):
 
@@ -603,7 +610,9 @@ a "What changed" feed with undo) → `v1-2-harness` ✅ (replays on your judgmen
 `v1-3-slots-and-benchmarks` ✅ (every plugin classified as core, slot, add-on or preference; the Plugins tab grouped by
 topic; benchmark presets per slot on cached public samples; usage attribution for add-ons) → `v1-4-weekly-upgrade` ✅
 (each week one focus chosen by Jev: ranking variants replayed and the winner applied with undo, an embedder candidate
-benchmarked and proposed, or add-ons scouted on the web) → `v1-5-knowledge-loop` (charter and new-question proposals).
+benchmarked and proposed, or add-ons scouted on the web) → `v1-5-knowledge-loop` ✅ (before each digest, charter
+proposals with evidence: weights, questions and queries to retire, new research questions scored by Jev, out-of-scope
+topics; an approved proposal is the next charter version) (charter and new-question proposals).
 Full text, the engineer, fine-tuning and MCP come later. What may change and how it is judged: EVOLUTION.md §0.1.
 
 v0 was built bottom-up; each layer is one OpenSpec change that depends only on the layers below it and

@@ -375,6 +375,15 @@ proposes charter changes and new research questions, and the user approves. Two 
   section; product upgrades have their own **Upgrades** tab (§3). Both use the same approve / reject / roll back
   actions and the same plugin history.
 
+**As built (v1-5, 2026-10-28):** the core plugin `rh.knowledge` runs a review before each weekly digest (or on
+request). Deterministic rules over the last `windowDays` (28) propose weights the judgments moved (≥ 0.25),
+retiring a question (≥ 8 judged cards, none liked) and dropping a query (≥ 10 carded papers, none liked); one
+review-model call drafts at most 3 research directions and 2 out-of-scope topics from the evidence pack; Jev
+`question-promise` keeps directions at ≥ 0.5; out-of-scope topics need 2 off-topic 👎 papers. Proposals sit in the
+digest ("Charter and questions") and the Charter tab; approve → the next charter version (stable question ids), reject
+(remembered 90 days), undo while latest. Question-finder strategies are not yet separate plugins: the evidence pack is
+the one strategy; same-method-different-problem and citation gaps wait for facet vectors and citation links.
+
 ---
 
 ## 5. The research project as the first real test
@@ -403,7 +412,7 @@ before the next). Order chosen so that each step makes the next one cheaper.
 | **3** ✅ 2026-10-26 | `v1-2-harness` | **Replays** of past sweeps against your judgments (train and held-out split), nDCG, precision@5, recall of ⭐ with bootstrap intervals; a **judge calibrated on your verdicts**; the Quality view. This is the preset of the Ranking slot | A change to a gate threshold is replayed and scored with an interval; the judge's agreement with your verdicts is reported |
 | **4** ✅ 2026-10-28 | `v1-3-slots-and-benchmarks` | The **classification** of §0.1 in every manifest (kind, topic, benchmark); the **Plugins tab grouped by topic and kind** (core collapsed, slots with alternatives, add-ons on/off); **benchmark presets** and a runner on cached public samples (first: Embedder with SCIDOCS + LitSearch samples, Facet labeler with PubMed RCT); **usage attribution** for add-ons in the digest | The embedder and facet presets run offline on cached samples and report their metric; the Plugins tab shows the four kinds; the digest shows per-source attribution |
 | **5** ✅ 2026-10-28 | `v1-4-weekly-upgrade` | The weekly upgrade of §0.2: nightly error analysis and slot choice, web search for candidates of one slot, the slot's preset on candidate vs active, settings winners applied with undo, plugin winners proposed; add-on scouting; a memory of what lost | A seeded weakness in the Ranking slot is found, a better setting is proven on held-out judgments and applied with undo; a candidate embedder is benchmarked and proposed; a new source is suggested with reasoning |
-| **6** | `v1-5-knowledge-loop` | Interests from your judgments, **charter proposals** and **new research questions** in the digest (you approve) | A digest proposes a charter change with evidence; approving it creates a charter version the next sweep uses |
+| **6** ✅ 2026-10-28 | `v1-5-knowledge-loop` | Interests from your judgments, **charter proposals** and **new research questions** in the digest (you approve) | A digest proposes a charter change with evidence; approving it creates a charter version the next sweep uses |
 | **7** | later | Full text and facet vectors for ⭐ (its slot preset: OmniDocBench and the research benchmarks), the engineer agent, fine-tuning (prompt optimization first), MCP for outside agents | Planned again when the loops run |
 
 

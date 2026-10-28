@@ -5,7 +5,7 @@ durable agent (built on [pi-durable](https://github.com/earendil-works/pi)) that
 [Jev](https://openrouter.ai/docs/guides/community/jev) make the bulk decisions, present a few paper cards a day,
 learn from your 👎/👍/⭐ and grow an Obsidian-compatible knowledge base. A new theme is a new container.
 
-**Status: v1.4 (the weekly upgrade).** v0 built the durable agent, Jev client, live stream, browser UI and containers (v0.0),
+**Status: v1.5 (the knowledge loop).** v0 built the durable agent, Jev client, live stream, browser UI and containers (v0.0),
 the brief, charter and schedule (v0.1), paper search with representations (v0.2), the daily sweep with paper cards
 (v0.3), learning from your judgments (v0.4) and the knowledge base with the real Obsidian interface (v0.5). v1.0 turns
 all of it into **plugins, like VS Code**: a small kernel and a plugin for every feature, which you can enable,
@@ -14,7 +14,8 @@ disable, configure, swap, install and roll back per project (see [Plugins](#plug
 [The daily cycle](#the-daily-cycle)). v1.2 measures the hub on your judgments ([Quality](#quality-the-harness)), v1.3 sorts every plugin into core, slots,
 add-ons and preferences with a fixed benchmark per slot ([What can change](#what-can-change-and-how-it-is-judged)),
 and v1.4 adds [the weekly upgrade](#the-weekly-upgrade): once a week the hub improves one slot on its benchmark or
-looks for new sources to add.
+looks for new sources to add. v1.5 closes the [knowledge loop](#the-knowledge-loop): before each digest the hub
+proposes charter changes and new research questions from what you liked, disliked and wrote, for you to approve.
 
 ## Architecture and what comes next
 
@@ -27,7 +28,8 @@ explain papers, analyze what you disliked or missed every night, replay candidat
 apply the ones that clearly win (each with undo), and send a weekly digest you read and comment on. You only read,
 judge and give opinions. Steps: a lighter image with the orchestrated cycle (v1-1), the replay harness on your
 judgments (v1-2), plugins grouped as core, slots with fixed benchmark presets, add-ons and preferences (v1-3), the
-weekly upgrade of one slot or a scout for add-ons (v1-4), all done; next, charter and new-question proposals (v1-5). Not
+weekly upgrade of one slot or a scout for add-ons (v1-4), and charter and new-question proposals (v1-5), all done;
+later: full text, the engineer agent, fine-tuning and MCP (EVOLUTION.md §6). Not
 everything can change: the core (including the harness that measures everything) never does; see EVOLUTION.md §0.1.
 
 ## Quick start (offline, no keys)
@@ -145,7 +147,7 @@ Each project runs one cycle on its own; your part is reading, judging and, when 
 | Every morning (`RH_SWEEP_TIME`, 06:00) | The sweep brings about 7 cards. Once you have liked papers, the last card is an **Exploration** pick: a paper outside the top ones, least like what you liked, so the feed does not narrow (setting `explorationPicks` of `rh.sweep`, 0 to 2, default 1) |
 | Any time | You judge cards 👎/👍/⭐ with a reason, or ask the desk |
 | Every night (`RH_NIGHTLY_TIME`, 02:00) | The nightly run records the day; the judge is recalibrated and labels new papers; once a week the [weekly upgrade](#the-weekly-upgrade) runs after it |
-| Weekly (`RH_REVIEW_TIME`, Sunday 07:00) | The **digest** (Digest tab): the week's sweeps and cards, your judgments and precision@5, the exploration picks and how you judged them, new knowledge-base notes, quality, sources, the week's upgrade, cost, and **every change** with an **Undo**. Each section has a comment box; your comments appear in the next digest |
+| Weekly (`RH_REVIEW_TIME`, Sunday 07:00) | The **digest** (Digest tab): the week's sweeps and cards, your judgments and precision@5, the exploration picks and how you judged them, new knowledge-base notes, quality, sources, the week's upgrade, charter proposals (Approve / Reject), cost, and **every change** with an **Undo**. Each section has a comment box; your comments appear in the next digest |
 
 A status line on the Feed and the Digest says where the cycle stands: the last sweep, how many cards wait for you,
 and the next sweep, nightly run and digest. **Undo** reverses one change and keeps later ones (it is refused, with
@@ -188,6 +190,31 @@ said "not enough data" ($0); scouting suggested CORE, Lens, OpenCitations, dblp 
 embedder run benchmarked Qwen3-Embedding-8B (0.679 mean nDCG@10) against the shortlisted Qwen3-Embedding-4B
 (0.678, not better), skipped Gemini Embedding 001 (about $0.18, over a $0.10 cap) and proposed nothing ($0.035,
 17 minutes, mostly embedding the samples).
+
+## The knowledge loop
+
+The charter is not fixed after the first approval. Before each weekly digest (and on "Review now" in the Charter
+tab) the **knowledge review** (`rh.knowledge`) reads the last 28 days (`windowDays`) and proposes changes, each with
+its evidence:
+
+| Proposal | When |
+|---|---|
+| **A weight** for a question or query | Your judgments moved its learned weight at least 0.25 away from the charter's |
+| **Retire a question** | At least 8 judged cards matched it and you liked none (while more than 3 remain) |
+| **Drop a query** | At least 10 of its papers became cards and you liked none (while more than 5 remain) |
+| **A new research question** with 2 queries | The review model drafts at most 3 from your liked and disliked papers with their reasons, your digest comments, your questions to the desk, liked papers that matched no question and the open questions in your knowledge base; the Jev command `question-promise` scores each (specific, answerable, not covered yet, at your level) and only those at 0.5 or more are proposed |
+| **An out-of-scope topic** | The model names it and at least 2 papers you marked 👎 as off topic share it |
+
+The proposals appear in the digest's "Charter and questions" section and in the Charter tab. **Approve** makes the
+change the next charter version (the open draft, if any, is untouched; weights replay; the vault's charter note
+follows), and the next sweep searches with it; **Reject** takes an optional reason, and a rejected proposal is not
+made again for 90 days; **Undo** restores the previous charter as a new version while no later version exists.
+Question ids stay stable: retiring Q2 keeps Q3 as Q3, and a new question gets the next id. Nothing changes without
+your approval.
+
+A first live review (2026-10-28, throwaway project, free review model, one real sweep with test judgments): two weight
+proposals and three drafted questions, of which Jev kept one (0.61) and dropped two (0.49); approving it created
+charter version 3 with Q5 and its two queries. The review cost $0.00007 (Jev only; the sweep before it $0.021).
 
 ## The knowledge base
 
@@ -385,6 +412,8 @@ curl -s -X POST -H "authorization: Bearer $RH_API_TOKEN" -H 'content-type: appli
 | `GET /v1/attribution?days=30` | Cards each paper source brought, and how many you liked |
 | `GET /v1/upgrades` · `POST /v1/upgrades/run` | Runs with their reports, proposals and suggestions · start a run now (`focus`: `ranking`, `embedder` or `scout-addons`; without it Jev chooses), in the background |
 | `POST /v1/proposals/:id/approve` · `POST /v1/proposals/:id/reject` · `POST /v1/suggestions/:id/dismiss` | Decide on a proposed upgrade · dismiss a suggested add-on |
+| `GET /v1/knowledge` · `POST /v1/knowledge/review` | Knowledge reviews and charter proposals · start a review now (in the background) |
+| `POST /v1/knowledge/proposals/:id/approve` · `…/reject` (`reason`) · `…/undo` | Make a proposal the next charter version · reject it · restore the charter before it |
 | `GET /v1/harness/quality` · `GET /v1/harness/replays` · `POST /v1/harness/replay` | The judge's agreement and quality over time · replays · replay a variant (`variant`) |
 | `GET /v1/cards` · `GET /v1/cards/:id` | The Feed (cards grouped by sweep, newest first) · one card with score details |
 | `GET /v1/sweeps[/:id]` | Sweeps with phases, counts, papers by status and the cost split |

@@ -18,8 +18,9 @@ context: |
     explicitly replaces them.
   - v0 (complete) was built as a pyramid: v0-0-skeleton -> v0-1-project-setup -> v0-2-paper-sources ->
     v0-3-daily-sweep -> v0-4-feedback -> v0-5-knowledge-vault. v1 follows EVOLUTION.md §6, in order:
-    v1-0-plugin-core (done) -> v1-1-lite-daily-cycle (done) -> v1-2-harness -> v1-3-slots-and-benchmarks ->
-    v1-4-weekly-upgrade -> v1-5-knowledge-loop; full text, the engineer, fine-tuning and MCP come later. Apply and
+    v1-0-plugin-core -> v1-1-lite-daily-cycle -> v1-2-harness -> v1-3-slots-and-benchmarks ->
+    v1-4-weekly-upgrade -> v1-5-knowledge-loop (all done 2026-10-28); full text, the engineer, fine-tuning and MCP
+    come later. Apply and
     archive each before the next. A change must not add requirements to a capability owned by an earlier change except as
     MODIFIED deltas.
   - Plugin architecture (from v1-0, EVOLUTION.md §2): a small kernel and plugins for every feature, modeled on
