@@ -1,0 +1,16 @@
+{
+  "id": "rh.converter-docling",
+  "version": "1.0.0",
+  "displayName": "Docling converter",
+  "kind": "slot",
+  "topic": "understanding",
+  "slot": "converter",
+  "description": "Turns PDFs into sections with Docling (layout, reading order, tables). Needs the research-hub:full image (RH_DOCLING=on) or a Docling Serve at RH_DOCLING_URL.",
+  "engines": { "research-hub": "^1.0.0" },
+  "main": "main.ts",
+  "activationEvents": ["onExtensionPoint:fulltext.converter"],
+  "contributes": {
+    "fulltext.converter": [{ "id": "docling", "title": "Docling (layout-aware)" }]
+  },
+  "permissions": {}
+}

@@ -11,6 +11,9 @@ USER_REASON: {{reason}}
 ABSTRACT:
 {{abstract}}
 
+FULL_TEXT (sections, possibly trimmed):
+{{full_text}}
+
 RESEARCH_QUESTIONS:
 {{questions}}
 

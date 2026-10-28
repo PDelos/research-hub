@@ -1,0 +1,53 @@
+{
+  "id": "rh.fulltext",
+  "version": "1.0.0",
+  "displayName": "Full text",
+  "kind": "core",
+  "topic": "understanding",
+  "description": "Gets the full text of starred papers (and others on request): arXiv HTML, Europe PMC and bioRxiv JATS XML, else the PDF through the active converter. The librarian writes notes from it and facet vectors come from its sections.",
+  "engines": { "research-hub": "^1.0.0" },
+  "main": "main.ts",
+  "required": true,
+  "activationEvents": ["onStartup"],
+  "dependencies": {
+    "rh.papers": "^1.0.0",
+    "rh.kb": "^1.0.0"
+  },
+  "contributes": {
+    "extensionPoints": {
+      "fulltext.converter": {
+        "description": "Turns a PDF into sections; one is active (the Converter slot).",
+        "cardinality": "one",
+        "default": "pdf-text",
+        "schema": { "required": ["id", "title"], "properties": { "title": { "type": "string" } } }
+      }
+    }
+  },
+  "permissions": {
+    "network": [
+      "arxiv.org",
+      "export.arxiv.org",
+      "www.ebi.ac.uk",
+      "europepmc.org",
+      "api.biorxiv.org",
+      "www.biorxiv.org",
+      "www.medrxiv.org",
+      "pmc.ncbi.nlm.nih.gov",
+      "www.ncbi.nlm.nih.gov",
+      "journals.plos.org",
+      "*.biomedcentral.com",
+      "*.frontiersin.org",
+      "*.mdpi.com",
+      "www.nature.com",
+      "elifesciences.org",
+      "cdn.elifesciences.org",
+      "academic.oup.com",
+      "openreview.net",
+      "proceedings.mlr.press",
+      "papers.nips.cc",
+      "proceedings.neurips.cc",
+      "aclanthology.org",
+      "openaccess.thecvf.com"
+    ]
+  }
+}

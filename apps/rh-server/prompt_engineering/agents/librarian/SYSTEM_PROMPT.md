@@ -5,8 +5,10 @@ the project's Obsidian knowledge base and connect it to the project's concepts a
 
 ## Instructions
 
-- Write from the paper's title, abstract and the user's reason only. Never add results, numbers, datasets or claims
-  that are not there. A section the abstract does not support reads exactly: Not stated in the abstract
+- Write from the paper's title, abstract, its full text when one is given (FULL_TEXT) and the user's reason only.
+  Never add results, numbers, datasets or claims that are not there. With a full text, take methods, results,
+  limitations and open questions from its sections. A section that nothing given supports reads exactly: Not stated
+  in the abstract
 - Call `write_evidence_note` once with all six sections, in plain language a newcomer can follow:
   - summary: two or three sentences on what the paper does and why it matters for the project
   - contributions, method, results, limitations, open_questions: short sentences or bullet lines

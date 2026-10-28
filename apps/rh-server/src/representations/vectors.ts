@@ -42,6 +42,21 @@ export class PaperVectors {
     },
   ) {}
 
+  /** Facet texts from a paper's full text (v1-6): when given, they replace the abstract's labeled sentences. */
+  private fullTextFacets?: (paperId: number) => Partial<Record<(typeof FACETS)[number], string>> | undefined;
+
+  setFullTextFacets(
+    fn: ((paperId: number) => Partial<Record<(typeof FACETS)[number], string>> | undefined) | undefined,
+  ): void {
+    this.fullTextFacets = fn;
+  }
+
+  /** Recompute one paper's vectors now (e.g. after its full text arrived). */
+  async refresh(paperId: number): Promise<RepresentResult> {
+    this.options.db.prepare("DELETE FROM representations WHERE paper_id = ?").run(paperId);
+    return this.represent([paperId]);
+  }
+
   get model(): string {
     return this.options.embedder.model;
   }
@@ -144,10 +159,12 @@ export class PaperVectors {
       texts.push(paper.titleOnly ? paper.title : `${paper.title}\n\n${paper.abstract}`);
       slots.push({ paperId: paper.id, kind: "whole" });
       const groups = FacetLabeler.group(labels);
+      const full = this.fullTextFacets?.(paper.id);
       for (const facet of FACETS) {
+        const fromFullText = full?.[facet];
         const sentences = groups[facet];
-        if (!sentences?.length) continue;
-        texts.push(sentences.join(" "));
+        if (!fromFullText && !sentences?.length) continue;
+        texts.push(fromFullText ?? sentences!.join(" "));
         slots.push({ paperId: paper.id, kind: facet });
       }
     }

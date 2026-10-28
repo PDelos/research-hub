@@ -4,11 +4,14 @@ import type { PluginModule } from "./lifecycle.ts";
 
 export const BUILTIN_MODULES: Record<string, () => Promise<PluginModule>> = {
   "rh.charter": () => import("../../plugins/rh.charter/main.ts") as Promise<PluginModule>,
+  "rh.converter-docling": () => import("../../plugins/rh.converter-docling/main.ts") as Promise<PluginModule>,
+  "rh.converter-pdf": () => import("../../plugins/rh.converter-pdf/main.ts") as Promise<PluginModule>,
   "rh.decision-jev": () => import("../../plugins/rh.decision-jev/main.ts") as Promise<PluginModule>,
   "rh.digest": () => import("../../plugins/rh.digest/main.ts") as Promise<PluginModule>,
   "rh.desk": () => import("../../plugins/rh.desk/main.ts") as Promise<PluginModule>,
   "rh.embedder-openrouter": () => import("../../plugins/rh.embedder-openrouter/main.ts") as Promise<PluginModule>,
   "rh.feedback": () => import("../../plugins/rh.feedback/main.ts") as Promise<PluginModule>,
+  "rh.fulltext": () => import("../../plugins/rh.fulltext/main.ts") as Promise<PluginModule>,
   "rh.harness": () => import("../../plugins/rh.harness/main.ts") as Promise<PluginModule>,
   "rh.upgrades": () => import("../../plugins/rh.upgrades/main.ts") as Promise<PluginModule>,
   "rh.kb": () => import("../../plugins/rh.kb/main.ts") as Promise<PluginModule>,

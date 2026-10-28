@@ -96,9 +96,10 @@ export class Ingest {
           if (!sections[key]?.trim())
             problems.push(`${key} is empty (write "${NOT_STATED}" if the abstract says nothing about it)`);
         const reason = this.deps.feedback.get(request.cardId)?.reason ?? "";
-        const source = `${paper.title} ${paper.abstract ?? ""} ${reason}`;
+        const source = `${paper.title} ${paper.abstract ?? ""} ${reason} ${this.fullTexts.get(paper.id) ?? ""}`;
         const invented = ungroundedNumbers(SECTIONS.map(([k]) => sections[k] ?? "").join(" "), source);
-        if (invented.length) problems.push(`numbers not in the title, abstract or reason: ${invented.join(", ")}`);
+        if (invented.length)
+          problems.push(`numbers not in the title, abstract, full text or reason: ${invented.join(", ")}`);
         if (problems.length)
           return toolError(`The note was not written: ${problems.join("; ")}.`, [
             "Fix exactly these and call write_evidence_note again.",
@@ -229,6 +230,14 @@ export class Ingest {
     if (this.timer) clearTimeout(this.timer);
   }
 
+  /** The paper's full text within a budget, when the full-text plugin can get it (v1-6). */
+  private fullText?: (paperId: number) => Promise<string | undefined>;
+  setFullText(fn: ((paperId: number) => Promise<string | undefined>) | undefined): void {
+    this.fullText = fn;
+  }
+  /** Full texts given to the librarian, for the number check. */
+  private readonly fullTexts = new Map<number, string>();
+
   private async start(request: KbRequest): Promise<void> {
     if (!this.harness || !this.ctx) return;
     // A note may already exist and be connected (a crash before the request was marked done).
@@ -239,6 +248,13 @@ export class Ingest {
     const paper = this.deps.store.get(request.paperId)!;
     const card = this.deps.cards.get(request.cardId);
     const charter = this.deps.charters.approved()!.charter;
+    let fullText: string | undefined;
+    try {
+      fullText = await this.fullText?.(paper.id);
+    } catch (error) {
+      this.deps.log.warn("kb.fulltext_failed", { paperId: paper.id, error: String(error) });
+    }
+    if (fullText) this.fullTexts.set(paper.id, fullText);
     const prompt = loadPrompt(join(this.deps.promptsDir, "agents"), "librarian", "USER_PROMPT_ingest.md", {
       title: paper.title,
       authors: paper.authors.slice(0, 8).join(", ") || "unknown",
@@ -248,6 +264,7 @@ export class Ingest {
       matched_question: card?.matchedQuestion ?? "none",
       reason: this.deps.feedback.get(request.cardId)?.reason ?? "(none)",
       abstract: paper.abstract ?? "(no abstract)",
+      full_text: fullText ?? "(not available: write from the abstract)",
       questions: charter.questions.map((q) => `${q.id}: ${q.text}`).join("\n"),
       concepts: this.existing("concepts").join("; ") || "(none yet)",
       charter_concepts: charter.concepts.join("; "),

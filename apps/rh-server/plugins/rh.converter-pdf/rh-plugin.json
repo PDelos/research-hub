@@ -1,0 +1,17 @@
+{
+  "id": "rh.converter-pdf",
+  "version": "1.0.0",
+  "displayName": "PDF text converter",
+  "kind": "slot",
+  "topic": "understanding",
+  "slot": "converter",
+  "description": "Turns PDFs into sections with pdf.js text (headings, no running headers or references). Light, in the core image; no layout or table recognition.",
+  "engines": { "research-hub": "^1.0.0" },
+  "main": "main.ts",
+  "required": true,
+  "activationEvents": ["onExtensionPoint:fulltext.converter"],
+  "contributes": {
+    "fulltext.converter": [{ "id": "pdf-text", "title": "PDF text (pdf.js)" }]
+  },
+  "permissions": {}
+}
