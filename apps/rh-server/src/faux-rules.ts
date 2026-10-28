@@ -225,7 +225,7 @@ export const knowledgeReviewRule: FauxRule = (turn) => {
     ? [
         {
           question: `What does recent work on ${term} add to the project's questions?`,
-          why: `${liked.length} papers you liked are about ${term}.`,
+          why: `${liked.length} papers you liked are about ${term}, such as #${liked[0].id}.`,
           paperIds: liked.slice(0, 3).map((l) => l.id),
           queries: [`${term} methods`, `${term} survey`],
         },

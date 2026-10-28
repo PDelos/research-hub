@@ -15,5 +15,5 @@
 
 ## 4. Integration
 
-- [ ] 4.1 All tests, checks, audit, offline e2e (a review with a proposal approved), UI tests, bundle and light image; one live review on a throwaway project (cost recorded)
+- [x] 4.1 All tests, checks, audit, offline e2e (a review with a proposal approved), UI tests, bundle and light image; one live review on a throwaway project (cost recorded)
 - [ ] 4.2 README, PLAN/EVOLUTION; archive

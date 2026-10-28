@@ -110,6 +110,7 @@ test("a review proposes from evidence and from the review model; approving creat
     assert.match(add.change.text!, /profiling/);
     assert.deepEqual(add.change.queries, ["profiling methods", "profiling survey"]);
     assert.equal(add.evidence.score, 0.8);
+    assert.match(add.evidence.summary, /such as “Ribosome profiling study/, "ids become titles");
     assert.ok(add.evidence.papers.every((p) => p.title.startsWith("Ribosome")));
     assert.equal(open.find((p) => p.kind === "add-out-of-scope")!.change.topic, "clinical");
     assert.ok(review.report.directions[0].kept);

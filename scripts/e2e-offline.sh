@@ -92,6 +92,11 @@ expect "nightly run recorded" "$n" 1
 curl -s -X POST "$U/runs/review" "${H[@]}" -d '{}' > /dev/null
 for _ in $(seq 1 40); do DIG=$(curl -s "$U/digests" "${H[@]}" | j "d[0]['id'] if d else ''"); [ -n "$DIG" ] && break; sleep 0.25; done
 expect "digest lists the sweep" "$(curl -s "$U/digests/$DIG" "${H[@]}" | j "len(d['cycle']['sweeps'])")" 1
+# The knowledge loop (v1-5): the digest ran a review first; a proposal approved becomes charter version 2.
+expect "knowledge review before the digest" "$(curl -s "$U/knowledge" "${H[@]}" | j "d['reviews'][0]['requestedBy']")" digest
+KP=$(curl -s "$U/knowledge" "${H[@]}" | j "[p['id'] for p in d['proposals'] if p['kind'] == 'add-question'][0]")
+expect "charter proposal approved" "$(curl -s -X POST "$U/knowledge/proposals/$KP/approve" "${H[@]}" -d '{}' | j "d['appliedVersion']")" 2
+expect "next charter version" "$(curl -s "$U/charter" "${H[@]}" | j "d['approved']['version']")" 2
 expect "comment saved" "$(curl -s -X POST "$U/digests/$DIG/comments" "${H[@]}" -d '{"section":"judgments","text":"more methods papers"}' | j "d['section']")" judgments
 SWAP=$(curl -s "$U/plugins/history?limit=500" "${H[@]}" | j "[h['id'] for h in d if h['message'] == 'configure rh.kb: kb.viewer'][0]")
 curl -s -X POST "$U/plugins/undo" "${H[@]}" -d "{\"commit\":\"$SWAP\"}" > /dev/null
