@@ -52,9 +52,9 @@ listed change.
 ### Requirement: Weekly digest
 The weekly digest SHALL summarize the week: sweeps and cards, judgments and precision@5 per sweep, exploration
 picks and their judgments, knowledge-base additions, cost, every change with Undo, the previous digest's
-comments, quality (the judge's agreement with the user and the replays of the week with their verdicts), and
-sources (the cards each paper source brought and how many were liked); it SHALL be computed from the project's
-records without an LLM call.
+comments, quality (the judge's agreement with the user and the replays of the week with their verdicts), sources
+(the cards each paper source brought and how many were liked), and the week's upgrade (its focus, what was tried,
+what was applied or proposed); it SHALL be computed from the project's records without an LLM call.
 
 #### Scenario: Digest contents
 - **WHEN** the digest runs after a week with 7 sweeps, 12 judgments, 2 knowledge-base notes and one plugin change
@@ -67,6 +67,10 @@ records without an LLM call.
 #### Scenario: Sources section
 - **WHEN** arXiv brought 5 cards this week, 3 liked, and Europe PMC 2, none liked
 - **THEN** the Sources section lists both with those numbers
+
+#### Scenario: Upgrade section
+- **WHEN** this week's upgrade applied `relevanceMin` 0.5
+- **THEN** the Upgrade section shows the focus, the variants tried and the applied change with Undo
 
 ### Requirement: Comments on the digest
 The user SHALL be able to comment on each section of a digest; comments SHALL be stored with the digest and
