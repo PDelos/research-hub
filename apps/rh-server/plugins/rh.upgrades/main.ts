@@ -89,6 +89,14 @@ export interface UpgradesExports {
   chooseFocus(): Promise<{ focus: Focus; reason: string; costUsd: number }>;
 }
 
+/** A reason as plain text: web answers cite inline as markdown links, which the report lists separately. */
+export function plainReason(text: unknown, max = 300): string {
+  return String(text ?? "")
+    .replace(/\s*\(?\[[^\]]*\]\([^)]*\)\)?/g, "")
+    .trim()
+    .slice(0, max);
+}
+
 /** Parse the first JSON array in a model's answer (it may be wrapped in prose or a code fence). */
 export function jsonArray(text: string): unknown[] {
   const start = text.indexOf("[");
@@ -220,6 +228,16 @@ export function activate(context: PluginContext): UpgradesExports {
           .get(since, since) as { c: number }
       ).c,
     );
+
+  // Web research is paid per request (OpenRouter's web plugin); it counts in the run's cost and the plugin's budget.
+  let researchUsd = 0;
+  const research: ProviderExports["research"] = async (prompt, o) => {
+    host.services.budgets.assertWithin(context.id, context.manifest.permissions.budgetUsdPerDay);
+    const r = await provider.research(prompt, o);
+    researchUsd += r.costUsd;
+    if (r.costUsd) host.services.budgets.charge(context.id, r.costUsd);
+    return r;
+  };
 
   // --- Focus ---------------------------------------------------------------------------------------------------
   const lastRun = () =>
@@ -373,7 +391,7 @@ export function activate(context: PluginContext): UpgradesExports {
     let shortlist: { id: string; reason: string }[] = [];
     let researchNote = "";
     try {
-      const answer = await provider.research(
+      const answer = await research(
         `Which of these OpenRouter embedding models is likely best for retrieving scientific papers (biology, bioinformatics, machine learning) by title and abstract? Search the web for recent benchmark results (e.g. MTEB, SciDocs). Answer only with a JSON array of at most 2 objects {"id": "<one of the ids>", "reason": "<one sentence>"}, best first.\n\nCurrent model: ${active.model}\nCandidates:\n${eligible
           .map((m) => `- ${m.id} ($${m.pricePerMillion.toFixed(3)}/M tokens): ${m.description}`)
           .join("\n")}`,
@@ -384,7 +402,7 @@ export function activate(context: PluginContext): UpgradesExports {
         .filter((x): x is { id: string; reason?: string } => !!x && typeof (x as { id?: unknown }).id === "string")
         .filter((x) => ids.has(x.id))
         .slice(0, 2)
-        .map((x) => ({ id: x.id, reason: String(x.reason ?? "").slice(0, 300) }));
+        .map((x) => ({ id: x.id, reason: plainReason(x.reason) }));
       researchNote = shortlist.length ? "shortlisted by web research" : "web research named no catalog model";
     } catch (error) {
       researchNote = `web research unavailable (${error instanceof Error ? error.message : String(error)})`;
@@ -410,7 +428,7 @@ export function activate(context: PluginContext): UpgradesExports {
     });
     const stars = (r: typeof base) => r.result.tasks.find((t) => t.task === "your-stars")?.value ?? null;
     let winner: { model: string; dims: number; record: typeof base; reason: string } | undefined;
-    let spent = base.costUsd;
+    let spent = base.costUsd + researchUsd;
     for (const pick of shortlist) {
       const m = eligible.find((e) => e.id === pick.id)!;
       const estimate = BENCHMARK_TOKENS_MILLIONS * m.pricePerMillion;
@@ -486,7 +504,7 @@ export function activate(context: PluginContext): UpgradesExports {
       : {};
     const installed = host.services.contributions.declaredContributions("papers.source").map((c) => c.id);
     const known = [...installed, ...suggestionsList(true).map((s) => s.name)];
-    const answer = await provider.research(
+    const answer = await research(
       `A self-hosted research assistant collects new scientific papers for these research questions:\n${
         (body.questions ?? []).map((q) => `- ${q.text}`).join("\n") || "- (no charter yet: AI and bioinformatics)"
       }\n\nIt already has these paper sources: ${installed.join(", ")}. Already suggested: ${known.join(", ") || "none"}.\nSearch the web for up to 5 free scholarly paper APIs or integrations (preprint servers, databases, citation graphs) it does not have yet that fit these questions. Answer only with a JSON array of objects {"name": "...", "url": "<official API or documentation link>", "reason": "<one sentence on why it fits>"}.`,
@@ -508,13 +526,13 @@ export function activate(context: PluginContext): UpgradesExports {
         runId,
         s.name.slice(0, 120),
         s.url.slice(0, 500),
-        String(s.reason ?? "").slice(0, 500),
+        plainReason(s.reason, 500),
         now(),
       );
     return {
       report: {
         analysis: { installed, citations: answer.citations.slice(0, 10) },
-        tried: items.map((s) => ({ what: s.name, why: String(s.reason ?? ""), note: s.url })),
+        tried: items.map((s) => ({ what: s.name, why: plainReason(s.reason, 500), note: s.url })),
         result: items.length
           ? `${items.length} add-on suggestions listed in the Upgrades tab.`
           : "No new sources or integrations found.",
@@ -547,6 +565,7 @@ export function activate(context: PluginContext): UpgradesExports {
       if (running) throw new UpgradeInvalid("an upgrade is already running");
       const work = (async () => {
         const started = now();
+        researchUsd = 0;
         const chosen = focus
           ? { focus, reason: requestedBy === "user" ? "Asked for by you." : `Asked for by ${requestedBy}.`, costUsd: 0 }
           : await chooseFocus();
@@ -581,7 +600,7 @@ export function activate(context: PluginContext): UpgradesExports {
         db.prepare(`UPDATE ${T.runs} SET status = ?, report_json = ?, cost_usd = ?, finished_at = ? WHERE id = ?`).run(
           status,
           JSON.stringify(report),
-          spentSince(started),
+          spentSince(started) + researchUsd,
           now(),
           id,
         );

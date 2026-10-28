@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { HarnessExports } from "../plugins/rh.harness/main.ts";
-import { jsonArray, type UpgradesExports } from "../plugins/rh.upgrades/main.ts";
+import { jsonArray, plainReason, type UpgradesExports } from "../plugins/rh.upgrades/main.ts";
 import { rankingGrid, shiftWeights } from "../plugins/rh.upgrades/ranking.ts";
 import { DEFAULT_SETTINGS } from "../src/harness/replay.ts";
 import { validateCharter } from "../src/charter.ts";
@@ -92,6 +92,10 @@ test("the grid starts from what the analysis points at and keeps rank weights su
   assert.deepEqual(grid[0].variant, { relevanceMin: DEFAULT_SETTINGS.relevanceMin + 0.05 });
   assert.deepEqual(jsonArray('Sure: ```json\n[{"id": "a"}]\n```'), [{ id: "a" }]);
   assert.deepEqual(jsonArray("no idea"), []);
+  assert.equal(
+    plainReason("Free DOI metadata, no key needed [crossref.org](https://api.crossref.org/works)."),
+    "Free DOI metadata, no key needed.",
+  );
 });
 
 test("due after everyDays; Jev picks the focus, and below 0.4 confidence the rotation does", async () => {
@@ -234,6 +238,7 @@ test("a scout run lists new sources from the web that the user can dismiss", asy
     ]);
     const run = await s.upgrades.run({ focus: "scout-addons" });
     assert.match(run.report!.result, /1 add-on suggestion/);
+    assert.equal(run.costUsd, 0.02, "the web search's cost");
     const [suggestion] = s.upgrades.suggestions();
     assert.equal(suggestion.name, "bioRxiv API");
     assert.match(String(s.or.research[0].messages.at(-1).content), /arxiv/);

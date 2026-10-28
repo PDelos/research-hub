@@ -66,8 +66,9 @@ export function activate(context: PluginContext): ProviderExports {
       error?: { message?: string };
     }>(CHAT_URL, {
       method: "POST",
-      timeoutMs: 120_000,
-      budgetMs: 240_000,
+      // Web search plus a reasoning model can take minutes; this runs in the background (weekly upgrade).
+      timeoutMs: 300_000,
+      budgetMs: 600_000,
       headers: {
         "content-type": "application/json",
         ...(host.options.openrouterKey ? { authorization: `Bearer ${host.options.openrouterKey}` } : {}),
@@ -75,6 +76,8 @@ export function activate(context: PluginContext): ProviderExports {
       body: JSON.stringify({
         model,
         plugins: [{ id: "web", max_results: o.maxResults ?? 5 }],
+        // Short answers from search results: little thinking needed (ignored by models without reasoning).
+        reasoning: { effort: "low" },
         usage: { include: true },
         messages: [...(o.system ? [{ role: "system", content: o.system }] : []), { role: "user", content: prompt }],
       }),

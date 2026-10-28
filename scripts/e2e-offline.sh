@@ -103,6 +103,11 @@ expect "quality: sweeps over time" "$(curl -s "$U/harness/quality" "${H[@]}" | j
 expect "slots in the catalog" "$(curl -s "$U/slots" "${H[@]}" | j "len(d)")" 6
 expect "core cannot be changed" "$(curl -s "$U/plugins" "${H[@]}" | j "[p['kind'] for p in d['plugins'] if p['id'] == 'rh.harness'][0]")" core
 expect "attribution (offline sources)" "$(curl -s "$U/attribution" "${H[@]}" | j "sum(a['cards'] for a in d) > 0")" True
+# The weekly upgrade (v1-4): a ranking run on one sweep reports that there is too little data and changes nothing.
+curl -s -X POST "$U/upgrades/run" "${H[@]}" -d '{"focus":"ranking"}' > /dev/null
+for _ in $(seq 1 40); do r=$(curl -s "$U/upgrades" "${H[@]}" | j "d['runs'][0]['status'] if d['runs'] else 'none'"); [ "$r" = done ] || [ "$r" = failed ] && break; sleep 0.25; done
+expect "upgrade run (ranking)" "$(curl -s "$U/upgrades" "${H[@]}" | j "d['runs'][0]['report']['result'][:30]")" "Nothing changed: not enough da"
+expect "nothing applied" "$(curl -s "$U/upgrades" "${H[@]}" | j "len(d['proposals'])")" 0
 expect "rolled back" "$(curl -s -X POST "$U/plugins/rollback" "${H[@]}" -d "{\"commit\":\"$INIT\"}" | j "[p['state'] for p in d['plugins'] if p['id'] == 'acme.sample'][0]")" disabled
 expect "viewer after rollback" "$(viewer)" library
 [ -n "${E2E_IMAGE:-}" ] && docker logs "$CONTAINER" >> "$LOG" 2>&1
