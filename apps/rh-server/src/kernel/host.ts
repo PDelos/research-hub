@@ -22,7 +22,12 @@ export interface PluginHostOptions {
   /** Built-in plugins folder (default apps/rh-server/plugins). */
   builtinDir?: string;
   /** What built-in plugins receive as `context.host`, given the kernel services and a way to reach other plugins. */
-  builtinHost?: (services: KernelServices, exportsOf: <T>(id: string) => Promise<T>, state: PluginState) => unknown;
+  builtinHost?: (
+    services: KernelServices,
+    exportsOf: <T>(id: string) => Promise<T>,
+    state: PluginState,
+    kernel: () => PluginKernel,
+  ) => unknown;
   fetch?: typeof fetch;
   activationTimeoutMs?: number;
   /** Longest wait for an answer from an external plugin's process (default 30 s). */
@@ -84,7 +89,7 @@ export async function startPluginHost(options: PluginHostOptions): Promise<Plugi
     log,
     env,
     ...(options.activationTimeoutMs ? { activationTimeoutMs: options.activationTimeoutMs } : {}),
-    builtinHost: options.builtinHost?.(services, exportsOf, state),
+    builtinHost: options.builtinHost?.(services, exportsOf, state, () => kernel),
     // Built-ins run in the kernel's process; other plugins with code in their own restricted process (design D6).
     load: async (plugin) =>
       // A plugin without code (declarative contributions only) needs no process.

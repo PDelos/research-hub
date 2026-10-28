@@ -1,0 +1,50 @@
+{
+  "id": "rh.upgrades",
+  "version": "1.0.0",
+  "displayName": "Weekly upgrade",
+  "kind": "core",
+  "topic": "ranking",
+  "description": "Once a week improves one slot on its fixed benchmark preset (ranking: applied with undo; embedder: proposed for your approval) or scouts add-ons on the web, and reports in the digest and the Upgrades tab.",
+  "engines": { "research-hub": "^1.0.0" },
+  "main": "main.ts",
+  "required": true,
+  "activationEvents": ["onStartup"],
+  "dependencies": {
+    "rh.provider-openrouter": "^1.0.0",
+    "rh.decision-jev": "^1.0.0",
+    "rh.papers": "^1.0.0",
+    "rh.sweep": "^1.0.0",
+    "rh.harness": "^1.0.0"
+  },
+  "contributes": {
+    "tabs": [{ "id": "upgrades", "title": "Upgrades", "view": "upgrades", "order": 17 }],
+    "jevCommands": ["jev/upgrade-focus"],
+    "settings": {
+      "properties": {
+        "enabled": { "type": "boolean", "default": true, "description": "Run the weekly upgrade." },
+        "everyDays": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 60,
+          "default": 7,
+          "description": "Days between upgrades."
+        },
+        "maxEmbedPricePerMillion": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 10,
+          "default": 0.25,
+          "description": "Embedding candidates cost at most this per million tokens."
+        },
+        "maxRunUsd": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 10,
+          "default": 0.5,
+          "description": "Most one upgrade run may spend on benchmarks and research."
+        }
+      }
+    }
+  },
+  "permissions": { "network": ["openrouter.ai"], "secrets": ["OPENROUTER_API_KEY"], "budgetUsdPerDay": 1 }
+}

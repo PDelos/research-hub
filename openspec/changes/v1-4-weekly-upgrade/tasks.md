@@ -5,10 +5,10 @@
 
 ## 2. The upgrade plugin
 
-- [ ] 2.1 `rh.upgrades`: tables, settings, nightly trigger when due, manual run, Jev `upgrade-focus` with rotation fallback; verify due/not-due and focus tests
-- [ ] 2.2 Ranking procedure (analysis, grid, replays, apply with undo or nothing); verify with seeded judgments that a winner is applied and undoable, and that no winner changes nothing
-- [ ] 2.3 Embedder procedure (catalog, shortlist, cost cap, benchmarks, proposal, approve/reject); verify offline with a fake catalog and research answer
-- [ ] 2.4 Scout procedure (suggestions, dismiss); verify with a fake research answer
+- [x] 2.1 `rh.upgrades`: tables, settings, nightly trigger when due, manual run, Jev `upgrade-focus` with rotation fallback; verify due/not-due and focus tests
+- [x] 2.2 Ranking procedure (analysis, grid, replays, apply with undo or nothing); verify with seeded judgments that a winner is applied and undoable, and that no winner changes nothing
+- [x] 2.3 Embedder procedure (catalog, shortlist, cost cap, benchmarks, proposal, approve/reject); verify offline with a fake catalog and research answer
+- [x] 2.4 Scout procedure (suggestions, dismiss); verify with a fake research answer
 
 ## 3. API and UI
 

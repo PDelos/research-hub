@@ -8,7 +8,7 @@ import type { Logger } from "../logger.ts";
 import type { OpenProjectOptions } from "../project.ts";
 import type { Telemetry } from "../telemetry.ts";
 import type { KernelServices } from "./api.ts";
-import type { HistoryEntry } from "./state.ts";
+import type { Actor, HistoryEntry } from "./state.ts";
 import type { PluginContext } from "./lifecycle.ts";
 
 export interface BuiltinHost {
@@ -27,6 +27,9 @@ export interface BuiltinHost {
   exportsOf<T>(id: string): Promise<T>;
   /** Every change to the plugin state, newest first (the digest lists them with undo). */
   pluginHistory(limit?: number): Promise<HistoryEntry[]>;
+  /** Change another plugin's settings as one recorded, undoable change (the weekly upgrade applies winners). */
+  configure(pluginId: string, changes: Record<string, unknown>, actor: Actor): Promise<void>;
+  undo(commit: string, actor: Actor): Promise<void>;
 }
 
 export function hostOf(context: PluginContext): BuiltinHost {

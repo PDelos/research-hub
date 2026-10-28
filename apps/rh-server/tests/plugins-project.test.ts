@@ -102,6 +102,7 @@ test("the v0 tabs come from built-in plugins and follow their enablement", async
       "feed:rh.sweep",
       "digest:rh.digest",
       "quality:rh.harness",
+      "upgrades:rh.upgrades",
       "library:rh.kb",
       "kb:rh.kb",
       "charter:rh.charter",
