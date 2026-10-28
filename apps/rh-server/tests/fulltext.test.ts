@@ -216,3 +216,24 @@ test("the API returns a paper's full text or its absence, fetches it on request,
     await s.server.stop();
   }
 });
+
+test("with RH_DOCLING=on the hub starts docling-serve itself on first use and stops it with the project", async () => {
+  process.env.RH_DOCLING = "on";
+  process.env.RH_DOCLING_CMD = join(import.meta.dirname, "fixtures/fulltext/fake-docling-serve.mjs");
+  process.env.RH_DOCLING_PORT = String(15_000 + Math.floor(Math.random() * 1000));
+  const s = await setup();
+  const health = `http://127.0.0.1:${process.env.RH_DOCLING_PORT}/health`;
+  try {
+    await assert.rejects(fetch(health), "not started before the first conversion");
+    const sections = await s.fulltext.convert(PDF, "docling");
+    assert.deepEqual(
+      sections.map((x) => x.text),
+      ["Started by the hub.", "Supervised."],
+    );
+  } finally {
+    await s.server.stop();
+    for (const k of ["RH_DOCLING", "RH_DOCLING_CMD", "RH_DOCLING_PORT"]) delete process.env[k];
+  }
+  await new Promise((r) => setTimeout(r, 300));
+  await assert.rejects(fetch(health), "stopped with the project");
+});

@@ -376,9 +376,17 @@ cd projects/proteins
 docker compose up -d               # open http://proteins.localhost:4850
 ```
 
-Two images: `research-hub:latest` (light: 232 MB on disk, an 82 MB download; the server is one bundled file on a
-minimal Node runtime; the Library shows the knowledge base) and `research-hub:obsidian` (the same plus Obsidian, 297
-MB). `docker compose build` builds the one a project's compose file names.
+Three images, each the previous plus an add-on:
+
+| Image | What it has | Size (download / unpacked, as `docker images` reports in 2026-10) |
+|---|---|---|
+| `research-hub:latest` (= `lite`) | The core: the server as one bundled file on a minimal Node runtime, the Library as viewer, the pdf.js converter; no Python | 82 MB / 326 MB |
+| `research-hub:obsidian` | Plus Obsidian (Ignis) as the knowledge-base viewer | about 90 MB / 401 MB |
+| `research-hub:full` | Plus Docling (Python, CPU PyTorch, its models) as the Converter slot's alternative | 2.3 GB / 7.3 GB |
+
+`docker compose build` builds the one a project's compose file names (`target: full` for the last). Docling on CPU
+takes about 45 seconds per PDF and up to 4–5 GB of memory while converting, so give a `full` project
+`RH_MEM_LIMIT=6g`.
 
 `new-project.sh` gives every project a unique compose name (`rh-<name>`), the next free port, a sweep time 20
 minutes after the previous project (so they don't hit the paper APIs together) and fresh tokens. Projects never
