@@ -599,7 +599,7 @@ add-on), the daily cycle (sweep with exploration picks, nightly run, weekly dige
 [EVOLUTION.md §0 and §6](EVOLUTION.md)** (revised 2026-10-26: core loop first, human on the loop):
 `v1-1-lite-daily-cycle` ✅ (a light image, Obsidian as an add-on, the daily cycle orchestrated with a weekly digest and
 a "What changed" feed with undo) → `v1-2-harness` ✅ (replays on your judgments, a judge calibrated on your verdicts: the Ranking slot's preset) →
-`v1-3-slots-and-benchmarks` (every plugin classified as core, slot, add-on or preference; the Plugins tab grouped by
+`v1-3-slots-and-benchmarks` ✅ (every plugin classified as core, slot, add-on or preference; the Plugins tab grouped by
 topic; benchmark presets per slot on cached public samples; usage attribution for add-ons) → `v1-4-weekly-upgrade`
 (improve one slot on its preset, or scout add-ons) → `v1-5-knowledge-loop` (charter and new-question proposals).
 Full text, the engineer, fine-tuning and MCP come later. What may change and how it is judged: EVOLUTION.md §0.1.

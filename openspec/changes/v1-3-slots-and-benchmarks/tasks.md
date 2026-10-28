@@ -27,4 +27,4 @@
     the project has liked papers). Facet preset (Jev abstract-facets) on 1,174 PubMed sentences: macro-F1 0.908,
     $0.013. The first live run exposed 210 empty LitSearch documents that the embeddings API refused; they are now
     left out (sample version 2).
-- [ ] 5.2 README, PLAN/EVOLUTION status; archive
+- [x] 5.2 README, PLAN/EVOLUTION status; archive

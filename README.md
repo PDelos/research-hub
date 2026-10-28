@@ -5,7 +5,7 @@ durable agent (built on [pi-durable](https://github.com/earendil-works/pi)) that
 [Jev](https://openrouter.ai/docs/guides/community/jev) make the bulk decisions, present a few paper cards a day,
 learn from your 👎/👍/⭐ and grow an Obsidian-compatible knowledge base. A new theme is a new container.
 
-**Status: v1.2 (the harness).** v0 built the durable agent, Jev client, live stream, browser UI and containers (v0.0),
+**Status: v1.3 (slots and benchmarks).** v0 built the durable agent, Jev client, live stream, browser UI and containers (v0.0),
 the brief, charter and schedule (v0.1), paper search with representations (v0.2), the daily sweep with paper cards
 (v0.3), learning from your judgments (v0.4) and the knowledge base with the real Obsidian interface (v0.5). v1.0 turns
 all of it into **plugins, like VS Code**: a small kernel and a plugin for every feature, which you can enable,
@@ -214,6 +214,26 @@ points), what it may reach (hosts, files, secrets, a daily budget), its settings
 - **History and rollback:** every change is a commit in `$RH_DATA_DIR/plugins/` (a git repository with
   `plugins.lock.json`), with who made it; "Restore this state" re-applies any earlier state.
 
+## What can change, and how it is judged
+
+Every plugin is one of four kinds, and the Plugins tab groups them that way, by topic:
+
+- **Core** (collapsed, cannot be changed): the kernel, the agent runtime, the database, the daily cycle, your
+  judgments, the charter, the vault, and the harness that measures everything.
+- **Slots** (one active each, replaced only when a benchmark says so): Ranking and gating (preset: replays on your
+  judgments), Embedder (SCIDOCS, LitSearch and "your stars"; nDCG@10), Facet labeler (PubMed 20k RCT; macro-F1),
+  Judge (agreement with you); Knowledge-base search and Models per job get presets later. Each slot card shows the
+  active implementation, its alternatives and the last result; "Run benchmark" runs the preset.
+- **Add-ons** (turn on or off): paper sources, enrichers, integrations, extra tabs. They are judged by what they
+  bring: each source shows the cards it found in the last 30 days and how many you liked (also in the digest).
+- **Preferences**: the knowledge-base viewer.
+
+Public benchmarks run on small fixed samples (100 queries or abstracts, seed 7), downloaded once per project from
+Hugging Face and cached, so results compare week to week; the datasets keep their licenses (SCIDOCS CC BY-SA 4.0,
+LitSearch MIT, PubMed 20k RCT its authors' terms). A first live run (2026-10-28): Qwen3-Embedding-8B scored
+SCIDOCS 0.555 / LitSearch 0.795 nDCG@10 ($0.009), Gemini Embedding 2 0.489 / 0.877 ($0.17); the facet labeler
+0.908 macro-F1 ($0.013).
+
 ## Writing a plugin
 
 A plugin is a folder with an `rh-plugin.json` and, if it has code, an ES module:
@@ -335,6 +355,8 @@ curl -s -X POST -H "authorization: Bearer $RH_API_TOKEN" -H 'content-type: appli
 | `GET /v1/scheduled-runs` · `POST /v1/runs/{sweep,nightly,review}` | Run log (requested, skipped with reason) · run now (review = the digest) |
 | `GET /v1/cycle` | Where the daily cycle stands: last sweep, cards waiting, next sweep, nightly run and digest |
 | `GET /v1/digests[/:id]` · `POST /v1/digests/:id/comments` | Weekly digests · comment on a section (`section`, `text`) |
+| `GET /v1/slots` · `POST /v1/slots/:id/benchmark` · `GET /v1/slots/benchmarks` | Slots with active implementation, preset and last result · run a preset (`candidate`, e.g. `{ "model": "google/gemini-embedding-2", "dims": 1024 }`) · past runs |
+| `GET /v1/attribution?days=30` | Cards each paper source brought, and how many you liked |
 | `GET /v1/harness/quality` · `GET /v1/harness/replays` · `POST /v1/harness/replay` | The judge's agreement and quality over time · replays · replay a variant (`variant`) |
 | `GET /v1/cards` · `GET /v1/cards/:id` | The Feed (cards grouped by sweep, newest first) · one card with score details |
 | `GET /v1/sweeps[/:id]` | Sweeps with phases, counts, papers by status and the cost split |
