@@ -53,8 +53,9 @@ listed change.
 The weekly digest SHALL summarize the week: sweeps and cards, judgments and precision@5 per sweep, exploration
 picks and their judgments, knowledge-base additions, cost, every change with Undo, the previous digest's
 comments, quality (the judge's agreement with the user and the replays of the week with their verdicts), sources
-(the cards each paper source brought and how many were liked), and the week's upgrade (its focus, what was tried,
-what was applied or proposed); it SHALL be computed from the project's records without an LLM call.
+(the cards each paper source brought and how many were liked), the week's upgrade (its focus, what was tried,
+what was applied or proposed), and the charter proposals of the knowledge review with Approve / Reject; it SHALL be
+computed from the project's records without an LLM call (the knowledge review runs before it).
 
 #### Scenario: Digest contents
 - **WHEN** the digest runs after a week with 7 sweeps, 12 judgments, 2 knowledge-base notes and one plugin change
@@ -71,6 +72,10 @@ what was applied or proposed); it SHALL be computed from the project's records w
 #### Scenario: Upgrade section
 - **WHEN** this week's upgrade applied `relevanceMin` 0.5
 - **THEN** the Upgrade section shows the focus, the variants tried and the applied change with Undo
+
+#### Scenario: Charter and questions section
+- **WHEN** the knowledge review proposed retiring Q3 and adding a new question
+- **THEN** the section lists both with their evidence and Approve / Reject
 
 ### Requirement: Comments on the digest
 The user SHALL be able to comment on each section of a digest; comments SHALL be stored with the digest and
