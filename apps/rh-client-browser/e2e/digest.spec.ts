@@ -2,7 +2,7 @@
 import { join } from "node:path";
 import { expect, test } from "@playwright/test";
 
-const SHOTS = join(import.meta.dirname, "../../../openspec/changes/v1-1-lite-daily-cycle/trial");
+const SHOTS = join(import.meta.dirname, "../screenshots");
 
 test.describe.configure({ mode: "serial" });
 

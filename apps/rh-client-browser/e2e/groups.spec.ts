@@ -2,7 +2,7 @@
 import { join } from "node:path";
 import { expect, test } from "@playwright/test";
 
-const SHOTS = join(import.meta.dirname, "../../../openspec/changes/v1-3-slots-and-benchmarks/trial");
+const SHOTS = join(import.meta.dirname, "../screenshots");
 
 test("the Plugins tab groups slots, add-ons, preferences and a collapsed core", async ({ page }) => {
   await page.goto("#/plugins");

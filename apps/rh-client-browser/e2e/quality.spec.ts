@@ -2,7 +2,7 @@
 import { join } from "node:path";
 import { expect, test } from "@playwright/test";
 
-const SHOTS = join(import.meta.dirname, "../../../openspec/changes/v1-2-harness/trial");
+const SHOTS = join(import.meta.dirname, "../screenshots");
 
 test("the Quality tab shows the judge, the cards over time and a replay with its verdict", async ({ page }) => {
   await page.goto("#/quality");

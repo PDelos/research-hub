@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 
 const FIXTURES = join(import.meta.dirname, "../../rh-server/tests/fixtures/plugins");
-const SHOTS = join(import.meta.dirname, "../../../openspec/changes/v1-0-plugin-core/trial");
+const SHOTS = join(import.meta.dirname, "../screenshots");
 
 test.describe.configure({ mode: "serial" });
 
