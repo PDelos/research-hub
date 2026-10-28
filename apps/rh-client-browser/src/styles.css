@@ -1097,3 +1097,63 @@ button.danger {
   white-space: nowrap;
   flex: none;
 }
+
+/* Grouped Plugins tab (v1.3) */
+.plugin-groups {
+  display: grid;
+  gap: 12px;
+}
+.plugin-group-kind {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 8px 14px;
+}
+.plugin-group-kind h3 {
+  margin: 6px 0;
+  display: inline;
+}
+.plugin-group-kind summary {
+  cursor: pointer;
+}
+.topic h4 {
+  margin: 10px 0 4px;
+  color: var(--muted);
+  font-weight: 600;
+}
+.slot-card {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 8px 12px;
+  margin: 6px 0;
+}
+.slot-card p {
+  margin: 4px 0;
+}
+.plugin-rows {
+  list-style: none;
+  padding: 0;
+  margin: 4px 0;
+}
+.plugin-rows li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--line);
+}
+.plugin-rows li.on {
+  background: var(--user);
+}
+
+.tabs {
+  flex: none;
+}
+.plugins-body.single {
+  grid-template-columns: 1fr;
+}
+.plugins a,
+.digest a,
+.quality a {
+  color: var(--accent);
+}

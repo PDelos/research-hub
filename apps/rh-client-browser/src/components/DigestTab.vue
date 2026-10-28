@@ -20,6 +20,7 @@ const sections: { id: DigestSection; title: string }[] = [
   { id: "exploration", title: "Exploration picks" },
   { id: "knowledgeBase", title: "Knowledge base" },
   { id: "quality", title: "Quality" },
+  { id: "sources", title: "Sources" },
   { id: "cost", title: "Cost" },
   { id: "changes", title: "What changed" },
   { id: "general", title: "Anything else" },
@@ -167,6 +168,14 @@ async function undo(commit: string, message: string) {
               {{ Object.keys(r.variant).join(", ") || "current settings" }}: <strong>{{ r.verdict }}</strong> ({{
                 r.heldOutDiff >= 0 ? "+" : ""
               }}{{ r.heldOutDiff.toFixed(2) }} nDCG)
+            </li>
+          </ul>
+        </template>
+        <template v-else-if="sec.id === 'sources'">
+          <p v-if="!digest.sources?.length" class="muted">No cards came in this week.</p>
+          <ul class="small">
+            <li v-for="x in digest.sources ?? []" :key="x.source">
+              {{ x.source }}: {{ x.cards }} cards, {{ x.liked }} liked
             </li>
           </ul>
         </template>

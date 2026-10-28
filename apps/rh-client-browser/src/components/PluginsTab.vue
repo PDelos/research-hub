@@ -3,7 +3,14 @@
 // permissions, settings and history; install (approve what it asks for first), enable, disable, configure,
 // uninstall and roll back.
 import { computed, onMounted, ref, watch } from "vue";
-import { isRhError, type PluginDetails, type PluginHistoryEntry, type PluginInstallPlan } from "@rh/sdk";
+import {
+  isRhError,
+  type PluginDetails,
+  type PluginHistoryEntry,
+  type PluginInstallPlan,
+  type SlotView,
+  type SourceAttribution,
+} from "@rh/sdk";
 import { client } from "../store.ts";
 import { usePlugins } from "../stores/plugins.ts";
 import PluginSettingsForm from "./PluginSettingsForm.vue";
@@ -20,11 +27,45 @@ const installing = ref(false);
 const source = ref({ kind: "git" as "git" | "folder", value: "" });
 const plan = ref<PluginInstallPlan>();
 
-const sorted = computed(() =>
-  plugins.plugins.toSorted(
-    (a, b) => Number(a.builtin) - Number(b.builtin) || a.displayName.localeCompare(b.displayName),
-  ),
-);
+const topics = [
+  { id: "finding", title: "Finding papers" },
+  { id: "understanding", title: "Understanding papers" },
+  { id: "ranking", title: "Ranking" },
+  { id: "knowledge", title: "Knowledge base" },
+  { id: "agents", title: "Agents and models" },
+  { id: "integrations", title: "Integrations" },
+  { id: "interface", title: "Interface" },
+] as const;
+const slots = ref<SlotView[]>([]);
+const attribution = ref<SourceAttribution[]>([]);
+const running = ref("");
+const slotsByTopic = (topic: string) => slots.value.filter((s) => s.topic === topic);
+const byKind = (kind: string, topic: string) => plugins.plugins.filter((p) => p.kind === kind && p.topic === topic);
+const usage = (pluginId: string) => {
+  const rows = attribution.value.filter((a) => a.pluginId === pluginId);
+  if (!rows.length) return "";
+  const cards = rows.reduce((n, r) => n + r.cards, 0);
+  const liked = rows.reduce((n, r) => n + r.liked, 0);
+  return `${cards} cards, ${liked} liked (30 days)`;
+};
+async function loadGroups() {
+  [slots.value, attribution.value] = await Promise.all([client.slots(), client.attribution(30)]);
+}
+async function runBenchmark(slot: string) {
+  running.value = slot;
+  try {
+    await run(() => client.runBenchmark(slot));
+    await loadGroups();
+  } catch {
+    // shown by run()
+  } finally {
+    running.value = "";
+  }
+}
+async function toggle(id: string, enabled: boolean) {
+  selected.value = id;
+  await setEnabled(enabled);
+}
 const stateLabel: Record<string, string> = {
   active: "active",
   activating: "starting",
@@ -55,6 +96,7 @@ function select(id: string) {
   void load(id);
 }
 onMounted(async () => {
+  void loadGroups();
   await plugins.refresh();
   await loadHistory();
 });
@@ -124,6 +166,7 @@ async function restore(entry: PluginHistoryEntry) {
   await run(() => client.rollbackPlugins(entry.id)).catch(() => undefined);
 }
 const time = (iso: string) => new Date(iso).toLocaleString();
+const day = (iso: string) => new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short" });
 const listOf = (items: string[] | undefined) => (items?.length ? items.join(", ") : "none");
 </script>
 
@@ -197,26 +240,103 @@ const listOf = (items: string[] | undefined) => (items?.length ? items.join(", "
       <li v-for="p in problems" :key="p">{{ p }}</li>
     </ul>
 
-    <div class="plugins-body">
-      <table class="plugin-list">
-        <tbody>
-          <tr
-            v-for="p in sorted"
-            :key="p.id"
-            :class="{ on: p.id === selected }"
-            :data-plugin="p.id"
-            @click="select(p.id)"
-          >
-            <td>
-              <strong>{{ p.displayName }}</strong>
-              <div class="muted small">{{ p.id }} {{ p.version }}{{ p.builtin ? " · built in" : "" }}</div>
-            </td>
-            <td>
+    <div class="plugins-body" :class="{ single: !details }">
+      <div class="plugin-groups">
+        <section class="plugin-group-kind" data-group="slots">
+          <h3>Slots <span class="muted small">one active each; replaced only when a benchmark says so</span></h3>
+          <template v-for="topic in topics" :key="'s' + topic.id">
+            <div v-if="slotsByTopic(topic.id).length" class="topic">
+              <h4>{{ topic.title }}</h4>
+              <article v-for="slot in slotsByTopic(topic.id)" :key="slot.id" class="slot-card" :data-slot="slot.id">
+                <div class="row">
+                  <strong>{{ slot.title }}</strong>
+                  <span class="spacer" />
+                  <button
+                    class="ghost small"
+                    :disabled="!slot.preset || running === slot.id"
+                    :title="slot.preset ? `Runs ${slot.preset.title}` : 'No benchmark preset yet'"
+                    @click="runBenchmark(slot.id)"
+                  >
+                    {{ running === slot.id ? "Running…" : "Run benchmark" }}
+                  </button>
+                </div>
+                <p class="muted small">{{ slot.description }}</p>
+                <p class="small">
+                  Active:
+                  <a href="#" @click.prevent="select(slot.active.pluginId)">{{ slot.active.name }}</a>
+                  <template v-if="slot.alternatives.length">
+                    · alternatives: {{ slot.alternatives.map((a) => a.name).join(", ") }}</template
+                  >
+                </p>
+                <p class="small">
+                  Preset: {{ slot.preset ? `${slot.preset.title} (${slot.preset.metric})` : "planned" }}
+                  <template v-if="slot.last">
+                    · last: <strong>{{ slot.last.result.label }}</strong> ({{ day(slot.last.createdAt) }}, ${{
+                      slot.last.costUsd.toFixed(4)
+                    }})</template
+                  >
+                </p>
+              </article>
+            </div>
+          </template>
+        </section>
+
+        <section class="plugin-group-kind" data-group="addons">
+          <h3>Add-ons <span class="muted small">add things; turn on or off</span></h3>
+          <template v-for="topic in topics" :key="'a' + topic.id">
+            <div v-if="byKind('addon', topic.id).length" class="topic">
+              <h4>{{ topic.title }}</h4>
+              <ul class="plugin-rows">
+                <li
+                  v-for="p in byKind('addon', topic.id)"
+                  :key="p.id"
+                  :data-plugin="p.id"
+                  :class="{ on: p.id === selected }"
+                >
+                  <a href="#" @click.prevent="select(p.id)">{{ p.displayName }}</a>
+                  <span class="muted small">{{ usage(p.id) }}</span>
+                  <span class="spacer" />
+                  <span class="state" :class="p.state">{{ stateLabel[p.state] }}</span>
+                  <button v-if="p.state === 'disabled'" class="ghost small" @click="toggle(p.id, true)">Turn on</button>
+                  <button v-else class="ghost small" @click="toggle(p.id, false)">Turn off</button>
+                </li>
+              </ul>
+            </div>
+          </template>
+        </section>
+
+        <section class="plugin-group-kind" data-group="preferences">
+          <h3>Preferences <span class="muted small">your choice, no benchmark</span></h3>
+          <ul class="plugin-rows">
+            <li v-for="p in plugins.plugins.filter((x) => x.kind === 'preference')" :key="p.id" :data-plugin="p.id">
+              <a href="#" @click.prevent="select(p.id)">{{ p.displayName }}</a>
+              <span class="spacer" />
               <span class="state" :class="p.state">{{ stateLabel[p.state] }}</span>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+            </li>
+          </ul>
+          <p class="muted small">
+            The Knowledge base viewer is chosen under Core → Knowledge base → Settings (Automatic by default).
+          </p>
+        </section>
+
+        <details class="plugin-group-kind" data-group="core">
+          <summary>
+            <h3>
+              Core
+              <span class="muted small"
+                >cannot be changed ({{ plugins.plugins.filter((x) => x.kind === "core").length }})</span
+              >
+            </h3>
+          </summary>
+          <ul class="plugin-rows">
+            <li v-for="p in plugins.plugins.filter((x) => x.kind === 'core')" :key="p.id" :data-plugin="p.id">
+              <a href="#" @click.prevent="select(p.id)">{{ p.displayName }}</a>
+              <span class="spacer" />
+              <span class="state" :class="p.state">{{ stateLabel[p.state] }}</span>
+            </li>
+          </ul>
+        </details>
+      </div>
 
       <article v-if="details" class="plugin-details">
         <h3>
@@ -305,7 +425,6 @@ const listOf = (items: string[] | undefined) => (items?.length ? items.join(", "
           </ul>
         </template>
       </article>
-      <p v-else class="empty muted">Select a plugin to see what it adds, what it may do, and its settings.</p>
     </div>
 
     <h3>History</h3>

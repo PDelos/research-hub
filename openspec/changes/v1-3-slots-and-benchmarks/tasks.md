@@ -14,7 +14,7 @@
 
 ## 4. UI
 
-- [ ] 4.1 The grouped Plugins tab (core collapsed, slot cards, add-ons with attribution, preferences) and the digest's Sources section; verify build and Playwright tests with screenshots
+- [x] 4.1 The grouped Plugins tab (core collapsed, slot cards, add-ons with attribution, preferences) and the digest's Sources section; verify build and Playwright tests with screenshots
 
 ## 5. Integration
 

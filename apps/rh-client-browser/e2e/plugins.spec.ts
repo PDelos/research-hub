@@ -11,7 +11,8 @@ test.describe.configure({ mode: "serial" });
 const tabs = (page: Page) => page.getByRole("tablist").getByRole("tab");
 const openPlugin = async (page: Page, id: string) => {
   await page.goto("#/plugins");
-  await page.locator(`tr[data-plugin="${id}"]`).click();
+  await page.locator('details[data-group="core"]').evaluate((d) => ((d as HTMLDetailsElement).open = true));
+  await page.locator(`li[data-plugin="${id}"] a`).click();
   await expect(page.locator(".plugin-details h3")).toContainText(id);
 };
 
@@ -85,11 +86,11 @@ test("installing shows what the plugin asks for; approve, then uninstall", async
   await expect(page.locator(".plan")).toContainText("Chat tools: sample_echo");
   await expect(page.locator(".plan")).toContainText("papers.source: sample");
   await page.getByRole("button", { name: "Approve and install" }).click();
-  await expect(page.locator('tr[data-plugin="acme.sample"] .state')).toHaveText("active");
+  await expect(page.locator('li[data-plugin="acme.sample"] .state')).toHaveText("active");
   await expect(page.locator(".plugin-details .history")).toContainText("install acme.sample 0.1.0");
 
   await page.getByRole("button", { name: "Uninstall" }).click();
-  await expect(page.locator('tr[data-plugin="acme.sample"]')).toHaveCount(0);
+  await expect(page.locator('li[data-plugin="acme.sample"]')).toHaveCount(0);
   await expect(page.locator(".plugins > .history")).toContainText("uninstall acme.sample");
 });
 
