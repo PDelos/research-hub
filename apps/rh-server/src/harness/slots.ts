@@ -37,6 +37,12 @@ export const PRESETS: Record<string, PresetInfo> = {
     metric: "macro-F1 over background, method, result",
   },
   judge: { id: "judge", title: "Agreement with you", tasks: ["your judged cards"], metric: "agreement (and kappa)" },
+  converter: {
+    id: "converter",
+    title: "arXiv PDF against its HTML",
+    tasks: ["converter-arxiv"],
+    metric: "(word F1 + section-heading recall) / 2",
+  },
 };
 
 export const SLOTS: SlotInfo[] = [
@@ -60,6 +66,13 @@ export const SLOTS: SlotInfo[] = [
     topic: "understanding",
     description: "Labels each abstract sentence as background, method or result.",
     preset: PRESETS.facets,
+  },
+  {
+    id: "converter",
+    title: "Converter",
+    topic: "understanding",
+    description: "Turns PDFs into sections when a paper has no HTML or XML version (full text of starred papers).",
+    preset: PRESETS.converter,
   },
   {
     id: "judge",

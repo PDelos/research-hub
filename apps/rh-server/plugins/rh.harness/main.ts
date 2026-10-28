@@ -23,6 +23,8 @@ import { facetsTask, retrievalTask, type TaskResult } from "../../src/harness/be
 import type { EmbedderExports } from "../rh.papers/main.ts";
 import type { SourceAttribution } from "@rh/sdk";
 import { sourceAttribution } from "../../src/harness/attribution.ts";
+import { converterTask, loadConverterSample } from "../../src/harness/benchmarks/converter.ts";
+import type { FullTextExports } from "../rh.fulltext/main.ts";
 
 export interface StoredReplay {
   id: number;
@@ -332,6 +334,44 @@ export async function activate(context: PluginContext): Promise<HarnessExports> 
           costSince(started),
         );
       }
+      if (slotId === "converter") {
+        const converter = candidate.converter;
+        if (converter !== undefined && (typeof converter !== "string" || !/^[a-z0-9-]+$/.test(converter)))
+          throw new BenchmarkInvalid("converter must be a converter id like pdf-text or docling");
+        const fulltext = await host.exportsOf<FullTextExports>("rh.fulltext");
+        const views = await fulltext.converters();
+        const chosen =
+          typeof converter === "string" ? views.find((v) => v.id === converter) : views.find((v) => v.active);
+        if (!chosen) throw new BenchmarkInvalid(`no converter ${String(converter)}`);
+        if (!chosen.available)
+          throw new BenchmarkInvalid(`${chosen.title} is not available here: ${chosen.reason ?? ""}`);
+        const task = await converterTask(await loadConverterSample(datasetIo), (pdf) =>
+          fulltext.convert(pdf, chosen.id),
+        );
+        const { perPaper, ...result } = task;
+        return record(
+          "converter",
+          "converter",
+          { converter: chosen.id, ...(converter ? { candidate: !chosen.active } : {}) },
+          {
+            tasks: [
+              {
+                ...result,
+                note: [
+                  result.note,
+                  perPaper.map((p) => `${p.id} F1 ${p.f1.toFixed(2)} headings ${p.headings.toFixed(2)}`).join("; "),
+                ]
+                  .filter(Boolean)
+                  .join(" | ")
+                  .slice(0, 2_000),
+              },
+            ],
+            value: task.value,
+            label: task.value === null ? "no result" : `score ${task.value.toFixed(3)}`,
+          },
+          0,
+        );
+      }
       // facets
       let task: TaskResult;
       try {
@@ -374,6 +414,17 @@ export async function activate(context: PluginContext): Promise<HarnessExports> 
           detail: { model: options.papers.embedModel, dims: options.papers.embedDims },
         },
         facets: { name: "Jev abstract-facets", pluginId: "rh.papers" },
+        converter: (() => {
+          const c = host.services.contributions.activeContribution(
+            "fulltext.converter",
+            host.settingsOf("rh.fulltext"),
+          );
+          return {
+            name: String(c?.title ?? "none"),
+            pluginId: c?.pluginId ?? "rh.converter-pdf",
+            detail: { converter: c?.id },
+          };
+        })(),
         judge: { name: "Jev would-like", pluginId: "rh.harness", detail: { ...judge.latestCalibration() } },
         "kb-search": { name: "SQLite full-text search", pluginId: "rh.kb" },
         models: {

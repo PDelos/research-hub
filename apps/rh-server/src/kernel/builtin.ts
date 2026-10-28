@@ -30,6 +30,8 @@ export interface BuiltinHost {
   /** Change another plugin's settings as one recorded, undoable change (the weekly upgrade applies winners). */
   configure(pluginId: string, changes: Record<string, unknown>, actor: Actor): Promise<void>;
   undo(commit: string, actor: Actor): Promise<void>;
+  /** Another plugin's current settings (saved values over defaults). */
+  settingsOf(pluginId: string): Record<string, unknown>;
 }
 
 export function hostOf(context: PluginContext): BuiltinHost {

@@ -32,6 +32,7 @@ onUnmounted(() => clearInterval(timer));
 const FOCUS: Record<UpgradeFocus, string> = {
   ranking: "Ranking (which papers become cards)",
   embedder: "Embedder (similarity and search)",
+  converter: "Converter (PDFs to full text)",
   "scout-addons": "New sources and integrations",
 };
 const latest = computed(() => view.value?.runs[0]);
@@ -43,9 +44,11 @@ const day = (iso: string) =>
 const usd = (n: number) => `$${n.toFixed(n < 0.01 ? 4 : 2)}`;
 const fmt = (v: number | null) => (v === null ? "—" : v.toFixed(3));
 const describe = (p: UpgradeProposal) =>
-  p.kind === "embedder"
-    ? `Switch the embedder to ${p.payload.model} (${p.payload.dims || "native"} dimensions): nDCG@10 ${fmt(Number(p.payload.mean))} vs ${fmt(Number(p.payload.activeMean))} for ${p.payload.activeModel}`
-    : `Sweep settings ${JSON.stringify(p.payload.variant)}`;
+  p.kind === "converter"
+    ? `Switch the converter to ${p.payload.converter}: score ${fmt(Number(p.payload.value))} vs ${fmt(Number(p.payload.activeValue))} for ${p.payload.active}`
+    : p.kind === "embedder"
+      ? `Switch the embedder to ${p.payload.model} (${p.payload.dims || "native"} dimensions): nDCG@10 ${fmt(Number(p.payload.mean))} vs ${fmt(Number(p.payload.activeMean))} for ${p.payload.activeModel}`
+      : `Sweep settings ${JSON.stringify(p.payload.variant)}`;
 
 async function act(fn: () => Promise<unknown>, done: string) {
   error.value = "";

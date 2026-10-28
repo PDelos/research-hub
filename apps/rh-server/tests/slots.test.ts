@@ -22,7 +22,12 @@ test("every built-in plugin is classified; core plugins are required; slot plugi
       .filter((p) => p.manifest.kind === k)
       .map((p) => p.manifest.id)
       .toSorted();
-  assert.deepEqual(kinds("slot"), ["rh.embedder-openrouter", "rh.provider-openrouter"]);
+  assert.deepEqual(kinds("slot"), [
+    "rh.converter-docling",
+    "rh.converter-pdf",
+    "rh.embedder-openrouter",
+    "rh.provider-openrouter",
+  ]);
   assert.deepEqual(kinds("preference"), ["rh.viewer-library", "rh.viewer-obsidian"]);
   assert.ok(kinds("addon").includes("rh.source-arxiv"));
   assert.ok(kinds("core").includes("rh.harness") && kinds("core").includes("rh.digest"));
@@ -55,7 +60,7 @@ test("the slot catalog lists each slot with its active implementation, alternati
     const slots = await server.client.slots();
     assert.deepEqual(
       slots.map((s) => s.id),
-      ["ranking", "embedder", "facets", "judge", "kb-search", "models"],
+      ["ranking", "embedder", "facets", "converter", "judge", "kb-search", "models"],
     );
     const embedder = slots.find((s) => s.id === "embedder")!;
     assert.equal(embedder.active.pluginId, "rh.embedder-openrouter");
@@ -65,6 +70,9 @@ test("the slot catalog lists each slot with its active implementation, alternati
     assert.deepEqual(embedder.alternatives, []);
     assert.equal(slots.find((s) => s.id === "kb-search")!.preset, null);
     assert.equal(slots.find((s) => s.id === "ranking")!.active.detail?.cardsPerSweep, 7);
+    const converter = slots.find((s) => s.id === "converter")!;
+    assert.equal(converter.active.pluginId, "rh.converter-pdf");
+    assert.deepEqual(converter.alternatives, [{ pluginId: "rh.converter-docling", name: "Docling converter" }]);
   } finally {
     await server.stop();
   }

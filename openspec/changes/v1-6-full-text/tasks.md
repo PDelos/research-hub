@@ -6,8 +6,8 @@
 
 ## 2. Uses
 
-- [ ] 2.1 Ingest with full text (prompt, number check) and facet vectors from sections; verify offline
-- [ ] 2.2 Converter preset in the harness and the slot catalog; converter focus in the weekly upgrade (upgrade-focus v2); verify with cached fixture samples
+- [x] 2.1 Ingest with full text (prompt, number check) and facet vectors from sections; verify offline
+- [x] 2.2 Converter preset in the harness and the slot catalog; converter focus in the weekly upgrade (upgrade-focus v2); verify with cached fixture samples
 
 ## 3. API, UI, images
 

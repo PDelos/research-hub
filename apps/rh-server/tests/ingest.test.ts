@@ -167,7 +167,7 @@ test("an invented number is refused; an edited note keeps the user's Summary whe
     const view = JSON.stringify(
       p.db.prepare("SELECT result_text FROM tool_calls WHERE tool_name = 'write_evidence_note'").all(),
     );
-    assert.match(view, /numbers not in the title, abstract or reason: 99/);
+    assert.match(view, /numbers not in the title, abstract, full text or reason: 99/);
     // The user rewrites the Summary in Obsidian.
     const path = join(p.vault.dir, "sources", `${first}.md`);
     const edited = readFileSync(path, "utf8").replace(/## Summary\n\n[^\n]*/, "## Summary\n\nMy own summary, keep it.");

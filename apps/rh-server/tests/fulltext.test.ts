@@ -144,3 +144,58 @@ test("the converter slot: pdf-text is active; Docling is unavailable without its
     docling.close();
   }
 });
+
+test("a starred paper's note is written with its full text; facet vectors come from its sections", async () => {
+  const { validateCharter } = await import("../src/charter.ts");
+  const { cardWriterRule, librarianRule } = await import("../src/faux-rules.ts");
+  const { sampleCharter } = await import("./fixtures/charter.ts");
+  const { choice, noul, score, scripted } = await import("./fixtures/jev-answers.ts");
+  const { arxivOnlyFetch, fakePapers } = await import("./fixtures/sweep-env.ts");
+  const papers = fakePapers(3);
+  const base = arxivOnlyFetch(papers);
+  const server = await startTestServer({
+    hub: {
+      ticker: false,
+      fauxRules: [cardWriterRule, librarianRule],
+      jevDecide: scripted((id, _c, q: any) =>
+        id === "relevance"
+          ? score(0.75, 5)
+          : id === "matched_question"
+            ? choice("Q1", Object.keys(q.criteria))
+            : id === "worth"
+              ? noul(0.8)
+              : undefined,
+      ).decide,
+      paperFetch: ((input: any, init: any) =>
+        String(input).startsWith("https://arxiv.org/html/")
+          ? Promise.resolve(new Response(ARXIV_HTML))
+          : base(input, init)) as typeof fetch,
+    },
+  });
+  const p = server.hub.project;
+  try {
+    p.brief.write("# Protein LMs");
+    p.charters.saveDraft(validateCharter(sampleCharter()), "agent");
+    p.charters.approve();
+    p.syncVault();
+    p.scheduler.trigger("sweep");
+    for (let i = 0; i < 500 && !p.sweeps.list()[0]; i++) await new Promise((r) => setTimeout(r, 10));
+    await p.sweeps.settled(p.sweeps.list()[0].id, 30_000);
+    const card = p.cards.list()[0];
+    p.feedback.judge(card.id, "star", "Great");
+    for (let i = 0; i < 1500 && !p.ingest.requests().some((r: any) => r.status === "done"); i++)
+      await new Promise((r) => setTimeout(r, 20));
+    const fulltext = await p.plugins.exportsOf<FullTextExports>("rh.fulltext");
+    assert.equal(fulltext.get(card.paperId)?.source, "arxiv-html");
+    const prompts = (
+      p.db.prepare("SELECT text FROM agent_runs WHERE text LIKE 'Add this starred paper%'").all() as { text: string }[]
+    ).map((r) => r.text);
+    assert.equal(prompts.length, 1);
+    assert.match(prompts[0], /FULL_TEXT \(sections, possibly trimmed\):\n## Abstract\nWe report an AUROC of 0.87/);
+    assert.match(prompts[0], /## Our kernels\nWe fine-tune on 12,000 transcripts/);
+    const { papers: service } = await p.plugins.exportsOf<PapersExports>("rh.papers");
+    assert.ok(service.vectors.kinds(card.paperId).includes("method"));
+  } finally {
+    await server.stop();
+  }
+});

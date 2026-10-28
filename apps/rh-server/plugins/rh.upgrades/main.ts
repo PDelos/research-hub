@@ -9,10 +9,11 @@ import type { HarnessExports, StoredReplay } from "../rh.harness/main.ts";
 import type { SweepExports } from "../rh.sweep/main.ts";
 import type { EmbedderExports, PapersExports } from "../rh.papers/main.ts";
 import type { ProviderExports } from "../rh.provider-openrouter/main.ts";
+import type { FullTextExports } from "../rh.fulltext/main.ts";
 import { analyze, rankingGrid, type Analysis } from "./ranking.ts";
 import { summarize } from "../rh.harness/main.ts";
 
-export const FOCUSES = ["ranking", "embedder", "scout-addons"] as const;
+export const FOCUSES = ["ranking", "embedder", "converter", "scout-addons"] as const;
 export type Focus = (typeof FOCUSES)[number];
 export const FOCUS_MIN_CONFIDENCE = 0.4;
 /** Tokens one embedder benchmark embeds (the two samples and "your stars"), for the cost estimate. */
@@ -52,7 +53,7 @@ export interface UpgradeRun {
 export interface Proposal {
   id: number;
   runId: number;
-  kind: "ranking" | "embedder";
+  kind: "ranking" | "embedder" | "converter";
   payload: Record<string, unknown>;
   /** applied: changed right away with undo (ranking); proposed: waits for the user (embedder). */
   status: "applied" | "proposed" | "approved" | "rejected";
@@ -244,9 +245,22 @@ export function activate(context: PluginContext): UpgradesExports {
     (db.prepare(`SELECT * FROM ${T.runs} WHERE status = 'done' ORDER BY id DESC LIMIT 1`).get() as
       | RunRow
       | undefined) ?? undefined;
-  const rotation = (): Focus => {
+  /** Converters other than the active one that can run here (Docling only in the full image). */
+  const converterAlternatives = async () => {
+    try {
+      const fulltext = await host.exportsOf<FullTextExports>("rh.fulltext");
+      return (await fulltext.converters()).filter((c) => !c.active && c.available);
+    } catch {
+      return [];
+    }
+  };
+  /** The next focus after the last one; the converter is skipped while it has no alternative. */
+  const rotation = async (): Promise<Focus> => {
     const last = lastRun()?.focus;
-    return last ? FOCUSES[(FOCUSES.indexOf(last) + 1) % FOCUSES.length] : FOCUSES[0];
+    let next = last ? FOCUSES[(FOCUSES.indexOf(last) + 1) % FOCUSES.length] : FOCUSES[0];
+    if (next === "converter" && !(await converterAlternatives()).length)
+      next = FOCUSES[(FOCUSES.indexOf(next) + 1) % FOCUSES.length];
+    return next;
   };
   const commentsSince = (since: string) => {
     try {
@@ -263,7 +277,7 @@ export function activate(context: PluginContext): UpgradesExports {
     const ageDays = (iso?: string) => (iso ? Math.round((Date.now() - Date.parse(iso)) / 86_400_000) : null);
     const slots = harness
       .slots()
-      .filter((s) => s.id === "ranking" || s.id === "embedder")
+      .filter((s) => s.id === "ranking" || s.id === "embedder" || s.id === "converter")
       .map((s) => ({
         slot: s.id,
         active: s.active.name,
@@ -276,10 +290,15 @@ export function activate(context: PluginContext): UpgradesExports {
         focus: string;
       }[]
     ).map((r) => r.focus);
-    const fallback = rotation();
+    const fallback = await rotation();
+    const alternatives = (await converterAlternatives()).map((c) => c.title);
     try {
       const { answers, costUsd } = await rh.decisions.decide("upgrade-focus", {
-        slots: JSON.stringify(slots),
+        slots: JSON.stringify(
+          slots.map((x) =>
+            x.slot === "converter" ? { ...x, alternatives: alternatives.length ? alternatives : "none here" } : x,
+          ),
+        ),
         comments: comments.length ? JSON.stringify(comments) : "none",
         failures: JSON.stringify(a),
         recent: recent.length ? recent.join(", ") : "none",
@@ -512,6 +531,46 @@ export function activate(context: PluginContext): UpgradesExports {
     };
   };
 
+  // --- Converter ------------------------------------------------------------------------------------------------
+  const converterRun = async (runId: number): Promise<Outcome> => {
+    const alternatives = await converterAlternatives();
+    if (!alternatives.length)
+      return {
+        report: {
+          tried: [],
+          result: "Nothing changed: no other converter is available here (Docling needs the research-hub:full image).",
+        },
+      };
+    const numbers = (r: Awaited<ReturnType<HarnessExports["runBenchmark"]>>) => ({ score: r.result.value });
+    const base = await harness.runBenchmark("converter");
+    const tried: UpgradeReport["tried"] = [{ what: `${base.candidate.converter} (active)`, numbers: numbers(base) }];
+    let winner: { id: string; value: number } | undefined;
+    for (const c of alternatives) {
+      try {
+        const r = await harness.runBenchmark("converter", { converter: c.id });
+        const wins =
+          r.result.value !== null && base.result.value !== null && r.result.value >= base.result.value + 0.02;
+        tried.push({ what: c.title, verdict: wins ? "better" : "not better", numbers: numbers(r) });
+        if (wins && (!winner || r.result.value! > winner.value)) winner = { id: c.id, value: r.result.value! };
+      } catch (error) {
+        tried.push({ what: c.title, note: `failed: ${error instanceof Error ? error.message : String(error)}` });
+      }
+    }
+    if (!winner) return { report: { tried, result: "Nothing changed: no converter beat the active one by 0.02." } };
+    const p = addProposal(
+      runId,
+      "converter",
+      { converter: winner.id, value: winner.value, activeValue: base.result.value, active: base.candidate.converter },
+      "proposed",
+    );
+    return {
+      report: {
+        tried,
+        result: `Proposed switching the converter to ${winner.id}: ${winner.value.toFixed(3)} vs ${(base.result.value ?? 0).toFixed(3)}. Approve it in the Upgrades tab (proposal ${p.id}).`,
+      },
+    };
+  };
+
   // --- Scout -----------------------------------------------------------------------------------------------------
   const scout = async (runId: number): Promise<Outcome> => {
     const charter = db
@@ -603,7 +662,9 @@ export function activate(context: PluginContext): UpgradesExports {
               ? await ranking(id)
               : chosen.focus === "embedder"
                 ? await embedderRun(id)
-                : await scout(id);
+                : chosen.focus === "converter"
+                  ? await converterRun(id)
+                  : await scout(id);
           report = { focus: chosen.focus, reason: chosen.reason, ...r };
         } catch (error) {
           status = "failed";
@@ -646,6 +707,20 @@ export function activate(context: PluginContext): UpgradesExports {
     async approve(id) {
       const p = proposal(id);
       if (p.status !== "proposed") throw new UpgradeInvalid(`proposal ${id} is ${p.status}`);
+      if (p.kind === "converter") {
+        await host.configure(
+          "rh.fulltext",
+          { "fulltext.converter": p.payload.converter },
+          `proposal:upgrade-${p.runId}`,
+        );
+        const commit = (await host.pluginHistory(1))[0]?.id ?? null;
+        db.prepare(`UPDATE ${T.proposals} SET status = 'approved', commit_id = ?, decided_at = ? WHERE id = ?`).run(
+          commit,
+          now(),
+          id,
+        );
+        return proposal(id);
+      }
       if (p.kind !== "embedder") throw new UpgradeInvalid(`proposal ${id} cannot be approved`);
       let dims = Number(p.payload.dims);
       if (!dims) {

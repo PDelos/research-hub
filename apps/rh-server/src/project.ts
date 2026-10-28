@@ -186,6 +186,7 @@ export async function openProject(options: OpenProjectOptions): Promise<ProjectR
       pluginHistory: (limit = 100) => pluginState.history(limit),
       configure: (pluginId, changes, actor) => kernel().configure(pluginId, changes, actor),
       undo: async (commit, actor) => void (await kernel().undo(commit, actor)),
+      settingsOf: (pluginId) => kernel().settings(pluginId),
     }),
   });
   const { catalog } = await plugins.exportsOf<ProviderExports>("rh.provider-openrouter");

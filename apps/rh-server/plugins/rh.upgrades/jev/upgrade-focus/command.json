@@ -1,6 +1,6 @@
 {
   "name": "upgrade-focus",
-  "version": 1,
+  "version": 2,
   "description": "Weekly upgrade: which one thing to improve this week",
   "state": {
     "slots": "{{slots}}",
@@ -15,6 +15,7 @@
       "criteria": {
         "ranking": "Which found papers become cards: gate thresholds, rank weights, cards per sweep, exploration",
         "embedder": "The embedding model behind similarity, exploration and search",
+        "converter": "How PDFs become full text (only worth it when another converter is available)",
         "scout-addons": "Look for new paper sources or integrations worth adding"
       }
     }

@@ -713,7 +713,7 @@ export interface SourceAttribution {
 
 // ---------------------------------------------------------------- the weekly upgrade (v1.4)
 
-export type UpgradeFocus = "ranking" | "embedder" | "scout-addons";
+export type UpgradeFocus = "ranking" | "embedder" | "converter" | "scout-addons";
 
 export interface UpgradeReport {
   focus: UpgradeFocus;
@@ -738,7 +738,7 @@ export interface UpgradeRun {
 export interface UpgradeProposal {
   id: number;
   runId: number;
-  kind: "ranking" | "embedder";
+  kind: "ranking" | "embedder" | "converter";
   payload: Record<string, unknown>;
   status: "applied" | "proposed" | "approved" | "rejected";
   commit: string | null;

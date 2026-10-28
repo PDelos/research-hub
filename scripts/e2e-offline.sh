@@ -105,7 +105,7 @@ expect "undo of the viewer choice" "$(curl -s "$U/plugins/history" "${H[@]}" | j
 expect "replay (one sweep: too little)" "$(curl -s -X POST "$U/harness/replay" "${H[@]}" -d '{"variant":{"cardsPerSweep":5}}' | j "d['report']['verdict']")" "not enough data"
 expect "quality: sweeps over time" "$(curl -s "$U/harness/quality" "${H[@]}" | j "len(d['overTime'])")" 1
 # Slots and attribution (v1-3).
-expect "slots in the catalog" "$(curl -s "$U/slots" "${H[@]}" | j "len(d)")" 6
+expect "slots in the catalog" "$(curl -s "$U/slots" "${H[@]}" | j "len(d)")" 7
 expect "core cannot be changed" "$(curl -s "$U/plugins" "${H[@]}" | j "[p['kind'] for p in d['plugins'] if p['id'] == 'rh.harness'][0]")" core
 expect "attribution (offline sources)" "$(curl -s "$U/attribution" "${H[@]}" | j "sum(a['cards'] for a in d) > 0")" True
 # The weekly upgrade (v1-4): a ranking run on one sweep reports that there is too little data and changes nothing.
