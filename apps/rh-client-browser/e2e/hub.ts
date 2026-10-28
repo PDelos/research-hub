@@ -38,6 +38,33 @@ await installer.confirm((await installer.prepare({ folder: join(FIXTURE_PLUGINS,
 // One change and a digest, so the Digest tab has something to show (and to undo).
 await p.plugins.kernel.configure("rh.sweep", { cardsPerSweep: 5 });
 await (await p.plugins.exportsOf<DigestExports>("rh.digest")).buildDigest();
+// A finished upgrade run with an embedder proposal and an add-on suggestion, so the Upgrades tab has them.
+await p.plugins.exportsOf("rh.upgrades");
+const at = new Date().toISOString();
+p.db
+  .prepare(
+    "INSERT INTO p_rh_upgrades__runs (focus, reason, status, report_json, cost_usd, requested_by, started_at, finished_at) VALUES ('embedder', 'Seeded for the UI tests.', 'done', ?, 0.01, 'test', ?, ?)",
+  )
+  .run(
+    JSON.stringify({
+      focus: "embedder",
+      reason: "Seeded for the UI tests.",
+      tried: [{ what: "acme/embed-native", verdict: "better", numbers: { mean: 0.7 } }],
+      result: "Proposed acme/embed-native.",
+    }),
+    at,
+    at,
+  );
+p.db
+  .prepare(
+    "INSERT INTO p_rh_upgrades__proposals (run_id, kind, payload_json, status, created_at) VALUES (1, 'embedder', ?, 'proposed', ?)",
+  )
+  .run(JSON.stringify({ model: "acme/embed-native", dims: 0, mean: 0.7, activeMean: 0.6, activeModel: "offline" }), at);
+p.db
+  .prepare(
+    "INSERT INTO p_rh_upgrades__suggestions (run_id, name, url, reason, created_at) VALUES (1, 'bioRxiv API', 'https://api.biorxiv.org', 'biology preprints', ?)",
+  )
+  .run(at);
 console.log(`ui test hub on ${running.url} (data ${dir})`);
 
 const stop = async () => {

@@ -14,6 +14,7 @@ import QualityTab from "./components/QualityTab.vue";
 import RunsView from "./components/RunsView.vue";
 import SettingsTab from "./components/SettingsTab.vue";
 import TopBar from "./components/TopBar.vue";
+import UpgradesTab from "./components/UpgradesTab.vue";
 import { client, connect, onPlugins, store } from "./store.ts";
 import { usePlugins } from "./stores/plugins.ts";
 
@@ -22,6 +23,7 @@ const views = {
   feed: FeedView,
   digest: DigestTab,
   quality: QualityTab,
+  upgrades: UpgradesTab,
   library: LibraryTab,
   charter: CharterTab,
   runs: RunsView,

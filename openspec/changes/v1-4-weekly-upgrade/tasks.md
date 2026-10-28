@@ -12,8 +12,8 @@
 
 ## 3. API and UI
 
-- [ ] 3.1 Routes `/v1/upgrades`, `/v1/upgrades/run`, `/v1/proposals/:id/{approve,reject}`, `/v1/suggestions/:id/dismiss`, SDK; the digest's Upgrade section; verify API tests
-- [ ] 3.2 The Upgrades tab and the digest section; verify build and Playwright tests
+- [x] 3.1 Routes `/v1/upgrades`, `/v1/upgrades/run`, `/v1/proposals/:id/{approve,reject}`, `/v1/suggestions/:id/dismiss`, SDK; the digest's Upgrade section; verify API tests
+- [x] 3.2 The Upgrades tab and the digest section; verify build and Playwright tests
 
 ## 4. Integration
 

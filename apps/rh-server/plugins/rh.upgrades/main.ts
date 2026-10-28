@@ -76,6 +76,8 @@ export class UpgradeInvalid extends Error {}
 export interface UpgradesExports {
   /** Whether an upgrade is due now (enabled and `everyDays` since the last one; nightly runs drift, so 7 days ≈ 6.5). */
   due(now?: number): boolean;
+  /** Whether a run is in progress. */
+  busy(): boolean;
   run(options?: { focus?: Focus; requestedBy?: string }): Promise<UpgradeRun>;
   runs(limit?: number): UpgradeRun[];
   proposals(status?: Proposal["status"]): Proposal[];
@@ -538,6 +540,7 @@ export function activate(context: PluginContext): UpgradesExports {
       )?.started_at;
       return !last || at - Date.parse(last) >= setting<number>("everyDays") * 0.93 * 86_400_000;
     },
+    busy: () => running !== undefined,
     async run({ focus, requestedBy = "user" } = {}) {
       if (focus !== undefined && !FOCUSES.includes(focus))
         throw new UpgradeInvalid(`focus must be one of ${FOCUSES.join(", ")}`);

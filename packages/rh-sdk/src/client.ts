@@ -12,6 +12,10 @@ import type {
   CycleStatus,
   SlotView,
   SourceAttribution,
+  UpgradeFocus,
+  UpgradeProposal,
+  UpgradeSuggestion,
+  UpgradesView,
   HarnessQuality,
   HarnessVariant,
   StoredReplay,
@@ -188,6 +192,14 @@ export class HubClient {
   benchmarks = (slot?: string) =>
     this.call<BenchmarkRecord[]>("GET", `/slots/benchmarks${slot ? `?slot=${encodeURIComponent(slot)}` : ""}`);
   attribution = (days = 30) => this.call<SourceAttribution[]>("GET", `/attribution?days=${days}`);
+
+  // The weekly upgrade (v1.4)
+  upgrades = () => this.call<UpgradesView>("GET", "/upgrades");
+  /** Start an upgrade now (in the background); without a focus Jev chooses one. */
+  runUpgrade = (focus?: UpgradeFocus) => this.call<{ started: true }>("POST", "/upgrades/run", focus ? { focus } : {});
+  approveProposal = (id: number) => this.call<UpgradeProposal>("POST", `/proposals/${id}/approve`, {});
+  rejectProposal = (id: number) => this.call<UpgradeProposal>("POST", `/proposals/${id}/reject`, {});
+  dismissSuggestion = (id: number) => this.call<UpgradeSuggestion>("POST", `/suggestions/${id}/dismiss`, {});
 
   /** Tell the hub a tab was opened, so plugins activated by onView:<tab> start. */
   openView = (tab: string) => this.call<void>("POST", `/plugins/views/${encodeURIComponent(tab)}/open`, {});

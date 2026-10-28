@@ -21,6 +21,7 @@ const sections: { id: DigestSection; title: string }[] = [
   { id: "knowledgeBase", title: "Knowledge base" },
   { id: "quality", title: "Quality" },
   { id: "sources", title: "Sources" },
+  { id: "upgrade", title: "Weekly upgrade" },
   { id: "cost", title: "Cost" },
   { id: "changes", title: "What changed" },
   { id: "general", title: "Anything else" },
@@ -176,6 +177,27 @@ async function undo(commit: string, message: string) {
           <ul class="small">
             <li v-for="x in digest.sources ?? []" :key="x.source">
               {{ x.source }}: {{ x.cards }} cards, {{ x.liked }} liked
+            </li>
+          </ul>
+        </template>
+        <template v-else-if="sec.id === 'upgrade'">
+          <p v-if="!digest.upgrade?.runs.length" class="muted">No upgrade ran this week.</p>
+          <ul class="changes small">
+            <li v-for="u in digest.upgrade?.runs ?? []" :key="u.id">
+              <span>
+                <strong>{{ u.focus }}</strong> · {{ u.reason }} — {{ u.result }}
+                <span class="muted">({{ u.tried }} tried)</span>
+                <a href="#/upgrades" class="small">Details</a>
+              </span>
+              <template v-for="p in u.proposals" :key="p.id">
+                <button
+                  v-if="p.status === 'applied' && p.commit"
+                  class="ghost small"
+                  @click="undo(p.commit, `upgrade ${u.id}`)"
+                >
+                  Undo
+                </button>
+              </template>
             </li>
           </ul>
         </template>

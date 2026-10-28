@@ -244,3 +244,39 @@ test("a scout run lists new sources from the web that the user can dismiss", asy
     await s.server.stop();
   }
 });
+
+test("the API starts a run in the background, lists it, decides proposals and dismisses suggestions; the digest shows it", async () => {
+  const s = await project();
+  try {
+    const { client } = s.server;
+    const empty = await client.upgrades();
+    assert.equal(empty.enabled, true);
+    assert.equal(empty.due, true);
+    assert.deepEqual(empty.runs, []);
+    await assert.rejects(client.runUpgrade("everything" as never), /focus must be one of/);
+
+    s.or.answer = '[{"name": "bioRxiv API", "url": "https://api.biorxiv.org", "reason": "biology preprints"}]';
+    assert.deepEqual(await client.runUpgrade("scout-addons"), { started: true });
+    await until(async () => (await client.upgrades()).runs[0]?.status === "done", 10_000, "run");
+    const view = await client.upgrades();
+    assert.equal(view.running, false);
+    assert.equal(view.due, false);
+    assert.equal(view.runs[0].focus, "scout-addons");
+    assert.equal(view.suggestions[0].name, "bioRxiv API");
+    assert.equal((await client.dismissSuggestion(view.suggestions[0].id)).status, "dismissed");
+    assert.deepEqual((await client.upgrades()).suggestions, []);
+    await assert.rejects(client.dismissSuggestion(999), /no suggestion 999/);
+    await assert.rejects(client.approveProposal(999), /no proposal 999/);
+    await assert.rejects(client.rejectProposal(999), /no proposal 999/);
+
+    const digest = await s.server.hub.project.plugins
+      .exportsOf<import("../plugins/rh.digest/main.ts").DigestExports>("rh.digest")
+      .then((d) => d.buildDigest(Date.now() + 1000));
+    assert.equal(digest.upgrade?.runs.length, 1);
+    assert.equal(digest.upgrade?.runs[0].focus, "scout-addons");
+    assert.match(digest.upgrade?.runs[0].result ?? "", /1 add-on suggestion/);
+    await client.commentDigest(digest.id, "upgrade", "Nice find");
+  } finally {
+    await s.server.stop();
+  }
+});

@@ -22,6 +22,7 @@ test("the tab bar comes from the plugins, and a plugin's own tab renders as a cu
     "Feed",
     "Digest",
     "Quality",
+    "Upgrades",
     "Library",
     "Knowledge base",
     "Reading list",

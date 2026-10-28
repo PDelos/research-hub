@@ -529,6 +529,7 @@ export type DigestSection =
   | "knowledgeBase"
   | "quality"
   | "sources"
+  | "upgrade"
   | "cost"
   | "changes"
   | "general";
@@ -555,6 +556,19 @@ export interface DigestBody {
   lastComments: { section: string; text: string; createdAt: string }[];
   /** What each paper source brought this week (v1.3). */
   sources?: SourceAttribution[];
+  /** The week's upgrade runs (v1.4): focus, reason, result, and what was applied or proposed. */
+  upgrade?: {
+    runs: {
+      id: number;
+      focus: UpgradeFocus;
+      reason: string;
+      status: string;
+      result: string;
+      tried: number;
+      proposals: { id: number; kind: string; status: string; commit: string | null }[];
+      startedAt: string;
+    }[];
+  };
   /** The harness (v1.2): the judge's agreement with you and the week's replays. */
   quality?: {
     judge: { agreement: number | null; cases: number; trusted: boolean } | null;
@@ -692,4 +706,59 @@ export interface SourceAttribution {
   pluginId: string | null;
   cards: number;
   liked: number;
+}
+
+// ---------------------------------------------------------------- the weekly upgrade (v1.4)
+
+export type UpgradeFocus = "ranking" | "embedder" | "scout-addons";
+
+export interface UpgradeReport {
+  focus: UpgradeFocus;
+  reason: string;
+  analysis?: unknown;
+  tried: { what: string; why?: string; verdict?: string; numbers?: Record<string, number | null>; note?: string }[];
+  result: string;
+}
+
+export interface UpgradeRun {
+  id: number;
+  focus: UpgradeFocus;
+  reason: string;
+  status: "running" | "done" | "failed";
+  report: UpgradeReport | null;
+  costUsd: number;
+  startedAt: string;
+  finishedAt: string | null;
+  requestedBy: string;
+}
+
+export interface UpgradeProposal {
+  id: number;
+  runId: number;
+  kind: "ranking" | "embedder";
+  payload: Record<string, unknown>;
+  status: "applied" | "proposed" | "approved" | "rejected";
+  commit: string | null;
+  createdAt: string;
+  decidedAt: string | null;
+}
+
+export interface UpgradeSuggestion {
+  id: number;
+  runId: number;
+  name: string;
+  url: string;
+  reason: string;
+  status: "open" | "dismissed";
+  createdAt: string;
+}
+
+export interface UpgradesView {
+  enabled: boolean;
+  everyDays: number;
+  running: boolean;
+  due: boolean;
+  runs: UpgradeRun[];
+  proposals: UpgradeProposal[];
+  suggestions: UpgradeSuggestion[];
 }

@@ -10,6 +10,7 @@ import type { FeedbackExports } from "../rh.feedback/main.ts";
 import type { ScheduleExports } from "../rh.schedule/main.ts";
 import { buildDigest } from "./digest.ts";
 import type { HarnessExports } from "../rh.harness/main.ts";
+import type { UpgradesExports } from "../rh.upgrades/main.ts";
 
 export const DIGEST_SECTIONS: readonly DigestSection[] = [
   "cycle",
@@ -18,6 +19,7 @@ export const DIGEST_SECTIONS: readonly DigestSection[] = [
   "knowledgeBase",
   "quality",
   "sources",
+  "upgrade",
   "cost",
   "changes",
   "general",
@@ -196,7 +198,8 @@ export function activate(context: PluginContext): DigestExports {
           judge: q.judge ? { agreement: q.judge.agreement, cases: q.judge.cases, trusted: q.judge.trusted } : null,
           replays: harness
             .replays(200)
-            .filter((r) => r.createdAt >= from && r.createdAt < to)
+            // The weekly upgrade's replays are listed in its own section.
+            .filter((r) => r.createdAt >= from && r.createdAt < to && !r.requestedBy.startsWith("upgrade-"))
             .map((r) => ({
               id: r.id,
               variant: r.variant as Record<string, unknown>,
@@ -210,6 +213,30 @@ export function activate(context: PluginContext): DigestExports {
         };
       } catch {
         // No harness: the digest goes without its quality section.
+      }
+      try {
+        const upgrades = await host.exportsOf<UpgradesExports>("rh.upgrades");
+        const proposals = upgrades.proposals();
+        body.upgrade = {
+          runs: upgrades
+            .runs(50)
+            // By when they finished: a run the digest's night started is in next week's digest.
+            .filter((u) => u.finishedAt !== null && u.finishedAt >= from && u.finishedAt < to)
+            .map((u) => ({
+              id: u.id,
+              focus: u.focus,
+              reason: u.reason,
+              status: u.status,
+              result: u.report?.result ?? "",
+              tried: u.report?.tried.length ?? 0,
+              proposals: proposals
+                .filter((p) => p.runId === u.id)
+                .map((p) => ({ id: p.id, kind: p.kind, status: p.status, commit: p.commit })),
+              startedAt: u.startedAt,
+            })),
+        };
+      } catch {
+        // No weekly upgrade plugin: no upgrade section.
       }
       const r = db
         .prepare(
