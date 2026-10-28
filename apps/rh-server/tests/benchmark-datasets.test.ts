@@ -33,7 +33,7 @@ test("a retrieval sample is built once from Parquet and TSV, with relevant docum
   const again = await loadSample("scidocs", s.io);
   assert.equal(again.downloaded, false);
   assert.equal(s.requests.length, 3, "cached: nothing downloaded the second time");
-  assert.ok(s.cache.has("benchmarks/scidocs-v1.json"));
+  assert.ok(s.cache.has("benchmarks/scidocs-v2.json"));
 
   // The same seed gives the same sample.
   const other = io();

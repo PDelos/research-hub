@@ -6,7 +6,8 @@ import { parquetReadObjects } from "hyparquet";
 import { compressors } from "hyparquet-compressors";
 import { seeded } from "../replay.ts";
 
-export const SAMPLE_VERSION = 1;
+/** 2: documents without text are left out (an embeddings API refuses empty input). */
+export const SAMPLE_VERSION = 2;
 export const SAMPLE_SEED = 7;
 const QUERIES = 100;
 const DISTRACTORS = 1_900;
@@ -69,6 +70,7 @@ export function sampleRetrieval(
   qrels: { query: string; doc: string; score: number }[],
 ): RetrievalSample {
   const random = seeded(SAMPLE_SEED);
+  corpus = corpus.filter((d) => d.text.trim());
   const corpusIds = new Set(corpus.map((d) => d.id));
   const relevant: Record<string, string[]> = {};
   for (const q of qrels) if (q.score > 0 && corpusIds.has(q.doc)) (relevant[q.query] ??= []).push(q.doc);

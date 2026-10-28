@@ -99,6 +99,10 @@ expect "undo of the viewer choice" "$(curl -s "$U/plugins/history" "${H[@]}" | j
 # The harness (v1-2): a replay of past sweeps and the Quality view.
 expect "replay (one sweep: too little)" "$(curl -s -X POST "$U/harness/replay" "${H[@]}" -d '{"variant":{"cardsPerSweep":5}}' | j "d['report']['verdict']")" "not enough data"
 expect "quality: sweeps over time" "$(curl -s "$U/harness/quality" "${H[@]}" | j "len(d['overTime'])")" 1
+# Slots and attribution (v1-3).
+expect "slots in the catalog" "$(curl -s "$U/slots" "${H[@]}" | j "len(d)")" 6
+expect "core cannot be changed" "$(curl -s "$U/plugins" "${H[@]}" | j "[p['kind'] for p in d['plugins'] if p['id'] == 'rh.harness'][0]")" core
+expect "attribution (offline sources)" "$(curl -s "$U/attribution" "${H[@]}" | j "sum(a['cards'] for a in d) > 0")" True
 expect "rolled back" "$(curl -s -X POST "$U/plugins/rollback" "${H[@]}" -d "{\"commit\":\"$INIT\"}" | j "[p['state'] for p in d['plugins'] if p['id'] == 'acme.sample'][0]")" disabled
 expect "viewer after rollback" "$(viewer)" library
 [ -n "${E2E_IMAGE:-}" ] && docker logs "$CONTAINER" >> "$LOG" 2>&1
