@@ -18,4 +18,4 @@
 ## 4. Integration
 
 - [x] 4.1 All tests, checks, audit, offline e2e (an upgrade run), UI tests, bundle and light image; one live upgrade run of each focus on a throwaway project (cost recorded)
-- [ ] 4.2 README, PLAN/EVOLUTION; archive
+- [x] 4.2 README, PLAN/EVOLUTION; archive

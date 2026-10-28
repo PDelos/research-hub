@@ -221,6 +221,9 @@ test("an embedder run shortlists from the cheap catalog, benchmarks, and propose
     const run2 = await s.upgrades.run({ focus: "embedder" });
     assert.match(run2.report!.result, /^Nothing changed/);
     assert.equal(s.upgrades.proposals("proposed").length, 0);
+    // What lost is remembered: the next run has no untried model within the price limit.
+    const run3 = await s.upgrades.run({ focus: "embedder" });
+    assert.match(run3.report!.result, /not tried in the last 90 days/);
     const p2 = s.upgrades.proposals()[0];
     assert.throws(() => s.upgrades.reject(p2.id), /is approved/);
   } finally {

@@ -380,13 +380,31 @@ export function activate(context: PluginContext): UpgradesExports {
     const maxPrice = setting<number>("maxEmbedPricePerMillion");
     const maxRun = setting<number>("maxRunUsd");
     const all = await catalog();
-    const eligible = all.filter(
-      (m) => m.id !== active.model && m.pricePerMillion <= maxPrice && m.contextLength >= 512,
+    // A memory of what lost: candidates benchmarked in the last 90 days are not tried again (the active one won).
+    const since = new Date(Date.now() - 90 * 86_400_000).toISOString();
+    const triedBefore = new Set(
+      harness
+        .benchmarks("embedder", 200)
+        .filter((b) => b.candidate.candidate && b.createdAt >= since)
+        .map((b) => String(b.candidate.model)),
     );
-    const analysis = { catalog: all.length, eligible: eligible.length, maxPricePerMillion: maxPrice, active };
+    const eligible = all.filter(
+      (m) => m.id !== active.model && !triedBefore.has(m.id) && m.pricePerMillion <= maxPrice && m.contextLength >= 512,
+    );
+    const analysis = {
+      catalog: all.length,
+      eligible: eligible.length,
+      triedBefore: [...triedBefore],
+      maxPricePerMillion: maxPrice,
+      active,
+    };
     if (!eligible.length)
       return {
-        report: { analysis, tried: [], result: "Nothing changed: no other embedding model within the price limit." },
+        report: {
+          analysis,
+          tried: [],
+          result: "Nothing changed: no embedding model within the price limit that was not tried in the last 90 days.",
+        },
       };
     let shortlist: { id: string; reason: string }[] = [];
     let researchNote = "";

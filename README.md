@@ -5,13 +5,16 @@ durable agent (built on [pi-durable](https://github.com/earendil-works/pi)) that
 [Jev](https://openrouter.ai/docs/guides/community/jev) make the bulk decisions, present a few paper cards a day,
 learn from your 👎/👍/⭐ and grow an Obsidian-compatible knowledge base. A new theme is a new container.
 
-**Status: v1.3 (slots and benchmarks).** v0 built the durable agent, Jev client, live stream, browser UI and containers (v0.0),
+**Status: v1.4 (the weekly upgrade).** v0 built the durable agent, Jev client, live stream, browser UI and containers (v0.0),
 the brief, charter and schedule (v0.1), paper search with representations (v0.2), the daily sweep with paper cards
 (v0.3), learning from your judgments (v0.4) and the knowledge base with the real Obsidian interface (v0.5). v1.0 turns
 all of it into **plugins, like VS Code**: a small kernel and a plugin for every feature, which you can enable,
 disable, configure, swap, install and roll back per project (see [Plugins](#plugins)). v1.1 makes the hub light
 (232 MB, Obsidian as an add-on image) and runs **one daily cycle** you only read and judge (see
-[The daily cycle](#the-daily-cycle)).
+[The daily cycle](#the-daily-cycle)). v1.2 measures the hub on your judgments ([Quality](#quality-the-harness)), v1.3 sorts every plugin into core, slots,
+add-ons and preferences with a fixed benchmark per slot ([What can change](#what-can-change-and-how-it-is-judged)),
+and v1.4 adds [the weekly upgrade](#the-weekly-upgrade): once a week the hub improves one slot on its benchmark or
+looks for new sources to add.
 
 ## Architecture and what comes next
 
@@ -22,9 +25,9 @@ manifest, activates only when needed and declares what it may reach. Next (plann
 [EVOLUTION.md](EVOLUTION.md) §0 and §6): the goal is a **daily cycle that runs itself**: agents sweep, rank and
 explain papers, analyze what you disliked or missed every night, replay candidate fixes on your past judgments and
 apply the ones that clearly win (each with undo), and send a weekly digest you read and comment on. You only read,
-judge and give opinions. Steps: a lighter image with the orchestrated cycle (v1-1, done), the replay harness on your
+judge and give opinions. Steps: a lighter image with the orchestrated cycle (v1-1), the replay harness on your
 judgments (v1-2), plugins grouped as core, slots with fixed benchmark presets, add-ons and preferences (v1-3), the
-weekly upgrade of one slot or a scout for add-ons (v1-4), then charter and new-question proposals (v1-5). Not
+weekly upgrade of one slot or a scout for add-ons (v1-4), all done; next, charter and new-question proposals (v1-5). Not
 everything can change: the core (including the harness that measures everything) never does; see EVOLUTION.md §0.1.
 
 ## Quick start (offline, no keys)
@@ -141,8 +144,8 @@ Each project runs one cycle on its own; your part is reading, judging and, when 
 |---|---|
 | Every morning (`RH_SWEEP_TIME`, 06:00) | The sweep brings about 7 cards. Once you have liked papers, the last card is an **Exploration** pick: a paper outside the top ones, least like what you liked, so the feed does not narrow (setting `explorationPicks` of `rh.sweep`, 0 to 2, default 1) |
 | Any time | You judge cards 👎/👍/⭐ with a reason, or ask the desk |
-| Every night (`RH_NIGHTLY_TIME`, 02:00) | The nightly run records the day; later versions analyze what you disliked or missed here and test fixes on your past judgments |
-| Weekly (`RH_REVIEW_TIME`, Sunday 07:00) | The **digest** (Digest tab): the week's sweeps and cards, your judgments and precision@5, the exploration picks and how you judged them, new knowledge-base notes, cost, and **every change** with an **Undo**. Each section has a comment box; your comments appear in the next digest |
+| Every night (`RH_NIGHTLY_TIME`, 02:00) | The nightly run records the day; the judge is recalibrated and labels new papers; once a week the [weekly upgrade](#the-weekly-upgrade) runs after it |
+| Weekly (`RH_REVIEW_TIME`, Sunday 07:00) | The **digest** (Digest tab): the week's sweeps and cards, your judgments and precision@5, the exploration picks and how you judged them, new knowledge-base notes, quality, sources, the week's upgrade, cost, and **every change** with an **Undo**. Each section has a comment box; your comments appear in the next digest |
 
 A status line on the Feed and the Digest says where the cycle stands: the last sweep, how many cards wait for you,
 and the next sweep, nightly run and digest. **Undo** reverses one change and keeps later ones (it is refused, with
@@ -162,6 +165,29 @@ and recent judgments), but only while it agrees with your own verdicts in at lea
 recalibrated and labels new papers every night within $0.20 a day. The **Quality** tab shows the judge's
 agreement, your cards over time and every replay; the digest summarizes them; and you can ask the desk "would 10
 cards a day be better?". The harness is part of the core: no plugin or upgrade can change how things are measured.
+
+## The weekly upgrade
+
+Once every 7 days (setting `everyDays` of `rh.upgrades`), after the nightly run, the hub works on **exactly one**
+thing, and the Upgrades tab and the digest report what it did:
+
+| Focus | What it does | What changes |
+|---|---|---|
+| **Ranking** | Counts what went wrong in the last 60 days (👎 by reason: off topic, too basic or advanced, low trust; liked cards ranked low; exploration picks liked or not; cards left unjudged) and replays at most 12 setting variants around the current ones, the ones the analysis points at first | The variant with the verdict "better" and the highest held-out lower bound is **applied** as one change with **Undo**; with none, nothing changes |
+| **Embedder** | Takes OpenRouter's embedding catalog, keeps models at most $0.25 per million tokens not tried in the last 90 days, shortlists 2 by a web search (or the 2 newest), and runs the embedder benchmark on the active model and each candidate within the run's cost cap (`maxRunUsd`, $0.50) | A candidate that beats the active model by 0.02 mean nDCG@10 without losing on "your stars" is **proposed**; Approve switches the embedder and re-embeds the papers in the background, with Undo |
+| **Scout add-ons** | A web search for up to 5 free paper APIs or integrations that fit your research questions and that the hub does not have | A **list** with links and reasons; you dismiss what you do not want |
+
+The focus is chosen by the Jev command `upgrade-focus` from each slot's last result and age, your digest comments
+since the last upgrade, the failure counts and the last focuses; when it is unsure (confidence under 0.4) the focus
+rotates ranking → embedder → scout. You can also start a run in the Upgrades tab. An upgrade never changes the core
+or how a slot is measured, and every report lists every candidate it tried with its numbers.
+
+Web searches go through OpenRouter's web plugin on the `chat` model (about $0.007 a search); their cost counts in the
+run's cost and the plugin's daily budget. A first live run (2026-10-28, free chat model): ranking on a fresh project
+said "not enough data" ($0); scouting suggested CORE, Lens, OpenCitations, dblp and Crossref ($0.007, 79 s); the
+embedder run benchmarked Qwen3-Embedding-8B (0.679 mean nDCG@10) against the shortlisted Qwen3-Embedding-4B
+(0.678, not better), skipped Gemini Embedding 001 (about $0.18, over a $0.10 cap) and proposed nothing ($0.035,
+17 minutes, mostly embedding the samples).
 
 ## The knowledge base
 
@@ -357,6 +383,8 @@ curl -s -X POST -H "authorization: Bearer $RH_API_TOKEN" -H 'content-type: appli
 | `GET /v1/digests[/:id]` · `POST /v1/digests/:id/comments` | Weekly digests · comment on a section (`section`, `text`) |
 | `GET /v1/slots` · `POST /v1/slots/:id/benchmark` · `GET /v1/slots/benchmarks` | Slots with active implementation, preset and last result · run a preset (`candidate`, e.g. `{ "model": "google/gemini-embedding-2", "dims": 1024 }`) · past runs |
 | `GET /v1/attribution?days=30` | Cards each paper source brought, and how many you liked |
+| `GET /v1/upgrades` · `POST /v1/upgrades/run` | Runs with their reports, proposals and suggestions · start a run now (`focus`: `ranking`, `embedder` or `scout-addons`; without it Jev chooses), in the background |
+| `POST /v1/proposals/:id/approve` · `POST /v1/proposals/:id/reject` · `POST /v1/suggestions/:id/dismiss` | Decide on a proposed upgrade · dismiss a suggested add-on |
 | `GET /v1/harness/quality` · `GET /v1/harness/replays` · `POST /v1/harness/replay` | The judge's agreement and quality over time · replays · replay a variant (`variant`) |
 | `GET /v1/cards` · `GET /v1/cards/:id` | The Feed (cards grouped by sweep, newest first) · one card with score details |
 | `GET /v1/sweeps[/:id]` | Sweeps with phases, counts, papers by status and the cost split |

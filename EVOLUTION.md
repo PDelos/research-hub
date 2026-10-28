@@ -84,6 +84,18 @@ Each week the agent does one of two things, and the digest reports it:
 
 The agent never chooses freely what to optimize, never changes the core, and never changes how a slot is measured.
 
+**As built (v1-4, 2026-10-28):** the core plugin `rh.upgrades` runs every `everyDays` (7) days after the nightly
+run, or on request. The Jev command `upgrade-focus` picks one focus (ranking, embedder or scout-addons) from the
+slots' last results and ages, your digest comments, the failure counts and the recent focuses; below confidence 0.4
+the focus rotates. **Ranking:** a failure analysis (👎 by reason, liked cards ranked low, exploration, unjudged share)
+orders at most 12 variants (gates ±0.05, 0.1 of rank weight moved, cards ±2, exploration ±1); the replay with the
+verdict "better" and the highest held-out lower bound is applied with undo. **Embedder:** OpenRouter's embedding
+catalog within the price limit, minus models tried in the last 90 days (the memory of what lost), shortlisted to 2
+by web research (OpenRouter's web plugin) or by recency, benchmarked within the run's cost cap; a winner by 0.02
+mean nDCG@10 that is not worse on "your stars" is proposed, and approving it re-embeds the papers live. **Scout:** up
+to 5 sources or integrations with links and reasons, dismissable. Each run stores a report with every candidate and
+its numbers; the Upgrades tab and the digest's Upgrade section show it.
+
 ## 1. The idea in one picture
 
 ```
@@ -390,7 +402,7 @@ before the next). Order chosen so that each step makes the next one cheaper.
 | **2** ✅ 2026-10-26 | `v1-1-lite-daily-cycle` | **A light image** (the server bundled into one file without unused SDKs; Obsidian/Ignis as an optional add-on image; Library the default viewer; target under 300 MB). **The daily cycle as one orchestrated workflow** (sweep → cards with an exploration pick → nightly analysis slot → weekly digest), a **"What changed" feed with undo**, and the **digest page** where you read and comment | The lite image runs a project end to end; the cycle runs on its own for a simulated week offline; the digest lists every change with undo and takes comments |
 | **3** ✅ 2026-10-26 | `v1-2-harness` | **Replays** of past sweeps against your judgments (train and held-out split), nDCG, precision@5, recall of ⭐ with bootstrap intervals; a **judge calibrated on your verdicts**; the Quality view. This is the preset of the Ranking slot | A change to a gate threshold is replayed and scored with an interval; the judge's agreement with your verdicts is reported |
 | **4** ✅ 2026-10-28 | `v1-3-slots-and-benchmarks` | The **classification** of §0.1 in every manifest (kind, topic, benchmark); the **Plugins tab grouped by topic and kind** (core collapsed, slots with alternatives, add-ons on/off); **benchmark presets** and a runner on cached public samples (first: Embedder with SCIDOCS + LitSearch samples, Facet labeler with PubMed RCT); **usage attribution** for add-ons in the digest | The embedder and facet presets run offline on cached samples and report their metric; the Plugins tab shows the four kinds; the digest shows per-source attribution |
-| **5** | `v1-4-weekly-upgrade` | The weekly upgrade of §0.2: nightly error analysis and slot choice, web search for candidates of one slot, the slot's preset on candidate vs active, settings winners applied with undo, plugin winners proposed; add-on scouting; a memory of what lost | A seeded weakness in the Ranking slot is found, a better setting is proven on held-out judgments and applied with undo; a candidate embedder is benchmarked and proposed; a new source is suggested with reasoning |
+| **5** ✅ 2026-10-28 | `v1-4-weekly-upgrade` | The weekly upgrade of §0.2: nightly error analysis and slot choice, web search for candidates of one slot, the slot's preset on candidate vs active, settings winners applied with undo, plugin winners proposed; add-on scouting; a memory of what lost | A seeded weakness in the Ranking slot is found, a better setting is proven on held-out judgments and applied with undo; a candidate embedder is benchmarked and proposed; a new source is suggested with reasoning |
 | **6** | `v1-5-knowledge-loop` | Interests from your judgments, **charter proposals** and **new research questions** in the digest (you approve) | A digest proposes a charter change with evidence; approving it creates a charter version the next sweep uses |
 | **7** | later | Full text and facet vectors for ⭐ (its slot preset: OmniDocBench and the research benchmarks), the engineer agent, fine-tuning (prompt optimization first), MCP for outside agents | Planned again when the loops run |
 

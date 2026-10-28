@@ -322,7 +322,12 @@ export async function activate(context: PluginContext): Promise<HarnessExports> 
         return record(
           "embedder",
           "embedder",
-          { model: embedder.model, dims: embedder.dims, ...(model ? { candidate: true } : {}) },
+          // The model asked for (offline, the fake embedder stands in for it).
+          {
+            model: typeof model === "string" ? model : embedder.model,
+            dims: embedder.dims,
+            ...(model ? { candidate: true } : {}),
+          },
           { tasks, value, label: value === null ? "no result" : `nDCG@10 ${value.toFixed(3)}` },
           costSince(started),
         );

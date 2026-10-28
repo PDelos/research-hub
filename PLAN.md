@@ -267,8 +267,8 @@ slower, less accurate long-context mode, so Jev only ever sees title/abstract-si
 | **paper-reader** (subagent) | Reads full text, extracts claims/method/results, checks claims with Jev | `read_paper`, `read_full_text`, `jev_classify`, `report_findings` |
 | **librarian** (subagent, on ⭐) | Writes the vault evidence note, connects it to ≥1 concept/question page | `read_paper`, `read_full_text`, `search_kb`, `kb_write_source`, `kb_upsert_concept`, `kb_upsert_question`, `kb_link` |
 | **reviewer** (subagent, weekly, read-only on settings) | Metrics, calibration, interests, charter proposals, new research questions, proposals | `review_metrics`, `interest_report`, `question_candidates`, `similar_papers`, `jev_classify`, `query_kb`, `search_kb`, `propose_change`, `propose_charter_change`, `propose_research_direction` |
-| **scout** (v1-4, weekly or on demand) | Finds upgrade ideas for the hub on the internet | `web_search` (OpenRouter), `search_papers`, `release_feeds`, `model_catalog`, `plugin_status`, `jev_classify`, `propose_idea` |
-| **tester** (v1-4, on your request) | Runs an idea's candidate beside the current plugin and writes the proof report | `install_variant`, `run_harness`, `judge_pairs`, `sample_examples`, `write_proof_report` |
+| **scout** (v1-4, weekly or on demand; built as the `rh.upgrades` plugin's web research, not a separate agent) | Finds upgrade ideas for the hub on the internet | `web_search` (OpenRouter), `search_papers`, `release_feeds`, `model_catalog`, `plugin_status`, `jev_classify`, `propose_idea` |
+| **tester** (v1-4, on your request; built as the slot benchmark presets of `rh.harness`, not a separate agent) | Runs an idea's candidate beside the current plugin and writes the proof report | `install_variant`, `run_harness`, `judge_pairs`, `sample_examples`, `write_proof_report` |
 | **engineer** (v1-5, on your request) | Writes plugin code when an idea needs it, in a sandbox | `read_plugin`, `write_plugin_files`, `run_contract_tests` (sandboxed worktree only) |
 
 **Built in v0** (the names above are the full plan; v0 shipped a subset): research desk `search_papers`,
@@ -495,7 +495,8 @@ properties so notes can be re-extracted later.
 so routes have no project segment. Built in v0: `/v1/{health,info,agent,chat,stream,transcript,runs,usage,
 jev/ping,project,brief,charter,schedule,scheduled-runs,cards,sweeps,sweep-settings,weights,feedback/precision,
 kb/papers,kb/notes,kb/search}`, `/v1/runs/{sweep,review}` (manual), `/v1/cards/:id/judgment`, and `/kb/` (the
-bundled Obsidian viewer). Planned: `/v1/plugins…` (v1-0), `/v1/upgrades…` (v1-4), `/v1/proposals…` (v1-3).
+bundled Obsidian viewer). Built in v1: `/v1/plugins…` (v1-0), `/v1/cycle`, `/v1/digests…` (v1-1), `/v1/harness…` (v1-2), `/v1/slots…`,
+`/v1/attribution` (v1-3), `/v1/upgrades…`, `/v1/proposals…`, `/v1/suggestions…` (v1-4).
 
 **UI** (Vue 3):
 
@@ -511,7 +512,7 @@ bundled Obsidian viewer). Planned: `/v1/plugins…` (v1-0), `/v1/upgrades…` (v
 | **Runs** | Chat runs, sweeps with phases, papers by status and the cost split, scheduled runs | v0 |
 | **Settings** | Schedule, cards per sweep, weights with their charter values | v0; plugin settings v1-0 |
 | **Plugins** | Every plugin: state, version, contributions, permissions, settings, history; enable, disable, install, uninstall, roll back | v1-0 |
-| **Upgrades** | Idea cards from the scout (and yours) → test → proof reports → implement → verification, with your decision at each gate; the product charter | v1-4 |
+| **Upgrades** | The weekly upgrade: the latest run (focus, reason, every candidate with its numbers, the result), proposals to approve or reject, add-on suggestions to dismiss, earlier runs, "Run one now". (The staged idea → test → proof workflow sketched earlier was replaced by fixed slots and presets, EVOLUTION.md §0.1–0.2) | v1-4 |
 | **Graph (typed relations)** | Typed edges between papers (extends, contradicts…), missing-link pairs | v2 |
 
 **Knowledge base tab (v0.5):** the real Obsidian interface embedded in the hub UI, served by
@@ -600,8 +601,9 @@ add-on), the daily cycle (sweep with exploration picks, nightly run, weekly dige
 `v1-1-lite-daily-cycle` ✅ (a light image, Obsidian as an add-on, the daily cycle orchestrated with a weekly digest and
 a "What changed" feed with undo) → `v1-2-harness` ✅ (replays on your judgments, a judge calibrated on your verdicts: the Ranking slot's preset) →
 `v1-3-slots-and-benchmarks` ✅ (every plugin classified as core, slot, add-on or preference; the Plugins tab grouped by
-topic; benchmark presets per slot on cached public samples; usage attribution for add-ons) → `v1-4-weekly-upgrade`
-(improve one slot on its preset, or scout add-ons) → `v1-5-knowledge-loop` (charter and new-question proposals).
+topic; benchmark presets per slot on cached public samples; usage attribution for add-ons) → `v1-4-weekly-upgrade` ✅
+(each week one focus chosen by Jev: ranking variants replayed and the winner applied with undo, an embedder candidate
+benchmarked and proposed, or add-ons scouted on the web) → `v1-5-knowledge-loop` (charter and new-question proposals).
 Full text, the engineer, fine-tuning and MCP come later. What may change and how it is judged: EVOLUTION.md §0.1.
 
 v0 was built bottom-up; each layer is one OpenSpec change that depends only on the layers below it and
@@ -675,7 +677,7 @@ replaces the phase list below):
 - [ ] Contact email for OpenAlex and Europe PMC polite pools (`CONTACT_EMAIL`); optional Semantic Scholar API key
 - [ ] Python in the image for process plugins (Docling, fine-tuning), or optional sidecar images (decide before v1-2)
 - [ ] Where fine-tuning runs: this machine's Quadro P2000 (4 GB) or a rented GPU (decide before v1-6)
-- [ ] Autonomy policy defaults beyond "every upgrade needs your request" (decide in v1-4)
+- [x] Autonomy policy (decided 2026-10-26, built in v1-4): setting winners on the finding loop apply with undo; new plugins (another embedder), charter changes and cost increases wait for approval
 
 ---
 
