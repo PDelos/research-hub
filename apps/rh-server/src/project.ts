@@ -32,7 +32,7 @@ import type { Vault } from "./kb/vault.ts";
 import type { Ingest } from "./kb/ingest.ts";
 import type { KbIndex } from "./kb/search.ts";
 import type { KbViewer } from "./kb/viewer.ts";
-import { ensureVectorTables, openProjectDb, Settings, type Db, type SelfCheck } from "./db.ts";
+import { openProjectDb, Settings, type Db, type SelfCheck } from "./db.ts";
 import type { Logger } from "./logger.ts";
 import { Telemetry } from "./telemetry.ts";
 import type { AgentHooks, BuiltinHost } from "./kernel/builtin.ts";
@@ -149,7 +149,8 @@ export async function openProject(options: OpenProjectOptions): Promise<ProjectR
   mkdirSync(dir, { recursive: true });
   migrateLegacyLayout(dir, log);
   const { db, check } = openProjectDb(join(dir, "project.sqlite"));
-  ensureVectorTables(db, options.papers.embedDims);
+  // The vector tables are sized by the paper service from the embedder plugin's settings (v1-4: they may differ
+  // from RH_EMBED_DIMS after an approved upgrade).
   const settings = new Settings(db);
   const telemetry = new Telemetry(db);
   const plog = log;

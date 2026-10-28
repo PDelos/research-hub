@@ -111,7 +111,13 @@ export class OpenRouterEmbedder implements Embedder {
         // A batch of 32 abstracts can take a while; allow 60 s per attempt and 3 minutes in all.
         timeoutMs: 60_000,
         budgetMs: 180_000,
-        body: JSON.stringify({ model: this.model, input, dimensions: this.dims, encoding_format: "float" }),
+        // dims 0: the model's native size (benchmarks of models that do not take `dimensions`).
+        body: JSON.stringify({
+          model: this.model,
+          input,
+          ...(this.dims ? { dimensions: this.dims } : {}),
+          encoding_format: "float",
+        }),
         headers: { authorization: `Bearer ${this.options.apiKey}`, "content-type": "application/json" },
       });
       if (!body.data || body.data.length !== input.length)
@@ -119,7 +125,7 @@ export class OpenRouterEmbedder implements Embedder {
       const vectors = [...body.data]
         .sort((a, b) => a.index - b.index)
         .map((d) => {
-          if (d.embedding.length !== this.dims)
+          if (this.dims && d.embedding.length !== this.dims)
             throw new Error(`${this.model} returned ${d.embedding.length} dimensions, RH_EMBED_DIMS is ${this.dims}`);
           return l2normalize(Float32Array.from(d.embedding));
         });

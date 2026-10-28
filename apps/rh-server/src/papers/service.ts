@@ -131,6 +131,9 @@ export class PaperService {
           error: error instanceof Error ? error.message : String(error),
           pending: this.vectors.pending(),
         });
+      } finally {
+        // A later model change starts a new catch-up.
+        this.catchingUp = undefined;
       }
     })();
   }

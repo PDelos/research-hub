@@ -18,7 +18,22 @@
         "id": "openrouter",
         "title": "OpenRouter embeddings"
       }
-    ]
+    ],
+    "settings": {
+      "properties": {
+        "model": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]+/[\\w.:-]+$",
+          "description": "OpenRouter embedding model (default: RH_MODEL_EMBED). Changing it re-embeds every paper in the background."
+        },
+        "dims": {
+          "type": "integer",
+          "minimum": 32,
+          "maximum": 4096,
+          "description": "Vector size (default: RH_EMBED_DIMS)."
+        }
+      }
+    }
   },
   "permissions": {
     "network": ["openrouter.ai"],

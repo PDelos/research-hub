@@ -12,6 +12,8 @@ import type { DecisionExports } from "../rh.decision-jev/main.ts";
 
 /** What a plugin contributing papers.embedder exports. */
 export interface EmbedderExports {
+  /** The model and size in use now. */
+  config(): { model: string; dims: number };
   /** The configured embedder, or (v1-3) one for a candidate model and size, e.g. for the slot's benchmark. */
   createEmbedder(context: { ledger: EmbeddingLedger; model?: string; dims?: number }): Embedder;
 }
@@ -35,7 +37,26 @@ export async function activate(context: PluginContext): Promise<PapersExports> {
 
   const choice = contributions.activeContribution("papers.embedder", context.settings);
   if (!choice) throw new Error("no plugin contributing papers.embedder is enabled");
-  const embedder = await host.exportsOf<EmbedderExports>(choice.pluginId);
+  const provider = await host.exportsOf<EmbedderExports>(choice.pluginId);
+  /** Delegates to the provider's current model, so a change of model applies without a restart. */
+  const delegating = (ledger: EmbeddingLedger): Embedder => {
+    let cache: { key: string; embedder: Embedder } | undefined;
+    const current = () => {
+      const { model, dims } = provider.config();
+      const key = `${model}:${dims}`;
+      if (cache?.key !== key) cache = { key, embedder: provider.createEmbedder({ ledger }) };
+      return cache.embedder;
+    };
+    return {
+      get model() {
+        return current().model;
+      },
+      get dims() {
+        return current().dims;
+      },
+      embed: (texts) => current().embed(texts),
+    };
+  };
 
   const papers = new PaperService({
     db: host.db,
@@ -48,7 +69,7 @@ export async function activate(context: PluginContext): Promise<PapersExports> {
     jevLedger: jev.ledger,
     log: host.log,
     fetch: options.paperFetch,
-    embedder: (c) => embedder.createEmbedder(c),
+    embedder: (c) => delegating(c.ledger),
     async selectedSources() {
       const sources = await contributions.contributionsTo("papers.source", { activate: true });
       const extra: PaperSource[] = [];
@@ -66,5 +87,10 @@ export async function activate(context: PluginContext): Promise<PapersExports> {
     },
   });
   context.subscriptions.push({ dispose: () => papers.close() });
+  // A new embedder (approved upgrade, settings): resize the vector tables if needed, drop the old vectors, re-embed.
+  context.rh.events.on("embedder.changed", () => {
+    if (papers.vectors.syncModel()) context.log.info("papers.embedder_changed", { model: papers.vectors.model });
+    papers.start();
+  });
   return { papers, agentExtensions: [paperTools(() => papers)], ready: () => papers.start() };
 }
