@@ -1,7 +1,10 @@
 # Research Hub: one container per research project, serving the API and the built UI on port 4850; data lives in
-# the /data volume. Two images (design v1-1 D2):
-#   docker build -t research-hub .                               the light default (Library viewer, under 300 MB)
-#   docker build --target obsidian -t research-hub:obsidian .    adds the Obsidian viewer (Ignis) as an add-on
+# the /data volume. The default image holds only what the core needs; add-ons come as larger images (design v1-1 D2,
+# v1-6 D7):
+#   docker build -t research-hub .                               the light default (Library viewer, no Python)
+#   docker build --target obsidian -t research-hub:obsidian .    adds the Obsidian viewer (Ignis), a preference
+#   docker build --target full -t research-hub:full .            Obsidian plus Docling, the Converter slot's
+#                                                                layout-aware alternative (Python, several GB)
 # syntax=docker/dockerfile:1
 
 # 0. The knowledge-base viewer for the add-on: a pinned Ignis release (AGPL-3.0, run unmodified as a separate
@@ -70,6 +73,23 @@ FROM lite AS obsidian
 ENV RH_KB_VIEWER=on \
     RH_KB_VIEWER_DIR=/opt/ignis
 COPY --from=ignis /app /opt/ignis
+
+# 6. Everything: the Obsidian image plus Docling Serve (CPU) in a Python virtual environment with its models
+#    downloaded at build time; the hub starts it on the first PDF conversion (RH_DOCLING=on).
+FROM obsidian AS full
+USER root
+RUN apt-get update && apt-get install -y --no-install-recommends python3 python3-venv libgl1 libglib2.0-0 \
+  && rm -rf /var/lib/apt/lists/* \
+  && python3 -m venv /opt/docling \
+  && /opt/docling/bin/pip install --no-cache-dir --extra-index-url https://download.pytorch.org/whl/cpu docling-serve \
+  && HF_HOME=/opt/docling/hf /opt/docling/bin/docling-tools models download -o /opt/docling/models \
+  && chown -R node:node /opt/docling
+ENV RH_DOCLING=on \
+    RH_DOCLING_CMD=/opt/docling/bin/docling-serve \
+    DOCLING_SERVE_ARTIFACTS_PATH=/opt/docling/models \
+    HF_HOME=/opt/docling/hf \
+    HF_HUB_OFFLINE=1
+USER node
 
 # The default build is the light image.
 FROM lite

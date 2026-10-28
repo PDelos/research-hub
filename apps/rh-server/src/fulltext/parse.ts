@@ -116,6 +116,8 @@ export function headingOf(line: string): string | undefined {
   if (!m) return undefined;
   // Subsections (2.1) stay inside their section; a numbered line ending in a digit is likely a table row.
   if (m[3] || /\d$/.test(t) || /^0\b/.test(t)) return undefined;
+  // Affiliations and sentences ("2. Department of Physics, University of …") are not headings.
+  if (/[,@;]/.test(m[5]) || m[5].split(/\s+/).length > 10) return undefined;
   return t;
 }
 

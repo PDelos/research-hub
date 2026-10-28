@@ -216,6 +216,28 @@ A first live review (2026-10-28, throwaway project, free review model, one real 
 proposals and three drafted questions, of which Jev kept one (0.61) and dropped two (0.49); approving it created
 charter version 3 with Q5 and its two queries. The review cost $0.00007 (Jev only; the sweep before it $0.021).
 
+## Full text
+
+When you star a paper, the hub gets its **full text** before the librarian writes the note (you can also press "Get
+full text" on any paper in the Library). It takes the first source that has it:
+
+1. **arXiv HTML** (most arXiv papers since late 2023);
+2. **Europe PMC** XML for open-access papers with a PMCID;
+3. **bioRxiv / medRxiv** XML for their DOIs;
+4. the **PDF** (arXiv, or the paper's open-access link on a known open-access host) through the active **converter**.
+
+The text is stored as sections without references. The librarian writes the note from it (methods, results and
+open questions from the paper itself, not only the abstract), and the paper's background, method and result vectors
+come from its sections. When nothing is found, the reason for each source is shown and the note is written from the
+abstract as before.
+
+**The Converter slot** turns PDFs into sections. The light image has a pdf.js converter (text and numbered headings,
+no Python). The `research-hub:full` image adds **Docling** (layout, reading order, tables), which the hub starts on
+the first PDF; `RH_DOCLING_URL` can point at a Docling Serve you run elsewhere instead. Both are judged on the same
+preset: 10 fixed arXiv papers that have a PDF and an HTML version, the HTML as the truth, scored by word F1 and
+section-heading recall. The weekly upgrade's converter focus proposes switching when another converter scores at
+least 0.02 higher.
+
 ## The knowledge base
 
 Every ⭐ becomes an evidence note in the project's Obsidian vault (`$RH_DATA_DIR/vault/`): the librarian (the
@@ -412,6 +434,7 @@ curl -s -X POST -H "authorization: Bearer $RH_API_TOKEN" -H 'content-type: appli
 | `GET /v1/attribution?days=30` | Cards each paper source brought, and how many you liked |
 | `GET /v1/upgrades` · `POST /v1/upgrades/run` | Runs with their reports, proposals and suggestions · start a run now (`focus`: `ranking`, `embedder` or `scout-addons`; without it Jev chooses), in the background |
 | `POST /v1/proposals/:id/approve` · `POST /v1/proposals/:id/reject` · `POST /v1/suggestions/:id/dismiss` | Decide on a proposed upgrade · dismiss a suggested add-on |
+| `GET /v1/papers/:id/fulltext` · `POST /v1/papers/:id/fulltext` · `GET /v1/fulltext/converters` | A paper's full text (or why it is missing) · get it now · the converters and which is active |
 | `GET /v1/knowledge` · `POST /v1/knowledge/review` | Knowledge reviews and charter proposals · start a review now (in the background) |
 | `POST /v1/knowledge/proposals/:id/approve` · `…/reject` (`reason`) · `…/undo` | Make a proposal the next charter version · reject it · restore the charter before it |
 | `GET /v1/harness/quality` · `GET /v1/harness/replays` · `POST /v1/harness/replay` | The judge's agreement and quality over time · replays · replay a variant (`variant`) |

@@ -50,6 +50,7 @@ test("PDF text: headings, running headers removed, hyphenation joined, reference
   assert.equal(headingOf("0. Due to the inclusion of the product kernel"), undefined);
   assert.equal(headingOf("2.1 Datasets"), undefined, "subsections stay inside");
   assert.equal(headingOf("II. RESULTS"), "II. RESULTS");
+  assert.equal(headingOf("2. Department of Physics, University of Gothenburg"), undefined, "an affiliation");
 });
 
 test("facets by heading, unnamed sections between background and results count as method; budget keeps every head", () => {
