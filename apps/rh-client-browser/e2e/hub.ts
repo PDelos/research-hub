@@ -63,6 +63,41 @@ propose.run(
   JSON.stringify({ summary: "You marked 3 clinical papers off topic.", papers: [] }),
   seededAt,
 );
+// A knowledge-base paper with its full text, so the Library shows both.
+{
+  const paperId = p.papers.store.upsert({
+    source: "arxiv",
+    externalId: "2601.00001",
+    ids: { arxiv: "2601.00001" },
+    title: "RNA-FM: an RNA foundation model",
+    abstract: "We train a language model on RNA sequences.",
+    authors: ["A. Author"],
+    year: 2026,
+  }).id;
+  const now = new Date().toISOString();
+  p.db
+    .prepare("INSERT INTO kb_requests (paper_id, card_id, status, created_at, updated_at) VALUES (?, 0, 'done', ?, ?)")
+    .run(paperId, now, now);
+  p.db
+    .prepare(
+      "INSERT INTO kb_notes (paper_id, stem, summary, created_at) VALUES (?, 'rna-fm', 'An RNA language model.', ?)",
+    )
+    .run(paperId, now);
+  p.vault.create("sources/rna-fm.md", "---\ntitle: RNA-FM\n---\n\n## Summary\nAn RNA language model.\n");
+  await p.plugins.exportsOf("rh.fulltext");
+  p.db
+    .prepare(
+      "INSERT INTO p_rh_fulltext__texts (paper_id, status, source, sections_json, chars, notes_json, fetched_at) VALUES (?, 'ok', 'arxiv-html', ?, 60, '[]', ?)",
+    )
+    .run(
+      paperId,
+      JSON.stringify([
+        { title: "Introduction", text: "RNA structure matters." },
+        { title: "Methods", text: "We pretrain on 23 million sequences." },
+      ]),
+      now,
+    );
+}
 // One change and a digest, so the Digest tab has something to show (and to undo).
 await p.plugins.kernel.configure("rh.sweep", { cardsPerSweep: 5 });
 await (await p.plugins.exportsOf<DigestExports>("rh.digest")).buildDigest();

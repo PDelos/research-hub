@@ -12,6 +12,8 @@ import type {
   CycleStatus,
   SlotView,
   SourceAttribution,
+  ConverterInfo,
+  FullTextView,
   KnowledgeProposal,
   KnowledgeView,
   UpgradeFocus,
@@ -202,6 +204,12 @@ export class HubClient {
   approveProposal = (id: number) => this.call<UpgradeProposal>("POST", `/proposals/${id}/approve`, {});
   rejectProposal = (id: number) => this.call<UpgradeProposal>("POST", `/proposals/${id}/reject`, {});
   dismissSuggestion = (id: number) => this.call<UpgradeSuggestion>("POST", `/suggestions/${id}/dismiss`, {});
+
+  // Full text (v1.6)
+  fullText = (paperId: number) => this.call<FullTextView>("GET", `/papers/${paperId}/fulltext`);
+  /** Fetch the paper's full text now (again), from the first source that has it. */
+  fetchFullText = (paperId: number) => this.call<FullTextView>("POST", `/papers/${paperId}/fulltext`, {});
+  converters = () => this.call<ConverterInfo[]>("GET", "/fulltext/converters");
 
   // The knowledge loop (v1.5)
   knowledge = () => this.call<KnowledgeView>("GET", "/knowledge");

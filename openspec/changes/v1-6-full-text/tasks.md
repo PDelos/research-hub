@@ -11,7 +11,7 @@
 
 ## 3. API, UI, images
 
-- [ ] 3.1 Routes, SDK, Library full-text view; verify API and Playwright tests
+- [x] 3.1 Routes, SDK, Library full-text view; verify API and Playwright tests
 - [ ] 3.2 Dockerfile `full` target; verify the light image is unchanged in content and the full image converts a PDF
 
 ## 4. Integration

@@ -1166,3 +1166,15 @@ button.danger {
 .knowledge-proposals .badge {
   margin-left: 6px;
 }
+
+/* Full text in the Library (v1.6) */
+.fulltext {
+  margin-top: 24px;
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+}
+.fulltext-section {
+  white-space: pre-wrap;
+  max-height: 320px;
+  overflow: auto;
+}

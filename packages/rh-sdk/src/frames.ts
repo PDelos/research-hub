@@ -818,3 +818,25 @@ export interface KnowledgeView {
   reviews: KnowledgeReview[];
   proposals: KnowledgeProposal[];
 }
+
+// ---------------------------------------------------------------- full text (v1.6)
+
+export interface FullTextView {
+  paperId: number;
+  /** none: never fetched. */
+  status: "ok" | "missing" | "none";
+  source: string | null;
+  sections: { title: string; text: string }[];
+  chars: number;
+  notes: string[];
+  fetchedAt: string | null;
+}
+
+export interface ConverterInfo {
+  id: string;
+  title: string;
+  pluginId: string;
+  active: boolean;
+  available: boolean;
+  reason?: string;
+}

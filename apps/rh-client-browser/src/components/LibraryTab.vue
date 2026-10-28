@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
-import { ago, type KbNote, type KbPaper, type KbSearchHit } from "@rh/sdk";
+import { ago, isRhError, type FullTextView, type KbNote, type KbPaper, type KbSearchHit } from "@rh/sdk";
 import { client, openInKb, store } from "../store.ts";
 import { renderMarkdown } from "../markdown.ts";
 
@@ -18,10 +18,44 @@ async function load() {
 }
 onMounted(load);
 
-async function open(stem: string | null) {
+// The paper's full text (v1.6): where it came from and its sections.
+const fullText = ref<FullTextView>();
+const fetching = ref(false);
+const fullTextError = ref("");
+const SOURCE: Record<string, string> = {
+  "arxiv-html": "arXiv HTML",
+  "europepmc-jats": "Europe PMC XML",
+  "biorxiv-jats": "bioRxiv XML",
+};
+const sourceName = (s: string | null) =>
+  !s ? "" : (SOURCE[s] ?? (s.startsWith("pdf:") ? `PDF via the ${s.slice(4)} converter` : s));
+async function loadFullText(paperId: number) {
+  fullTextError.value = "";
+  try {
+    fullText.value = await client.fullText(paperId);
+  } catch {
+    fullText.value = undefined;
+  }
+}
+async function getFullText() {
+  if (!fullText.value) return;
+  fetching.value = true;
+  fullTextError.value = "";
+  try {
+    fullText.value = await client.fetchFullText(fullText.value.paperId);
+  } catch (e) {
+    fullTextError.value = isRhError(e) ? e.message : String(e);
+  } finally {
+    fetching.value = false;
+  }
+}
+
+async function open(stem: string | null, paperId?: number) {
   if (!stem) return;
   try {
     note.value = await client.kbNote(stem);
+    const id = paperId ?? papers.value.find((p) => p.stem === stem)?.paperId;
+    if (id !== undefined) await loadFullText(id);
   } catch (e) {
     store.error = e instanceof Error ? e.message : String(e);
   }
@@ -73,7 +107,7 @@ const HIDDEN = new Set(["title"]);
           v-for="p in papers"
           :key="p.paperId"
           :class="{ sel: note && note.stem === p.stem, static: !p.stem }"
-          @click="open(p.stem)"
+          @click="open(p.stem, p.paperId)"
         >
           <strong>{{ p.title }}</strong>
           <span class="muted small">
@@ -99,6 +133,26 @@ const HIDDEN = new Set(["title"]);
         </tr>
       </table>
       <div class="note-body" v-html="renderMarkdown(note.body)" />
+      <section v-if="fullText" class="fulltext" data-test="fulltext" @click.stop>
+        <div class="row">
+          <h3>Full text</h3>
+          <span class="spacer" />
+          <button class="ghost small" :disabled="fetching" @click="getFullText">
+            {{ fetching ? "Getting…" : fullText.status === "ok" ? "Get again" : "Get full text" }}
+          </button>
+        </div>
+        <p v-if="fullTextError" class="error small">{{ fullTextError }}</p>
+        <p v-if="fullText.status === 'ok'" class="muted small">
+          From {{ sourceName(fullText.source) }} · {{ fullText.sections.length }} sections ·
+          {{ fullText.chars < 1000 ? fullText.chars : `${Math.round(fullText.chars / 1000)}k` }} characters
+        </p>
+        <p v-else-if="fullText.status === 'missing'" class="muted small">Not found: {{ fullText.notes.join("; ") }}</p>
+        <p v-else class="muted small">Not fetched yet.</p>
+        <details v-for="(s, i) in fullText.sections" :key="i">
+          <summary>{{ s.title }}</summary>
+          <p class="small fulltext-section">{{ s.text }}</p>
+        </details>
+      </section>
     </article>
     <div v-else class="note empty muted">Choose a paper to read its note.</div>
   </div>

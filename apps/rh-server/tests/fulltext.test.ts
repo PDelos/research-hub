@@ -199,3 +199,20 @@ test("a starred paper's note is written with its full text; facet vectors come f
     await server.stop();
   }
 });
+
+test("the API returns a paper's full text or its absence, fetches it on request, and lists the converters", async () => {
+  const s = await setup();
+  try {
+    const id = s.add({ arxiv: "2601.00001" });
+    const none = await s.server.client.fullText(id);
+    assert.equal(none.status, "none");
+    const got = await s.server.client.fetchFullText(id);
+    assert.equal(got.source, "arxiv-html");
+    assert.equal((await s.server.client.fullText(id)).sections.length, 4);
+    await assert.rejects(s.server.client.fullText(999_999), /No paper 999999/);
+    const converters = await s.server.client.converters();
+    assert.deepEqual(converters.find((c) => c.active)?.id, "pdf-text");
+  } finally {
+    await s.server.stop();
+  }
+});
