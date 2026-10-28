@@ -613,7 +613,9 @@ topic; benchmark presets per slot on cached public samples; usage attribution fo
 benchmarked and proposed, or add-ons scouted on the web) → `v1-5-knowledge-loop` ✅ (before each digest, charter
 proposals with evidence: weights, questions and queries to retire, new research questions scored by Jev, out-of-scope
 topics; an approved proposal is the next charter version) (charter and new-question proposals).
-Full text, the engineer, fine-tuning and MCP come later. What may change and how it is judged: EVOLUTION.md §0.1.
+Next, step 7 built completely (EVOLUTION.md §6): `v1-6-full-text` → `v1-7-question-finders` → `v1-8-engineer` →
+`v1-9-fine-tuning` (free, on Kaggle) → `v1-10-mcp`; then review cycles, testing and shipping. What may change and how
+it is judged: EVOLUTION.md §0.1.
 
 v0 was built bottom-up; each layer is one OpenSpec change that depends only on the layers below it and
 is applied, tested and archived before the next starts. All six v0 changes exist in `openspec/changes/`
@@ -684,8 +686,8 @@ replaces the phase list below):
 - [x] One project per container, owner lock, `new-project.sh`
 - [x] Ignis trial (2026-10-23, from source): passed with a same-origin `/kb/` proxy and a loopback preload (see v0.5 proposal)
 - [ ] Contact email for OpenAlex and Europe PMC polite pools (`CONTACT_EMAIL`); optional Semantic Scholar API key
-- [ ] Python in the image for process plugins (Docling, fine-tuning), or optional sidecar images (decide before v1-2)
-- [ ] Where fine-tuning runs: this machine's Quadro P2000 (4 GB) or a rented GPU (decide before v1-6)
+- [x] Python (decided 2026-10-28): not in the core image; Docling in the add-on image `research-hub:full` as the Converter slot's alternative
+- [x] Where fine-tuning runs (decided 2026-10-28): Kaggle Notebooks, free, through Kaggle's API (needs a free Kaggle account and API key)
 - [x] Autonomy policy (decided 2026-10-26, built in v1-4): setting winners on the finding loop apply with undo; new plugins (another embedder), charter changes and cost increases wait for approval
 
 ---

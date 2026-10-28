@@ -413,7 +413,12 @@ before the next). Order chosen so that each step makes the next one cheaper.
 | **4** ✅ 2026-10-28 | `v1-3-slots-and-benchmarks` | The **classification** of §0.1 in every manifest (kind, topic, benchmark); the **Plugins tab grouped by topic and kind** (core collapsed, slots with alternatives, add-ons on/off); **benchmark presets** and a runner on cached public samples (first: Embedder with SCIDOCS + LitSearch samples, Facet labeler with PubMed RCT); **usage attribution** for add-ons in the digest | The embedder and facet presets run offline on cached samples and report their metric; the Plugins tab shows the four kinds; the digest shows per-source attribution |
 | **5** ✅ 2026-10-28 | `v1-4-weekly-upgrade` | The weekly upgrade of §0.2: nightly error analysis and slot choice, web search for candidates of one slot, the slot's preset on candidate vs active, settings winners applied with undo, plugin winners proposed; add-on scouting; a memory of what lost | A seeded weakness in the Ranking slot is found, a better setting is proven on held-out judgments and applied with undo; a candidate embedder is benchmarked and proposed; a new source is suggested with reasoning |
 | **6** ✅ 2026-10-28 | `v1-5-knowledge-loop` | Interests from your judgments, **charter proposals** and **new research questions** in the digest (you approve) | A digest proposes a charter change with evidence; approving it creates a charter version the next sweep uses |
-| **7** | later | Full text and facet vectors for ⭐ (its slot preset: OmniDocBench and the research benchmarks), the engineer agent, fine-tuning (prompt optimization first), MCP for outside agents | Planned again when the loops run |
+| **7** | `v1-6-full-text` | **Full text** for ⭐ (and on request 👍) papers: structured sources first (arXiv HTML, Europe PMC and bioRxiv JATS XML: no conversion), PDFs through the **Converter slot** (default in the light image: a Node PDF-to-text converter; alternative in the add-on image `research-hub:full`: Docling in a supervised Python process). The slot's preset: arXiv papers that have both a PDF and an HTML version, the HTML as ground truth (text and section similarity). The librarian writes KB notes from the full text; **facet vectors** (background, method, result) for ⭐ papers | A starred arXiv paper gets its full text from HTML, a PDF-only one through the converter; both converters run on the preset; the light image stays under its size and needs no Python |
+| **8** | `v1-7-question-finders` | The knowledge review's question sources as **pluggable strategies** judged by attribution (which strategy's proposals you approve, and which lead to ⭐): same method, different problem (facet vectors), missing links (Jev `link-candidate`), citation-graph gaps (OpenAlex references), rising topics; **level-up** (curriculum) and **taste-rule** proposals | Each strategy proposes on a seeded project; the digest shows approvals per strategy |
+| **9** | `v1-8-engineer` | The **engineer** agent: writes a plugin from a scout suggestion (e.g. a new paper-source API) in a sandbox, runs its contract tests, installs it disabled as an external plugin (Node permission process) and asks for approval | A suggested source becomes a working, tested, approved add-on without hand-written code |
+| **10** | `v1-9-fine-tuning` | **Free fine-tuning on Kaggle** (30 GPU hours a week, started through Kaggle's API, no clicking): first **prompt optimization** (Jev wording, agent prompts) judged on replays; then a small embedder (e.g. EmbeddingGemma or Qwen3-Embedding-0.6B) trained on your ⭐/👎 and the judge's labels, exported to ONNX and run **in Node** as a candidate of the Embedder slot, adopted only if it wins the embedder preset | A training run starts on Kaggle and its model is benchmarked against the active embedder; nothing changes unless it wins and you approve |
+| **11** | `v1-10-mcp` | An **MCP server** per project so outside agents (Claude, IDEs) can search the knowledge base, cards and charter with a scoped token | An MCP client lists the tools and gets search results from a project |
+| **then** | review, test, ship | Review cycles (code, security, docs), real use on `proteins`, then packaging for other users (install guide, published images) | |
 
 
 ## 7. Decisions
@@ -426,6 +431,12 @@ before the next). Order chosen so that each step makes the next one cheaper.
    finding loop apply automatically with undo; charter changes, cost increases and outside upgrades wait for
    approval. Obsidian is an optional add-on; the Library is the default viewer. The image must be light. Order:
    core loop first (§6). Everything is a plugin (2.0); no hidden experiments on the live feed.
-1. **Python inside the image** for process plugins (Docling, fine-tuning): not in the default image; optional
-   add-on images per heavy plugin, like Obsidian.
-2. **Where training runs:** decided when fine-tuning is planned again (this machine's 4 GB GPU or a rented one).
+1. **Settled (2026-10-28):** the core image is as light as possible but holds everything the **core** needs; what
+   is not core (a preference like the Obsidian viewer, a slot alternative like Docling) lives in add-on images. The
+   core needs no Python: full text comes from structured sources and a Node converter; Docling is the Converter
+   slot's alternative in `research-hub:full`. Fine-tuning trains on **Kaggle** for free (Python runs there) and the
+   result runs in Node (ONNX). Step 7 is built completely before review cycles, testing and shipping.
+   (Earlier: **Python inside the image** for process plugins (Docling, fine-tuning): not in the default image; optional
+   add-on images per heavy plugin, like Obsidian.)
+2. **Where training runs (settled 2026-10-28):** Kaggle Notebooks, free (about 30 GPU hours a week on T4/P100),
+   started and collected through Kaggle's API; it needs a free Kaggle account and its API key in `.env`.
