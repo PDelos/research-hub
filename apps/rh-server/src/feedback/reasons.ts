@@ -78,7 +78,7 @@ export class ReasonParser {
     const kind = (result.answers.reason_kind as ChoiceAnswer).choice;
     const p = (result.answers.generalizable as NoulAnswer).noul;
     const policy = cmd.policy as { candidate_min: number; unclassified_min: number };
-    const status = p >= policy.candidate_min ? "candidate" : p >= policy.unclassified_min ? "unclassified" : "none";
+    const status = ruleStatus(p, policy);
     const db = this.deps.db;
     // Only apply if the reason was not changed meanwhile.
     const changed = db
@@ -110,4 +110,11 @@ export class ReasonParser {
       createdAt: r.created_at,
     }));
   }
+}
+
+/** A generalizable reason becomes a rule candidate, an unclassified one, or nothing, by its probability. */
+function ruleStatus(probability: number, policy: { candidate_min: number; unclassified_min: number }) {
+  if (probability >= policy.candidate_min) return "candidate";
+  if (probability >= policy.unclassified_min) return "unclassified";
+  return "none";
 }

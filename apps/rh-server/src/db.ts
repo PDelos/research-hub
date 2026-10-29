@@ -287,20 +287,14 @@ export const nowIso = () => new Date().toISOString();
 
 /** Bind named parameters: undefined → null, booleans → 0/1, objects → JSON. */
 export function bind(params: Record<string, unknown>): Record<string, string | number | bigint | null> {
-  const out: Record<string, string | number | bigint | null> = {};
-  for (const [k, v] of Object.entries(params)) {
-    out[k] =
-      v === undefined || v === null
-        ? null
-        : typeof v === "boolean"
-          ? v
-            ? 1
-            : 0
-          : typeof v === "object"
-            ? JSON.stringify(v)
-            : (v as string | number | bigint);
-  }
-  return out;
+  return Object.fromEntries(Object.entries(params).map(([name, value]) => [name, sqlValue(value)]));
+}
+
+function sqlValue(value: unknown): string | number | bigint | null {
+  if (value === undefined || value === null) return null;
+  if (typeof value === "boolean") return value ? 1 : 0;
+  if (typeof value === "object") return JSON.stringify(value);
+  return value as string | number | bigint;
 }
 
 export class Settings {

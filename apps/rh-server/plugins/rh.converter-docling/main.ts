@@ -70,12 +70,12 @@ export function activate(context: PluginContext): ConverterExports {
   });
 
   return {
-    available: () =>
-      external || local
-        ? restarts > 5
-          ? { ok: false, reason: "docling-serve keeps exiting (see the log)" }
-          : { ok: true }
-        : { ok: false, reason: "needs the research-hub:full image (RH_DOCLING=on) or RH_DOCLING_URL" },
+    available: () => {
+      if (!external && !local)
+        return { ok: false, reason: "needs the research-hub:full image (RH_DOCLING=on) or RH_DOCLING_URL" };
+      if (restarts > 5) return { ok: false, reason: "docling-serve keeps exiting (see the log)" };
+      return { ok: true };
+    },
     async convert(pdf) {
       if (restarts) await new Promise((r) => setTimeout(r, Math.min(30_000, 1_000 * 2 ** restarts)));
       await start();

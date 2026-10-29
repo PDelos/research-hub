@@ -489,11 +489,7 @@ export class PluginKernel {
         {
           manifest: r.plugin.manifest,
           enabled: lock.plugins[id]?.enabled ?? false,
-          ...(r.plugin.incompatible
-            ? { problem: r.plugin.incompatible }
-            : r.state === "failed"
-              ? { problem: `failed: ${r.reason}` }
-              : {}),
+          ...problemOf(r),
         },
       ]),
     );
@@ -507,14 +503,7 @@ export class PluginKernel {
     for (const [id, r] of this.records) {
       if (r.state === "active" || r.state === "activating" || r.state === "failed") continue;
       const reason = blocked.get(id);
-      const next: [PluginRunState, string | undefined] =
-        reason === undefined
-          ? ["inactive", undefined]
-          : reason === "disabled"
-            ? ["disabled", undefined]
-            : r.plugin.incompatible
-              ? ["incompatible", reason]
-              : ["blocked", reason];
+      const next = idleState(reason, !!r.plugin.incompatible);
       if (r.state !== next[0] || r.reason !== next[1]) {
         r.state = next[0];
         r.reason = next[1];
@@ -563,4 +552,20 @@ async function dispose(module: PluginModule | undefined, context: PluginContext,
       log.warn("plugin.dispose_failed", { error: String(error) });
     }
   }
+}
+
+/** What the Plugins tab shows as a plugin's problem, if any. */
+function problemOf(record: { plugin: { incompatible?: string }; state: string; reason?: string }): {
+  problem?: string;
+} {
+  if (record.plugin.incompatible) return { problem: record.plugin.incompatible };
+  if (record.state === "failed") return { problem: `failed: ${record.reason}` };
+  return {};
+}
+
+/** The state of a plugin that is not running, from why it is held back (if it is). */
+function idleState(reason: string | undefined, incompatible: boolean): [PluginRunState, string | undefined] {
+  if (reason === undefined) return ["inactive", undefined];
+  if (reason === "disabled") return ["disabled", undefined];
+  return [incompatible ? "incompatible" : "blocked", reason];
 }

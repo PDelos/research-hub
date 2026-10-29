@@ -186,7 +186,7 @@ function field(prefix: string, error: ErrorObject): string {
 export function contributionProblems(manifest: PluginManifest, dir?: string): string[] {
   const problems: string[] = [];
   for (const [key, value] of Object.entries(manifest.contributes)) {
-    const kind = (KERNEL_POINTS as readonly string[]).includes(key) ? key : POINT_ID.test(key) ? "point" : undefined;
+    const kind = contributionKind(key);
     if (!kind) {
       problems.push(
         `contributes.${key}: not a known contribution point (extension points are named like papers.source)`,
@@ -534,4 +534,10 @@ export function checkJevAcrossPlugins(discovery: Discovery): string[] {
     }
   for (const dir of dirs) problems.push(...checkLock(dir, readLock(dir)).map((p) => `${dir}: ${p}`));
   return problems;
+}
+
+/** A kernel point by its own name, "point" for an extension point (papers.source), else unknown. */
+function contributionKind(key: string): string | undefined {
+  if ((KERNEL_POINTS as readonly string[]).includes(key)) return key;
+  return POINT_ID.test(key) ? "point" : undefined;
 }

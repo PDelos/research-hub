@@ -176,46 +176,44 @@ export class AgentModel extends Emitter {
   }
 
   private event(event: WireAgentEvent) {
-    switch (event.type) {
-      case "snapshot":
-        return this.reset(event);
-      case "run_start":
+    (this.handlers[event.type] as ((e: WireAgentEvent) => void) | undefined)?.(event);
+  }
+
+  /** One handler per event type (events the model does not track are ignored). */
+  private readonly handlers: { [T in WireAgentEvent["type"]]?: (event: Extract<WireAgentEvent, { type: T }>) => void } =
+    {
+      snapshot: (event) => this.reset(event),
+      run_start: () => {
         this.state.running = true;
-        return;
-      case "run_end":
+      },
+      run_end: () => {
         this.state.running = false;
         this.live = undefined;
-        return;
-      case "message_start":
+      },
+      message_start: (event) => {
         if (event.message.role === "assistant") this.live = structuredClone(event.message as WireAssistantMessage);
-        return;
-      case "message_update":
-        if (!this.live)
-          this.live = {
-            role: "assistant",
-            content: [],
-            provider: "",
-            model: "",
-            usage: event.usage,
-            stopReason: "pending",
-          };
-        for (const change of event.changes) this.live = applyMessageChange(this.live, change);
-        this.live = { ...this.live, usage: event.usage };
-        return;
-      case "message_end":
+      },
+      message_update: (event) => {
+        let live: WireAssistantMessage = this.live ?? {
+          role: "assistant",
+          content: [],
+          provider: "",
+          model: "",
+          usage: event.usage,
+          stopReason: "pending",
+        };
+        for (const change of event.changes) live = applyMessageChange(live, change);
+        this.live = { ...live, usage: event.usage };
+      },
+      message_end: (event) => {
         this.live = undefined;
-        return this.commit(event.entry);
-      case "entry_appended":
-        return this.commit(event.entry);
-      case "tool_execution_start":
-        this.tools.set(event.toolCallId, {
-          name: event.toolName,
-          status: "running",
-          output: "",
-          args: event.args,
-        });
-        return;
-      case "tool_execution_update": {
+        this.commit(event.entry);
+      },
+      entry_appended: (event) => this.commit(event.entry),
+      tool_execution_start: (event) => {
+        this.tools.set(event.toolCallId, { name: event.toolName, status: "running", output: "", args: event.args });
+      },
+      tool_execution_update: (event) => {
         const tool = this.tools.get(event.toolCallId) ?? {
           name: event.toolName,
           status: "running" as const,
@@ -226,41 +224,34 @@ export class AgentModel extends Emitter {
         else if (output) tool.output = tool.output.slice(output.trimStart ?? 0) + (output.append ?? "");
         tool.status = "running";
         this.tools.set(event.toolCallId, tool);
-        return;
-      }
-      case "inbox_update":
-        this.state.inbox = event.items.map((q) => ({
-          id: q.id,
-          mode: q.mode as InboxItem["mode"],
-        }));
-        return;
-      case "tool_execution_end":
+      },
+      inbox_update: (event) => {
+        this.state.inbox = event.items.map((item) => ({ id: item.id, mode: item.mode as InboxItem["mode"] }));
+      },
+      tool_execution_end: (event) => {
         this.tools.delete(event.toolCallId);
         if (event.entry) this.entries.set(event.entry.id, event.entry);
-        return;
-      case "agent_changed":
+      },
+      agent_changed: (event) => {
         this.state.agent = event.agent;
-        return;
-      case "usage_changed":
+      },
+      usage_changed: (event) => {
         this.state.usage = event.usage;
-        return;
-      case "auto_retry_start":
+      },
+      auto_retry_start: (event) => {
         this.state.retry = { at: event.at, error: event.errorMessage };
-        return;
-      case "auto_retry_end":
+      },
+      auto_retry_end: () => {
         this.state.retry = undefined;
-        return;
-      case "compaction_start":
+      },
+      compaction_start: (event) => {
         if (!this.state.compactions.includes(event.taskId)) this.state.compactions.push(event.taskId);
-        return;
-      case "compaction_end":
+      },
+      compaction_end: (event) => {
         this.state.compactions = this.state.compactions.filter((id) => id !== event.taskId);
-        return;
-      case "task_failed":
+      },
+      task_failed: (event) => {
         this.state.notices = [...this.state.notices.slice(-9), `${event.kind} failed: ${event.message}`];
-        return;
-      default:
-        return;
-    }
-  }
+      },
+    };
 }

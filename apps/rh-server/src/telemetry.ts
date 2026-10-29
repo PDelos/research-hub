@@ -149,8 +149,7 @@ export class Telemetry implements TelemetryStore {
     if (run === undefined) return;
     // An aborted generation (process killed or turn interrupted) is not an answer: the run stays open until the
     // resumed turn produces one.
-    const status =
-      rec.stopReason === "error" ? "error" : rec.stopReason === "aborted" || rec.toolCalls.length ? "running" : "done";
+    const status = runStatus(rec.stopReason, rec.toolCalls.length);
     this.db
       .prepare(
         "UPDATE agent_runs SET ended_at = :ended, status = CASE WHEN status = 'done' THEN status ELSE :status END, answer_entry_id = CASE WHEN :done = 1 THEN :entry ELSE answer_entry_id END WHERE run_entry_id = :run",
@@ -183,8 +182,7 @@ export class Telemetry implements TelemetryStore {
     if (rec.kind !== "pi.tool") return;
     const input = rec.input as { assistant?: number; callId?: string };
     if (input?.assistant === undefined || !input.callId) return;
-    const status =
-      rec.status === "terminal" ? (rec.outcome === "completed" ? "done" : (rec.outcome ?? "done")) : rec.status;
+    const status = rec.status === "terminal" ? terminalStatus(rec.outcome) : rec.status;
     this.db
       .prepare(
         `UPDATE tool_calls SET task_id = :task, started_at = COALESCE(:started, started_at), ended_at = COALESCE(:ended, ended_at),
@@ -378,3 +376,11 @@ export class Telemetry implements TelemetryStore {
     return row?.context_tokens ?? 0;
   }
 }
+
+/** An agent run after a generation: an error, still running (tool calls or an aborted turn), or done. */
+function runStatus(stopReason: string | undefined, toolCalls: number): "error" | "running" | "done" {
+  if (stopReason === "error") return "error";
+  return stopReason === "aborted" || toolCalls ? "running" : "done";
+}
+
+const terminalStatus = (outcome: string | undefined) => (outcome === "completed" || !outcome ? "done" : outcome);

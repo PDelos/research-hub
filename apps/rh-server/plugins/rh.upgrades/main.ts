@@ -657,14 +657,13 @@ export function activate(context: PluginContext): UpgradesExports {
         let status: UpgradeRun["status"] = "done";
         let report: UpgradeReport;
         try {
-          const { report: r } =
-            chosen.focus === "ranking"
-              ? await ranking(id)
-              : chosen.focus === "embedder"
-                ? await embedderRun(id)
-                : chosen.focus === "converter"
-                  ? await converterRun(id)
-                  : await scout(id);
+          const procedures: Record<Focus, (runId: number) => Promise<Outcome>> = {
+            ranking,
+            embedder: embedderRun,
+            converter: converterRun,
+            "scout-addons": scout,
+          };
+          const { report: r } = await procedures[chosen.focus](id);
           report = { focus: chosen.focus, reason: chosen.reason, ...r };
         } catch (error) {
           status = "failed";

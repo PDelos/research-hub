@@ -47,12 +47,14 @@ const day = (iso: string) =>
   new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 const usd = (n: number) => `$${n.toFixed(n < 0.01 ? 4 : 2)}`;
 const fmt = (v: number | null) => (v === null ? "—" : v.toFixed(3));
-const describe = (p: UpgradeProposal) =>
-  p.kind === "converter"
-    ? `Switch the converter to ${p.payload.converter}: score ${fmt(Number(p.payload.value))} vs ${fmt(Number(p.payload.activeValue))} for ${p.payload.active}`
-    : p.kind === "embedder"
-      ? `Switch the embedder to ${p.payload.model} (${p.payload.dims || "native"} dimensions): nDCG@10 ${fmt(Number(p.payload.mean))} vs ${fmt(Number(p.payload.activeMean))} for ${p.payload.activeModel}`
-      : `Sweep settings ${JSON.stringify(p.payload.variant)}`;
+function describe(proposal: UpgradeProposal): string {
+  const payload = proposal.payload;
+  if (proposal.kind === "converter")
+    return `Switch the converter to ${payload.converter}: score ${fmt(Number(payload.value))} vs ${fmt(Number(payload.activeValue))} for ${payload.active}`;
+  if (proposal.kind === "embedder")
+    return `Switch the embedder to ${payload.model} (${payload.dims || "native"} dimensions): nDCG@10 ${fmt(Number(payload.mean))} vs ${fmt(Number(payload.activeMean))} for ${payload.activeModel}`;
+  return `Sweep settings ${JSON.stringify(payload.variant)}`;
+}
 
 async function act(fn: () => Promise<unknown>, done: string) {
   error.value = "";

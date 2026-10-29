@@ -77,128 +77,150 @@ function eventText(entry: WireEntry): string {
   return entry.kind;
 }
 
+interface ToolCalls {
+  /** Tool results by call id, with the entry that holds them. */
+  results: Map<string, { entryId: number; message: WireToolResultMessage }>;
+  /** Every call id an assistant message made (stored or live). */
+  callIds: Set<string>;
+}
+
+function collectToolCalls(entries: readonly WireEntry[], live?: WireAssistantMessage): ToolCalls {
+  const calls: ToolCalls = { results: new Map(), callIds: new Set() };
+  const addCalls = (message: WireAssistantMessage) => {
+    for (const block of message.content) if (block.type === "toolCall") calls.callIds.add(block.id);
+  };
+  for (const entry of entries)
+    for (const message of entry.model ?? []) {
+      if (entry.kind === "pi.tool-result" && isToolResult(message))
+        calls.results.set(message.toolCallId, { entryId: entry.id, message });
+      if (entry.kind === "pi.assistant" && isAssistant(message)) addCalls(message);
+    }
+  if (live) addCalls(live);
+  return calls;
+}
+
+function toolView(
+  calls: ToolCalls,
+  tools: ReadonlyMap<string, LiveTool>,
+  call: { id: string; name: string; args: unknown },
+): ToolCallView {
+  const result = calls.results.get(call.id);
+  if (result)
+    return {
+      callId: call.id,
+      name: call.name,
+      args: call.args,
+      status: result.message.isError ? "error" : "done",
+      result: messageText(result.message),
+      resultEntryId: result.entryId,
+    };
+  const running = tools.get(call.id);
+  return {
+    callId: call.id,
+    name: call.name,
+    args: call.args,
+    status: running?.status === "running" ? "running" : "pending",
+    output: running?.output || undefined,
+  };
+}
+
+function entryItems(
+  entry: WireEntry,
+  calls: ToolCalls,
+  blocks: (message: WireAssistantMessage) => AssistantBlockView[],
+): TranscriptItem[] {
+  const messages = entry.model ?? [];
+  if (entry.kind === "pi.system") return [];
+  if (entry.kind === "pi.user") return [{ kind: "user", id: entry.id, text: messages.map(messageText).join("\n") }];
+  if (entry.kind === "pi.assistant") {
+    const assistant = messages.filter(isAssistant);
+    return [
+      {
+        kind: "assistant",
+        id: entry.id,
+        streaming: false,
+        blocks: assistant.flatMap(blocks),
+        error: assistant.map(assistantError).find(Boolean),
+        model: assistant[0]?.model,
+      },
+    ];
+  }
+  // Results whose call is shown inline with its assistant message are not listed again.
+  if (entry.kind === "pi.tool-result")
+    return messages
+      .filter(isToolResult)
+      .filter((message) => !calls.callIds.has(message.toolCallId))
+      .map((message) => ({
+        kind: "tool-result",
+        id: entry.id,
+        name: message.toolName,
+        text: messageText(message),
+        isError: message.isError,
+      }));
+  return [
+    {
+      kind: "event",
+      id: entry.id,
+      entryKind: entry.kind,
+      text: eventText(entry),
+      note: messages.length ? messages.map(messageText).join("\n") : undefined,
+      ...(entry.data !== undefined ? { data: entry.data } : {}),
+    },
+  ];
+}
+
 export function toTranscript(
   entries: readonly WireEntry[],
   live?: WireAssistantMessage,
   tools: ReadonlyMap<string, LiveTool> = new Map(),
 ): TranscriptItem[] {
-  const results = new Map<string, { entryId: number; message: WireToolResultMessage }>();
-  const callIds = new Set<string>();
-  for (const entry of entries) {
-    for (const message of entry.model ?? []) {
-      if (entry.kind === "pi.tool-result" && isToolResult(message))
-        results.set(message.toolCallId, { entryId: entry.id, message });
-      if (entry.kind === "pi.assistant" && isAssistant(message))
-        for (const block of message.content) if (block.type === "toolCall") callIds.add(block.id);
-    }
-  }
-  if (live) for (const block of live.content) if (block.type === "toolCall") callIds.add(block.id);
-
-  const toolView = (id: string, name: string, args: unknown): ToolCallView => {
-    const result = results.get(id);
-    const running = tools.get(id);
-    if (result)
-      return {
-        callId: id,
-        name,
-        args,
-        status: result.message.isError ? "error" : "done",
-        result: messageText(result.message),
-        resultEntryId: result.entryId,
-      };
-    return {
-      callId: id,
-      name,
-      args,
-      status: running?.status === "running" ? "running" : "pending",
-      output: running?.output || undefined,
-    };
-  };
-
-  const assistantBlocks = (message: WireAssistantMessage): AssistantBlockView[] =>
+  const calls = collectToolCalls(entries, live);
+  const blocks = (message: WireAssistantMessage): AssistantBlockView[] =>
     message.content.flatMap((block): AssistantBlockView[] => {
       if (block.type === "text") return block.text ? [{ type: "text", text: block.text }] : [];
       if (block.type === "thinking") return block.thinking ? [{ type: "thinking", text: block.thinking }] : [];
-      return [{ type: "tool", call: toolView(block.id, block.name, block.arguments) }];
+      return [
+        { type: "tool", call: toolView(calls, tools, { id: block.id, name: block.name, args: block.arguments }) },
+      ];
     });
 
-  const items: TranscriptItem[] = [];
-  for (const entry of entries) {
-    if (entry.kind === "pi.system") continue;
-    if (entry.kind === "pi.user") {
-      items.push({
-        kind: "user",
-        id: entry.id,
-        text: (entry.model ?? []).map(messageText).join("\n"),
-      });
-    } else if (entry.kind === "pi.assistant") {
-      const messages = (entry.model ?? []).filter(isAssistant);
-      items.push({
-        kind: "assistant",
-        id: entry.id,
-        streaming: false,
-        blocks: messages.flatMap(assistantBlocks),
-        error: messages.map(assistantError).find(Boolean),
-        model: messages[0]?.model,
-      });
-    } else if (entry.kind === "pi.tool-result") {
-      for (const message of (entry.model ?? []).filter(isToolResult)) {
-        if (callIds.has(message.toolCallId)) continue;
-        items.push({
-          kind: "tool-result",
-          id: entry.id,
-          name: message.toolName,
-          text: messageText(message),
-          isError: message.isError,
-        });
-      }
-    } else {
-      items.push({
-        kind: "event",
-        id: entry.id,
-        entryKind: entry.kind,
-        text: eventText(entry),
-        note: entry.model?.length ? (entry.model ?? []).map(messageText).join("\n") : undefined,
-        ...(entry.data !== undefined ? { data: entry.data } : {}),
-      });
-    }
-  }
-  if (live)
-    items.push({
-      kind: "assistant",
-      id: "live",
-      streaming: true,
-      blocks: assistantBlocks(live),
-      model: live.model,
-    });
+  const items = entries.flatMap((entry) => entryItems(entry, calls, blocks));
+  if (live) items.push({ kind: "assistant", id: "live", streaming: true, blocks: blocks(live), model: live.model });
+  // Tools still running whose call has not reached the transcript yet.
   for (const [callId, tool] of tools)
-    if (tool.status !== "done" && !callIds.has(callId))
-      items.push({ kind: "tool", id: callId, call: toolView(callId, tool.name, tool.args) });
+    if (tool.status !== "done" && !calls.callIds.has(callId))
+      items.push({
+        kind: "tool",
+        id: callId,
+        call: toolView(calls, tools, { id: callId, name: tool.name, args: tool.args }),
+      });
   return items;
 }
 
-export function toMarkdown(items: readonly TranscriptItem[]): string {
-  const out: string[] = [];
-  for (const item of items) {
-    if (item.kind === "user") out.push(`### You (#${item.id})\n\n${item.text}`);
-    else if (item.kind === "assistant") {
-      const parts = item.blocks.map((block) =>
-        block.type === "text"
-          ? block.text
-          : block.type === "thinking"
-            ? `> _thinking:_ ${block.text.replaceAll("\n", " ").slice(0, 400)}`
-            : `- \`${block.call.name}\` ${block.call.status}${block.call.result ? `\n\n\`\`\`\n${block.call.result.slice(0, 2000)}\n\`\`\`` : ""}`,
-      );
-      if (item.error) parts.push(`> ${item.error}`);
-      out.push(`### Agent (${item.id === "live" ? "working" : `#${item.id}`})\n\n${parts.join("\n\n")}`);
-    } else if (item.kind === "tool-result")
-      out.push(
-        `- \`${item.name}\` ${item.isError ? "error" : "result"}\n\n\`\`\`\n${item.text.slice(0, 2000)}\n\`\`\``,
-      );
-    else if (item.kind === "tool") out.push(`- \`${item.call.name}\` ${item.call.status}`);
-    else out.push(`_${item.text}_`);
+const fenced = (text: string) => `\`\`\`\n${text.slice(0, 2000)}\n\`\`\``;
+
+function blockMarkdown(block: AssistantBlockView): string {
+  if (block.type === "text") return block.text;
+  if (block.type === "thinking") return `> _thinking:_ ${block.text.replaceAll("\n", " ").slice(0, 400)}`;
+  const result = block.call.result ? `\n\n${fenced(block.call.result)}` : "";
+  return `- \`${block.call.name}\` ${block.call.status}${result}`;
+}
+
+function itemMarkdown(item: TranscriptItem): string {
+  if (item.kind === "user") return `### You (#${item.id})\n\n${item.text}`;
+  if (item.kind === "assistant") {
+    const parts = item.blocks.map(blockMarkdown);
+    if (item.error) parts.push(`> ${item.error}`);
+    return `### Agent (${item.id === "live" ? "working" : `#${item.id}`})\n\n${parts.join("\n\n")}`;
   }
-  return out.join("\n\n") + "\n";
+  if (item.kind === "tool-result")
+    return `- \`${item.name}\` ${item.isError ? "error" : "result"}\n\n${fenced(item.text)}`;
+  if (item.kind === "tool") return `- \`${item.call.name}\` ${item.call.status}`;
+  return `_${item.text}_`;
+}
+
+export function toMarkdown(items: readonly TranscriptItem[]): string {
+  return items.map(itemMarkdown).join("\n\n") + "\n";
 }
 
 /** Text of the last assistant entry, for previews and simple clients. */
@@ -225,6 +247,8 @@ export interface UsageSummary {
   cacheWriteCost: number;
 }
 
+const USAGE_FIELDS = ["input", "output", "cacheRead", "cacheWrite"] as const;
+
 export function sumUsage(state?: Pick<WireUsageState, "models"> | { models: Record<string, WireUsage> }): UsageSummary {
   const total: UsageSummary = {
     tokens: 0,
@@ -238,17 +262,13 @@ export function sumUsage(state?: Pick<WireUsageState, "models"> | { models: Reco
     cacheReadCost: 0,
     cacheWriteCost: 0,
   };
-  for (const u of Object.values(state?.models ?? {})) {
-    total.tokens += u.totalTokens ?? u.input + u.output + u.cacheRead + u.cacheWrite;
-    total.cost += u.cost?.total ?? 0;
-    total.input += u.input ?? 0;
-    total.output += u.output ?? 0;
-    total.cacheRead += u.cacheRead ?? 0;
-    total.cacheWrite += u.cacheWrite ?? 0;
-    total.inputCost += u.cost?.input ?? 0;
-    total.outputCost += u.cost?.output ?? 0;
-    total.cacheReadCost += u.cost?.cacheRead ?? 0;
-    total.cacheWriteCost += u.cost?.cacheWrite ?? 0;
+  for (const usage of Object.values(state?.models ?? {})) {
+    total.tokens += usage.totalTokens ?? usage.input + usage.output + usage.cacheRead + usage.cacheWrite;
+    total.cost += usage.cost?.total ?? 0;
+    for (const field of USAGE_FIELDS) {
+      total[field] += usage[field] ?? 0;
+      total[`${field}Cost`] += usage.cost?.[field] ?? 0;
+    }
   }
   return total;
 }

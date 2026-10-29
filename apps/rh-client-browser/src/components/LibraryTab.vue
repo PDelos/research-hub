@@ -74,8 +74,12 @@ function follow(event: MouseEvent) {
   }
 }
 
-const shown = (v: unknown) =>
-  Array.isArray(v) ? v.join(", ") : typeof v === "object" && v ? JSON.stringify(v) : String(v ?? "");
+/** A note property as text: lists joined, objects as JSON. */
+function shown(property: unknown): string {
+  if (Array.isArray(property)) return property.join(", ");
+  if (typeof property === "object" && property) return JSON.stringify(property);
+  return String(property ?? "");
+}
 const HIDDEN = new Set(["title"]);
 </script>
 

@@ -69,15 +69,7 @@ export function paperTools(papers: () => PaperService): Extension {
       if (memo.error)
         return toolError(`The search failed: ${memo.error}.`, ["Tell the user the search failed and why."]);
       const found = memo.ids.map((id) => papers().store.get(id)).filter((p): p is Paper => !!p);
-      const status = memo.sources
-        .map((s) =>
-          s.status === "ok"
-            ? `${s.source} ${s.count}`
-            : s.status === "failed"
-              ? `${s.source} failed (${s.error})`
-              : `${s.source} skipped`,
-        )
-        .join(", ");
+      const status = memo.sources.map(sourceStatus).join(", ");
       if (!found.length) return toolText(`No papers found for "${query}". Sources: ${status}.`, { ids: [] });
       const lines = found.map((p, i) => `${i + 1}. ${formatPaper(p)}`);
       return toolText(
@@ -102,4 +94,10 @@ export function formatPaper(p: Paper): string {
     link,
   ];
   return parts.filter(Boolean).join(" · ");
+}
+
+function sourceStatus(s: { source: string; status: string; count?: number; error?: string }): string {
+  if (s.status === "ok") return `${s.source} ${s.count}`;
+  if (s.status === "failed") return `${s.source} failed (${s.error})`;
+  return `${s.source} skipped`;
 }

@@ -239,8 +239,7 @@ export function replay(
   const trainDiff = avg(train.map(diff)) ?? 0;
   const heldDiff = avg(heldDiffs) ?? 0;
   const { low, high } = bootstrap(heldDiffs);
-  const verdict: Verdict =
-    labelled.length < 3 ? "not enough data" : low > 0 && trainDiff > 0 ? "better" : high < 0 ? "worse" : "inconclusive";
+  const verdict = verdictOf({ labelled: labelled.length, low, high, trainDiff });
   const meanOf = (k: "current" | "candidate"): SweepMetrics => ({
     ...(avg(labelled.map((r) => r[k].ndcg)) !== undefined ? { ndcg: avg(labelled.map((r) => r[k].ndcg)) } : {}),
     ...(avg(labelled.map((r) => r[k].precision5)) !== undefined
@@ -271,4 +270,12 @@ export function replay(
     judgeUsed: !!labels.judge,
     verdict,
   };
+}
+
+/** Better only when the held-out interval is above zero and the earlier sweeps agree; worse when it is below. */
+function verdictOf(x: { labelled: number; low: number; high: number; trainDiff: number }): Verdict {
+  if (x.labelled < 3) return "not enough data";
+  if (x.low > 0 && x.trainDiff > 0) return "better";
+  if (x.high < 0) return "worse";
+  return "inconclusive";
 }

@@ -103,8 +103,7 @@ export class PaperSearch {
         try {
           return { source: source.name, results: await source.search(q) };
         } catch (error) {
-          const reason =
-            error instanceof SourceError ? error.message : error instanceof Error ? error.message : String(error);
+          const reason = error instanceof Error ? error.message : String(error);
           this.options.log?.warn("papers.source_failed", { source: source.name, error: reason });
           return { source: source.name, results: [] as SourcePaper[], error: reason };
         }
@@ -195,7 +194,7 @@ export class PaperSearch {
     // Without a DOI: PMID, PMCID or a known OpenAlex ID.
     for (const p of targets.values()) {
       if (doiOf(p) || error) continue;
-      const kind = p.ids.openalex ? "openalex" : p.ids.pmid ? "pmid" : p.ids.pmcid ? "pmcid" : undefined;
+      const kind = (["openalex", "pmid", "pmcid"] as const).find((k) => p.ids[k]);
       if (!kind) {
         store.setEnrichment(p.id, "missing"); // nothing OpenAlex can be asked about
         targets.delete(p.id);

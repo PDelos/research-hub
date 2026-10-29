@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { nextTick, ref, watch } from "vue";
-import { k } from "@rh/sdk";
+import { formatTokens } from "@rh/sdk";
 import { send, store, transcript } from "../store.ts";
 
 const draft = ref("");
@@ -45,7 +45,7 @@ function onKey(e: KeyboardEvent) {
       <span class="muted">{{ store.agent?.model ?? "" }}</span>
       <span class="spacer" />
       <span class="muted" v-if="store.agent"
-        >{{ k(store.agent.contextTokens) }} / {{ k(store.agent.contextWindow) }} context</span
+        >{{ formatTokens(store.agent.contextTokens) }} / {{ formatTokens(store.agent.contextWindow) }} context</span
       >
     </div>
     <div class="transcript" ref="scroller" aria-live="polite">

@@ -49,7 +49,7 @@ export function mapEuropePmcRecord(r: any): SourcePaper | null {
     ids: normalizeIds({ doi: r.doi, pmid: r.pmid, pmcid: r.pmcid }),
     title,
     abstract: abstractText(r.abstractText),
-    authors: authors.length ? authors : r.authorString ? String(r.authorString).replace(/\.$/, "").split(/,\s*/) : [],
+    authors: authors.length ? authors : splitAuthorString(r.authorString),
     year: r.pubYear ? Number(r.pubYear) : undefined,
     publishedAt: normalizeDate(r.firstPublicationDate),
     venue: preprint ? undefined : cleanText(r.journalInfo?.journal?.title) || undefined,
@@ -65,4 +65,10 @@ function abstractText(raw: string | undefined): string | undefined {
   if (!raw) return undefined;
   const text = cleanText(raw.replace(/<h\d[^>]*>\s*([^<]+?)\s*<\/h\d>/gi, " $1: "));
   return text || undefined;
+}
+
+/** "Smith J, Doe A." → ["Smith J", "Doe A"]; nothing → []. */
+function splitAuthorString(authorString: unknown): string[] {
+  if (!authorString) return [];
+  return String(authorString).replace(/\.$/, "").split(/,\s*/);
 }

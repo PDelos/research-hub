@@ -103,13 +103,7 @@ export function computeScores(
   const novelty = sp.novelty ?? 0;
   const worth = sp.worth ?? 0;
   const kind = sp.kind ?? "other";
-  const kindFactor = ["method", "tool", "dataset", "benchmark"].includes(kind)
-    ? 1
-    : ["survey", "review", "tutorial"].includes(kind)
-      ? options.orientation
-        ? 0.9
-        : 0.6
-      : 0.5;
+  const kindFactor = kindValue(kind, options.orientation);
   const value = clamp(100 * (0.55 * novelty + 0.3 * worth + 0.15 * kindFactor));
   const valueReason = reason([
     `novelty ${novelty.toFixed(2)}`,
@@ -158,4 +152,11 @@ export function computeScores(
       },
     },
   };
+}
+
+/** How actionable a kind of paper is: methods and tools most; surveys count more while the user is orienting. */
+function kindValue(kind: string, orientation: boolean): number {
+  if (["method", "tool", "dataset", "benchmark"].includes(kind)) return 1;
+  if (["survey", "review", "tutorial"].includes(kind)) return orientation ? 0.9 : 0.6;
+  return 0.5;
 }

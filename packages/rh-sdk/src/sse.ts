@@ -29,17 +29,20 @@ export async function* readSse(body: ReadableStream<Uint8Array>, idleMs = 45_000
       }
       if (chunk.done) return;
       buffer += chunk.value.replaceAll("\r\n", "\n");
-      let cut: number;
-      while ((cut = buffer.indexOf("\n\n")) >= 0) {
-        const block = buffer.slice(0, cut);
-        buffer = buffer.slice(cut + 2);
-        const message = parseBlock(block);
-        if (message) yield message;
-      }
+      const { messages, rest } = splitBlocks(buffer);
+      buffer = rest;
+      yield* messages;
     }
   } finally {
     reader.cancel().catch(() => {});
   }
+}
+
+/** The complete blocks in the buffer (separated by a blank line), parsed; the incomplete rest stays. */
+export function splitBlocks(buffer: string): { messages: SseMessage[]; rest: string } {
+  const blocks = buffer.split("\n\n");
+  const rest = blocks.pop() ?? "";
+  return { messages: blocks.map(parseBlock).filter((m): m is SseMessage => !!m), rest };
 }
 
 export function parseBlock(block: string): SseMessage | undefined {

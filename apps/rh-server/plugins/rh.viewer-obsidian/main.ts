@@ -26,12 +26,12 @@ export function activate(context: PluginContext): void {
   context.subscriptions.push(
     kb.registerViewer("obsidian", {
       kbViewer,
-      usable: () =>
-        !(options.kbViewer?.enabled ?? false)
-          ? { ok: false, reason: "RH_KB_VIEWER=off" }
-          : existsSync(join(ignisDir, "apps", "ignis-server", "server", "index.js"))
-            ? { ok: true }
-            : { ok: false, reason: "Ignis is not installed in this image" },
+      usable: () => {
+        if (!(options.kbViewer?.enabled ?? false)) return { ok: false, reason: "RH_KB_VIEWER=off" };
+        if (!existsSync(join(ignisDir, "apps", "ignis-server", "server", "index.js")))
+          return { ok: false, reason: "Ignis is not installed in this image" };
+        return { ok: true };
+      },
       show: () => kbViewer.resume(),
       hide: (reason) => kbViewer.pause(reason),
     }),

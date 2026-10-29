@@ -1,10 +1,10 @@
 // Small formatters shared by the browser, the TUI and the CLI. The UI rule: no dashes or dots as punctuation.
-export const k = (tokens: number) =>
-  tokens >= 1_000_000
-    ? `${(tokens / 1_000_000).toFixed(tokens % 1_000_000 ? 1 : 0)}M`
-    : tokens >= 1000
-      ? `${Math.round(tokens / 1000)}k`
-      : String(Math.round(tokens));
+/** A token count in short form: 1.5M, 12k, 950. */
+export function formatTokens(tokens: number): string {
+  if (tokens >= 1_000_000) return `${(tokens / 1_000_000).toFixed(tokens % 1_000_000 ? 1 : 0)}M`;
+  if (tokens >= 1000) return `${Math.round(tokens / 1000)}k`;
+  return String(Math.round(tokens));
+}
 
 export function usd(amount: number | undefined): string {
   const n = amount ?? 0;

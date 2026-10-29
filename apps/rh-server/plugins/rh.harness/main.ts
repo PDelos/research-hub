@@ -331,7 +331,7 @@ export async function activate(context: PluginContext): Promise<HarnessExports> 
           "embedder",
           // The model asked for (offline, the fake embedder stands in for it).
           {
-            model: typeof model === "string" ? (local ? `local/${model}` : model) : embedder.model,
+            model: candidateModel(model, local) ?? embedder.model,
             dims: embedder.dims,
             ...(model ? { candidate: true } : {}),
             ...(local ? { provider: "local" } : {}),
@@ -567,4 +567,10 @@ export async function activate(context: PluginContext): Promise<HarnessExports> 
     },
   });
   return { ...exports, agentExtensions: [defineExtension({ name: "harness-tools", tools: [tool] })] };
+}
+
+/** The model a benchmark record names: the candidate asked for (local models prefixed), else the active one. */
+function candidateModel(model: unknown, local: boolean): string | undefined {
+  if (typeof model !== "string") return undefined;
+  return local ? `local/${model}` : model;
 }

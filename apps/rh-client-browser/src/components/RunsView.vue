@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted } from "vue";
-import { ago, k, usd } from "@rh/sdk";
+import { ago, formatTokens, usd } from "@rh/sdk";
 import { client, openRun, openSweep, refreshFeed, refreshSchedule, store } from "../store.ts";
 
 onMounted(async () => {
@@ -47,7 +47,7 @@ const counts = (c?: Record<string, number>) =>
           <td>{{ run.status }}</td>
           <td class="muted">{{ run.models.join(", ") }}</td>
           <td>{{ run.toolCalls }}</td>
-          <td>{{ k(run.inputTokens) }} / {{ k(run.outputTokens) }}</td>
+          <td>{{ formatTokens(run.inputTokens) }} / {{ formatTokens(run.outputTokens) }}</td>
           <td>{{ usd(run.costUsd) }}</td>
           <td class="muted">{{ ago(run.startedAt) }}</td>
         </tr>
@@ -157,7 +157,8 @@ const counts = (c?: Record<string, number>) =>
       <h4>Model calls</h4>
       <ul>
         <li v-for="g in store.run.generationList" :key="g.entryId">
-          {{ g.model }} · {{ g.stopReason }} · {{ k(g.inputTokens) }} in / {{ k(g.outputTokens) }} out ·
+          {{ g.model }} · {{ g.stopReason }} · {{ formatTokens(g.inputTokens) }} in /
+          {{ formatTokens(g.outputTokens) }} out ·
           {{ usd(g.costUsd) }}
         </li>
       </ul>

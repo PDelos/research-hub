@@ -64,7 +64,10 @@ async function saveReason(card: CardView) {
 
 const trend = computed(() => [...store.precision].reverse().slice(-12));
 const latestPrecision = computed(() => store.precision.find((p) => p.judged > 0));
-const scoreClass = (n: number) => (n >= 70 ? "hi" : n >= 45 ? "mid" : "lo");
+function scoreClass(score: number): "hi" | "mid" | "lo" {
+  if (score >= 70) return "hi";
+  return score >= 45 ? "mid" : "lo";
+}
 const authors = (a: string[]) => (a.length > 3 ? `${a.slice(0, 3).join(", ")} et al.` : a.join(", "));
 </script>
 

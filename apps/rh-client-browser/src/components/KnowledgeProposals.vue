@@ -27,7 +27,8 @@ const FINDER: Record<string, string> = {
   "missing-links": "missing link",
   "rising-topics": "rising topic",
 };
-const verdict = (v: string | null) => (v === "star" ? "⭐" : v === "up" ? "👍" : v === "down" ? "👎" : "");
+const VERDICT_ICON: Record<string, string> = { star: "⭐", up: "👍", down: "👎" };
+const verdict = (judgment: string | null) => VERDICT_ICON[judgment ?? ""] ?? "";
 
 async function act(fn: () => Promise<unknown>) {
   error.value = "";

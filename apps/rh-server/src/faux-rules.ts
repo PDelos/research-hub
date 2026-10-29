@@ -135,6 +135,12 @@ const ORDINALS: Record<string, number> = {
   last: -1,
 };
 
+const verdictFrom = (said: string) => {
+  if (/star/i.test(said)) return "star";
+  if (/down|dislike/i.test(said)) return "down";
+  return "up";
+};
+
 /** The offline desk records judgments said in chat: "star the second card, great foundation". */
 export const deskJudgeRule: FauxRule = (turn) => {
   if (turn.sections["charter-writer"] || turn.sections["card-writer"] || turn.sections["librarian"]) return undefined;
@@ -144,7 +150,7 @@ export const deskJudgeRule: FauxRule = (turn) => {
     /\b(star|upvote|like|downvote|dislike)\s+(?:the\s+)?(?:card\s+)?(first|second|third|fourth|fifth|sixth|seventh|\d+)(?:st|nd|rd|th)?\s*(?:card)?[,.:;-]?\s*(.*)$/i,
   );
   if (!m) return undefined;
-  const verdict = /star/i.test(m[1]) ? "star" : /down|dislike/i.test(m[1]) ? "down" : "up";
+  const verdict = verdictFrom(m[1]);
   const position = ORDINALS[m[2].toLowerCase()] ?? Number(m[2]);
   return call("judge_card", { verdict, position, ...(m[3].trim() ? { reason: m[3].trim() } : {}) });
 };
@@ -258,11 +264,16 @@ export const knowledgeReviewRule: FauxRule = (turn) => {
  * authors, year }] }` at `<base>/search?q=…&rows=…`, with a wrong source field on the first attempt (to exercise the
  * retry with the test's error).
  */
+const ideaKind = (idea: string, url: string | undefined) => {
+  if (/fine-?tun/i.test(idea)) return "embedder-finetune";
+  return url ? "paper-source" : "other";
+};
+
 export const engineerRule: FauxRule = (turn) => {
   if (turn.system.includes("engineer-assess")) {
     const idea = section(turn.lastUser, "Idea");
     const url = idea.match(/https?:\/\/[^\s"')]+/)?.[0];
-    const kind = /fine-?tun/i.test(idea) ? "embedder-finetune" : url ? "paper-source" : "other";
+    const kind = ideaKind(idea, url);
     const origin = url ? new URL(url).origin : undefined;
     return say(
       JSON.stringify({

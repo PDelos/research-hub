@@ -51,7 +51,7 @@ export function kbProxy(
   mode: "paths" | "assets" = "paths",
 ): RequestHandler {
   return (req, res, next) => {
-    const path = mode === "assets" ? (req.url.startsWith("/assets/") ? req.url : undefined) : viewerPath(req.url);
+    const path = mode === "assets" ? assetPath(req.url) : viewerPath(req.url);
     if (path === undefined) return next();
     const why = refusal(req, allowedHosts);
     if (why)
@@ -109,3 +109,5 @@ export function kbUpgrade(viewer: () => KbViewer | undefined, allowedHosts: Set<
     socket.on("close", () => upstream.destroy());
   };
 }
+
+const assetPath = (url: string) => (url.startsWith("/assets/") ? url : undefined);

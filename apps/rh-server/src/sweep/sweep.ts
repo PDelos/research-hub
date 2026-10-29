@@ -813,11 +813,7 @@ export class SweepRunner {
     if (sweep.scheduledRunId !== undefined)
       this.deps.db
         .prepare("UPDATE scheduled_runs SET status = ?, reason = COALESCE(?, reason) WHERE id = ?")
-        .run(
-          status === "failed" ? "failed" : "done",
-          status === "failed" ? (error ?? null) : status === "no_new_papers" ? "no new papers" : null,
-          sweep.scheduledRunId,
-        );
+        .run(status === "failed" ? "failed" : "done", runReason(status, error), sweep.scheduledRunId);
     this.deps.log.info("sweep.finished", { sweep: id, status, error, cost });
     this.emit(this.get(id)!);
     // The next requested sweep (if any) may start now.
@@ -962,4 +958,10 @@ function toRecord(r: SweepRow): SweepRecord {
     startedAt: r.started_at,
     endedAt: opt(r.ended_at),
   };
+}
+
+/** What the scheduled run records as the reason a sweep ended. */
+function runReason(status: SweepStatus, error: string | undefined): string | null {
+  if (status === "failed") return error ?? null;
+  return status === "no_new_papers" ? "no new papers" : null;
 }

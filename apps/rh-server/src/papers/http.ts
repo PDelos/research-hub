@@ -115,8 +115,7 @@ export class PoliteHttp {
           throw new SourceError(options.source, `${lastError} after ${attempts} attempts`, response.status);
       } catch (error) {
         if (error instanceof SourceError) throw error;
-        lastError =
-          error instanceof Error ? (error.name === "TimeoutError" ? "timed out" : error.message) : String(error);
+        lastError = describeFailure(error);
         if (attempt === attempts) break;
       }
       const wait = retryAfter ?? 2_000 * 2 ** (attempt - 1);
@@ -147,4 +146,9 @@ export function parseRetryAfter(value: string | null, now: number): number | und
   const seconds = Number(value);
   const ms = Number.isFinite(seconds) ? seconds * 1000 : Date.parse(value) - now;
   return Number.isFinite(ms) ? Math.min(Math.max(ms, 0), 60_000) : undefined;
+}
+
+function describeFailure(error: unknown): string {
+  if (!(error instanceof Error)) return String(error);
+  return error.name === "TimeoutError" ? "timed out" : error.message;
 }
