@@ -70,6 +70,10 @@ test("rising topics: words much more frequent in the last 14 days, not in the ch
   assert.match(leads[0].summary, /“(diffusion|enzyme)/);
   assert.match(leads[0].summary, /4 of 10 papers gathered in the last 14 days, 0 of 30/);
   assert.ok(!leads.some((l) => /folding/.test(l.summary)), "in the charter");
+  const fresh = {
+    prepare: () => ({ all: (from: string) => (Date.parse(from) >= now - 15 * 86_400_000 ? recent : []) }),
+  } as never;
+  assert.deepEqual(risingTopicLeads(fresh, "{}", now), [], "nothing rises without history");
 });
 
 test("a review credits its finder, proposes level up and a taste rule; approvals change the sweep settings, undoably", async () => {
@@ -129,6 +133,23 @@ test("a review credits its finder, proposes level up and a taste rule; approvals
       )
       .run(card.id, "no clinical trials", new Date().toISOString());
 
+    // History for rising topics: an older sweep (30 days ago) of 20 papers about something else.
+    const old = new Date(Date.now() - 30 * 86_400_000).toISOString();
+    const oldSweep = Number(
+      p.db
+        .prepare("INSERT INTO sweeps (trigger, status, phase, started_at) VALUES ('manual', 'completed', 'cards', ?)")
+        .run(old).lastInsertRowid,
+    );
+    for (let i = 0; i < 20; i++) {
+      const id = p.papers.store.upsert({
+        source: "arxiv",
+        externalId: `old-${i}`,
+        ids: { arxiv: `2601.${10000 + i}` },
+        title: `Translation elongation kinetics ${i}`,
+        authors: [],
+      } as never).id;
+      p.db.prepare("INSERT INTO sweep_papers (sweep_id, paper_id, status) VALUES (?, ?, 'rejected')").run(oldSweep, id);
+    }
     const knowledge = await p.plugins.exportsOf<KnowledgeExports>("rh.knowledge");
     const review = await knowledge.review();
     assert.ok(

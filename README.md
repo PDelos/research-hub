@@ -212,6 +212,23 @@ made again for 90 days; **Undo** restores the previous charter as a new version 
 Question ids stay stable: retiring Q2 keeps Q3 as Q3, and a new question gets the next id. Nothing changes without
 your approval.
 
+**Question finders** (v1.7) bring leads the review model can build new questions on; each is an add-on you can turn
+off, and the Charter tab shows what each brought (proposals, approvals, rejections, and the cards you liked under the
+questions you approved from it):
+
+| Finder | What it notices |
+|---|---|
+| Same method, different problem | Two papers you liked whose methods are close while their problems are far apart (their method and background vectors) |
+| Missing links | Two liked papers on different research questions, close but never citing each other, when Jev judges one could inform the other |
+| Rising topics | Words much more frequent in the last two weeks' gathered papers than in the 60 days before (once there is history), not in the charter |
+
+The review also proposes **raising your level** (the sweep's `level` setting, from auto to core, advanced or
+frontier) when most cards you like sit above it or "too basic" dislikes pile up, and **taste rules** generalized from
+reasons you keep giving ("no clinical trial reports"); an approved rule goes with every paper decision. Both are
+plugin settings, so approving is one change with Undo. A live review on a throwaway project (2026-10-29, one sweep,
+test judgments): method transfer and missing links each found leads, a question built on a method-transfer lead was
+kept (Jev 0.73), for $0.00007 (the sweep before it $0.030).
+
 A first live review (2026-10-28, throwaway project, free review model, one real sweep with test judgments): two weight
 proposals and three drafted questions, of which Jev kept one (0.61) and dropped two (0.49); approving it created
 charter version 3 with Q5 and its two queries. The review cost $0.00007 (Jev only; the sweep before it $0.021).

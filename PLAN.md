@@ -614,7 +614,8 @@ benchmarked and proposed, or add-ons scouted on the web) → `v1-5-knowledge-loo
 proposals with evidence: weights, questions and queries to retire, new research questions scored by Jev, out-of-scope
 topics; an approved proposal is the next charter version) (charter and new-question proposals).
 Next, step 7 built completely (EVOLUTION.md §6): `v1-6-full-text` ✅ (full text from arXiv HTML, Europe PMC and
-bioRxiv XML or PDFs through the Converter slot: pdf.js in the light image, Docling in `research-hub:full`) → `v1-7-question-finders` → `v1-8-engineer` →
+bioRxiv XML or PDFs through the Converter slot: pdf.js in the light image, Docling in `research-hub:full`) →
+`v1-7-question-finders` ✅ (pluggable question finders judged by attribution, level-up and taste-rule proposals) → `v1-8-engineer` →
 `v1-9-mcp`, where the engineer researches and builds plugins from suggestions or your proposals (a fine-tuned
 embedder trained free on Kaggle is one example); then review cycles, testing and shipping. What may change and how
 it is judged: EVOLUTION.md §0.1.

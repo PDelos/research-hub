@@ -104,7 +104,7 @@ export function unlinkedPairs(db: Db, liked: LikedPaper[], vector: Vector, limit
 }
 
 const STOP = new Set(
-  "about above after again against among based being below between could during every first further their there these those through under using where which while within without would towards toward large learning model models paper study approach method methods results based novel analysis framework improved efficient".split(
+  "about above after again against among based being below between could during every first further their there these those through under using where which while within without would towards toward large learning model models paper study approach method methods results based novel analysis framework improved efficient review reviews survey sequence sequences towards using perspectives progress challenges current future comprehensive".split(
     " ",
   ),
 );
@@ -114,7 +114,10 @@ const terms = (title: string) => {
   return new Set([...words, ...bigrams]);
 };
 
-/** Words and word pairs rising in titles gathered in the last 14 days against the 60 days before, not in the charter. */
+/**
+ * Words and word pairs rising in titles gathered in the last 14 days against the 60 days before (at least 20 papers),
+ * not in the charter (a pair whose words both are counts as in it).
+ */
 export function risingTopicLeads(db: Db, charterText: string, now = Date.now(), limit = 3): Lead[] {
   const day = 86_400_000;
   const gathered = (from: number, to: number) =>
@@ -126,7 +129,8 @@ export function risingTopicLeads(db: Db, charterText: string, now = Date.now(), 
       .all(new Date(from).toISOString(), new Date(to).toISOString()) as { id: number; title: string }[];
   const recent = gathered(now - 14 * day, now + 1);
   const before = gathered(now - 74 * day, now - 14 * day);
-  if (recent.length < 5) return [];
+  // Rising needs something to rise from: a new project has no "before".
+  if (recent.length < 5 || before.length < 20) return [];
   const count = (rows: { title: string }[]) => {
     const m = new Map<string, number>();
     for (const r of rows) for (const t of terms(r.title)) m.set(t, (m.get(t) ?? 0) + 1);
@@ -137,7 +141,7 @@ export function risingTopicLeads(db: Db, charterText: string, now = Date.now(), 
   const charter = charterText.toLowerCase();
   return (
     [...r]
-      .filter(([t, n]) => n >= 3 && !charter.includes(t))
+      .filter(([t, n]) => n >= 3 && !charter.includes(t) && !t.split(" ").every((w) => charter.includes(w)))
       // The earlier rate, at least one paper's share of everything seen (a new project has no "before").
       .map(([t, n]) => ({
         t,
