@@ -76,9 +76,9 @@ export function validateCharter(input: unknown, options: { keepIds?: boolean } =
       problems.push(`${field}: must be nonblank text`);
       return "";
     }
-    const t = value.trim().replace(/\s+/g, " ");
-    if (t.length > max) problems.push(`${field}: ${t.length} characters, at most ${max} allowed`);
-    return t;
+    const cleaned = value.trim().replace(/\s+/g, " ");
+    if (cleaned.length > max) problems.push(`${field}: ${cleaned.length} characters, at most ${max} allowed`);
+    return cleaned;
   };
   const weight = (field: string, value: unknown): number => {
     if (value === undefined) return 1;
@@ -101,27 +101,27 @@ export function validateCharter(input: unknown, options: { keepIds?: boolean } =
     }
   let next = Math.max(0, ...[...kept].map((id) => Number(id.slice(1))));
   const seen = new Set<string>();
-  const questions = rawQuestions.map((q, i) => {
-    const r = isRecord(q) ? q : { text: q };
+  const questions = rawQuestions.map((question, i) => {
+    const fields = isRecord(question) ? question : { text: question };
     let id = `Q${i + 1}`;
     if (options.keepIds) {
-      const own = typeof r.id === "string" && kept.has(r.id) && !seen.has(r.id) ? r.id : undefined;
+      const own = typeof fields.id === "string" && kept.has(fields.id) && !seen.has(fields.id) ? fields.id : undefined;
       id = own ?? `Q${++next}`;
       seen.add(id);
     }
     return {
       id,
-      text: text(`questions[${i + 1}].text`, r.text, LIMITS.questionText),
-      weight: weight(`questions[${i + 1}].weight`, r.weight),
+      text: text(`questions[${i + 1}].text`, fields.text, LIMITS.questionText),
+      weight: weight(`questions[${i + 1}].weight`, fields.weight),
     };
   });
   const concepts = strings("concepts", LIMITS.concepts);
   const subAreas = strings("subAreas", LIMITS.subAreas);
-  const queries = list("queries", LIMITS.queries).map((q, i) => {
-    const r = isRecord(q) ? q : { text: q };
+  const queries = list("queries", LIMITS.queries).map((query, i) => {
+    const fields = isRecord(query) ? query : { text: query };
     return {
-      text: text(`queries[${i + 1}].text`, r.text, LIMITS.queryText),
-      weight: weight(`queries[${i + 1}].weight`, r.weight),
+      text: text(`queries[${i + 1}].text`, fields.text, LIMITS.queryText),
+      weight: weight(`queries[${i + 1}].weight`, fields.weight),
     };
   });
   const outOfScope = strings("outOfScope", LIMITS.outOfScope);
@@ -156,19 +156,19 @@ export class Charters {
 
   /** The open draft, if any. */
   draft(): CharterRecord | undefined {
-    const r = this.db.prepare("SELECT * FROM charters WHERE status = 'draft' ORDER BY id DESC LIMIT 1").get();
-    return r ? toRecord(r) : undefined;
+    const row = this.db.prepare("SELECT * FROM charters WHERE status = 'draft' ORDER BY id DESC LIMIT 1").get();
+    return row ? toRecord(row) : undefined;
   }
 
   /** The approved charter in force: the highest version. */
   approved(): CharterRecord | undefined {
-    const r = this.db.prepare("SELECT * FROM charters WHERE version IS NOT NULL ORDER BY version DESC LIMIT 1").get();
-    return r ? toRecord(r) : undefined;
+    const row = this.db.prepare("SELECT * FROM charters WHERE version IS NOT NULL ORDER BY version DESC LIMIT 1").get();
+    return row ? toRecord(row) : undefined;
   }
 
-  version(n: number): CharterRecord | undefined {
-    const r = this.db.prepare("SELECT * FROM charters WHERE version = ?").get(n);
-    return r ? toRecord(r) : undefined;
+  version(versionNumber: number): CharterRecord | undefined {
+    const row = this.db.prepare("SELECT * FROM charters WHERE version = ?").get(versionNumber);
+    return row ? toRecord(row) : undefined;
   }
 
   versions(): { version: number; approvedAt: string; source: string }[] {
@@ -306,9 +306,9 @@ export class Brief {
     const chars = [...text].length;
     if (chars > MAX_BRIEF_CHARS)
       throw new BriefInvalid(`brief is ${chars} characters; the limit is ${MAX_BRIEF_CHARS.toLocaleString("en-US")}`);
-    const tmp = `${this.path}.tmp`;
-    writeFileSync(tmp, text, "utf8");
-    renameSync(tmp, this.path);
+    const temporaryPath = `${this.path}.tmp`;
+    writeFileSync(temporaryPath, text, "utf8");
+    renameSync(temporaryPath, this.path);
     return text;
   }
 }

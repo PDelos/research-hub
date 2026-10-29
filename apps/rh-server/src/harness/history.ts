@@ -33,10 +33,10 @@ export function loadHistory(
        FROM sweep_papers sp JOIN papers p ON p.id = sp.paper_id
       WHERE sp.sweep_id = ? AND sp.relevance IS NOT NULL AND sp.worth IS NOT NULL AND sp.status != 'blocked'`,
   );
-  return sweeps.map((s) => {
-    const charter = charters.filter((c) => c.at <= s.started_at).at(-1)?.charter;
+  return sweeps.map((sweep) => {
+    const charter = charters.filter((c) => c.at <= sweep.started_at).at(-1)?.charter;
     const papers = (
-      pool.all(s.id) as {
+      pool.all(sweep.id) as {
         paper_id: number;
         relevance: number;
         worth: number;
@@ -54,12 +54,12 @@ export function loadHistory(
       ...(r.matched_question === null ? {} : { matchedQuestion: r.matched_question }),
       ...(r.published_at === null ? {} : { publishedAt: r.published_at }),
     }));
-    const likedBefore = likes.filter((l) => l.created_at < s.started_at).map((l) => Number(l.paper_id));
+    const likedBefore = likes.filter((l) => l.created_at < sweep.started_at).map((l) => Number(l.paper_id));
     const vec = (id: number) => vectors?.vector(id, "whole");
     return {
-      sweepId: Number(s.id),
-      startedAt: Date.parse(s.started_at),
-      orientation: !!s.orientation,
+      sweepId: Number(sweep.id),
+      startedAt: Date.parse(sweep.started_at),
+      orientation: !!sweep.orientation,
       ...(charter ? { charter } : {}),
       pool: papers,
       liked: likedBefore.map(vec).filter((v): v is Float32Array => !!v),

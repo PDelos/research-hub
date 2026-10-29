@@ -25,20 +25,20 @@ const words = (text: string) => text.toLowerCase().match(/[a-z]{3,}/g) ?? [];
 /** F1 of the two texts' word multisets (lowercased words of 3+ letters). */
 export function wordF1(candidate: string, truth: string): number {
   const count = (ws: string[]) => {
-    const m = new Map<string, number>();
-    for (const w of ws) m.set(w, (m.get(w) ?? 0) + 1);
-    return m;
+    const counts = new Map<string, number>();
+    for (const w of ws) counts.set(w, (counts.get(w) ?? 0) + 1);
+    return counts;
   };
-  const c = count(words(candidate));
-  const t = count(words(truth));
+  const candidateWords = count(words(candidate));
+  const truthWords = count(words(truth));
   let overlap = 0;
-  for (const [w, n] of c) overlap += Math.min(n, t.get(w) ?? 0);
-  const cn = [...c.values()].reduce((a, b) => a + b, 0);
-  const tn = [...t.values()].reduce((a, b) => a + b, 0);
+  for (const [w, n] of candidateWords) overlap += Math.min(n, truthWords.get(w) ?? 0);
+  const cn = [...candidateWords.values()].reduce((a, b) => a + b, 0);
+  const tn = [...truthWords.values()].reduce((a, b) => a + b, 0);
   if (!cn || !tn || !overlap) return 0;
-  const p = overlap / cn;
-  const r = overlap / tn;
-  return (2 * p * r) / (p + r);
+  const precision = overlap / cn;
+  const recall = overlap / tn;
+  return (2 * precision * recall) / (precision + recall);
 }
 
 const normHeading = (h: string) =>

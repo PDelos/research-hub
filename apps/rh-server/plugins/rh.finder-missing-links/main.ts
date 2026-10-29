@@ -24,10 +24,10 @@ export function activate(context: PluginContext): FinderExports {
           question_a: question(pair.a.question),
           question_b: question(pair.b.question),
         });
-        const p = Number((answers.link as { noul?: number } | undefined)?.noul ?? 0);
-        if (p >= LINK_MIN)
+        const probability = Number((answers.link as { noul?: number } | undefined)?.noul ?? 0);
+        if (probability >= LINK_MIN)
           leads.push({
-            summary: `“${short(pair.a.title)}” (${pair.a.question}) and “${short(pair.b.title)}” (${pair.b.question}) are close but never cite each other; Jev thinks one could inform the other (${p.toFixed(2)})`,
+            summary: `“${short(pair.a.title)}” (${pair.a.question}) and “${short(pair.b.title)}” (${pair.b.question}) are close but never cite each other; Jev thinks one could inform the other (${probability.toFixed(2)})`,
             paperIds: [pair.a.id, pair.b.id],
           });
         if (leads.length >= Math.min(3, limit)) break;

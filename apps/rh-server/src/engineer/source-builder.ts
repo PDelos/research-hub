@@ -75,15 +75,15 @@ export function contractProblems(papers: unknown, sourceId: string, limit: numbe
   if (!papers.length) return ["search returned no papers for a common query"];
   const problems: string[] = [];
   if (papers.length > limit) problems.push(`search returned ${papers.length} papers, more than the limit ${limit}`);
-  papers.slice(0, 5).forEach((p: any, i) => {
-    if (!p || typeof p !== "object") return void problems.push(`paper ${i}: not an object`);
-    if (typeof p.title !== "string" || !p.title.trim()) problems.push(`paper ${i}: no title`);
-    if (p.source !== sourceId)
-      problems.push(`paper ${i}: source must be "${sourceId}", got ${JSON.stringify(p.source)}`);
-    if (typeof p.externalId !== "string" || !p.externalId) problems.push(`paper ${i}: no externalId`);
-    if (!Array.isArray(p.authors)) problems.push(`paper ${i}: authors must be an array`);
-    const ids = p.ids && typeof p.ids === "object" ? Object.values(p.ids).filter(Boolean) : [];
-    if (!ids.length && !p.url) problems.push(`paper ${i}: needs an identifier (doi, arxiv, pmid, pmcid) or a url`);
+  papers.slice(0, 5).forEach((paper: any, i) => {
+    if (!paper || typeof paper !== "object") return void problems.push(`paper ${i}: not an object`);
+    if (typeof paper.title !== "string" || !paper.title.trim()) problems.push(`paper ${i}: no title`);
+    if (paper.source !== sourceId)
+      problems.push(`paper ${i}: source must be "${sourceId}", got ${JSON.stringify(paper.source)}`);
+    if (typeof paper.externalId !== "string" || !paper.externalId) problems.push(`paper ${i}: no externalId`);
+    if (!Array.isArray(paper.authors)) problems.push(`paper ${i}: authors must be an array`);
+    const ids = paper.ids && typeof paper.ids === "object" ? Object.values(paper.ids).filter(Boolean) : [];
+    if (!ids.length && !paper.url) problems.push(`paper ${i}: needs an identifier (doi, arxiv, pmid, pmcid) or a url`);
   });
   return problems;
 }

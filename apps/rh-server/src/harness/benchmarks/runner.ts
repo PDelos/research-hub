@@ -22,16 +22,16 @@ export async function embedAll(
   return out;
 }
 
-const dot = (float32Array: Float32Array, b: Float32Array) => {
-  let s = 0;
-  for (let i = 0; i < float32Array.length; i++) s += float32Array[i] * b[i];
-  return s;
+const dot = (left: Float32Array, right: Float32Array) => {
+  let sum = 0;
+  for (let i = 0; i < left.length; i++) sum += left[i] * right[i];
+  return sum;
 };
 
 /** nDCG@k of a ranking against a set of relevant ids (binary gains). */
-export function ndcgAt(ranked: string[], relevant: Set<string>, k = 10): number {
-  const dcg = ranked.slice(0, k).reduce((s, id, i) => s + (relevant.has(id) ? 1 / Math.log2(i + 2) : 0), 0);
-  const ideal = Array.from({ length: Math.min(k, relevant.size) }, (_, i) => 1 / Math.log2(i + 2)).reduce(
+export function ndcgAt(ranked: string[], relevant: Set<string>, cutoff = 10): number {
+  const dcg = ranked.slice(0, cutoff).reduce((s, id, i) => s + (relevant.has(id) ? 1 / Math.log2(i + 2) : 0), 0);
+  const ideal = Array.from({ length: Math.min(cutoff, relevant.size) }, (_, i) => 1 / Math.log2(i + 2)).reduce(
     (a, b) => a + b,
     0,
   );
@@ -53,12 +53,12 @@ export async function retrievalTask(
     sample.queries.map((q) => q.text),
     embed,
   );
-  const scores = sample.queries.map((q, qi) => {
+  const scores = sample.queries.map((query, qi) => {
     const ranked = sample.docs
       .map((d, di) => ({ id: d.id, s: dot(queryVectors[qi], docVectors[di]) }))
       .toSorted((a, b) => b.s - a.s)
       .map((x) => x.id);
-    return ndcgAt(ranked, new Set(sample.relevant[q.id]));
+    return ndcgAt(ranked, new Set(sample.relevant[query.id]));
   });
   return {
     task,
@@ -84,20 +84,20 @@ export async function facetsTask(
       "(benchmark abstract)",
       a.sentences.map((s) => s.text),
     );
-    a.sentences.forEach((s, i) => {
+    a.sentences.forEach((sentence, i) => {
       sentences++;
       const facetLabel = predicted[i] ?? "other";
       for (const c of classes) {
-        if (facetLabel === c && s.label === c) tally[c].tp++;
+        if (facetLabel === c && sentence.label === c) tally[c].tp++;
         else if (facetLabel === c) tally[c].fp++;
-        else if (s.label === c) tally[c].fn++;
+        else if (sentence.label === c) tally[c].fn++;
       }
     });
   }
   const f1 = classes.map((facetLabel) => {
-    const { tp, fp, fn } = tally[facetLabel];
+    const { tp, fp, fn: falseNegatives } = tally[facetLabel];
     const precision = tp + fp ? tp / (tp + fp) : 0;
-    const recall = tp + fn ? tp / (tp + fn) : 0;
+    const recall = tp + falseNegatives ? tp / (tp + falseNegatives) : 0;
     return precision + recall ? (2 * precision * recall) / (precision + recall) : 0;
   });
   return {

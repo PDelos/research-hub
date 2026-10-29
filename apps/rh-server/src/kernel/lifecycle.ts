@@ -189,9 +189,9 @@ export class PluginKernel {
       .map((r) => r.plugin.manifest.id);
   }
 
-  onChange(fn: (plugins: PluginSummary[]) => void): () => void {
-    this.listeners.add(fn);
-    return () => this.listeners.delete(fn);
+  onChange(listener: (plugins: PluginSummary[]) => void): () => void {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
   }
 
   /** Fire an activation event: every available plugin listening for it is activated (failures are isolated). */
@@ -206,13 +206,14 @@ export class PluginKernel {
 
   /** Activate a plugin (and its dependencies) and return its exports. */
   activate(id: string): Promise<unknown> {
-    const r = this.records.get(id);
-    if (!r) return Promise.reject(new PluginUnavailable(id, "not installed"));
-    if (r.state === "active") return Promise.resolve(r.exports);
-    if (r.activation) return r.activation;
-    if (r.state !== "inactive") return Promise.reject(new PluginUnavailable(id, r.reason ?? r.state));
-    r.activation = this.doActivate(r).finally(() => (r.activation = undefined));
-    return r.activation;
+    const pluginRecord = this.records.get(id);
+    if (!pluginRecord) return Promise.reject(new PluginUnavailable(id, "not installed"));
+    if (pluginRecord.state === "active") return Promise.resolve(pluginRecord.exports);
+    if (pluginRecord.activation) return pluginRecord.activation;
+    if (pluginRecord.state !== "inactive")
+      return Promise.reject(new PluginUnavailable(id, pluginRecord.reason ?? pluginRecord.state));
+    pluginRecord.activation = this.doActivate(pluginRecord).finally(() => (pluginRecord.activation = undefined));
+    return pluginRecord.activation;
   }
 
   private async doActivate(entry: Record_): Promise<unknown> {
@@ -296,8 +297,8 @@ export class PluginKernel {
 
   /** Deactivate a plugin, its active dependents first. */
   async deactivate(id: string): Promise<void> {
-    const r = this.records.get(id);
-    if (!r) return;
+    const pluginRecord = this.records.get(id);
+    if (!pluginRecord) return;
     const deps = new Set(dependentsOf(this.nodes(), id));
     for (const dependent of this.activeOrder.filter((d) => deps.has(d)).toReversed())
       await this.deactivateOne(dependent);
@@ -381,10 +382,10 @@ export class PluginKernel {
 
   /** A plugin's effective settings: schema defaults, environment defaults, then saved values. */
   settings(id: string): Record<string, unknown> {
-    const r = this.records.get(id);
-    if (!r) throw new PluginUnavailable(id, "not installed");
+    const pluginRecord = this.records.get(id);
+    if (!pluginRecord) throw new PluginUnavailable(id, "not installed");
     return resolveSettings(
-      r.plugin.manifest,
+      pluginRecord.plugin.manifest,
       this.options.state.current().plugins[id]?.settings ?? {},
       this.options.env,
     );
@@ -395,13 +396,16 @@ export class PluginKernel {
    * rule); a running plugin is restarted with the new values. `undefined` removes a saved value.
    */
   async configure(id: string, changes: Record<string, unknown>, actor: Actor = "user"): Promise<void> {
-    const r = this.records.get(id);
-    if (!r) throw new PluginUnavailable(id, "not installed");
+    const pluginRecord = this.records.get(id);
+    if (!pluginRecord) throw new PluginUnavailable(id, "not installed");
     const saved = { ...this.options.state.current().plugins[id]?.settings };
     for (const [key, value] of Object.entries(changes))
       if (value === undefined) delete saved[key];
       else saved[key] = value;
-    validateSettings(r.plugin.manifest, resolveSettings(r.plugin.manifest, saved, this.options.env));
+    validateSettings(
+      pluginRecord.plugin.manifest,
+      resolveSettings(pluginRecord.plugin.manifest, saved, this.options.env),
+    );
     await this.options.state.update(
       (lockfile) => {
         if (!lockfile.plugins[id]) throw new PluginUnavailable(id, "not in the lockfile");
@@ -440,15 +444,15 @@ export class PluginKernel {
    * dependents are deactivated and blocked, and the reason is shown. Enabling it again gives it a fresh start.
    */
   async markFailed(id: string, reason: string): Promise<void> {
-    const r = this.records.get(id);
-    if (!r || (r.state !== "active" && r.state !== "activating")) return;
+    const pluginRecord = this.records.get(id);
+    if (!pluginRecord || (pluginRecord.state !== "active" && pluginRecord.state !== "activating")) return;
     const deps = new Set(dependentsOf(this.nodes(), id));
     for (const dependent of this.activeOrder.filter((d) => deps.has(d)).toReversed())
       await this.deactivateOne(dependent);
-    if (r.state === "active") {
+    if (pluginRecord.state === "active") {
       const log = this.options.log.child({ plugin: id });
-      if (r.context) await dispose(undefined, r.context, log);
-      Object.assign(r, {
+      if (pluginRecord.context) await dispose(undefined, pluginRecord.context, log);
+      Object.assign(pluginRecord, {
         module: undefined,
         context: undefined,
         exports: undefined,
@@ -459,7 +463,7 @@ export class PluginKernel {
       this.activeOrder.splice(this.activeOrder.indexOf(id), 1);
     }
     this.options.log.warn("plugin.failed", { plugin: id, reason });
-    this.set(r, "failed", reason);
+    this.set(pluginRecord, "failed", reason);
     this.recompute();
   }
 
@@ -522,9 +526,9 @@ export class PluginKernel {
 
   private emit(): void {
     const plugins = this.list();
-    for (const fn of this.listeners) {
+    for (const listener of this.listeners) {
       try {
-        fn(plugins);
+        listener(plugins);
       } catch (error) {
         this.options.log.warn("plugin.listener_failed", { error: String(error) });
       }

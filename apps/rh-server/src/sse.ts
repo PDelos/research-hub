@@ -40,9 +40,9 @@ export function openSse(response: Response): Sse {
     if (closed) return;
     closed = true;
     clearInterval(ping);
-    for (const fn of cleanups.splice(0)) {
+    for (const cleanup of cleanups.splice(0)) {
       try {
-        fn();
+        cleanup();
       } catch {}
     }
   };
@@ -64,9 +64,9 @@ export function openSse(response: Response): Sse {
       last.set(key, json);
       send(frame);
     },
-    onClose(fn) {
-      if (closed) fn();
-      else cleanups.push(fn);
+    onClose(listener) {
+      if (closed) listener();
+      else cleanups.push(listener);
     },
     close() {
       response.end();
@@ -79,7 +79,7 @@ export function openSse(response: Response): Sse {
 }
 
 /** Run `fn` at most once per `ms`, never concurrently, always catching up on the latest trigger. */
-export function coalesce(fn: () => Promise<void>, ms: number, onError: (e: unknown) => void) {
+export function coalesce(work: () => Promise<void>, ms: number, onError: (e: unknown) => void) {
   let timer: ReturnType<typeof setTimeout> | undefined;
   let running = false;
   let again = false;
@@ -91,7 +91,7 @@ export function coalesce(fn: () => Promise<void>, ms: number, onError: (e: unkno
     }
     running = true;
     try {
-      await fn();
+      await work();
     } catch (error) {
       onError(error);
     } finally {

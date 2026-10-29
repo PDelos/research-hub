@@ -42,19 +42,19 @@ function hashInt(text: string): number {
   return createHash("sha256").update(text).digest().readUInt32BE(0);
 }
 
-function corpus(query: string, prefix: string, n: number, today: Date): Synthetic[] {
+function corpus(query: string, prefix: string, count: number, today: Date): Synthetic[] {
   const topic =
     query
       .replace(/["()]/g, "")
       .replace(/\b(AND|OR|NOT)\b/g, " ")
       .replace(/\s+/g, " ")
       .trim() || "the topic";
-  return Array.from({ length: n }, (_, i) => {
-    const h = hashInt(`${prefix}:${topic}:${i}`);
-    const method = METHODS[h % METHODS.length];
-    const finding = FINDINGS[(h >>> 8) % FINDINGS.length];
-    const date = new Date(today.getTime() - ((h >>> 16) % 28) * 86_400_000).toISOString().slice(0, 10);
-    const arxiv = `${date.slice(2, 4)}${date.slice(5, 7)}.${String(h % 100_000).padStart(5, "0")}`;
+  return Array.from({ length: count }, (_, i) => {
+    const hash = hashInt(`${prefix}:${topic}:${i}`);
+    const method = METHODS[hash % METHODS.length];
+    const finding = FINDINGS[(hash >>> 8) % FINDINGS.length];
+    const date = new Date(today.getTime() - ((hash >>> 16) % 28) * 86_400_000).toISOString().slice(0, 10);
+    const arxiv = `${date.slice(2, 4)}${date.slice(5, 7)}.${String(hash % 100_000).padStart(5, "0")}`;
     return {
       arxiv,
       doi: `10.48550/arxiv.${arxiv}`,
@@ -64,7 +64,7 @@ function corpus(query: string, prefix: string, n: number, today: Date): Syntheti
         `We propose ${method} trained on public data for ${topic}. ` +
         `On standard benchmarks our approach ${finding}. ` +
         `Code is available online.`,
-      authors: [AUTHORS[h % AUTHORS.length], AUTHORS[(h >>> 4) % AUTHORS.length]].filter(
+      authors: [AUTHORS[hash % AUTHORS.length], AUTHORS[(hash >>> 4) % AUTHORS.length]].filter(
         (a, k, all) => all.indexOf(a) === k,
       ),
       date,
@@ -129,21 +129,21 @@ const REFERENCES = [
 export function offlinePaperFetch(today: () => Date = () => new Date()): typeof fetch {
   return (async (input: string | URL | Request) => {
     const url = new URL(input instanceof Request ? input.url : String(input));
-    const uRLSearchParams = url.searchParams;
+    const searchParams = url.searchParams;
     if (url.host === "export.arxiv.org") {
-      const query = (uRLSearchParams.get("search_query") ?? "")
+      const query = (searchParams.get("search_query") ?? "")
         .replace(/all:/g, "")
         .replace(/ AND submittedDate:\[.*\]$/, "")
         .replace(/ AND /g, " ");
       return new Response(
-        arxivFeed(corpus(query, "arXiv", Math.min(Number(uRLSearchParams.get("max_results") ?? 5), 10), today())),
+        arxivFeed(corpus(query, "arXiv", Math.min(Number(searchParams.get("max_results") ?? 5), 10), today())),
         {
           headers: { "content-type": "application/atom+xml" },
         },
       );
     }
     if (url.host === "api.openalex.org" && url.pathname === "/works") {
-      const filter = uRLSearchParams.get("filter") ?? "";
+      const filter = searchParams.get("filter") ?? "";
       if (filter.startsWith("doi:")) {
         // Enrichment lookups: known unless the DOI hashes to a multiple of five (not indexed yet).
         const results = filter
@@ -160,11 +160,11 @@ export function offlinePaperFetch(today: () => Date = () => new Date()): typeof 
           });
         return Response.json({ results });
       }
-      const search = uRLSearchParams.get("search") ?? "";
-      const n = Math.min(Number(uRLSearchParams.get("per-page") ?? 5), 10);
+      const search = searchParams.get("search") ?? "";
+      const perPage = Math.min(Number(searchParams.get("per-page") ?? 5), 10);
       // Every third arXiv paper reappears here as a journal version with the same DOI.
-      const arxiv = corpus(search, "arXiv", n, today()).filter((_, i) => i % 3 === 0);
-      const own = corpus(search, "OpenAlex", n - arxiv.length, today());
+      const arxiv = corpus(search, "arXiv", perPage, today()).filter((_, i) => i % 3 === 0);
+      const own = corpus(search, "OpenAlex", perPage - arxiv.length, today());
       return Response.json({
         results: [
           ...arxiv.map((w) => openalexWork(w, "Bioinformatics", REFERENCES.slice(0, 3))),
@@ -174,8 +174,8 @@ export function offlinePaperFetch(today: () => Date = () => new Date()): typeof 
     }
     if (url.host === "api.openalex.org") return new Response("", { status: 404 });
     if (url.host === "www.ebi.ac.uk") {
-      const query = (uRLSearchParams.get("query") ?? "").replace(/ AND FIRST_PDATE:\[.*\]$/, "");
-      const papers = corpus(query, "bioRxiv", Math.min(Number(uRLSearchParams.get("pageSize") ?? 5), 10), today());
+      const query = (searchParams.get("query") ?? "").replace(/ AND FIRST_PDATE:\[.*\]$/, "");
+      const papers = corpus(query, "bioRxiv", Math.min(Number(searchParams.get("pageSize") ?? 5), 10), today());
       return Response.json({
         resultList: {
           result: papers.map((w, i) => ({

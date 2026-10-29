@@ -226,10 +226,10 @@ export class Feedback {
         targets.push(["source", source]);
       }
       for (const [kind, key] of targets) {
-        const w = weights.get(id(kind, key))!;
-        const before = w.value;
-        w.value = clamp(before + STEP[j.verdict]);
-        effects.push({ cardId: Number(j.card_id), kind, key, before, after: w.value });
+        const weight = weights.get(id(kind, key))!;
+        const before = weight.value;
+        weight.value = clamp(before + STEP[j.verdict]);
+        effects.push({ cardId: Number(j.card_id), kind, key, before, after: weight.value });
       }
     }
     db.exec("BEGIN IMMEDIATE");
@@ -283,17 +283,17 @@ export class Feedback {
         "SELECT DISTINCT s.id, s.started_at FROM sweeps s JOIN cards c ON c.sweep_id = s.id ORDER BY s.id DESC LIMIT ?",
       )
       .all(limit) as { id: number; started_at: string }[];
-    return sweeps.map((s) => {
+    return sweeps.map((sweep) => {
       const top = this.deps.db
         .prepare(
           "SELECT c.id, j.verdict FROM cards c LEFT JOIN judgments j ON j.card_id = c.id WHERE c.sweep_id = ? ORDER BY c.rank IS NULL, c.rank, c.id LIMIT 5",
         )
-        .all(s.id) as { id: number; verdict: Verdict | null }[];
+        .all(sweep.id) as { id: number; verdict: Verdict | null }[];
       const judged = top.filter((t) => t.verdict).length;
       const good = top.filter((t) => t.verdict === "up" || t.verdict === "star").length;
       return {
-        sweepId: Number(s.id),
-        startedAt: s.started_at,
+        sweepId: Number(sweep.id),
+        startedAt: sweep.started_at,
         top: top.length,
         judged,
         good,

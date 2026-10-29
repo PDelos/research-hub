@@ -19,9 +19,9 @@ interface LocalParts {
 
 const formatters = new Map<string, Intl.DateTimeFormat>();
 function formatter(tz: string): Intl.DateTimeFormat {
-  let f = formatters.get(tz);
-  if (!f) {
-    f = new Intl.DateTimeFormat("en-US", {
+  let cached = formatters.get(tz);
+  if (!cached) {
+    cached = new Intl.DateTimeFormat("en-US", {
       timeZone: tz,
       hourCycle: "h23",
       year: "numeric",
@@ -32,9 +32,9 @@ function formatter(tz: string): Intl.DateTimeFormat {
       second: "2-digit",
       weekday: "short",
     });
-    formatters.set(tz, f);
+    formatters.set(tz, cached);
   }
-  return f;
+  return cached;
 }
 
 export function localParts(instant: number, tz: string): LocalParts {
@@ -55,33 +55,38 @@ export function localParts(instant: number, tz: string): LocalParts {
 
 /** Offset of `tz` from UTC at `instant`, in ms. */
 function offsetAt(instant: number, tz: string): number {
-  const p = localParts(instant, tz);
+  const parts = localParts(instant, tz);
   const seconds = new Date(instant).getUTCSeconds();
-  return Date.UTC(p.y, p.m - 1, p.d, p.hh, p.mm, seconds) - Math.floor(instant / 1000) * 1000;
+  return Date.UTC(parts.y, parts.m - 1, parts.d, parts.hh, parts.mm, seconds) - Math.floor(instant / 1000) * 1000;
 }
 
 /** The instant of local wall time y-m-d hh:mm in `tz` (a time skipped by a DST jump lands just after the jump). */
-export function zonedToUtc(y: number, m: number, d: number, hh: number, mm: number, tz: string): number {
-  const guess = Date.UTC(y, m - 1, d, hh, mm);
-  let t = guess - offsetAt(guess, tz);
-  t = guess - offsetAt(t, tz);
-  return t;
+export function zonedToUtc(y: number, month: number, day: number, hh: number, mm: number, tz: string): number {
+  const guess = Date.UTC(y, month - 1, day, hh, mm);
+  let candidate = guess - offsetAt(guess, tz);
+  candidate = guess - offsetAt(candidate, tz);
+  return candidate;
 }
 
 const pad = (n: number) => String(n).padStart(2, "0");
 const ymd = (p: { y: number; m: number; d: number }) => `${p.y}-${pad(p.m)}-${pad(p.d)}`;
 /** Calendar arithmetic on a local date, independent of time zones. */
-function shiftDate(p: { y: number; m: number; d: number }, days: number) {
-  const t = new Date(Date.UTC(p.y, p.m - 1, p.d + days));
-  return { y: t.getUTCFullYear(), m: t.getUTCMonth() + 1, d: t.getUTCDate(), weekday: t.getUTCDay() };
+function shiftDate(date: { y: number; m: number; d: number }, days: number) {
+  const shifted = new Date(Date.UTC(date.y, date.m - 1, date.d + days));
+  return {
+    y: shifted.getUTCFullYear(),
+    m: shifted.getUTCMonth() + 1,
+    d: shifted.getUTCDate(),
+    weekday: shifted.getUTCDay(),
+  };
 }
-export function isoWeek(p: { y: number; m: number; d: number }): string {
-  const t = new Date(Date.UTC(p.y, p.m - 1, p.d));
-  const day = t.getUTCDay() || 7;
-  t.setUTCDate(t.getUTCDate() + 4 - day);
-  const yearStart = Date.UTC(t.getUTCFullYear(), 0, 1);
-  const week = Math.ceil(((t.getTime() - yearStart) / 86_400_000 + 1) / 7);
-  return `${t.getUTCFullYear()}-W${pad(week)}`;
+export function isoWeek(date: { y: number; m: number; d: number }): string {
+  const utc = new Date(Date.UTC(date.y, date.m - 1, date.d));
+  const day = utc.getUTCDay() || 7;
+  utc.setUTCDate(utc.getUTCDate() + 4 - day);
+  const yearStart = Date.UTC(utc.getUTCFullYear(), 0, 1);
+  const week = Math.ceil(((utc.getTime() - yearStart) / 86_400_000 + 1) / 7);
+  return `${utc.getUTCFullYear()}-W${pad(week)}`;
 }
 
 export type RunKind = "sweep" | "nightly" | "review";
@@ -196,11 +201,11 @@ export class Scheduler {
 
   /** Save schedule changes; saved values override the environment defaults from then on. */
   setSchedule(patch: unknown): ScheduleSettings {
-    const p = (patch ?? {}) as Record<string, any>;
+    const fields = (patch ?? {}) as Record<string, any>;
     const current = this.schedule();
     const next = { sweep: { ...current.sweep }, nightly: { ...current.nightly }, review: { ...current.review } };
     for (const kind of ["sweep", "nightly"] as const) {
-      const part = p[kind];
+      const part = fields[kind];
       if (part === undefined) continue;
       if (part.enabled !== undefined) {
         if (typeof part.enabled !== "boolean") throw new ScheduleInvalid(`${kind}.enabled must be true or false`);
@@ -211,19 +216,20 @@ export class Scheduler {
         next[kind].time = part.time;
       }
     }
-    if (p.review !== undefined) {
-      if (p.review.enabled !== undefined) {
-        if (typeof p.review.enabled !== "boolean") throw new ScheduleInvalid("review.enabled must be true or false");
-        next.review.enabled = p.review.enabled;
+    if (fields.review !== undefined) {
+      if (fields.review.enabled !== undefined) {
+        if (typeof fields.review.enabled !== "boolean")
+          throw new ScheduleInvalid("review.enabled must be true or false");
+        next.review.enabled = fields.review.enabled;
       }
-      if (p.review.time !== undefined) {
-        if (!TIME.test(p.review.time)) throw new ScheduleInvalid("review.time must be HH:MM (24 h)");
-        next.review.time = p.review.time;
+      if (fields.review.time !== undefined) {
+        if (!TIME.test(fields.review.time)) throw new ScheduleInvalid("review.time must be HH:MM (24 h)");
+        next.review.time = fields.review.time;
       }
-      if (p.review.weekday !== undefined) {
-        if (!WEEKDAYS.includes(p.review.weekday))
+      if (fields.review.weekday !== undefined) {
+        if (!WEEKDAYS.includes(fields.review.weekday))
           throw new ScheduleInvalid(`review.weekday must be one of ${WEEKDAYS.join(", ")}`);
-        next.review.weekday = p.review.weekday;
+        next.review.weekday = fields.review.weekday;
       }
     }
     this.deps.settings.set("schedule", next);
@@ -361,13 +367,13 @@ export class Scheduler {
         const probe = now + (kind === "review" ? ahead * 7 * 86_400_000 : ahead * 86_400_000);
         const slot = this.latest(kind, probe);
         if (slot.at > now) {
-          let s = slot;
+          let cursor = slot;
           for (let back = 1; back <= 3; back++) {
             const earlier = this.latest(kind, probe, back);
-            if (earlier.at > now) s = earlier;
+            if (earlier.at > now) cursor = earlier;
             else break;
           }
-          return new Date(s.at).toISOString();
+          return new Date(cursor.at).toISOString();
         }
       }
       return null;

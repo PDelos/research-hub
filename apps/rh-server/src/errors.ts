@@ -41,18 +41,18 @@ export const invalid = (message: string) => new ApiFault("invalid", message);
 export const notFound = (message: string) => new ApiFault("not_found", message);
 
 export function errorMiddleware(log: Logger): ErrorRequestHandler {
-  return (err, request, response, _next) => {
+  return (error, request, response, _next) => {
     let fault: ApiFault;
-    if (err instanceof ApiFault) fault = err;
-    else if (err instanceof ConversationBusy) fault = new ApiFault("busy", "The agent is busy");
-    else if (err?.type === "entity.parse.failed") fault = invalid("Body must be valid JSON");
-    else if (err?.type === "entity.too.large") fault = invalid("Body too large");
+    if (error instanceof ApiFault) fault = error;
+    else if (error instanceof ConversationBusy) fault = new ApiFault("busy", "The agent is busy");
+    else if (error?.type === "entity.parse.failed") fault = invalid("Body must be valid JSON");
+    else if (error?.type === "entity.too.large") fault = invalid("Body too large");
     else {
       log.error("http.error", {
         method: request.method,
         path: request.path,
-        error: err instanceof Error ? err.message : String(err),
-        stack: err instanceof Error ? err.stack : undefined,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
       });
       fault = new ApiFault("internal", "Internal error");
     }
@@ -69,9 +69,9 @@ export function errorMiddleware(log: Logger): ErrorRequestHandler {
 
 export function int(value: unknown, name: string, fallback?: number): number {
   if ((value === undefined || value === "") && fallback !== undefined) return fallback;
-  const n = Number(value);
-  if (!Number.isInteger(n) || n < 0) throw invalid(`${name} must be a whole number`);
-  return n;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 0) throw invalid(`${name} must be a whole number`);
+  return parsed;
 }
 
 export const optInt = (value: unknown, name: string): number | undefined =>

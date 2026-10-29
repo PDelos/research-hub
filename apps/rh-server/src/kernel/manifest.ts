@@ -128,25 +128,25 @@ function describe(error: ErrorObject): string {
 export function parseManifest(raw: unknown, where = MANIFEST_FILE): PluginManifest {
   const problems: string[] = [];
   if (!validate(raw)) problems.push(...(validate.errors ?? []).map(describe));
-  const m = raw as Partial<PluginManifest> & { builtin?: unknown };
-  if (m && typeof m === "object") {
-    if (typeof m.version === "string" && !semver.valid(m.version))
-      problems.push(`version: "${m.version}" is not a semantic version`);
-    const range = m.engines?.["research-hub"];
+  const fields = raw as Partial<PluginManifest> & { builtin?: unknown };
+  if (fields && typeof fields === "object") {
+    if (typeof fields.version === "string" && !semver.valid(fields.version))
+      problems.push(`version: "${fields.version}" is not a semantic version`);
+    const range = fields.engines?.["research-hub"];
     if (typeof range === "string" && !semver.validRange(range))
       problems.push(`engines.research-hub: "${range}" is not a version range`);
-    if (m.kind === "slot" && !m.slot) problems.push("slot: required for a plugin of kind slot");
-    for (const [id, r] of Object.entries(m.dependencies ?? {}))
+    if (fields.kind === "slot" && !fields.slot) problems.push("slot: required for a plugin of kind slot");
+    for (const [id, r] of Object.entries(fields.dependencies ?? {}))
       if (!semver.validRange(r)) problems.push(`dependencies.${id}: "${r}" is not a version range`);
   }
   if (problems.length) throw new ManifestInvalid(where, [...new Set(problems)]);
   return {
-    ...(m as PluginManifest),
-    contributes: m.contributes ?? {},
-    kind: m.kind ?? "addon",
-    topic: m.topic ?? "integrations",
-    dependencies: m.dependencies ?? {},
-    permissions: m.permissions ?? {},
+    ...(fields as PluginManifest),
+    contributes: fields.contributes ?? {},
+    kind: fields.kind ?? "addon",
+    topic: fields.topic ?? "integrations",
+    dependencies: fields.dependencies ?? {},
+    permissions: fields.permissions ?? {},
   };
 }
 

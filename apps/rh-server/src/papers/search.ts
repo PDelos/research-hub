@@ -88,7 +88,7 @@ export class PaperSearch {
     const query = request.query.trim();
     if (!query) throw new RangeError("query must not be empty");
     const perSource = Math.min(request.perSource ?? limit, SEARCH_LIMIT_MAX);
-    const q = {
+    const sourceQuery = {
       query,
       since: request.since,
       until: request.until,
@@ -101,7 +101,7 @@ export class PaperSearch {
     const settled = await Promise.all(
       active.map(async (source) => {
         try {
-          return { source: source.name, results: await source.search(q) };
+          return { source: source.name, results: await source.search(sourceQuery) };
         } catch (error) {
           const reason = error instanceof Error ? error.message : String(error);
           this.options.log?.warn("papers.source_failed", { source: source.name, error: reason });
@@ -144,7 +144,7 @@ export class PaperSearch {
     const enrichment =
       request.enrich === false || (chosen && !chosen.enrich)
         ? { done: 0, pending: 0 }
-        : await this.enrich(ids, q.budgetMs);
+        : await this.enrich(ids, sourceQuery.budgetMs);
     const papers = ids
       .map((id) => this.options.store.get(id))
       .filter((p): p is Paper => !!p && inWindow(p.publishedAt, request.since, request.until))
@@ -157,8 +157,8 @@ export class PaperSearch {
     const { store, cache } = this.options;
     const targets = new Map<number, Paper>();
     for (const id of ids) {
-      const p = store.get(id);
-      if (p && p.enrichment === "pending") targets.set(id, p);
+      const paper = store.get(id);
+      if (paper && paper.enrichment === "pending") targets.set(id, paper);
     }
     for (const p of store.pendingEnrichment(ENRICH_RETRY_BATCH)) targets.set(p.id, p);
     if (!targets.size) return { done: 0, pending: 0 };
@@ -187,8 +187,8 @@ export class PaperSearch {
           const doi = doiOf(p);
           if (doi && uncached.includes(doi)) found.set(p.id, works.get(doi));
         }
-      } catch (e) {
-        error = e instanceof Error ? e.message : String(e);
+      } catch (failure) {
+        error = failure instanceof Error ? failure.message : String(failure);
       }
     }
     // Without a DOI: PMID, PMCID or a known OpenAlex ID.
@@ -206,8 +206,8 @@ export class PaperSearch {
           p.id,
           await cache.through(`openalex:${kind}:${value}`, () => this.openalex.lookup(kind, value, budgetMs)),
         );
-      } catch (e) {
-        error = e instanceof Error ? e.message : String(e);
+      } catch (enrichFailure) {
+        error = enrichFailure instanceof Error ? enrichFailure.message : String(enrichFailure);
       }
     }
 

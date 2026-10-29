@@ -92,17 +92,17 @@ export function activate(context: PluginContext): EngineerExports {
   const { rh } = context;
   const provider = context.exports["rh.provider-openrouter"] as ProviderExports;
   const { charters } = context.exports["rh.charter"] as CharterExports;
-  const T = rh.db.table("ideas");
+  const table = rh.db.table("ideas");
   rh.db.migrate([
     {
       version: 1,
-      sql: `CREATE TABLE ${T} (id INTEGER PRIMARY KEY, source TEXT NOT NULL, text TEXT NOT NULL, stage TEXT NOT NULL,
+      sql: `CREATE TABLE ${table} (id INTEGER PRIMARY KEY, source TEXT NOT NULL, text TEXT NOT NULL, stage TEXT NOT NULL,
               assessment_json TEXT, plugin_id TEXT, log_json TEXT NOT NULL DEFAULT '[]', numbers_json TEXT,
               cost_usd REAL NOT NULL DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)`,
     },
   ]);
   // Work interrupted by a restart did not finish.
-  db.prepare(`UPDATE ${T} SET stage = 'failed', updated_at = ? WHERE stage IN ('researching', 'building')`).run(
+  db.prepare(`UPDATE ${table} SET stage = 'failed', updated_at = ? WHERE stage IN ('researching', 'building')`).run(
     new Date().toISOString(),
   );
   const now = () => new Date().toISOString();
@@ -133,16 +133,16 @@ export function activate(context: PluginContext): EngineerExports {
     updatedAt: r.updated_at,
   });
   const idea = (id: number) => {
-    const r = db.prepare(`SELECT * FROM ${T} WHERE id = ?`).get(id) as Row | undefined;
-    if (!r) throw new EngineerInvalid(`no idea ${id}`);
-    return toIdea(r);
+    const row = db.prepare(`SELECT * FROM ${table} WHERE id = ?`).get(id) as Row | undefined;
+    if (!row) throw new EngineerInvalid(`no idea ${id}`);
+    return toIdea(row);
   };
   const update = (
     id: number,
     fields: Partial<Record<"stage" | "assessment_json" | "plugin_id" | "numbers_json", string | null>>,
   ) => {
     const keys = Object.keys(fields);
-    db.prepare(`UPDATE ${T} SET ${keys.map((k) => `${k} = ?`).join(", ")}, updated_at = ? WHERE id = ?`).run(
+    db.prepare(`UPDATE ${table} SET ${keys.map((k) => `${k} = ?`).join(", ")}, updated_at = ? WHERE id = ?`).run(
       ...keys.map((k) => fields[k as keyof typeof fields] ?? null),
       now(),
       id,
@@ -151,7 +151,7 @@ export function activate(context: PluginContext): EngineerExports {
   const say = (id: number, text: string) => {
     const log = idea(id).log;
     log.push({ at: now(), text: text.slice(0, 2_000) });
-    db.prepare(`UPDATE ${T} SET log_json = ?, updated_at = ? WHERE id = ?`).run(
+    db.prepare(`UPDATE ${table} SET log_json = ?, updated_at = ? WHERE id = ?`).run(
       JSON.stringify(log.slice(-200)),
       now(),
       id,
@@ -159,19 +159,19 @@ export function activate(context: PluginContext): EngineerExports {
     context.log.info("engineer.log", { idea: id, text: text.slice(0, 200) });
   };
   const charge = (id: number, usd: number) => {
-    if (usd) db.prepare(`UPDATE ${T} SET cost_usd = cost_usd + ? WHERE id = ?`).run(usd, id);
+    if (usd) db.prepare(`UPDATE ${table} SET cost_usd = cost_usd + ? WHERE id = ?`).run(usd, id);
   };
   const jsonObject = (text: string): Record<string, unknown> | undefined => {
-    const a = text.indexOf("{");
-    const b = text.lastIndexOf("}");
-    if (a < 0 || b <= a) return undefined;
+    const start = text.indexOf("{");
+    const end = text.lastIndexOf("}");
+    if (start < 0 || end <= start) return undefined;
     try {
-      return JSON.parse(text.slice(a, b + 1));
+      return JSON.parse(text.slice(start, end + 1));
     } catch {
       return undefined;
     }
   };
-  const str = (v: unknown, max = 600) => (typeof v === "string" ? v.trim().slice(0, max) : "");
+  const trimmed = (v: unknown, max = 600) => (typeof v === "string" ? v.trim().slice(0, max) : "");
 
   // --- Research and assessment ---------------------------------------------------------------------------------
   const assess = async (id: number) => {
@@ -204,12 +204,18 @@ export function activate(context: PluginContext): EngineerExports {
     const assessment: Assessment = {
       worth: body.worth === true,
       kind,
-      gain: str(body.gain),
-      cost: str(body.cost),
-      risk: str(body.risk),
-      plan: str(body.plan, 1_200),
+      gain: trimmed(body.gain),
+      cost: trimmed(body.cost),
+      risk: trimmed(body.risk),
+      plan: trimmed(body.plan, 1_200),
       ...(kind === "paper-source"
-        ? { api: { name: str(api.name, 80), baseUrl: str(api.baseUrl, 300), docsUrl: str(api.docsUrl, 300) } }
+        ? {
+            api: {
+              name: trimmed(api.name, 80),
+              baseUrl: trimmed(api.baseUrl, 300),
+              docsUrl: trimmed(api.docsUrl, 300),
+            },
+          }
         : {}),
       citations,
     };
@@ -313,7 +319,7 @@ export function activate(context: PluginContext): EngineerExports {
 
   const running = new Map<number, Promise<void>>();
   const runInBackground = (id: number, work: () => Promise<void>) => {
-    const p = work()
+    const promise = work()
       .catch((error) => {
         const message = error instanceof Error ? error.message : String(error);
         say(id, `Failed: ${message}`);
@@ -321,12 +327,12 @@ export function activate(context: PluginContext): EngineerExports {
         context.log.warn("engineer.failed", { idea: id, error: message });
       })
       .finally(() => running.delete(id));
-    running.set(id, p);
+    running.set(id, promise);
   };
 
   const exports: EngineerExports = {
     ideas(limit = 50) {
-      return (db.prepare(`SELECT * FROM ${T} ORDER BY id DESC LIMIT ?`).all(limit) as Row[]).map(toIdea);
+      return (db.prepare(`SELECT * FROM ${table} ORDER BY id DESC LIMIT ?`).all(limit) as Row[]).map(toIdea);
     },
     idea,
     propose(text, source = "user") {
@@ -335,7 +341,9 @@ export function activate(context: PluginContext): EngineerExports {
       if (body.length > 2_000) throw new EngineerInvalid("an idea is at most 2,000 characters");
       const id = Number(
         db
-          .prepare(`INSERT INTO ${T} (source, text, stage, created_at, updated_at) VALUES (?, ?, 'researching', ?, ?)`)
+          .prepare(
+            `INSERT INTO ${table} (source, text, stage, created_at, updated_at) VALUES (?, ?, 'researching', ?, ?)`,
+          )
           .run(source, body, now(), now()).lastInsertRowid,
       );
       runInBackground(id, () => assess(id));

@@ -27,12 +27,12 @@ function fault(error: unknown): never {
 export function projectRoutes(hub: Hub): Router {
   const router = express.Router();
   router.use("/v1", requireAuth(hub.log));
-  const p = () => hub.project;
+  const currentProject = () => hub.project;
   const charterView = () => {
-    const { charters, questions, charterWriter } = p();
+    const { charters, questions, charterWriter } = currentProject();
     const run = charterWriter.run();
     return {
-      status: p().state.status(),
+      status: currentProject().state.status(),
       draft: charters.draft() ?? null,
       approved: charters.approved() ?? null,
       versions: charters.versions(),
@@ -42,15 +42,15 @@ export function projectRoutes(hub: Hub): Router {
     };
   };
   router.get("/v1/brief", (_request, response) => {
-    const text = p().brief.read();
-    response.json({ brief: text ?? null, chars: text ? [...text].length : 0, status: p().state.status() });
+    const text = currentProject().brief.read();
+    response.json({ brief: text ?? null, chars: text ? [...text].length : 0, status: currentProject().state.status() });
   });
 
   router.put("/v1/brief", async (request, response) => {
-    if (p().charterWriter.run()?.status === "running") throw busy();
+    if (currentProject().charterWriter.run()?.status === "running") throw busy();
     try {
-      p().brief.write(bodyOf(request).brief);
-      await p().charterWriter.draft();
+      currentProject().brief.write(bodyOf(request).brief);
+      await currentProject().charterWriter.draft();
     } catch (error) {
       fault(error);
     }
@@ -60,15 +60,15 @@ export function projectRoutes(hub: Hub): Router {
   router.get("/v1/charter", (_request, response) => void response.json(charterView()));
 
   router.get("/v1/charter/versions/:n", (request, response) => {
-    const record = p().charters.version(int(request.params.n, "n"));
+    const record = currentProject().charters.version(int(request.params.n, "n"));
     if (!record) throw notFound(`No charter version ${request.params.n}`);
     response.json(record);
   });
 
   router.put("/v1/charter", (request, response) => {
-    if (p().charterWriter.run()?.status === "running") throw busy();
+    if (currentProject().charterWriter.run()?.status === "running") throw busy();
     try {
-      p().charters.saveDraft(validateCharter(bodyOf(request).charter), "user");
+      currentProject().charters.saveDraft(validateCharter(bodyOf(request).charter), "user");
     } catch (error) {
       fault(error);
     }
@@ -79,22 +79,23 @@ export function projectRoutes(hub: Hub): Router {
     const answers = bodyOf(request).answers;
     if (!Array.isArray(answers) || !answers.length) throw invalid("answers must be a nonempty list of {id, answer}");
     const open = new Map(
-      p()
+      currentProject()
         .questions.open()
         .map((q) => [q.id, q]),
     );
-    const clean = answers.map((a, i) => {
-      const id = Number((a as any)?.id);
-      const answer = (a as any)?.answer;
-      if (!open.has(id)) throw invalid(`answers[${i + 1}]: question ${(a as any)?.id} is not an open scoping question`);
+    const clean = answers.map((entry, i) => {
+      const id = Number((entry as any)?.id);
+      const answer = (entry as any)?.answer;
+      if (!open.has(id))
+        throw invalid(`answers[${i + 1}]: question ${(entry as any)?.id} is not an open scoping question`);
       if (typeof answer !== "string" || !answer.trim() || answer.length > 2000)
         throw invalid(`answers[${i + 1}]: answer must be 1 to 2000 characters`);
       return { id, answer: answer.trim() };
     });
-    if (p().charterWriter.run()?.status === "running") throw busy();
-    const answered = p().questions.answer(clean);
+    if (currentProject().charterWriter.run()?.status === "running") throw busy();
+    const answered = currentProject().questions.answer(clean);
     try {
-      await p().charterWriter.revise(answered.map((q) => ({ question: q.text, answer: q.answer ?? "" })));
+      await currentProject().charterWriter.revise(answered.map((q) => ({ question: q.text, answer: q.answer ?? "" })));
     } catch (error) {
       fault(error);
     }
@@ -102,21 +103,21 @@ export function projectRoutes(hub: Hub): Router {
   });
 
   router.post("/v1/charter/approve", (_request, response) => {
-    if (p().charterWriter.run()?.status === "running") throw busy();
-    const approved = p().charters.approve();
+    if (currentProject().charterWriter.run()?.status === "running") throw busy();
+    const approved = currentProject().charters.approve();
     if (!approved) throw new ApiFault("conflict", "There is no draft to approve");
     hub.log.info("charter.approved", { version: approved.version });
     // Weights replay onto the new version's base weights.
-    p().feedback.replay();
-    p().syncVault();
+    currentProject().feedback.replay();
+    currentProject().syncVault();
     response.json(charterView());
   });
 
   router.post("/v1/charter/retry", async (_request, response) => {
-    const run = p().charterWriter.run();
+    const run = currentProject().charterWriter.run();
     if (!run || run.status !== "failed") throw new ApiFault("conflict", "There is no failed charter run to retry");
     try {
-      await p().charterWriter.retry();
+      await currentProject().charterWriter.retry();
     } catch (error) {
       fault(error);
     }
@@ -124,7 +125,7 @@ export function projectRoutes(hub: Hub): Router {
   });
 
   router.get("/v1/project", (_request, response) => {
-    const project = p();
+    const project = currentProject();
     const approved = project.charters.approved();
     response.json({
       name: project.name,
@@ -138,11 +139,11 @@ export function projectRoutes(hub: Hub): Router {
     });
   });
 
-  router.get("/v1/schedule", (_request, response) => void response.json(p().scheduler.schedule()));
+  router.get("/v1/schedule", (_request, response) => void response.json(currentProject().scheduler.schedule()));
 
   router.put("/v1/schedule", (request, response) => {
     try {
-      response.json(p().scheduler.setSchedule(bodyOf(request)));
+      response.json(currentProject().scheduler.setSchedule(bodyOf(request)));
     } catch (error) {
       if (error instanceof ScheduleInvalid) throw invalid(error.message);
       throw error;
@@ -150,26 +151,26 @@ export function projectRoutes(hub: Hub): Router {
   });
 
   router.get("/v1/scheduled-runs", (request, response) => {
-    response.json(p().scheduler.runs(Math.min(int(request.query.limit, "limit", 100), 500)));
+    response.json(currentProject().scheduler.runs(Math.min(int(request.query.limit, "limit", 100), 500)));
   });
 
   router.post("/v1/runs/:kind", (request, response) => {
     const kind = request.params.kind;
     if (kind !== "sweep" && kind !== "nightly" && kind !== "review") throw notFound(`No run kind ${kind}`);
-    const run = p().scheduler.trigger(kind);
+    const run = currentProject().scheduler.trigger(kind);
     response.status(run.status === "requested" ? 202 : 200).json(run);
   });
 
   router.post("/v1/project/pause", (_request, response) => {
-    p().state.pause();
+    currentProject().state.pause();
     hub.log.info("project.paused", {});
-    response.json({ status: p().state.status() });
+    response.json({ status: currentProject().state.status() });
   });
 
   router.post("/v1/project/resume", (_request, response) => {
-    p().state.resume();
+    currentProject().state.resume();
     hub.log.info("project.resumed", {});
-    response.json({ status: p().state.status() });
+    response.json({ status: currentProject().state.status() });
   });
 
   return router;

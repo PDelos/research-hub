@@ -47,22 +47,22 @@ export function activate(context: PluginContext): DigestExports {
   const { rh } = context;
   const { scheduler } = context.exports["rh.schedule"] as ScheduleExports;
   const { feedback } = context.exports["rh.feedback"] as FeedbackExports;
-  const T = { digests: rh.db.table("digests"), comments: rh.db.table("comments"), nights: rh.db.table("nights") };
+  const tables = { digests: rh.db.table("digests"), comments: rh.db.table("comments"), nights: rh.db.table("nights") };
   rh.db.migrate([
     {
       version: 1,
-      sql: `CREATE TABLE ${T.digests} (id INTEGER PRIMARY KEY, week TEXT NOT NULL, period_from TEXT NOT NULL,
+      sql: `CREATE TABLE ${tables.digests} (id INTEGER PRIMARY KEY, week TEXT NOT NULL, period_from TEXT NOT NULL,
               period_to TEXT NOT NULL, body_json TEXT NOT NULL, created_at TEXT NOT NULL);
-            CREATE TABLE ${T.comments} (id INTEGER PRIMARY KEY, digest_id INTEGER NOT NULL, section TEXT NOT NULL,
+            CREATE TABLE ${tables.comments} (id INTEGER PRIMARY KEY, digest_id INTEGER NOT NULL, section TEXT NOT NULL,
               text TEXT NOT NULL, created_at TEXT NOT NULL);
-            CREATE TABLE ${T.nights} (day TEXT PRIMARY KEY, figures_json TEXT NOT NULL, created_at TEXT NOT NULL);`,
+            CREATE TABLE ${tables.nights} (day TEXT PRIMARY KEY, figures_json TEXT NOT NULL, created_at TEXT NOT NULL);`,
     },
   ]);
 
   const commentsOf = (digestId: number): DigestComment[] =>
     (
       db
-        .prepare(`SELECT id, section, text, created_at FROM ${T.comments} WHERE digest_id = ? ORDER BY id`)
+        .prepare(`SELECT id, section, text, created_at FROM ${tables.comments} WHERE digest_id = ? ORDER BY id`)
         .all(digestId) as {
         id: number;
         section: string;
@@ -71,7 +71,7 @@ export function activate(context: PluginContext): DigestExports {
       }[]
     ).map((c) => ({ id: Number(c.id), section: c.section, text: c.text, createdAt: c.created_at }));
   const latest = () =>
-    db.prepare(`SELECT id, week, period_to, created_at FROM ${T.digests} ORDER BY id DESC LIMIT 1`).get() as
+    db.prepare(`SELECT id, week, period_to, created_at FROM ${tables.digests} ORDER BY id DESC LIMIT 1`).get() as
       | { id: number; week: string; period_to: string; created_at: string }
       | undefined;
 
@@ -95,7 +95,7 @@ export function activate(context: PluginContext): DigestExports {
             ).n,
           )
         : 0;
-      const night = db.prepare(`SELECT created_at FROM ${T.nights} ORDER BY day DESC LIMIT 1`).get() as
+      const night = db.prepare(`SELECT created_at FROM ${tables.nights} ORDER BY day DESC LIMIT 1`).get() as
         | { created_at: string }
         | undefined;
       const digest = latest();
@@ -119,7 +119,7 @@ export function activate(context: PluginContext): DigestExports {
       return (
         db
           .prepare(
-            `SELECT d.id, d.week, d.period_from, d.period_to, d.created_at, (SELECT COUNT(*) FROM ${T.comments} c WHERE c.digest_id = d.id) comments FROM ${T.digests} d ORDER BY d.id DESC LIMIT ?`,
+            `SELECT d.id, d.week, d.period_from, d.period_to, d.created_at, (SELECT COUNT(*) FROM ${tables.comments} c WHERE c.digest_id = d.id) comments FROM ${tables.digests} d ORDER BY d.id DESC LIMIT ?`,
           )
           .all(limit) as {
           id: number;
@@ -139,7 +139,7 @@ export function activate(context: PluginContext): DigestExports {
       }));
     },
     digest(id) {
-      const row = db.prepare(`SELECT id, body_json, created_at FROM ${T.digests} WHERE id = ?`).get(id) as
+      const row = db.prepare(`SELECT id, body_json, created_at FROM ${tables.digests} WHERE id = ?`).get(id) as
         | { id: number; body_json: string; created_at: string }
         | undefined;
       if (!row) return undefined;
@@ -159,7 +159,7 @@ export function activate(context: PluginContext): DigestExports {
       if (body.length > COMMENT_MAX) throw new CommentInvalid(`a comment is at most ${COMMENT_MAX} characters`);
       const createdAt = new Date().toISOString();
       const written = db
-        .prepare(`INSERT INTO ${T.comments} (digest_id, section, text, created_at) VALUES (?, ?, ?, ?)`)
+        .prepare(`INSERT INTO ${tables.comments} (digest_id, section, text, created_at) VALUES (?, ?, ?, ?)`)
         .run(id, section, body, createdAt);
       const comment = { id: Number(written.lastInsertRowid), section, text: body, createdAt };
       // Later changes (self-improvement, the knowledge loop) act on comments.
@@ -174,7 +174,9 @@ export function activate(context: PluginContext): DigestExports {
       const label = week ?? isoWeek(localParts(now, tz));
       const nightlyRuns = Number(
         (
-          db.prepare(`SELECT COUNT(*) n FROM ${T.nights} WHERE created_at >= ? AND created_at < ?`).get(from, to) as {
+          db
+            .prepare(`SELECT COUNT(*) n FROM ${tables.nights} WHERE created_at >= ? AND created_at < ?`)
+            .get(from, to) as {
             n: number;
           }
         ).n,
@@ -203,10 +205,12 @@ export function activate(context: PluginContext): DigestExports {
       // The harness's view of the week, when it runs (it is a separate plugin).
       try {
         const harness = await host.exportsOf<HarnessExports>("rh.harness");
-        const q = harness.quality();
+        const quality = harness.quality();
         body.sources = harness.attribution(from, to);
         body.quality = {
-          judge: q.judge ? { agreement: q.judge.agreement, cases: q.judge.cases, trusted: q.judge.trusted } : null,
+          judge: quality.judge
+            ? { agreement: quality.judge.agreement, cases: quality.judge.cases, trusted: quality.judge.trusted }
+            : null,
           replays: harness
             .replays(200)
             // The weekly upgrade's replays are listed in its own section.
@@ -261,7 +265,7 @@ export function activate(context: PluginContext): DigestExports {
         };
       const written = db
         .prepare(
-          `INSERT INTO ${T.digests} (week, period_from, period_to, body_json, created_at) VALUES (?, ?, ?, ?, ?)`,
+          `INSERT INTO ${tables.digests} (week, period_from, period_to, body_json, created_at) VALUES (?, ?, ?, ?, ?)`,
         )
         .run(label, from, to, JSON.stringify(body), to);
       context.log.info("digest.built", {
@@ -282,7 +286,7 @@ export function activate(context: PluginContext): DigestExports {
         ),
         waiting: exports.cycle(now).waiting,
       };
-      db.prepare(`INSERT OR REPLACE INTO ${T.nights} (day, figures_json, created_at) VALUES (?, ?, ?)`).run(
+      db.prepare(`INSERT OR REPLACE INTO ${tables.nights} (day, figures_json, created_at) VALUES (?, ?, ?)`).run(
         day,
         JSON.stringify(figures),
         new Date(now).toISOString(),

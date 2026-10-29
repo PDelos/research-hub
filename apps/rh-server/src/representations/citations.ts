@@ -13,10 +13,10 @@ export interface CitationReport {
 export class Citations {
   constructor(private readonly db: Db) {}
 
-  report(a: number, b: number): CitationReport {
+  report(paperA: number, paperB: number): CitationReport {
     return {
-      aCitesB: this.cites(a, b),
-      bCitesA: this.cites(b, a),
+      aCitesB: this.cites(paperA, paperB),
+      bCitesA: this.cites(paperB, paperA),
       sharedReferences: Number(
         (
           this.db
@@ -24,7 +24,7 @@ export class Citations {
               `SELECT COUNT(*) n FROM (SELECT cited_kind, cited_value FROM citation_links WHERE citing_paper_id = ?
                INTERSECT SELECT cited_kind, cited_value FROM citation_links WHERE citing_paper_id = ?)`,
             )
-            .get(a, b) as { n: number }
+            .get(paperA, paperB) as { n: number }
         ).n,
       ),
       coCitedBy: Number(
@@ -34,7 +34,7 @@ export class Citations {
               `SELECT COUNT(*) n FROM (SELECT citing_paper_id FROM citation_links WHERE cited_paper_id = ?
                INTERSECT SELECT citing_paper_id FROM citation_links WHERE cited_paper_id = ?)`,
             )
-            .get(a, b) as { n: number }
+            .get(paperA, paperB) as { n: number }
         ).n,
       ),
     };

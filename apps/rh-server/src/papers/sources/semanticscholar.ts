@@ -27,22 +27,22 @@ export class SemanticScholarSource implements PaperSource {
   }
 }
 
-export function mapS2Paper(p: any): SourcePaper | null {
-  const title = cleanText(p?.title);
-  if (!title || !p.paperId) return null;
-  const x = p.externalIds ?? {};
+export function mapS2Paper(paper: any): SourcePaper | null {
+  const title = cleanText(paper?.title);
+  if (!title || !paper.paperId) return null;
+  const x = paper.externalIds ?? {};
   return {
     source: "semanticscholar",
-    externalId: p.paperId,
-    ids: normalizeIds({ s2: p.paperId, doi: x.DOI, arxiv: x.ArXiv, pmid: x.PubMed, pmcid: x.PubMedCentral }),
+    externalId: paper.paperId,
+    ids: normalizeIds({ s2: paper.paperId, doi: x.DOI, arxiv: x.ArXiv, pmid: x.PubMed, pmcid: x.PubMedCentral }),
     title,
-    abstract: cleanText(p.abstract) || undefined,
-    authors: (p.authors ?? []).map((a: any) => cleanText(a.name)).filter(Boolean),
-    year: p.year ?? undefined,
-    publishedAt: normalizeDate(p.publicationDate) ?? (p.year ? `${p.year}-01-01` : undefined),
-    venue: cleanText(p.venue) || undefined,
-    oaUrl: p.openAccessPdf?.url ?? undefined,
-    url: p.url,
-    citedByCount: typeof p.citationCount === "number" ? p.citationCount : undefined,
+    abstract: cleanText(paper.abstract) || undefined,
+    authors: (paper.authors ?? []).map((a: any) => cleanText(a.name)).filter(Boolean),
+    year: paper.year ?? undefined,
+    publishedAt: normalizeDate(paper.publicationDate) ?? (paper.year ? `${paper.year}-01-01` : undefined),
+    venue: cleanText(paper.venue) || undefined,
+    oaUrl: paper.openAccessPdf?.url ?? undefined,
+    url: paper.url,
+    citedByCount: typeof paper.citationCount === "number" ? paper.citationCount : undefined,
   };
 }

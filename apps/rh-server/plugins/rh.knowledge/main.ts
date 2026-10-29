@@ -115,8 +115,8 @@ export function jsonObject(text: string): Record<string, unknown> | undefined {
   const end = text.lastIndexOf("}");
   if (start < 0 || end <= start) return undefined;
   try {
-    const v = JSON.parse(text.slice(start, end + 1));
-    return v && typeof v === "object" && !Array.isArray(v) ? v : undefined;
+    const value = JSON.parse(text.slice(start, end + 1));
+    return value && typeof value === "object" && !Array.isArray(value) ? value : undefined;
   } catch {
     return undefined;
   }
@@ -139,22 +139,22 @@ export function activate(context: PluginContext): KnowledgeExports {
   const { rh } = context;
   const { charters } = context.exports["rh.charter"] as CharterExports;
   const { feedback } = context.exports["rh.feedback"] as FeedbackExports;
-  const T = { reviews: rh.db.table("reviews"), proposals: rh.db.table("proposals") };
+  const tables = { reviews: rh.db.table("reviews"), proposals: rh.db.table("proposals") };
   rh.db.migrate([
     {
       version: 1,
-      sql: `CREATE TABLE ${T.reviews} (id INTEGER PRIMARY KEY, requested_by TEXT NOT NULL, report_json TEXT NOT NULL,
+      sql: `CREATE TABLE ${tables.reviews} (id INTEGER PRIMARY KEY, requested_by TEXT NOT NULL, report_json TEXT NOT NULL,
               cost_usd REAL NOT NULL, created_at TEXT NOT NULL);
-            CREATE TABLE ${T.proposals} (id INTEGER PRIMARY KEY, review_id INTEGER NOT NULL, kind TEXT NOT NULL,
+            CREATE TABLE ${tables.proposals} (id INTEGER PRIMARY KEY, review_id INTEGER NOT NULL, kind TEXT NOT NULL,
               change_key TEXT NOT NULL, change_json TEXT NOT NULL, evidence_json TEXT NOT NULL, status TEXT NOT NULL,
               base_version INTEGER NOT NULL, before_version INTEGER, applied_version INTEGER, reason TEXT,
               created_at TEXT NOT NULL, decided_at TEXT)`,
     },
     {
       version: 2,
-      sql: `ALTER TABLE ${T.proposals} ADD COLUMN finder TEXT;
-            ALTER TABLE ${T.proposals} ADD COLUMN question_id TEXT;
-            ALTER TABLE ${T.proposals} ADD COLUMN commit_id TEXT`,
+      sql: `ALTER TABLE ${tables.proposals} ADD COLUMN finder TEXT;
+            ALTER TABLE ${tables.proposals} ADD COLUMN question_id TEXT;
+            ALTER TABLE ${tables.proposals} ADD COLUMN commit_id TEXT`,
     },
   ]);
   const setting = <V>(key: string) => context.settings[key] as V;
@@ -196,9 +196,9 @@ export function activate(context: PluginContext): KnowledgeExports {
     };
   };
   const row = (id: number) => {
-    const r = db.prepare(`SELECT * FROM ${T.proposals} WHERE id = ?`).get(id) as ProposalRow | undefined;
-    if (!r) throw new KnowledgeInvalid(`no proposal ${id}`);
-    return r;
+    const row = db.prepare(`SELECT * FROM ${tables.proposals} WHERE id = ?`).get(id) as ProposalRow | undefined;
+    if (!row) throw new KnowledgeInvalid(`no proposal ${id}`);
+    return row;
   };
   type ReviewRow = { id: number; requested_by: string; report_json: string; cost_usd: number; created_at: string };
   const toReview = (r: ReviewRow): KnowledgeReview => ({
@@ -214,15 +214,15 @@ export function activate(context: PluginContext): KnowledgeExports {
     const key = changeKey(proposed.change);
     const since = new Date(Date.now() - REJECTED_MEMORY_DAYS * 86_400_000).toISOString();
     const rejected = db
-      .prepare(`SELECT 1 FROM ${T.proposals} WHERE change_key = ? AND status = 'rejected' AND decided_at >= ?`)
+      .prepare(`SELECT 1 FROM ${tables.proposals} WHERE change_key = ? AND status = 'rejected' AND decided_at >= ?`)
       .get(key, since);
     if (rejected) return undefined;
-    const open = db.prepare(`SELECT id FROM ${T.proposals} WHERE change_key = ? AND status = 'proposed'`).get(key) as
-      | { id: number }
-      | undefined;
+    const open = db
+      .prepare(`SELECT id FROM ${tables.proposals} WHERE change_key = ? AND status = 'proposed'`)
+      .get(key) as { id: number } | undefined;
     if (open) {
       db.prepare(
-        `UPDATE ${T.proposals} SET review_id = ?, change_json = ?, evidence_json = ?, base_version = ?, finder = ? WHERE id = ?`,
+        `UPDATE ${tables.proposals} SET review_id = ?, change_json = ?, evidence_json = ?, base_version = ?, finder = ? WHERE id = ?`,
       ).run(
         reviewId,
         JSON.stringify(proposed.change),
@@ -236,7 +236,7 @@ export function activate(context: PluginContext): KnowledgeExports {
     return Number(
       db
         .prepare(
-          `INSERT INTO ${T.proposals} (review_id, kind, change_key, change_json, evidence_json, status, base_version, finder, created_at)
+          `INSERT INTO ${tables.proposals} (review_id, kind, change_key, change_json, evidence_json, status, base_version, finder, created_at)
            VALUES (?, ?, ?, ?, ?, 'proposed', ?, ?, ?)`,
         )
         .run(
@@ -272,7 +272,9 @@ export function activate(context: PluginContext): KnowledgeExports {
   const startReview = (requestedBy: string, charterVersion: number | null): Review => {
     const id = Number(
       db
-        .prepare(`INSERT INTO ${T.reviews} (requested_by, report_json, cost_usd, created_at) VALUES (?, '{}', 0, ?)`)
+        .prepare(
+          `INSERT INTO ${tables.reviews} (requested_by, report_json, cost_usd, created_at) VALUES (?, '{}', 0, ?)`,
+        )
         .run(requestedBy, now()).lastInsertRowid,
     );
     const report: KnowledgeReview["report"] = {
@@ -451,7 +453,7 @@ export function activate(context: PluginContext): KnowledgeExports {
     if (!approved) review.report.notes.push("No approved charter yet.");
     else if (!setting<boolean>("enabled")) review.report.notes.push("The knowledge review is off.");
     else await reviewCharter(review, approved.charter);
-    db.prepare(`UPDATE ${T.reviews} SET report_json = ?, cost_usd = ? WHERE id = ?`).run(
+    db.prepare(`UPDATE ${tables.reviews} SET report_json = ?, cost_usd = ? WHERE id = ?`).run(
       JSON.stringify(review.report),
       review.costUsd,
       review.id,
@@ -461,7 +463,7 @@ export function activate(context: PluginContext): KnowledgeExports {
       proposals: review.report.proposals.length,
       cost: review.costUsd,
     });
-    return toReview(db.prepare(`SELECT * FROM ${T.reviews} WHERE id = ?`).get(review.id) as ReviewRow);
+    return toReview(db.prepare(`SELECT * FROM ${tables.reviews} WHERE id = ?`).get(review.id) as ReviewRow);
   };
 
   const approveSetting = async (id: number, change: Change) => {
@@ -471,7 +473,7 @@ export function activate(context: PluginContext): KnowledgeExports {
       change.kind === "level" ? { level: change.level!.to } : { tasteRules: [...tasteRules, change.rule!].slice(-10) };
     await host.configure("rh.sweep", update, `proposal:knowledge-${id}`);
     const commit = (await host.pluginHistory(1))[0]?.id ?? null;
-    db.prepare(`UPDATE ${T.proposals} SET status = 'approved', commit_id = ?, decided_at = ? WHERE id = ?`).run(
+    db.prepare(`UPDATE ${tables.proposals} SET status = 'approved', commit_id = ?, decided_at = ? WHERE id = ?`).run(
       commit,
       now(),
       id,
@@ -488,7 +490,7 @@ export function activate(context: PluginContext): KnowledgeExports {
     } catch (error) {
       if (error instanceof ChangeRefused) throw new KnowledgeInvalid(error.message);
       if (!(error instanceof ChangeStale)) throw error;
-      db.prepare(`UPDATE ${T.proposals} SET status = 'stale', reason = ?, decided_at = ? WHERE id = ?`).run(
+      db.prepare(`UPDATE ${tables.proposals} SET status = 'stale', reason = ?, decided_at = ? WHERE id = ?`).run(
         error.message,
         now(),
         id,
@@ -502,10 +504,10 @@ export function activate(context: PluginContext): KnowledgeExports {
     if (!current) throw new KnowledgeInvalid("there is no approved charter");
     const applied = charters.approveVersion(changedCharter(id, current.charter, change), "user");
     db.prepare(
-      `UPDATE ${T.proposals} SET status = 'approved', before_version = ?, applied_version = ?, decided_at = ? WHERE id = ?`,
+      `UPDATE ${tables.proposals} SET status = 'approved', before_version = ?, applied_version = ?, decided_at = ? WHERE id = ?`,
     ).run(current.version, applied.version, now(), id);
     const added = change.kind === "add-question" && applied.charter.questions.find((q) => q.text === change.text);
-    if (added) db.prepare(`UPDATE ${T.proposals} SET question_id = ? WHERE id = ?`).run(added.id, id);
+    if (added) db.prepare(`UPDATE ${tables.proposals} SET question_id = ? WHERE id = ?`).run(added.id, id);
     context.log.info("knowledge.approved", { id, version: applied.version });
     afterCharterChange(applied.version!);
   };
@@ -522,14 +524,14 @@ export function activate(context: PluginContext): KnowledgeExports {
       }
     },
     reviews(limit = 10) {
-      return (db.prepare(`SELECT * FROM ${T.reviews} ORDER BY id DESC LIMIT ?`).all(limit) as ReviewRow[]).map(
+      return (db.prepare(`SELECT * FROM ${tables.reviews} ORDER BY id DESC LIMIT ?`).all(limit) as ReviewRow[]).map(
         toReview,
       );
     },
     proposals(status) {
       return (
         db
-          .prepare(`SELECT * FROM ${T.proposals} ${status ? "WHERE status = ?" : ""} ORDER BY id DESC LIMIT 100`)
+          .prepare(`SELECT * FROM ${tables.proposals} ${status ? "WHERE status = ?" : ""} ORDER BY id DESC LIMIT 100`)
           .all(...(status ? [status] : [])) as ProposalRow[]
       ).map(toProposal);
     },
@@ -545,7 +547,7 @@ export function activate(context: PluginContext): KnowledgeExports {
     reject(id, reason) {
       const proposalRow = row(id);
       if (proposalRow.status !== "proposed") throw new KnowledgeInvalid(`proposal ${id} is ${proposalRow.status}`);
-      db.prepare(`UPDATE ${T.proposals} SET status = 'rejected', reason = ?, decided_at = ? WHERE id = ?`).run(
+      db.prepare(`UPDATE ${tables.proposals} SET status = 'rejected', reason = ?, decided_at = ? WHERE id = ?`).run(
         reason?.trim().slice(0, 500) || null,
         now(),
         id,
@@ -557,7 +559,7 @@ export function activate(context: PluginContext): KnowledgeExports {
       if (proposalRow.status !== "approved") throw new KnowledgeInvalid(`proposal ${id} is ${proposalRow.status}`);
       if (proposalRow.commit_id) {
         await host.undo(proposalRow.commit_id, "user");
-        db.prepare(`UPDATE ${T.proposals} SET status = 'undone', decided_at = ? WHERE id = ?`).run(now(), id);
+        db.prepare(`UPDATE ${tables.proposals} SET status = 'undone', decided_at = ? WHERE id = ?`).run(now(), id);
         return toProposal(row(id));
       }
       if (charters.approved()?.version !== proposalRow.applied_version)
@@ -567,7 +569,7 @@ export function activate(context: PluginContext): KnowledgeExports {
       const before = charters.version(Number(proposalRow.before_version));
       if (!before) throw new KnowledgeInvalid(`charter version ${proposalRow.before_version} is missing`);
       const restored = charters.approveVersion(before.charter, "user");
-      db.prepare(`UPDATE ${T.proposals} SET status = 'undone', decided_at = ? WHERE id = ?`).run(now(), id);
+      db.prepare(`UPDATE ${tables.proposals} SET status = 'undone', decided_at = ? WHERE id = ?`).run(now(), id);
       afterCharterChange(restored.version!);
       return toProposal(row(id));
     },
@@ -577,7 +579,7 @@ export function activate(context: PluginContext): KnowledgeExports {
         titles.set(c.id, String(c.title ?? c.id));
       const rows = db
         .prepare(
-          `SELECT finder, status, question_id, decided_at FROM ${T.proposals} WHERE kind = 'add-question' AND finder IS NOT NULL`,
+          `SELECT finder, status, question_id, decided_at FROM ${tables.proposals} WHERE kind = 'add-question' AND finder IS NOT NULL`,
         )
         .all() as { finder: string; status: string; question_id: string | null; decided_at: string | null }[];
       const liked = (questionId: string, since: string) =>

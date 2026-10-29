@@ -28,21 +28,21 @@ export function likedPapers(db: Db, limit = 60): LikedPaper[] {
   ).map((r) => ({ ...r, id: Number(r.id) }));
 }
 
-export function cosine(float32Array: Float32Array, b: Float32Array): number {
+export function cosine(left: Float32Array, right: Float32Array): number {
   let dot = 0;
   let na = 0;
   let nb = 0;
-  for (let i = 0; i < float32Array.length; i++) {
-    dot += float32Array[i] * b[i];
-    na += float32Array[i] * float32Array[i];
-    nb += b[i] * b[i];
+  for (let i = 0; i < left.length; i++) {
+    dot += left[i] * right[i];
+    na += left[i] * left[i];
+    nb += right[i] * right[i];
   }
   return na && nb ? dot / Math.sqrt(na * nb) : 0;
 }
 
-const quantile = (xs: number[], q: number) => {
-  const s = xs.toSorted((a, b) => a - b);
-  return s.length ? s[Math.min(s.length - 1, Math.floor(q * s.length))] : 0;
+const quantile = (xs: number[], fraction: number) => {
+  const sorted = xs.toSorted((a, b) => a - b);
+  return sorted.length ? sorted[Math.min(sorted.length - 1, Math.floor(fraction * sorted.length))] : 0;
 };
 const short = (t: string) => (t.length > 70 ? `${t.slice(0, 67)}…` : t);
 
@@ -132,15 +132,15 @@ export function risingTopicLeads(db: Db, charterText: string, now = Date.now(), 
   // Rising needs something to rise from: a new project has no "before".
   if (recent.length < 5 || before.length < 20) return [];
   const count = (rows: { title: string }[]) => {
-    const m = new Map<string, number>();
-    for (const r of rows) for (const t of terms(r.title)) m.set(t, (m.get(t) ?? 0) + 1);
-    return m;
+    const counts = new Map<string, number>();
+    for (const r of rows) for (const t of terms(r.title)) counts.set(t, (counts.get(t) ?? 0) + 1);
+    return counts;
   };
-  const r = count(recent);
-  const b = count(before);
+  const recentCounts = count(recent);
+  const beforeCounts = count(before);
   const charter = charterText.toLowerCase();
   return (
-    [...r]
+    [...recentCounts]
       .filter(([t, n]) => n >= 3 && !charter.includes(t) && !t.split(" ").every((w) => charter.includes(w)))
       // The earlier rate, at least one paper's share of everything seen (a new project has no "before").
       .map(([t, n]) => ({
@@ -149,7 +149,7 @@ export function risingTopicLeads(db: Db, charterText: string, now = Date.now(), 
         ratio:
           n /
           recent.length /
-          Math.max((b.get(t) ?? 0) / Math.max(1, before.length), 1 / (before.length + recent.length)),
+          Math.max((beforeCounts.get(t) ?? 0) / Math.max(1, before.length), 1 / (before.length + recent.length)),
       }))
       .filter((x) => x.ratio >= 3)
       .toSorted((x, y) => y.ratio - x.ratio || y.n - x.n)
@@ -157,7 +157,7 @@ export function risingTopicLeads(db: Db, charterText: string, now = Date.now(), 
       .filter((x, i, all) => !all.slice(0, i).some((y) => y.t.includes(x.t) || x.t.includes(y.t)))
       .slice(0, limit)
       .map((x) => ({
-        summary: `“${x.t}” is rising: ${x.n} of ${recent.length} papers gathered in the last 14 days, ${b.get(x.t) ?? 0} of ${before.length} in the 60 days before; the charter does not mention it`,
+        summary: `“${x.t}” is rising: ${x.n} of ${recent.length} papers gathered in the last 14 days, ${beforeCounts.get(x.t) ?? 0} of ${before.length} in the 60 days before; the charter does not mention it`,
         paperIds: recent
           .filter((p) => terms(p.title).has(x.t))
           .slice(0, 4)

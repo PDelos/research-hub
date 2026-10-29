@@ -152,9 +152,9 @@ export class Vault {
   private write(rel: string, text: string): void {
     const path = join(this.dir, rel);
     mkdirSync(dirname(path), { recursive: true });
-    const tmp = join(dirname(path), `.${Date.now()}-${Math.random().toString(36).slice(2)}.tmp`);
-    writeFileSync(tmp, text);
-    renameSync(tmp, path);
+    const temporaryPath = join(dirname(path), `.${Date.now()}-${Math.random().toString(36).slice(2)}.tmp`);
+    writeFileSync(temporaryPath, text);
+    renameSync(temporaryPath, path);
   }
 }
 
@@ -166,8 +166,8 @@ export function appendUnderHeading(text: string, heading: string, line: string):
   if (start === -1) return `${text.replace(/\n*$/, "")}${text.trim() ? "\n\n" : ""}${heading}\n\n${line}\n`;
   let end = lines.length;
   for (let i = start + 1; i < lines.length; i++) {
-    const m = lines[i].match(/^(#+)\s/);
-    if (m && m[1].length <= level) {
+    const headingMatch = lines[i].match(/^(#+)\s/);
+    if (headingMatch && headingMatch[1].length <= level) {
       end = i;
       break;
     }

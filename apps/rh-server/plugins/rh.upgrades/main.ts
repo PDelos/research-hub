@@ -100,21 +100,25 @@ export function activate(context: PluginContext): UpgradesExports {
   const sweep = context.exports["rh.sweep"] as SweepExports;
   const { papers } = context.exports["rh.papers"] as PapersExports;
   const provider = context.exports["rh.provider-openrouter"] as ProviderExports;
-  const T = { runs: rh.db.table("runs"), proposals: rh.db.table("proposals"), suggestions: rh.db.table("suggestions") };
+  const tables = {
+    runs: rh.db.table("runs"),
+    proposals: rh.db.table("proposals"),
+    suggestions: rh.db.table("suggestions"),
+  };
   rh.db.migrate([
     {
       version: 1,
-      sql: `CREATE TABLE ${T.runs} (id INTEGER PRIMARY KEY, focus TEXT NOT NULL, reason TEXT NOT NULL, status TEXT NOT NULL,
+      sql: `CREATE TABLE ${tables.runs} (id INTEGER PRIMARY KEY, focus TEXT NOT NULL, reason TEXT NOT NULL, status TEXT NOT NULL,
               report_json TEXT, cost_usd REAL NOT NULL DEFAULT 0, requested_by TEXT NOT NULL, started_at TEXT NOT NULL,
               finished_at TEXT);
-            CREATE TABLE ${T.proposals} (id INTEGER PRIMARY KEY, run_id INTEGER NOT NULL, kind TEXT NOT NULL,
+            CREATE TABLE ${tables.proposals} (id INTEGER PRIMARY KEY, run_id INTEGER NOT NULL, kind TEXT NOT NULL,
               payload_json TEXT NOT NULL, status TEXT NOT NULL, commit_id TEXT, created_at TEXT NOT NULL, decided_at TEXT);
-            CREATE TABLE ${T.suggestions} (id INTEGER PRIMARY KEY, run_id INTEGER NOT NULL, name TEXT NOT NULL,
+            CREATE TABLE ${tables.suggestions} (id INTEGER PRIMARY KEY, run_id INTEGER NOT NULL, name TEXT NOT NULL,
               url TEXT NOT NULL, reason TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'open', created_at TEXT NOT NULL)`,
     },
   ]);
   // A run interrupted by a restart did not finish.
-  db.prepare(`UPDATE ${T.runs} SET status = 'failed', finished_at = ? WHERE status = 'running'`).run(
+  db.prepare(`UPDATE ${tables.runs} SET status = 'failed', finished_at = ? WHERE status = 'running'`).run(
     new Date().toISOString(),
   );
 
@@ -181,7 +185,7 @@ export function activate(context: PluginContext): UpgradesExports {
     createdAt: r.created_at,
   });
   const proposal = (id: number) => {
-    const row = db.prepare(`SELECT * FROM ${T.proposals} WHERE id = ?`).get(id) as ProposalRow | undefined;
+    const row = db.prepare(`SELECT * FROM ${tables.proposals} WHERE id = ?`).get(id) as ProposalRow | undefined;
     if (!row) throw new UpgradeInvalid(`no proposal ${id}`);
     return toProposal(row);
   };
@@ -194,7 +198,7 @@ export function activate(context: PluginContext): UpgradesExports {
   ) => {
     const written = db
       .prepare(
-        `INSERT INTO ${T.proposals} (run_id, kind, payload_json, status, commit_id, created_at, decided_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO ${tables.proposals} (run_id, kind, payload_json, status, commit_id, created_at, decided_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(runId, kind, JSON.stringify(payload), status, commit, now(), status === "applied" ? now() : null);
     return proposal(Number(written.lastInsertRowid));
@@ -213,9 +217,9 @@ export function activate(context: PluginContext): UpgradesExports {
 
   // Web research is paid per request (OpenRouter's web plugin); it counts in the run's cost and the plugin's budget.
   let researchUsd = 0;
-  const research: ProviderExports["research"] = async (prompt, o) => {
+  const research: ProviderExports["research"] = async (prompt, options) => {
     host.services.budgets.assertWithin(context.id, context.manifest.permissions.budgetUsdPerDay);
-    const researchResult = await provider.research(prompt, o);
+    const researchResult = await provider.research(prompt, options);
     researchUsd += researchResult.costUsd;
     if (researchResult.costUsd) host.services.budgets.charge(context.id, researchResult.costUsd);
     return researchResult;
@@ -223,7 +227,7 @@ export function activate(context: PluginContext): UpgradesExports {
 
   // --- Focus ---------------------------------------------------------------------------------------------------
   const lastRun = () =>
-    (db.prepare(`SELECT * FROM ${T.runs} WHERE status = 'done' ORDER BY id DESC LIMIT 1`).get() as
+    (db.prepare(`SELECT * FROM ${tables.runs} WHERE status = 'done' ORDER BY id DESC LIMIT 1`).get() as
       | RunRow
       | undefined) ?? undefined;
   /** Converters other than the active one that can run here (Docling only in the full image). */
@@ -267,7 +271,7 @@ export function activate(context: PluginContext): UpgradesExports {
       }));
     const analysis = analyze(db);
     const recent = (
-      db.prepare(`SELECT focus FROM ${T.runs} WHERE status = 'done' ORDER BY id DESC LIMIT 3`).all() as {
+      db.prepare(`SELECT focus FROM ${tables.runs} WHERE status = 'done' ORDER BY id DESC LIMIT 3`).all() as {
         focus: string;
       }[]
     ).map((r) => r.focus);
@@ -304,8 +308,8 @@ export function activate(context: PluginContext): UpgradesExports {
   // --- Ranking ---------------------------------------------------------------------------------------------------
   type Outcome = { report: Omit<UpgradeReport, "focus" | "reason"> };
   const ranking = async (runId: number): Promise<Outcome> => {
-    const a: Analysis = analyze(db);
-    const grid = rankingGrid(sweep.currentSettings(), a);
+    const analysis: Analysis = analyze(db);
+    const grid = rankingGrid(sweep.currentSettings(), analysis);
     const tried: UpgradeReport["tried"] = [];
     let best: { replay: StoredReplay; why: string } | undefined;
     for (const candidate of grid) {
@@ -327,7 +331,7 @@ export function activate(context: PluginContext): UpgradesExports {
     if (!best)
       return {
         report: {
-          analysis: a,
+          analysis: analysis,
           tried,
           result:
             tried[0]?.verdict === "not enough data"
@@ -346,7 +350,7 @@ export function activate(context: PluginContext): UpgradesExports {
     );
     return {
       report: {
-        analysis: a,
+        analysis: analysis,
         tried,
         result: `Applied ${JSON.stringify(best.replay.variant)} (${best.why}); ${summarize(best.replay.report)} Undo it from the Upgrades tab or the digest.`,
       },
@@ -461,13 +465,9 @@ export function activate(context: PluginContext): UpgradesExports {
       .filter((x) => !lower.has(x.name.toLowerCase()))
       .slice(0, 5);
     for (const s of items)
-      db.prepare(`INSERT INTO ${T.suggestions} (run_id, name, url, reason, created_at) VALUES (?, ?, ?, ?, ?)`).run(
-        runId,
-        s.name.slice(0, 120),
-        s.url.slice(0, 500),
-        plainReason(s.reason, 500),
-        now(),
-      );
+      db.prepare(
+        `INSERT INTO ${tables.suggestions} (run_id, name, url, reason, created_at) VALUES (?, ?, ?, ?, ?)`,
+      ).run(runId, s.name.slice(0, 120), s.url.slice(0, 500), plainReason(s.reason, 500), now());
     return {
       report: {
         analysis: { installed, citations: answer.citations.slice(0, 10) },
@@ -482,7 +482,9 @@ export function activate(context: PluginContext): UpgradesExports {
   const suggestionsList = (includeDismissed = false) =>
     (
       db
-        .prepare(`SELECT * FROM ${T.suggestions} ${includeDismissed ? "" : "WHERE status = 'open'"} ORDER BY id DESC`)
+        .prepare(
+          `SELECT * FROM ${tables.suggestions} ${includeDismissed ? "" : "WHERE status = 'open'"} ORDER BY id DESC`,
+        )
         .all() as SuggestionRow[]
     ).map(toSuggestion);
 
@@ -491,7 +493,7 @@ export function activate(context: PluginContext): UpgradesExports {
     due(at = Date.now()) {
       if (!setting<boolean>("enabled")) return false;
       const last = (
-        db.prepare(`SELECT started_at FROM ${T.runs} WHERE status != 'failed' ORDER BY id DESC LIMIT 1`).get() as
+        db.prepare(`SELECT started_at FROM ${tables.runs} WHERE status != 'failed' ORDER BY id DESC LIMIT 1`).get() as
           | { started_at: string }
           | undefined
       )?.started_at;
@@ -511,7 +513,7 @@ export function activate(context: PluginContext): UpgradesExports {
         const id = Number(
           db
             .prepare(
-              `INSERT INTO ${T.runs} (focus, reason, status, requested_by, started_at) VALUES (?, ?, 'running', ?, ?)`,
+              `INSERT INTO ${tables.runs} (focus, reason, status, requested_by, started_at) VALUES (?, ?, 'running', ?, ?)`,
             )
             .run(chosen.focus, chosen.reason, requestedBy, started).lastInsertRowid,
         );
@@ -525,8 +527,8 @@ export function activate(context: PluginContext): UpgradesExports {
             converter: converterRun,
             "scout-addons": scout,
           };
-          const { report: r } = await procedures[chosen.focus](id);
-          report = { focus: chosen.focus, reason: chosen.reason, ...r };
+          const { report: outcome } = await procedures[chosen.focus](id);
+          report = { focus: chosen.focus, reason: chosen.reason, ...outcome };
         } catch (error) {
           status = "failed";
           report = {
@@ -537,15 +539,11 @@ export function activate(context: PluginContext): UpgradesExports {
           };
           context.log.warn("upgrades.failed", { id, error: String(error) });
         }
-        db.prepare(`UPDATE ${T.runs} SET status = ?, report_json = ?, cost_usd = ?, finished_at = ? WHERE id = ?`).run(
-          status,
-          JSON.stringify(report),
-          spentSince(started) + researchUsd,
-          now(),
-          id,
-        );
+        db.prepare(
+          `UPDATE ${tables.runs} SET status = ?, report_json = ?, cost_usd = ?, finished_at = ? WHERE id = ?`,
+        ).run(status, JSON.stringify(report), spentSince(started) + researchUsd, now(), id);
         rh.events.emit("upgrade.finished", { id, focus: chosen.focus, status });
-        return toRun(db.prepare(`SELECT * FROM ${T.runs} WHERE id = ?`).get(id) as RunRow);
+        return toRun(db.prepare(`SELECT * FROM ${tables.runs} WHERE id = ?`).get(id) as RunRow);
       })();
       running = work;
       try {
@@ -555,47 +553,49 @@ export function activate(context: PluginContext): UpgradesExports {
       }
     },
     runs(limit = 20) {
-      return (db.prepare(`SELECT * FROM ${T.runs} ORDER BY id DESC LIMIT ?`).all(limit) as RunRow[]).map(toRun);
+      return (db.prepare(`SELECT * FROM ${tables.runs} ORDER BY id DESC LIMIT ?`).all(limit) as RunRow[]).map(toRun);
     },
     proposals(status) {
       return (
         db
-          .prepare(`SELECT * FROM ${T.proposals} ${status ? "WHERE status = ?" : ""} ORDER BY id DESC LIMIT 50`)
+          .prepare(`SELECT * FROM ${tables.proposals} ${status ? "WHERE status = ?" : ""} ORDER BY id DESC LIMIT 50`)
           .all(...(status ? [status] : [])) as ProposalRow[]
       ).map(toProposal);
     },
     suggestions: suggestionsList,
     async approve(id) {
-      const p = proposal(id);
-      if (p.status !== "proposed") throw new UpgradeInvalid(`proposal ${id} is ${p.status}`);
-      if (p.kind === "converter") {
+      const current = proposal(id);
+      if (current.status !== "proposed") throw new UpgradeInvalid(`proposal ${id} is ${current.status}`);
+      if (current.kind === "converter") {
         await host.configure(
           "rh.fulltext",
-          { "fulltext.converter": p.payload.converter },
-          `proposal:upgrade-${p.runId}`,
+          { "fulltext.converter": current.payload.converter },
+          `proposal:upgrade-${current.runId}`,
         );
         const commit = (await host.pluginHistory(1))[0]?.id ?? null;
-        db.prepare(`UPDATE ${T.proposals} SET status = 'approved', commit_id = ?, decided_at = ? WHERE id = ?`).run(
-          commit,
-          now(),
-          id,
-        );
+        db.prepare(
+          `UPDATE ${tables.proposals} SET status = 'approved', commit_id = ?, decided_at = ? WHERE id = ?`,
+        ).run(commit, now(), id);
         return proposal(id);
       }
-      if (p.kind !== "embedder") throw new UpgradeInvalid(`proposal ${id} cannot be approved`);
-      let dims = Number(p.payload.dims);
+      if (current.kind !== "embedder") throw new UpgradeInvalid(`proposal ${id} cannot be approved`);
+      let dims = Number(current.payload.dims);
       if (!dims) {
         // A model without a size parameter: learn its native size from one embedding.
         const one = (await embedder()).createEmbedder({
           ledger: papers.embeddingLedger,
-          model: String(p.payload.model),
+          model: String(current.payload.model),
           dims: 0,
         });
         dims = (await one.embed(["size probe"]))[0].length;
       }
-      await host.configure("rh.embedder-openrouter", { model: p.payload.model, dims }, `proposal:upgrade-${p.runId}`);
+      await host.configure(
+        "rh.embedder-openrouter",
+        { model: current.payload.model, dims },
+        `proposal:upgrade-${current.runId}`,
+      );
       const commit = (await host.pluginHistory(1))[0]?.id ?? null;
-      db.prepare(`UPDATE ${T.proposals} SET status = 'approved', commit_id = ?, decided_at = ? WHERE id = ?`).run(
+      db.prepare(`UPDATE ${tables.proposals} SET status = 'approved', commit_id = ?, decided_at = ? WHERE id = ?`).run(
         commit,
         now(),
         id,
@@ -603,15 +603,15 @@ export function activate(context: PluginContext): UpgradesExports {
       return proposal(id);
     },
     reject(id) {
-      const p = proposal(id);
-      if (p.status !== "proposed") throw new UpgradeInvalid(`proposal ${id} is ${p.status}`);
-      db.prepare(`UPDATE ${T.proposals} SET status = 'rejected', decided_at = ? WHERE id = ?`).run(now(), id);
+      const current = proposal(id);
+      if (current.status !== "proposed") throw new UpgradeInvalid(`proposal ${id} is ${current.status}`);
+      db.prepare(`UPDATE ${tables.proposals} SET status = 'rejected', decided_at = ? WHERE id = ?`).run(now(), id);
       return proposal(id);
     },
     dismiss(id) {
-      const written = db.prepare(`UPDATE ${T.suggestions} SET status = 'dismissed' WHERE id = ?`).run(id);
+      const written = db.prepare(`UPDATE ${tables.suggestions} SET status = 'dismissed' WHERE id = ?`).run(id);
       if (!written.changes) throw new UpgradeInvalid(`no suggestion ${id}`);
-      return toSuggestion(db.prepare(`SELECT * FROM ${T.suggestions} WHERE id = ?`).get(id) as SuggestionRow);
+      return toSuggestion(db.prepare(`SELECT * FROM ${tables.suggestions} WHERE id = ?`).get(id) as SuggestionRow);
     },
     chooseFocus,
   };

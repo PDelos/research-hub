@@ -246,20 +246,20 @@ export interface Contributions {
 
 /** A manifest's contributions with every list present (the manifest must have passed contributionProblems). */
 export function contributionsOf(manifest: PluginManifest): Contributions {
-  const c = manifest.contributes as Record<string, unknown>;
-  const list = <T>(key: string) => (Array.isArray(c[key]) ? (c[key] as T[]) : []);
+  const contributes = manifest.contributes as Record<string, unknown>;
+  const list = <T>(key: string) => (Array.isArray(contributes[key]) ? (contributes[key] as T[]) : []);
   const points: Record<string, PointContribution[]> = {};
-  for (const [key, value] of Object.entries(c))
+  for (const [key, value] of Object.entries(contributes))
     if (POINT_ID.test(key) && Array.isArray(value)) points[key] = value as PointContribution[];
   return {
     tabs: list<TabContribution>("tabs"),
-    ...(c.settings ? { settings: c.settings as Contributions["settings"] } : {}),
+    ...(contributes.settings ? { settings: contributes.settings as Contributions["settings"] } : {}),
     commands: list<CommandContribution>("commands"),
     chatTools: list<ChatToolContribution>("chatTools"),
     jevCommands: list<string>("jevCommands"),
     prompts: list<PromptContribution>("prompts"),
     processes: list<ProcessContribution>("processes"),
-    extensionPoints: (c.extensionPoints ?? {}) as Record<string, ExtensionPointDecl>,
+    extensionPoints: (contributes.extensionPoints ?? {}) as Record<string, ExtensionPointDecl>,
     points,
   };
 }

@@ -34,9 +34,11 @@ export class BudgetExceeded extends Error {
 
 /** Exact host names, or "*.example.org" for any subdomain of example.org. */
 export function hostAllowed(patterns: readonly string[], host: string): boolean {
-  const h = host.toLowerCase();
+  const lowerHost = host.toLowerCase();
   return patterns.some((p) =>
-    p.startsWith("*.") ? h.endsWith(p.slice(1)) && h.length > p.length - 1 : h === p.toLowerCase(),
+    p.startsWith("*.")
+      ? lowerHost.endsWith(p.slice(1)) && lowerHost.length > p.length - 1
+      : lowerHost === p.toLowerCase(),
   );
 }
 

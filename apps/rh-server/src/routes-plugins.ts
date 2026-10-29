@@ -71,7 +71,7 @@ export function pluginRoutes(hub: Hub): Router {
     const { kernel, discovery, contributions, state } = host();
     const plugin = discovery.plugins.get(id)!;
     const { manifest } = plugin;
-    const c = contributionsOf(manifest);
+    const declared = contributionsOf(manifest);
     const lock = state.current();
     const nodes = new Map(
       [...discovery.plugins].map(([pid, p]) => [
@@ -89,18 +89,18 @@ export function pluginRoutes(hub: Hub): Router {
       required: !!(plugin.builtin && manifest.required),
       permissions: manifest.permissions,
       contributions: {
-        tabs: c.tabs,
-        commands: c.commands,
-        chatTools: c.chatTools.map(({ name, description, desk }) => ({
+        tabs: declared.tabs,
+        commands: declared.commands,
+        chatTools: declared.chatTools.map(({ name, description, desk }) => ({
           name,
           description,
           ...(desk === undefined ? {} : { desk }),
         })),
-        jevCommands: c.jevCommands.map((p) => p.split("/").at(-1)!),
-        prompts: c.prompts,
-        processes: c.processes,
+        jevCommands: declared.jevCommands.map((p) => p.split("/").at(-1)!),
+        prompts: declared.prompts,
+        processes: declared.processes,
         extensionPoints: Object.fromEntries(
-          Object.entries(c.extensionPoints).map(([k, v]) => [
+          Object.entries(declared.extensionPoints).map(([k, v]) => [
             k,
             {
               cardinality: v.cardinality,
@@ -109,7 +109,7 @@ export function pluginRoutes(hub: Hub): Router {
             },
           ]),
         ),
-        points: c.points,
+        points: declared.points,
       },
       settings: { properties: settingsProperties(manifest), values: kernel.settings(id) },
       problems: contributions.problems(id),
@@ -134,17 +134,17 @@ export function pluginRoutes(hub: Hub): Router {
         : [],
     );
     const view: PluginContributionsView = {
-      tabs: contributions.tabs().map((t) => {
-        const plugin = discovery.plugins.get(t.pluginId)!;
+      tabs: contributions.tabs().map((tab) => {
+        const plugin = discovery.plugins.get(tab.pluginId)!;
         return {
-          id: t.id,
-          title: t.title,
-          view: t.view,
-          ...(t.order === undefined ? {} : { order: t.order }),
-          pluginId: t.pluginId,
+          id: tab.id,
+          title: tab.title,
+          view: tab.view,
+          ...(tab.order === undefined ? {} : { order: tab.order }),
+          pluginId: tab.pluginId,
           builtin: plugin.builtin,
           ...(!plugin.builtin && plugin.manifest.browser
-            ? { script: `/plugins/${t.pluginId}/${plugin.manifest.browser.split("/").at(-1)}` }
+            ? { script: `/plugins/${tab.pluginId}/${plugin.manifest.browser.split("/").at(-1)}` }
             : {}),
         };
       }),

@@ -58,12 +58,12 @@ export class EmbeddingLedger {
   }
 }
 
-export function l2normalize(float32Array: Float32Array): Float32Array {
+export function l2normalize(left: Float32Array): Float32Array {
   let sum = 0;
-  for (const x of float32Array) sum += x * x;
+  for (const x of left) sum += x * x;
   const norm = Math.sqrt(sum);
-  if (norm > 0) for (let i = 0; i < float32Array.length; i++) float32Array[i] /= norm;
-  return float32Array;
+  if (norm > 0) for (let i = 0; i < left.length; i++) left[i] /= norm;
+  return left;
 }
 
 export class OpenRouterEmbedder implements Embedder {
@@ -124,10 +124,12 @@ export class OpenRouterEmbedder implements Embedder {
         throw new Error(body.error?.message ?? `expected ${input.length} embeddings, got ${body.data?.length ?? 0}`);
       const vectors = [...body.data]
         .sort((a, b) => a.index - b.index)
-        .map((d) => {
-          if (this.dims && d.embedding.length !== this.dims)
-            throw new Error(`${this.model} returned ${d.embedding.length} dimensions, RH_EMBED_DIMS is ${this.dims}`);
-          return l2normalize(Float32Array.from(d.embedding));
+        .map((item) => {
+          if (this.dims && item.embedding.length !== this.dims)
+            throw new Error(
+              `${this.model} returned ${item.embedding.length} dimensions, RH_EMBED_DIMS is ${this.dims}`,
+            );
+          return l2normalize(Float32Array.from(item.embedding));
         });
       call.tokens = body.usage?.total_tokens ?? body.usage?.prompt_tokens;
       if (typeof body.usage?.cost === "number") {
@@ -169,7 +171,7 @@ export class FakeEmbedder implements Embedder {
   }
 
   private vector(text: string): Float32Array {
-    const float32Array = new Float32Array(this.dims);
+    const left = new Float32Array(this.dims);
     for (const word of fakeWords(text)) {
       const seed = createHash("sha256").update(word).digest();
       let state = seed.readUInt32LE(0) || 1;
@@ -177,10 +179,10 @@ export class FakeEmbedder implements Embedder {
         state ^= state << 13;
         state ^= state >>> 17;
         state ^= state << 5;
-        float32Array[i] += ((state >>> 0) / 0xffffffff) * 2 - 1;
+        left[i] += ((state >>> 0) / 0xffffffff) * 2 - 1;
       }
     }
-    return l2normalize(float32Array);
+    return l2normalize(left);
   }
 }
 

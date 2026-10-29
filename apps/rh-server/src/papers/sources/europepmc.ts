@@ -34,30 +34,30 @@ export class EuropePmcSource implements PaperSource {
   }
 }
 
-export function mapEuropePmcRecord(r: any): SourcePaper | null {
-  const title = cleanText(r?.title).replace(/\.$/, "");
-  if (!title || !r.id) return null;
-  const preprint = r.source === "PPR";
-  const authors = ((r.authorList?.author ?? []) as any[])
+export function mapEuropePmcRecord(record: any): SourcePaper | null {
+  const title = cleanText(record?.title).replace(/\.$/, "");
+  if (!title || !record.id) return null;
+  const preprint = record.source === "PPR";
+  const authors = ((record.authorList?.author ?? []) as any[])
     .map((a) => cleanText(a.fullName ?? a.collectiveName))
     .filter(Boolean);
-  const free = ((r.fullTextUrlList?.fullTextUrl ?? []) as any[]).find(
+  const free = ((record.fullTextUrlList?.fullTextUrl ?? []) as any[]).find(
     (u) => u.availabilityCode === "OA" || u.availabilityCode === "F",
   );
   return {
     source: "europepmc",
-    externalId: `${r.source}:${r.id}`,
-    ids: normalizeIds({ doi: r.doi, pmid: r.pmid, pmcid: r.pmcid }),
+    externalId: `${record.source}:${record.id}`,
+    ids: normalizeIds({ doi: record.doi, pmid: record.pmid, pmcid: record.pmcid }),
     title,
-    abstract: abstractText(r.abstractText),
-    authors: authors.length ? authors : splitAuthorString(r.authorString),
-    year: r.pubYear ? Number(r.pubYear) : undefined,
-    publishedAt: normalizeDate(r.firstPublicationDate),
-    venue: preprint ? undefined : cleanText(r.journalInfo?.journal?.title) || undefined,
-    server: preprint ? serverName(r.bookOrReportDetails?.publisher) : undefined,
+    abstract: abstractText(record.abstractText),
+    authors: authors.length ? authors : splitAuthorString(record.authorString),
+    year: record.pubYear ? Number(record.pubYear) : undefined,
+    publishedAt: normalizeDate(record.firstPublicationDate),
+    venue: preprint ? undefined : cleanText(record.journalInfo?.journal?.title) || undefined,
+    server: preprint ? serverName(record.bookOrReportDetails?.publisher) : undefined,
     oaUrl: free?.url,
-    url: `https://europepmc.org/article/${r.source}/${r.id}`,
-    citedByCount: typeof r.citedByCount === "number" ? r.citedByCount : undefined,
+    url: `https://europepmc.org/article/${record.source}/${record.id}`,
+    citedByCount: typeof record.citedByCount === "number" ? record.citedByCount : undefined,
   };
 }
 

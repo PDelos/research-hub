@@ -96,8 +96,8 @@ export function formatPaper(paper: Paper): string {
   return parts.filter(Boolean).join(" · ");
 }
 
-function sourceStatus(s: { source: string; status: string; count?: number; error?: string }): string {
-  if (s.status === "ok") return `${s.source} ${s.count}`;
-  if (s.status === "failed") return `${s.source} failed (${s.error})`;
-  return `${s.source} skipped`;
+function sourceStatus(entry: { source: string; status: string; count?: number; error?: string }): string {
+  if (entry.status === "ok") return `${entry.source} ${entry.count}`;
+  if (entry.status === "failed") return `${entry.source} failed (${entry.error})`;
+  return `${entry.source} skipped`;
 }

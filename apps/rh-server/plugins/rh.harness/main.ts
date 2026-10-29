@@ -86,14 +86,14 @@ export interface HarnessExports extends AgentHooks {
 
 /** One line a person can read: "better: nDCG 0.62 → 0.71 on held-out sweeps (+0.09, 95 % interval 0.04 to 0.12)". */
 export function summarize(replayReport: ReplayReport): string {
-  const n = (x: number | undefined) => (x === undefined ? "–" : x.toFixed(2));
+  const twoDecimals = (x: number | undefined) => (x === undefined ? "–" : x.toFixed(2));
   const sign = (x: number) => `${x >= 0 ? "+" : ""}${x.toFixed(2)}`;
   if (replayReport.verdict === "not enough data")
     return `not enough data: ${replayReport.sweeps.labelled} of ${replayReport.sweeps.total} sweeps have judged cards (3 needed).`;
   return (
-    `${replayReport.verdict}: nDCG ${n(replayReport.mean.current.ndcg)} → ${n(replayReport.mean.candidate.ndcg)}; on the ${replayReport.heldOut.n} latest sweeps ` +
+    `${replayReport.verdict}: nDCG ${twoDecimals(replayReport.mean.current.ndcg)} → ${twoDecimals(replayReport.mean.candidate.ndcg)}; on the ${replayReport.heldOut.n} latest sweeps ` +
     `${sign(replayReport.heldOut.diff)} (95 % interval ${sign(replayReport.heldOut.low)} to ${sign(replayReport.heldOut.high)}), earlier sweeps ${sign(replayReport.train.diff)}; ` +
-    `precision@5 ${n(replayReport.mean.current.precision5)} → ${n(replayReport.mean.candidate.precision5)}` +
+    `precision@5 ${twoDecimals(replayReport.mean.current.precision5)} → ${twoDecimals(replayReport.mean.candidate.precision5)}` +
     (replayReport.estimated ? `; ${replayReport.estimated} papers scored with estimated importance` : "") +
     (replayReport.judgeUsed ? "; unjudged papers labelled by the calibrated judge" : "; only your judgments used")
   );
@@ -228,8 +228,8 @@ export async function activate(context: PluginContext): Promise<HarnessExports> 
     return { id: Number(inserted.lastInsertRowid), slot, preset: slot, candidate, result, costUsd, createdAt };
   };
   const mean = (tasks: TaskResult[]) => {
-    const v = tasks.map((t) => t.value).filter((x): x is number => x !== null);
-    return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null;
+    const values = tasks.map((t) => t.value).filter((x): x is number => x !== null);
+    return values.length ? values.reduce((a, b) => a + b, 0) / values.length : null;
   };
   const sampleTask = async (
     name: "scidocs" | "litsearch",
@@ -405,14 +405,14 @@ export async function activate(context: PluginContext): Promise<HarnessExports> 
         },
         facets: { name: "Jev abstract-facets", pluginId: "rh.papers" },
         converter: (() => {
-          const c = host.services.contributions.activeContribution(
+          const converter = host.services.contributions.activeContribution(
             "fulltext.converter",
             host.settingsOf("rh.fulltext"),
           );
           return {
-            name: String(c?.title ?? "none"),
-            pluginId: c?.pluginId ?? "rh.converter-pdf",
-            detail: { converter: c?.id },
+            name: String(converter?.title ?? "none"),
+            pluginId: converter?.pluginId ?? "rh.converter-pdf",
+            detail: { converter: converter?.id },
           };
         })(),
         judge: { name: "Jev would-like", pluginId: "rh.harness", detail: { ...judge.latestCalibration() } },
@@ -486,12 +486,12 @@ export async function activate(context: PluginContext): Promise<HarnessExports> 
       ).map(toStored);
     },
     quality() {
-      const l = labels();
-      const report = replay(loadHistory(db, undefined), sweep.currentSettings(), {}, l);
+      const currentLabels = labels();
+      const report = replay(loadHistory(db, undefined), sweep.currentSettings(), {}, currentLabels);
       return {
         judge: judge.latestCalibration() ?? null,
         overTime: report.perSweep.map((p) => ({ sweepId: p.sweepId, startedAt: p.startedAt, ...p.current })),
-        labels: { judged: l.user.size, judge: l.judge?.size ?? 0 },
+        labels: { judged: currentLabels.user.size, judge: currentLabels.judge?.size ?? 0 },
         replays: exports.replays(20),
       };
     },

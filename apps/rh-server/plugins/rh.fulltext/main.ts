@@ -73,11 +73,11 @@ export function activate(context: PluginContext): FullTextExports {
   const { rh } = context;
   const { papers } = context.exports["rh.papers"] as PapersExports;
   const kb = context.exports["rh.kb"] as KbExports;
-  const T = rh.db.table("texts");
+  const table = rh.db.table("texts");
   rh.db.migrate([
     {
       version: 1,
-      sql: `CREATE TABLE ${T} (paper_id INTEGER PRIMARY KEY, status TEXT NOT NULL, source TEXT, sections_json TEXT NOT NULL,
+      sql: `CREATE TABLE ${table} (paper_id INTEGER PRIMARY KEY, status TEXT NOT NULL, source TEXT, sections_json TEXT NOT NULL,
               chars INTEGER NOT NULL, notes_json TEXT NOT NULL, fetched_at TEXT NOT NULL)`,
     },
   ]);
@@ -101,8 +101,8 @@ export function activate(context: PluginContext): FullTextExports {
     fetchedAt: r.fetched_at,
   });
   const get = (paperId: number) => {
-    const r = db.prepare(`SELECT * FROM ${T} WHERE paper_id = ?`).get(paperId) as Row | undefined;
-    return r ? toText(r) : undefined;
+    const row = db.prepare(`SELECT * FROM ${table} WHERE paper_id = ?`).get(paperId) as Row | undefined;
+    return row ? toText(row) : undefined;
   };
 
   const { contributions } = host.services;
@@ -110,18 +110,18 @@ export function activate(context: PluginContext): FullTextExports {
     const all = await contributions.contributionsTo("fulltext.converter", { activate: true });
     const active = contributions.activeContribution("fulltext.converter", context.settings);
     return Promise.all(
-      all.map(async (c) => {
+      all.map(async (contribution) => {
         let availability: { ok: boolean; reason?: string } = { ok: false, reason: "not loaded" };
         try {
-          availability = (await host.exportsOf<ConverterExports>(c.pluginId)).available();
+          availability = (await host.exportsOf<ConverterExports>(contribution.pluginId)).available();
         } catch (error) {
           availability = { ok: false, reason: String(error) };
         }
         return {
-          id: c.id,
-          title: String(c.title ?? c.id),
-          pluginId: c.pluginId,
-          active: c.id === active?.id,
+          id: contribution.id,
+          title: String(contribution.title ?? contribution.id),
+          pluginId: contribution.pluginId,
+          active: contribution.id === active?.id,
           available: availability.ok,
           ...(availability.reason ? { reason: availability.reason } : {}),
         };
@@ -227,7 +227,7 @@ export function activate(context: PluginContext): FullTextExports {
     const chars = sections.reduce((n, s) => n + s.text.length, 0);
     const fetchedAt = new Date().toISOString();
     db.prepare(
-      `INSERT INTO ${T} (paper_id, status, source, sections_json, chars, notes_json, fetched_at) VALUES (?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO ${table} (paper_id, status, source, sections_json, chars, notes_json, fetched_at) VALUES (?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT (paper_id) DO UPDATE SET status = excluded.status, source = excluded.source, sections_json = excluded.sections_json,
          chars = excluded.chars, notes_json = excluded.notes_json, fetched_at = excluded.fetched_at`,
     ).run(
@@ -256,25 +256,25 @@ export function activate(context: PluginContext): FullTextExports {
   const once = (paperId: number, force: boolean): Promise<FullText> => {
     const stored = force ? undefined : get(paperId);
     if (stored) return Promise.resolve(stored);
-    let p = inFlight.get(paperId);
-    if (!p) {
-      p = fetchFullText(paperId).finally(() => inFlight.delete(paperId));
-      inFlight.set(paperId, p);
+    let pending = inFlight.get(paperId);
+    if (!pending) {
+      pending = fetchFullText(paperId).finally(() => inFlight.delete(paperId));
+      inFlight.set(paperId, pending);
     }
-    return p;
+    return pending;
   };
 
   // Facet vectors use the stored sections; notes get the text within a budget, waiting at most 90 s.
   papers.vectors.setFullTextFacets((paperId) => {
-    const t = get(paperId);
-    return t?.status === "ok" ? facetTexts(t.sections) : undefined;
+    const stored = get(paperId);
+    return stored?.status === "ok" ? facetTexts(stored.sections) : undefined;
   });
   kb.ingest.setFullText(async (paperId) => {
-    const t = await Promise.race([
+    const fullText = await Promise.race([
       once(paperId, false),
       new Promise<undefined>((resolve) => setTimeout(() => resolve(undefined), INGEST_WAIT_MS).unref()),
     ]);
-    return t?.status === "ok" ? withinBudget(t.sections) : undefined;
+    return fullText?.status === "ok" ? withinBudget(fullText.sections) : undefined;
   });
   context.subscriptions.push({
     dispose: async () => {

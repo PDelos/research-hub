@@ -59,7 +59,7 @@ export class KaggleRunner {
   /** Push a private GPU script kernel `<username>/<slug>` and run it. */
   async push(slug: string, title: string, script: string): Promise<{ ref: string; url?: string }> {
     const ref = `${this.deps.credentials.username}/${slug}`;
-    const r = await this.call<{ ref?: string; url?: string; error?: string }>("SaveKernel", {
+    const saved = await this.call<{ ref?: string; url?: string; error?: string }>("SaveKernel", {
       slug: ref,
       newTitle: title,
       text: script,
@@ -69,8 +69,8 @@ export class KaggleRunner {
       enableGpu: true,
       enableInternet: true,
     });
-    if (r.error) throw new Error(`Kaggle SaveKernel: ${r.error}`);
-    return { ref: r.ref ?? ref, ...(r.url ? { url: r.url } : {}) };
+    if (saved.error) throw new Error(`Kaggle SaveKernel: ${saved.error}`);
+    return { ref: saved.ref ?? ref, ...(saved.url ? { url: saved.url } : {}) };
   }
 
   async status(slug: string): Promise<{ status: string; failureMessage?: string }> {
@@ -78,14 +78,14 @@ export class KaggleRunner {
   }
 
   async output(slug: string): Promise<{ files: { url: string; fileName: string }[]; log?: string }> {
-    const r = await this.call<{ files?: { url: string; fileName: string }[]; log?: string }>(
+    const output = await this.call<{ files?: { url: string; fileName: string }[]; log?: string }>(
       "ListKernelSessionOutput",
       {
         userName: this.deps.credentials.username,
         kernelSlug: slug,
       },
     );
-    return { files: r.files ?? [], ...(r.log ? { log: r.log } : {}) };
+    return { files: output.files ?? [], ...(output.log ? { log: output.log } : {}) };
   }
 
   /** Wait until the kernel is COMPLETE (or throw on ERROR, a cancel, or the time limit). */
@@ -94,15 +94,17 @@ export class KaggleRunner {
     const deadline = Date.now() + (this.deps.maxWaitMs ?? 6 * 3_600_000);
     let last = "";
     for (;;) {
-      const s = await this.status(slug);
-      const status = String(s.status ?? "")
+      const session = await this.status(slug);
+      const status = String(session.status ?? "")
         .replace(/^KERNEL_WORKER_STATUS_/, "")
         .toUpperCase();
       if (status !== last) this.deps.onStatus?.(status);
       last = status;
       if (status === "COMPLETE") return;
       if (status === "ERROR" || status.startsWith("CANCEL"))
-        throw new Error(`the Kaggle run ended with ${status}${s.failureMessage ? `: ${s.failureMessage}` : ""}`);
+        throw new Error(
+          `the Kaggle run ended with ${status}${session.failureMessage ? `: ${session.failureMessage}` : ""}`,
+        );
       if (Date.now() > deadline) throw new Error("the Kaggle run did not finish within its time limit");
       await sleep(this.deps.pollMs ?? 60_000);
     }

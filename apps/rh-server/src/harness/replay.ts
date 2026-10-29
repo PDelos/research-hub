@@ -66,26 +66,28 @@ const VERDICT_GAIN = { star: 2, up: 1, down: 0 } as const;
 export function gainOf(labels: Labels, paperId: number): number | undefined {
   const verdict = labels.user.get(paperId);
   if (verdict) return VERDICT_GAIN[verdict];
-  const p = labels.judge?.get(paperId);
-  return p === undefined ? undefined : p * 1.5;
+  const probability = labels.judge?.get(paperId);
+  return probability === undefined ? undefined : probability * 1.5;
 }
 
-function cosine(float32Array: Float32Array, b: Float32Array): number {
+function cosine(left: Float32Array, right: Float32Array): number {
   let dot = 0;
   let na = 0;
   let nb = 0;
-  for (let i = 0; i < float32Array.length; i++) {
-    dot += float32Array[i] * b[i];
-    na += float32Array[i] * float32Array[i];
-    nb += b[i] * b[i];
+  for (let i = 0; i < left.length; i++) {
+    dot += left[i] * right[i];
+    na += left[i] * left[i];
+    nb += right[i] * right[i];
   }
   return na && nb ? dot / Math.sqrt(na * nb) : 0;
 }
 
 const median = (xs: number[]) => {
   if (!xs.length) return 0.5;
-  const s = xs.toSorted((a, b) => a - b);
-  return s.length % 2 ? s[(s.length - 1) / 2] : (s[s.length / 2 - 1] + s[s.length / 2]) / 2;
+  const sorted = xs.toSorted((a, b) => a - b);
+  return sorted.length % 2
+    ? sorted[(sorted.length - 1) / 2]
+    : (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2;
 };
 
 /** The cards a sweep would have shown with these settings, best first, and how many used estimated features. */
@@ -117,15 +119,17 @@ export function replayCards(
       };
     })
     .toSorted((a, b) => b.score - a.score || a.id - b.id);
-  const n = settings.cardsPerSweep;
-  const picks = Math.min(settings.explorationPicks, n - 1);
+  const cards = settings.cardsPerSweep;
+  const picks = Math.min(settings.explorationPicks, cards - 1);
   let explore: number[] = [];
   if (picks > 0 && sweepHistory.liked.length) {
     explore = scored
-      .slice(n - picks)
-      .map((s, i) => {
-        const v = sweepHistory.vectors.get(s.id);
-        return v ? { id: s.id, i, sim: Math.max(...sweepHistory.liked.map((l) => cosine(v, l))) } : undefined;
+      .slice(cards - picks)
+      .map((sweep, i) => {
+        const vector = sweepHistory.vectors.get(sweep.id);
+        return vector
+          ? { id: sweep.id, i, sim: Math.max(...sweepHistory.liked.map((l) => cosine(vector, l))) }
+          : undefined;
       })
       .filter((x): x is { id: number; i: number; sim: number } => !!x)
       .toSorted((a, b) => a.sim - b.sim || a.i - b.i)
@@ -133,7 +137,7 @@ export function replayCards(
       .map((x) => x.id);
   }
   const chosen = new Set(explore);
-  const top = scored.filter((s) => !chosen.has(s.id)).slice(0, n - explore.length);
+  const top = scored.filter((s) => !chosen.has(s.id)).slice(0, cards - explore.length);
   return { cards: [...top.map((s) => s.id), ...explore], estimated };
 }
 
@@ -167,13 +171,13 @@ export function sweepMetrics(sweepHistory: SweepHistory, cards: number[], labels
 
 /** A seeded generator (mulberry32), so a replay's interval is reproducible. */
 export function seeded(seed: number): () => number {
-  let a = seed >>> 0;
+  let state = seed >>> 0;
   return () => {
-    a = (a + 0x6d2b79f5) >>> 0;
-    let t = a;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    state = (state + 0x6d2b79f5) >>> 0;
+    let mixed = state;
+    mixed = Math.imul(mixed ^ (mixed >>> 15), mixed | 1);
+    mixed ^= mixed + Math.imul(mixed ^ (mixed >>> 7), mixed | 61);
+    return ((mixed ^ (mixed >>> 14)) >>> 0) / 4294967296;
   };
 }
 
@@ -215,8 +219,8 @@ export interface ReplayReport {
 }
 
 const avg = (xs: (number | undefined)[]) => {
-  const v = xs.filter((x): x is number => x !== undefined);
-  return v.length ? v.reduce((a, b) => a + b, 0) / v.length : undefined;
+  const defined = xs.filter((x): x is number => x !== undefined);
+  return defined.length ? defined.reduce((a, b) => a + b, 0) / defined.length : undefined;
 };
 
 export function replay(

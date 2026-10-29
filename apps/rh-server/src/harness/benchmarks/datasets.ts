@@ -43,12 +43,12 @@ export interface DatasetIo {
 export class SampleUnavailable extends Error {}
 
 function shuffle<T>(items: T[], random: () => number): T[] {
-  const a = [...items];
-  for (let i = a.length - 1; i > 0; i--) {
+  const shuffled = [...items];
+  for (let i = shuffled.length - 1; i > 0; i--) {
     const j = Math.floor(random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
   }
-  return a;
+  return shuffled;
 }
 
 async function parquet(bytes: Uint8Array): Promise<Record<string, unknown>[]> {
@@ -106,11 +106,11 @@ export function samplePubmed(lines: string[]): FacetSample {
   const abstracts = new Map<string, { i: number; text: string; label: FacetLabel }[]>();
   for (const line of lines) {
     if (!line.trim()) continue;
-    const r = JSON.parse(line) as { abstract_id: string; label: string; text: string; sentence_id: number };
-    (abstracts.get(r.abstract_id) ?? abstracts.set(r.abstract_id, []).get(r.abstract_id)!).push({
-      i: r.sentence_id,
-      text: r.text,
-      label: PUBMED_LABELS[r.label.toLowerCase()] ?? "other",
+    const sentence = JSON.parse(line) as { abstract_id: string; label: string; text: string; sentence_id: number };
+    (abstracts.get(sentence.abstract_id) ?? abstracts.set(sentence.abstract_id, []).get(sentence.abstract_id)!).push({
+      i: sentence.sentence_id,
+      text: sentence.text,
+      label: PUBMED_LABELS[sentence.label.toLowerCase()] ?? "other",
     });
   }
   const ids = shuffle([...abstracts.keys()].toSorted(), seeded(SAMPLE_SEED)).slice(0, QUERIES);

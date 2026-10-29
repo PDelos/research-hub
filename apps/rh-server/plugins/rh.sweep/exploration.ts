@@ -18,14 +18,14 @@ export function migrateExploration(rh: RhApi): void {
   ]);
 }
 
-function cosine(float32Array: Float32Array, b: Float32Array): number {
+function cosine(left: Float32Array, right: Float32Array): number {
   let dot = 0;
   let na = 0;
   let nb = 0;
-  for (let i = 0; i < float32Array.length; i++) {
-    dot += float32Array[i] * b[i];
-    na += float32Array[i] * float32Array[i];
-    nb += b[i] * b[i];
+  for (let i = 0; i < left.length; i++) {
+    dot += left[i] * right[i];
+    na += left[i] * left[i];
+    nb += right[i] * right[i];
   }
   return na && nb ? dot / Math.sqrt(na * nb) : 0;
 }
@@ -51,8 +51,8 @@ export function pickExploration(x: {
   const pool = x.ranked.slice(x.slots - x.picks);
   const scored = pool
     .map((paperId, i) => {
-      const v = x.vectors.vector(paperId, "whole");
-      return v ? { paperId, i, similarity: Math.max(...liked.map((l) => cosine(v, l))) } : undefined;
+      const vector = x.vectors.vector(paperId, "whole");
+      return vector ? { paperId, i, similarity: Math.max(...liked.map((l) => cosine(vector, l))) } : undefined;
     })
     .filter((s): s is { paperId: number; i: number; similarity: number } => !!s)
     .toSorted((a, b) => a.similarity - b.similarity || a.i - b.i)

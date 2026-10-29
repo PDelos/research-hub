@@ -13,18 +13,18 @@ import type { Card } from "./sweep/cards.ts";
 import type { SweepRecord } from "./sweep/sweep.ts";
 
 export function paperMeta(project: ProjectRuntime, paperId: number, withAbstract = false): PaperMeta {
-  const p = project.papers.store.get(paperId);
-  if (!p) return { id: paperId, title: "(removed)", authors: [] };
+  const paper = project.papers.store.get(paperId);
+  if (!paper) return { id: paperId, title: "(removed)", authors: [] };
   return {
-    id: p.id,
-    title: p.title,
-    authors: p.authors,
-    year: p.year,
-    venue: p.venue,
-    server: p.server,
-    link: p.ids.doi ? `https://doi.org/${p.ids.doi}` : (p.url ?? p.oaUrl),
-    citations: p.citedByCount,
-    ...(withAbstract ? { abstract: p.abstract } : {}),
+    id: paper.id,
+    title: paper.title,
+    authors: paper.authors,
+    year: paper.year,
+    venue: paper.venue,
+    server: paper.server,
+    link: paper.ids.doi ? `https://doi.org/${paper.ids.doi}` : (paper.url ?? paper.oaUrl),
+    citations: paper.citedByCount,
+    ...(withAbstract ? { abstract: paper.abstract } : {}),
   };
 }
 
@@ -96,10 +96,10 @@ export function sweepSummary(project: ProjectRuntime, sweepRecord: SweepRecord):
 export function sweepRoutes(hub: Hub): Router {
   const router = express.Router();
   router.use("/v1", requireAuth(hub.log));
-  const p = () => hub.project;
+  const currentProject = () => hub.project;
 
   router.get("/v1/cards", (request, response) => {
-    const project = p();
+    const project = currentProject();
     const groups: CardGroup[] = [];
     for (const card of project.cards.list(Math.min(int(request.query.limit, "limit", 100), 500))) {
       let group = groups.at(-1);
@@ -113,14 +113,14 @@ export function sweepRoutes(hub: Hub): Router {
   });
 
   router.get("/v1/cards/:id", (request, response) => {
-    const project = p();
+    const project = currentProject();
     const card = project.cards.get(int(request.params.id, "id"));
     if (!card) throw notFound(`No card ${request.params.id}`);
     response.json(cardDetail(project, card));
   });
 
   router.put("/v1/cards/:id/judgment", (request, response) => {
-    const project = p();
+    const project = currentProject();
     const card = project.cards.get(int(request.params.id, "id"));
     if (!card) throw notFound(`No card ${request.params.id}`);
     const body = (request.body ?? {}) as Record<string, unknown>;
@@ -134,25 +134,28 @@ export function sweepRoutes(hub: Hub): Router {
   });
 
   router.delete("/v1/cards/:id/judgment", (request, response) => {
-    const project = p();
+    const project = currentProject();
     const card = project.cards.get(int(request.params.id, "id"));
     if (!card) throw notFound(`No card ${request.params.id}`);
     project.feedback.clear(card.id);
     response.json(cardDetail(project, card));
   });
 
-  router.get("/v1/feedback/precision", (_request, response) => void response.json(p().feedback.precision()));
-  router.get("/v1/weights", (_request, response) => void response.json(p().feedback.weights()));
+  router.get(
+    "/v1/feedback/precision",
+    (_request, response) => void response.json(currentProject().feedback.precision()),
+  );
+  router.get("/v1/weights", (_request, response) => void response.json(currentProject().feedback.weights()));
 
   router.get("/v1/sweeps", (request, response) => {
-    const project = p();
+    const project = currentProject();
     response.json(
       project.sweeps.list(Math.min(int(request.query.limit, "limit", 50), 200)).map((s) => sweepSummary(project, s)),
     );
   });
 
   router.get("/v1/sweeps/:id", (request, response) => {
-    const project = p();
+    const project = currentProject();
     const sweep = project.sweeps.get(int(request.params.id, "id"));
     if (!sweep) throw notFound(`No sweep ${request.params.id}`);
     const detail: SweepDetail = {
@@ -180,7 +183,7 @@ export function sweepRoutes(hub: Hub): Router {
 
   router.get(
     "/v1/sweep-settings",
-    (_request, response) => void response.json({ cardsPerSweep: p().sweeps.cardsPerSweep() }),
+    (_request, response) => void response.json({ cardsPerSweep: currentProject().sweeps.cardsPerSweep() }),
   );
 
   router.put("/v1/sweep-settings", async (request, response) => {
@@ -188,13 +191,13 @@ export function sweepRoutes(hub: Hub): Router {
     if (body.cardsPerSweep !== undefined) {
       // A plugin setting since v1-1: the change is recorded in the plugin history and can be undone.
       try {
-        await p().plugins.kernel.configure("rh.sweep", { cardsPerSweep: body.cardsPerSweep });
+        await currentProject().plugins.kernel.configure("rh.sweep", { cardsPerSweep: body.cardsPerSweep });
       } catch (error) {
         if (error instanceof SettingsInvalid) throw invalid(error.problems.join("; "));
         throw error;
       }
     }
-    response.json({ cardsPerSweep: p().sweeps.cardsPerSweep() });
+    response.json({ cardsPerSweep: currentProject().sweeps.cardsPerSweep() });
   });
 
   return router;

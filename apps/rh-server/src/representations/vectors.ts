@@ -46,9 +46,9 @@ export class PaperVectors {
   private fullTextFacets?: (paperId: number) => Partial<Record<(typeof FACETS)[number], string>> | undefined;
 
   setFullTextFacets(
-    fn: ((paperId: number) => Partial<Record<(typeof FACETS)[number], string>> | undefined) | undefined,
+    provider: ((paperId: number) => Partial<Record<(typeof FACETS)[number], string>> | undefined) | undefined,
   ): void {
-    this.fullTextFacets = fn;
+    this.fullTextFacets = provider;
   }
 
   /** Recompute one paper's vectors now (e.g. after its full text arrived). */
@@ -239,8 +239,8 @@ export class PaperVectors {
     options: { by?: VectorKind; k?: number } = {},
   ): Promise<SimilarHit[]> {
     const by = options.by ?? "whole";
-    const k = options.k ?? SIMILAR_K_DEFAULT;
-    if (!Number.isInteger(k) || k < 1 || k > 100) throw new RangeError(`k must be 1 to 100, got ${k}`);
+    const count = options.k ?? SIMILAR_K_DEFAULT;
+    if (!Number.isInteger(count) || count < 1 || count > 100) throw new RangeError(`k must be 1 to 100, got ${count}`);
     let query: Float32Array | undefined;
     let self: number | undefined;
     if ("paperId" in from) {
@@ -252,11 +252,11 @@ export class PaperVectors {
     }
     const rows = this.options.db
       .prepare(`SELECT rowid, distance FROM vec_${by} WHERE embedding MATCH ? AND k = ? ORDER BY distance`)
-      .all(query, k + (self === undefined ? 0 : 1)) as { rowid: number | bigint; distance: number }[];
+      .all(query, count + (self === undefined ? 0 : 1)) as { rowid: number | bigint; distance: number }[];
     const hits = rows
       .map((r) => ({ paperId: Number(r.rowid), distance: r.distance }))
       .filter((h) => h.paperId !== self)
-      .slice(0, k) as SimilarHit[];
+      .slice(0, count) as SimilarHit[];
     if (self !== undefined && by !== "whole") {
       const background = this.vector(self, "background");
       const whole = this.vector(self, "whole");
@@ -271,14 +271,14 @@ export class PaperVectors {
   }
 }
 
-export function cosineDistance(float32Array: Float32Array, b: Float32Array): number {
+export function cosineDistance(left: Float32Array, right: Float32Array): number {
   let dot = 0;
   let na = 0;
   let nb = 0;
-  for (let i = 0; i < float32Array.length; i++) {
-    dot += float32Array[i] * b[i];
-    na += float32Array[i] * float32Array[i];
-    nb += b[i] * b[i];
+  for (let i = 0; i < left.length; i++) {
+    dot += left[i] * right[i];
+    na += left[i] * left[i];
+    nb += right[i] * right[i];
   }
   return na && nb ? 1 - dot / Math.sqrt(na * nb) : 1;
 }

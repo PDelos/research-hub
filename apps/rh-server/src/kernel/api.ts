@@ -68,9 +68,9 @@ export class EventBus {
   on<K extends keyof EventMap & string>(type: K, handler: (payload: EventMap[K]) => void): Disposable {
     const set = this.handlers.get(type) ?? new Set();
     this.handlers.set(type, set);
-    const h = handler as (payload: unknown) => void;
-    set.add(h);
-    return { dispose: () => void set.delete(h) };
+    const listener = handler as (payload: unknown) => void;
+    set.add(listener);
+    return { dispose: () => void set.delete(listener) };
   }
 
   emit<K extends keyof EventMap & string>(type: K, payload: EventMap[K]): void {
@@ -240,9 +240,9 @@ export function createRhApi(plugin: DiscoveredPlugin, services: KernelServices, 
     kind: K,
     what: string,
   ): NonNullable<KernelServices["providers"][K]> => {
-    const p = services.providers[kind];
-    if (!p) throw new Error(`no ${what} plugin is active`);
-    return p as NonNullable<KernelServices["providers"][K]>;
+    const provider = services.providers[kind];
+    if (!provider) throw new Error(`no ${what} plugin is active`);
+    return provider as NonNullable<KernelServices["providers"][K]>;
   };
 
   return {

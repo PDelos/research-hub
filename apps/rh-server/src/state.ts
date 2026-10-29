@@ -14,7 +14,7 @@ export async function agentState(project: ProjectRuntime): Promise<AgentState> {
   } finally {
     graph.dispose();
   }
-  const c = project.compaction();
+  const compaction = project.compaction();
   return {
     project: project.name,
     conversationId: project.root.id as number,
@@ -22,6 +22,6 @@ export async function agentState(project: ProjectRuntime): Promise<AgentState> {
     contextTokens: project.telemetry.contextTokens(project.root.id as number),
     contextWindow: model.window,
     busy,
-    compaction: { ...c.points, enabled: c.enabled, window: c.window },
+    compaction: { ...compaction.points, enabled: compaction.enabled, window: compaction.window },
   };
 }

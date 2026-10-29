@@ -101,8 +101,8 @@ export class Judge {
     const pairs: { judge: boolean; user: boolean }[] = [];
     for (const j of judged) {
       try {
-        const p = await this.label(Number(j.paper_id));
-        pairs.push({ judge: p >= 0.5, user: j.verdict !== "down" });
+        const probability = await this.label(Number(j.paper_id));
+        pairs.push({ judge: probability >= 0.5, user: j.verdict !== "down" });
       } catch (error) {
         if (error instanceof BudgetExceeded) break;
         throw error;

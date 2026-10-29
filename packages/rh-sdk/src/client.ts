@@ -71,9 +71,9 @@ export class HubClient {
   }
 
   private async call<T>(method: string, path: string, body?: unknown): Promise<T> {
-    let res: Response;
+    let response: Response;
     try {
-      res = await this.f(`${this.options.base}${path}`, {
+      response = await this.f(`${this.options.base}${path}`, {
         method,
         headers: {
           ...(body !== undefined ? { "content-type": "application/json" } : {}),
@@ -84,11 +84,11 @@ export class HubClient {
     } catch (error) {
       throw new RhError("offline", "The hub cannot be reached", 0, { cause: error });
     }
-    const text = await res.text();
+    const text = await response.text();
     const json = text ? JSON.parse(text) : undefined;
-    if (!res.ok) {
+    if (!response.ok) {
       const e = json?.error ?? {};
-      throw new RhError((e.code as ErrorCode) ?? "internal", e.message ?? `HTTP ${res.status}`, res.status, {
+      throw new RhError((e.code as ErrorCode) ?? "internal", e.message ?? `HTTP ${response.status}`, response.status, {
         details: e.details,
       });
     }
@@ -98,8 +98,8 @@ export class HubClient {
   health = () => this.call<Health>("GET", "/health");
   info = () => this.call<Info>("GET", "/info");
   agent = () => this.call<AgentState>("GET", "/agent");
-  send = (content: string, opts: { requestId?: string; waitMs?: number } = {}) =>
-    this.call<SendResult>("POST", "/chat", { content, ...opts });
+  send = (content: string, options: { requestId?: string; waitMs?: number } = {}) =>
+    this.call<SendResult>("POST", "/chat", { content, ...options });
   runs = (limit = 50) => this.call<RunSummary[]>("GET", `/runs?limit=${limit}`);
   run = (id: number) => this.call<RunDetail>("GET", `/runs/${id}`);
   usage = () => this.call<CostTotals>("GET", "/usage");
@@ -236,11 +236,12 @@ export class HubClient {
 
   /** Follow the project's stream until the signal aborts. */
   async *stream(signal?: AbortSignal): AsyncGenerator<Frame> {
-    const res = await this.f(`${this.options.base}/stream`, {
+    const response = await this.f(`${this.options.base}/stream`, {
       headers: this.options.token ? { authorization: `Bearer ${this.options.token}` } : {},
       signal,
     });
-    if (!res.ok || !res.body) throw new RhError("unavailable", `Stream failed: HTTP ${res.status}`, res.status);
-    for await (const message of readSse(res.body)) yield JSON.parse(message.data) as Frame;
+    if (!response.ok || !response.body)
+      throw new RhError("unavailable", `Stream failed: HTTP ${response.status}`, response.status);
+    for await (const message of readSse(response.body)) yield JSON.parse(message.data) as Frame;
   }
 }

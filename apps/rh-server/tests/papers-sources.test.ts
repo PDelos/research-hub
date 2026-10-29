@@ -29,12 +29,12 @@ test("arXiv: id, title, abstract, authors and date from the Atom feed; the windo
   const results = await arxiv.search({ query: '"protein language model" contact', since: "2026-10-01", limit: 3 });
   assert.equal(results.length, 3);
   assert.ok(results.every((p) => p.publishedAt! >= "2026-10-01"));
-  const uRLSearchParams = fake.requests[0].url.searchParams;
+  const searchParams = fake.requests[0].url.searchParams;
   assert.equal(
-    uRLSearchParams.get("search_query"),
+    searchParams.get("search_query"),
     'all:"protein language model" AND all:contact AND submittedDate:[202610010000 TO 299912312359]',
   );
-  assert.equal(uRLSearchParams.get("max_results"), "3");
+  assert.equal(searchParams.get("max_results"), "3");
   // The date window is also applied to what comes back.
   const late = await arxiv.search({ query: "protein", since: "2026-10-19", until: "2026-10-19", limit: 3 });
   assert.ok(late.length >= 1 && late.length < 3, `only papers from 2026-10-19: ${late.map((p) => p.publishedAt)}`);
@@ -77,10 +77,10 @@ test("OpenAlex: fields, abstract from the inverted index, references, server nam
     limit: 3,
   });
   assert.equal(results.length, 3);
-  const uRLSearchParams = fake.requests[0].url.searchParams;
-  assert.equal(uRLSearchParams.get("mailto"), "me@example.org");
-  assert.equal(uRLSearchParams.get("filter"), "from_publication_date:2025-01-01");
-  assert.equal(uRLSearchParams.get("per-page"), "3");
+  const searchParams = fake.requests[0].url.searchParams;
+  assert.equal(searchParams.get("mailto"), "me@example.org");
+  assert.equal(searchParams.get("filter"), "from_publication_date:2025-01-01");
+  assert.equal(searchParams.get("per-page"), "3");
 });
 
 test("OpenAlex lookups: DOIs in one batched request, 404 means not found", async () => {
@@ -132,10 +132,10 @@ test("Europe PMC: a bioRxiv preprint maps to server bioRxiv with DOI and abstrac
     limit: 3,
   });
   assert.equal(results.length, 3);
-  const uRLSearchParams = fake.requests[0].url.searchParams;
-  assert.equal(uRLSearchParams.get("query"), '("protein language model") AND FIRST_PDATE:[2026-01-01 TO 2026-12-31]');
-  assert.equal(uRLSearchParams.get("email"), "me@example.org");
-  assert.equal(uRLSearchParams.get("resultType"), "core");
+  const searchParams = fake.requests[0].url.searchParams;
+  assert.equal(searchParams.get("query"), '("protein language model") AND FIRST_PDATE:[2026-01-01 TO 2026-12-31]');
+  assert.equal(searchParams.get("email"), "me@example.org");
+  assert.equal(searchParams.get("resultType"), "core");
 });
 
 test("Semantic Scholar mapping and query terms", () => {

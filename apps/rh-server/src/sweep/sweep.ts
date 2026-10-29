@@ -235,13 +235,18 @@ export class SweepRunner {
     return this.deps.cardsPerSweep?.() ?? this.deps.settings.get("cards_per_sweep", CARDS_PER_SWEEP.default);
   }
 
-  setCardsPerSweep(n: unknown): number {
-    if (typeof n !== "number" || !Number.isInteger(n) || n < CARDS_PER_SWEEP.min || n > CARDS_PER_SWEEP.max)
+  setCardsPerSweep(value: unknown): number {
+    if (
+      typeof value !== "number" ||
+      !Number.isInteger(value) ||
+      value < CARDS_PER_SWEEP.min ||
+      value > CARDS_PER_SWEEP.max
+    )
       throw new RangeError(
         `cards_per_sweep must be a whole number from ${CARDS_PER_SWEEP.min} to ${CARDS_PER_SWEEP.max}`,
       );
-    this.deps.settings.set("cards_per_sweep", n);
-    return n;
+    this.deps.settings.set("cards_per_sweep", value);
+    return value;
   }
 
   get(id: number): SweepRecord | undefined {
@@ -409,20 +414,20 @@ export class SweepRunner {
   charter(): Charter {
     const approved = this.deps.charters.approved();
     if (!approved) throw new Error("the project has no approved charter");
-    const w = this.deps.weight;
-    if (!w) return approved.charter;
+    const weight = this.deps.weight;
+    if (!weight) return approved.charter;
     return {
       ...approved.charter,
-      questions: approved.charter.questions.map((q) => ({ ...q, weight: w("question", q.id, q.weight) })),
-      queries: approved.charter.queries.map((q) => ({ ...q, weight: w("query", q.text, q.weight) })),
+      questions: approved.charter.questions.map((q) => ({ ...q, weight: weight("question", q.id, q.weight) })),
+      queries: approved.charter.queries.map((q) => ({ ...q, weight: weight("query", q.text, q.weight) })),
     };
   }
 
   /** Average effective weight of a paper's sources (1 when untouched). */
   private sourceWeight(paper: Paper): number {
-    const w = this.deps.weight;
-    if (!w || !paper.sources.length) return 1;
-    return paper.sources.reduce((sum, s) => sum + w("source", s, 1), 0) / paper.sources.length;
+    const weight = this.deps.weight;
+    if (!weight || !paper.sources.length) return 1;
+    return paper.sources.reduce((sum, s) => sum + weight("source", s, 1), 0) / paper.sources.length;
   }
 
   private plan(sweep: SweepRecord): Record<string, number> {
@@ -614,7 +619,7 @@ export class SweepRunner {
 
   private rank(sweep: SweepRecord): Record<string, number> {
     const charter = this.charter();
-    const n = this.cardsPerSweep();
+    const cards = this.cardsPerSweep();
     const rows = this.deps.db
       .prepare(
         "SELECT paper_id, matched_question, level, importance, relevance FROM sweep_papers WHERE sweep_id = ? AND status = 'gated'",
@@ -658,8 +663,10 @@ export class SweepRunner {
     }
     scored.sort((a, b) => b.score - a.score || a.id - b.id);
     // Exploration picks take the last card slots; the rest keep their rank order.
-    const picks = new Set(this.deps.explore?.({ sweepId: sweep.id, ranked: scored.map((s) => s.id), slots: n }) ?? []);
-    const top = scored.filter((s) => !picks.has(s.id)).slice(0, Math.max(0, n - picks.size));
+    const picks = new Set(
+      this.deps.explore?.({ sweepId: sweep.id, ranked: scored.map((s) => s.id), slots: cards }) ?? [],
+    );
+    const top = scored.filter((s) => !picks.has(s.id)).slice(0, Math.max(0, cards - picks.size));
     const chosen = [...top, ...scored.filter((s) => picks.has(s.id))];
     const chosenIds = new Set(chosen.map((s) => s.id));
     [...chosen, ...scored.filter((s) => !chosenIds.has(s.id))].forEach((s, i) =>
@@ -832,10 +839,10 @@ export class SweepRunner {
 }
 
 /** Run `work` over items in `n` parallel lanes; every lane finishes its items, then the first failure is thrown. */
-async function lanes<T>(items: T[], n: number, work: (item: T) => Promise<void>): Promise<void> {
+async function lanes<T>(items: T[], concurrency: number, work: (item: T) => Promise<void>): Promise<void> {
   const results = await Promise.allSettled(
-    Array.from({ length: n }, async (_, lane) => {
-      for (let k = lane; k < items.length; k += n) await work(items[k]);
+    Array.from({ length: concurrency }, async (_, lane) => {
+      for (let k = lane; k < items.length; k += concurrency) await work(items[k]);
     }),
   );
   const failure = results.find((r): r is PromiseRejectedResult => r.status === "rejected");

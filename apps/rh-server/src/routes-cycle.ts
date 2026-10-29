@@ -18,9 +18,9 @@ export function cycleRoutes(hub: Hub): Router {
   });
 
   router.get("/v1/digests/:id", async (request, response) => {
-    const d = (await digest()).digest(int(request.params.id, "id"));
-    if (!d) throw notFound(`No digest ${request.params.id}`);
-    response.json(d);
+    const view = (await digest()).digest(int(request.params.id, "id"));
+    if (!view) throw notFound(`No digest ${request.params.id}`);
+    response.json(view);
   });
 
   router.post("/v1/digests/:id/comments", async (request, response) => {

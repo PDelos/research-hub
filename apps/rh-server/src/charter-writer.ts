@@ -152,8 +152,8 @@ export class CharterWriter {
         });
         if (result.startsWith("error:"))
           return toolError(`Not asked: ${result.slice(6)}.`, ["Save the draft without further questions."]);
-        const n = Number(result.slice(3));
-        return toolText(`${n} question${n === 1 ? "" : "s"} recorded for the user.`);
+        const asked = Number(result.slice(3));
+        return toolText(`${asked} question${asked === 1 ? "" : "s"} recorded for the user.`);
       },
     });
     this.tools = { save, ask };

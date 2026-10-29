@@ -41,24 +41,24 @@ export function activate(context: PluginContext): McpExports {
       )
       .get(paperId) as Record<string, unknown> | undefined;
   const paperSummary = (id: number) => {
-    const p = papers.store.get(id);
-    if (!p) return undefined;
-    const c = card(id);
+    const paper = papers.store.get(id);
+    if (!paper) return undefined;
+    const paperCard = card(id);
     return {
-      paper_id: p.id,
-      title: p.title,
-      year: p.year,
-      venue: p.venue ?? p.server,
-      ids: p.ids,
-      url: p.url ?? p.oaUrl,
-      ...(c ? { your_judgment: c.verdict ?? null, card_summary: c.summary } : {}),
+      paper_id: paper.id,
+      title: paper.title,
+      year: paper.year,
+      venue: paper.venue ?? paper.server,
+      ids: paper.ids,
+      url: paper.url ?? paper.oaUrl,
+      ...(paperCard ? { your_judgment: paperCard.verdict ?? null, card_summary: paperCard.summary } : {}),
     };
   };
   const logged =
-    <A>(tool: string, fn: (args: A) => Promise<ReturnType<typeof text>> | ReturnType<typeof text>) =>
+    <A>(tool: string, handler: (args: A) => Promise<ReturnType<typeof text>> | ReturnType<typeof text>) =>
     async (args: A) => {
       context.log.info("mcp.call", { tool });
-      return fn(args);
+      return handler(args);
     };
 
   return {
@@ -116,18 +116,20 @@ export function activate(context: PluginContext): McpExports {
           inputSchema: { paper_id: z.number().int().min(1), full_text: z.boolean().optional() },
         },
         logged("get_paper", ({ paper_id, full_text }: { paper_id: number; full_text?: boolean }) => {
-          const p = papers.store.get(paper_id);
-          if (!p) return text(`No paper ${paper_id}.`);
-          const t = full_text ? fulltext.get(paper_id) : undefined;
+          const paper = papers.store.get(paper_id);
+          if (!paper) return text(`No paper ${paper_id}.`);
+          const stored = full_text ? fulltext.get(paper_id) : undefined;
           return text({
             ...paperSummary(paper_id),
-            authors: p.authors.slice(0, 20),
-            abstract: p.abstract,
+            authors: paper.authors.slice(0, 20),
+            abstract: paper.abstract,
             card: card(paper_id) ?? null,
             ...(full_text
               ? {
                   full_text:
-                    t?.status === "ok" ? { source: t.source, text: withinBudget(t.sections, 15_000) } : "not available",
+                    stored?.status === "ok"
+                      ? { source: stored.source, text: withinBudget(stored.sections, 15_000) }
+                      : "not available",
                 }
               : {}),
           });
@@ -162,8 +164,8 @@ export function activate(context: PluginContext): McpExports {
           inputSchema: {},
         },
         logged("get_charter", () => {
-          const c = charters.approved();
-          return text(c ? { version: c.version, ...c.charter } : "No approved charter yet.");
+          const approved = charters.approved();
+          return text(approved ? { version: approved.version, ...approved.charter } : "No approved charter yet.");
         }),
       );
       return server;

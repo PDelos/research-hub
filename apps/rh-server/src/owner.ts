@@ -75,9 +75,9 @@ export function acquireOwner(
     heartbeat: now(),
   };
   const write = () => {
-    const tmp = `${path}.${process.pid}.tmp`;
-    writeFileSync(tmp, JSON.stringify(record), { mode: 0o600 });
-    renameSync(tmp, path);
+    const temporaryPath = `${path}.${process.pid}.tmp`;
+    writeFileSync(temporaryPath, JSON.stringify(record), { mode: 0o600 });
+    renameSync(temporaryPath, path);
   };
   write();
   const timer = setInterval(() => {

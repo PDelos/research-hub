@@ -50,24 +50,24 @@ export function kbProxy(
   allowedHosts: Set<string>,
   mode: "paths" | "assets" = "paths",
 ): RequestHandler {
-  return (req, response, next) => {
-    const path = mode === "assets" ? assetPath(req.url) : viewerPath(req.url);
+  return (request, response, next) => {
+    const path = mode === "assets" ? assetPath(request.url) : viewerPath(request.url);
     if (path === undefined) return next();
-    const why = refusal(req, allowedHosts);
+    const why = refusal(request, allowedHosts);
     if (why)
       return void response.status(403).json({ error: { code: "forbidden", message: `Knowledge base viewer: ${why}` } });
-    const v = viewer();
-    const target = v?.target();
+    const active = viewer();
+    const target = active?.target();
     if (!target) {
       if (mode === "assets") return next();
       return void response
         .status(503)
         .type("html")
-        .send(unavailablePage(v?.status() ?? { state: "disabled", obsidianVersion: "", restarts: 0 }));
+        .send(unavailablePage(active?.status() ?? { state: "disabled", obsidianVersion: "", restarts: 0 }));
     }
-    const headers = { ...req.headers, host: `127.0.0.1:${target.port}` };
+    const headers = { ...request.headers, host: `127.0.0.1:${target.port}` };
     delete headers.authorization;
-    const upstream = http.request({ ...target, path, method: req.method, headers }, (incomingMessage) => {
+    const upstream = http.request({ ...target, path, method: request.method, headers }, (incomingMessage) => {
       response.writeHead(incomingMessage.statusCode ?? 502, incomingMessage.headers);
       incomingMessage.pipe(response);
     });
@@ -79,7 +79,7 @@ export function kbProxy(
           .send(unavailablePage({ state: "crashed", obsidianVersion: "", restarts: 0 }));
       else response.end();
     });
-    req.pipe(upstream);
+    request.pipe(upstream);
   };
 }
 

@@ -31,8 +31,8 @@ export function normalizeArxivId(raw: string | null | undefined): string | undef
 
 /** arXiv DOIs (10.48550/arxiv.<id>) name an arXiv ID too. */
 export function arxivIdFromDoi(doi: string | undefined): string | undefined {
-  const m = doi?.match(/^10\.48550\/arxiv\.(.+)$/);
-  return m ? normalizeArxivId(m[1]) : undefined;
+  const match = doi?.match(/^10\.48550\/arxiv\.(.+)$/);
+  return match ? normalizeArxivId(match[1]) : undefined;
 }
 
 export function normalizePmid(raw: string | number | null | undefined): string | undefined {
@@ -117,9 +117,9 @@ export function cleanText(raw: string | null | undefined): string {
 
 /** A YYYY-MM-DD date from an ISO timestamp or partial date ("2026", "2026-10"), or undefined. */
 export function normalizeDate(raw: string | null | undefined): string | undefined {
-  const m = raw?.trim().match(/^(\d{4})(?:-(\d{2}))?(?:-(\d{2}))?/);
-  if (!m) return undefined;
-  return `${m[1]}-${m[2] ?? "01"}-${m[3] ?? "01"}`;
+  const match = raw?.trim().match(/^(\d{4})(?:-(\d{2}))?(?:-(\d{2}))?/);
+  if (!match) return undefined;
+  return `${match[1]}-${match[2] ?? "01"}-${match[3] ?? "01"}`;
 }
 
 // Words after which a period does not end a sentence.

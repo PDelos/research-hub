@@ -9,9 +9,9 @@ export function engineerRoutes(hub: Hub): Router {
   const router = express.Router();
   router.use("/v1", requireAuth(hub.log));
   const engineer = () => hub.project.plugins.exportsOf<EngineerExports>("rh.engineer");
-  const guard = async <T>(fn: () => T | Promise<T>) => {
+  const guard = async <T>(work: () => T | Promise<T>) => {
     try {
-      return await fn();
+      return await work();
     } catch (error) {
       if (error instanceof EngineerInvalid) throw invalid(error.message);
       throw error;

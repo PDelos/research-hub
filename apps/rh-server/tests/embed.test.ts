@@ -94,17 +94,14 @@ test("a wrong dimension or an error answer fails the call and is recorded as an 
 
 test("the offline fake is deterministic, unit length, and closer for texts sharing words", async () => {
   const fake = new FakeEmbedder(256);
-  const [float32Array, a2, b, c] = await fake.embed([
+  const [left, a2, b, c] = await fake.embed([
     "graph neural network for protein contact prediction",
     "graph neural network for protein contact prediction",
     "graph neural network for single-cell gene regulation",
     "a survey of hospital staffing policies",
   ]);
-  assert.deepEqual([...float32Array], [...a2]);
-  assert.ok(Math.abs(cosine(float32Array, float32Array) - 1) < 1e-5);
-  assert.ok(
-    cosine(float32Array, b) > cosine(float32Array, c),
-    `${cosine(float32Array, b)} > ${cosine(float32Array, c)}`,
-  );
-  assert.ok(cosine(float32Array, b) > 0.3);
+  assert.deepEqual([...left], [...a2]);
+  assert.ok(Math.abs(cosine(left, left) - 1) < 1e-5);
+  assert.ok(cosine(left, b) > cosine(left, c), `${cosine(left, b)} > ${cosine(left, c)}`);
+  assert.ok(cosine(left, b) > 0.3);
 });

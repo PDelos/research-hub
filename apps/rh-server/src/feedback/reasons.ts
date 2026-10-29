@@ -76,21 +76,21 @@ export class ReasonParser {
     }
     this.deps.ledger.record(result, { command: cmd.name, version: cmd.version, extra: { cardId } });
     const kind = (result.answers.reason_kind as ChoiceAnswer).choice;
-    const p = (result.answers.generalizable as NoulAnswer).noul;
+    const probability = (result.answers.generalizable as NoulAnswer).noul;
     const policy = cmd.policy as { candidate_min: number; unclassified_min: number };
-    const status = ruleStatus(p, policy);
+    const status = ruleStatus(probability, policy);
     const db = this.deps.db;
     // Only apply if the reason was not changed meanwhile.
     const changed = db
       .prepare(
         "UPDATE judgments SET reason_kind = ?, rule_probability = ?, rule_status = ? WHERE card_id = ? AND reason = ? AND rule_status = 'pending'",
       )
-      .run(kind, p, status, cardId, reason).changes;
+      .run(kind, probability, status, cardId, reason).changes;
     if (Number(changed) && status === "candidate")
       db.prepare(
         "INSERT INTO rule_candidates (card_id, reason, reason_kind, probability, status, created_at) VALUES (?, ?, ?, ?, 'open', ?) ON CONFLICT (card_id) DO UPDATE SET reason = excluded.reason, reason_kind = excluded.reason_kind, probability = excluded.probability",
-      ).run(cardId, reason, kind, p, nowIso());
-    this.deps.log.info("feedback.reason_parsed", { cardId, kind, generalizable: p, status });
+      ).run(cardId, reason, kind, probability, nowIso());
+    this.deps.log.info("feedback.reason_parsed", { cardId, kind, generalizable: probability, status });
   }
 
   candidates(): {

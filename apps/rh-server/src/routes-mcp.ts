@@ -6,9 +6,9 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import type { Hub } from "./hub.ts";
 import type { McpExports } from "../plugins/rh.mcp/main.ts";
 
-const same = (a: string, b: string) => {
-  const x = Buffer.from(a);
-  const y = Buffer.from(b);
+const same = (left: string, right: string) => {
+  const x = Buffer.from(left);
+  const y = Buffer.from(right);
   return x.length === y.length && timingSafeEqual(x, y);
 };
 

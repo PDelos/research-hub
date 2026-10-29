@@ -8,10 +8,10 @@ import type { Hub } from "./hub.ts";
 
 /** Split a note into frontmatter properties (`key: <JSON or text>`) and the markdown body. */
 export function parseNote(text: string): { properties: Record<string, unknown>; body: string } {
-  const m = text.match(/^---\n([\s\S]*?)\n---\n?/);
-  if (!m) return { properties: {}, body: text };
+  const match = text.match(/^---\n([\s\S]*?)\n---\n?/);
+  if (!match) return { properties: {}, body: text };
   const properties: Record<string, unknown> = {};
-  for (const line of m[1].split("\n")) {
+  for (const line of match[1].split("\n")) {
     const kv = line.match(/^([A-Za-z_][\w-]*):\s*(.*)$/);
     if (!kv) continue;
     try {
@@ -20,16 +20,16 @@ export function parseNote(text: string): { properties: Record<string, unknown>; 
       properties[kv[1]] = kv[2].replace(/^["']|["']$/g, "");
     }
   }
-  return { properties, body: text.slice(m[0].length) };
+  return { properties, body: text.slice(match[0].length) };
 }
 
 export function kbRoutes(hub: Hub): Router {
   const router = express.Router();
   router.use("/v1", requireAuth(hub.log));
-  const p = () => hub.project;
+  const currentProject = () => hub.project;
 
   router.get("/v1/kb/papers", (_request, response) => {
-    const project = p();
+    const project = currentProject();
     const rows = project.db
       .prepare(
         `SELECT r.paper_id, r.card_id, r.status, r.reason AS status_reason, r.created_at, n.stem, c.level, j.reason
@@ -59,7 +59,7 @@ export function kbRoutes(hub: Hub): Router {
   router.get("/v1/kb/notes/:stem", (request, response) => {
     const stem = String(request.params.stem);
     if (!/^[a-z0-9][a-z0-9-]{0,150}$/.test(stem)) throw invalid("stem must be lowercase letters, digits and dashes");
-    const vault = p().vault;
+    const vault = currentProject().vault;
     for (const folder of ["sources", "concepts", "questions"]) {
       const path = `${folder}/${stem}.md`;
       const text = vault.read(path);
@@ -72,12 +72,12 @@ export function kbRoutes(hub: Hub): Router {
   });
 
   router.get("/v1/kb/search", (request, response) => {
-    const q = String(request.query.q ?? "").trim();
-    if (!q) throw invalid("q is required");
+    const query = String(request.query.q ?? "").trim();
+    if (!query) throw invalid("q is required");
     const limit = Math.min(20, Math.max(1, int(request.query.limit, "limit", 8)));
     response.json(
-      p()
-        .kbIndex.search(q, limit)
+      currentProject()
+        .kbIndex.search(query, limit)
         .map(({ path, stem, title, excerpt }) => ({ path, stem, title, excerpt })),
     );
   });

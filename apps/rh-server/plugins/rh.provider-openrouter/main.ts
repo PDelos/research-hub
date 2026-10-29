@@ -52,7 +52,7 @@ export function activate(context: PluginContext): ProviderExports {
       if (host.services.providers.models === models) host.services.providers.models = undefined;
     },
   });
-  const research: ProviderExports["research"] = async (prompt, o = {}) => {
+  const research: ProviderExports["research"] = async (prompt, options = {}) => {
     if (host.offline && !host.options.paperFetch) throw new ResearchUnavailable("offline mode: no web search");
     const model = catalog.forJob("chat").modelId;
     const body = await context.rh.http.json<{
@@ -75,11 +75,14 @@ export function activate(context: PluginContext): ProviderExports {
       },
       body: JSON.stringify({
         model,
-        plugins: [{ id: "web", max_results: o.maxResults ?? 5 }],
+        plugins: [{ id: "web", max_results: options.maxResults ?? 5 }],
         // Short answers from search results: little thinking needed (ignored by models without reasoning).
         reasoning: { effort: "low" },
         usage: { include: true },
-        messages: [...(o.system ? [{ role: "system", content: o.system }] : []), { role: "user", content: prompt }],
+        messages: [
+          ...(options.system ? [{ role: "system", content: options.system }] : []),
+          { role: "user", content: prompt },
+        ],
       }),
     });
     const message = body.choices?.[0]?.message;

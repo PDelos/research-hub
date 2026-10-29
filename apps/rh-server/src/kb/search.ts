@@ -81,8 +81,8 @@ export class KbIndex {
       } catch {
         continue;
       }
-      const k = known.get(path);
-      if (k && Number(k.mtime_ms) === st.mtimeMs && Number(k.size) === st.size) continue;
+      const existing = known.get(path);
+      if (existing && Number(existing.mtime_ms) === st.mtimeMs && Number(existing.size) === st.size) continue;
       this.put(path);
       changed++;
     }
@@ -96,16 +96,16 @@ export class KbIndex {
     return { changed, removed };
   }
 
-  search(query: string, k = 8): KbHit[] {
-    const q = ftsQuery(query);
-    if (!q) return [];
+  search(query: string, limit = 8): KbHit[] {
+    const ftsExpression = ftsQuery(query);
+    if (!ftsExpression) return [];
     return (
       this.deps.db
         .prepare(
           `SELECT path, title, snippet(kb_fts, 2, '**', '**', '…', 14) AS excerpt, bm25(kb_fts) AS score
            FROM kb_fts WHERE kb_fts MATCH ? ORDER BY score, path LIMIT ?`,
         )
-        .all(q, k) as { path: string; title: string; excerpt: string; score: number }[]
+        .all(ftsExpression, limit) as { path: string; title: string; excerpt: string; score: number }[]
     ).map((r) => ({
       path: r.path,
       stem: r.path.split("/").pop()!.replace(/\.md$/, ""),

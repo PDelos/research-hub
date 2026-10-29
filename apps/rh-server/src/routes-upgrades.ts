@@ -11,9 +11,9 @@ export function upgradeRoutes(hub: Hub): Router {
   const router = express.Router();
   router.use("/v1", requireAuth(hub.log));
   const upgrades = () => hub.project.plugins.exportsOf<UpgradesExports>("rh.upgrades");
-  const guard = async <T>(fn: () => T | Promise<T>) => {
+  const guard = async <T>(work: () => T | Promise<T>) => {
     try {
-      return await fn();
+      return await work();
     } catch (error) {
       if (error instanceof UpgradeInvalid) throw invalid(error.message);
       throw error;

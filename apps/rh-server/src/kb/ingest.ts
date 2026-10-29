@@ -232,8 +232,8 @@ export class Ingest {
 
   /** The paper's full text within a budget, when the full-text plugin can get it (v1-6). */
   private fullText?: (paperId: number) => Promise<string | undefined>;
-  setFullText(fn: ((paperId: number) => Promise<string | undefined>) | undefined): void {
-    this.fullText = fn;
+  setFullText(provider: ((paperId: number) => Promise<string | undefined>) | undefined): void {
+    this.fullText = provider;
   }
   /** Full texts given to the librarian, for the number check. */
   private readonly fullTexts = new Map<number, string>();
@@ -468,17 +468,17 @@ export class Ingest {
   }
 }
 
-function toRequest(r: any): KbRequest {
+function toRequest(row: any): KbRequest {
   return {
-    paperId: Number(r.paper_id),
-    cardId: Number(r.card_id),
-    status: r.status,
-    attempts: Number(r.attempts ?? 0),
+    paperId: Number(row.paper_id),
+    cardId: Number(row.card_id),
+    status: row.status,
+    attempts: Number(row.attempts ?? 0),
     nextAttemptAt:
-      r.next_attempt_at === null || r.next_attempt_at === undefined ? undefined : Number(r.next_attempt_at),
-    reason: r.reason ?? undefined,
+      row.next_attempt_at === null || row.next_attempt_at === undefined ? undefined : Number(row.next_attempt_at),
+    reason: row.reason ?? undefined,
     conversationId:
-      r.conversation_id === null || r.conversation_id === undefined ? undefined : Number(r.conversation_id),
-    submissionId: r.submission_id === null || r.submission_id === undefined ? undefined : Number(r.submission_id),
+      row.conversation_id === null || row.conversation_id === undefined ? undefined : Number(row.conversation_id),
+    submissionId: row.submission_id === null || row.submission_id === undefined ? undefined : Number(row.submission_id),
   };
 }

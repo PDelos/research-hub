@@ -63,8 +63,8 @@ export const charterWriterRule: FauxRule = (turn) => {
     const outOfScope = [...(draft.outOfScope ?? [])];
     const concepts = [...(draft.concepts ?? [])];
     for (const a of answers) {
-      const m = a.match(/^(.*?)\s+(?:are|is)\s+out of scope/i);
-      if (m) outOfScope.push(m[1].replace(/^no,?\s*/i, "").trim());
+      const match = a.match(/^(.*?)\s+(?:are|is)\s+out of scope/i);
+      if (match) outOfScope.push(match[1].replace(/^no,?\s*/i, "").trim());
       else if (concepts.length < 30) concepts.push(a.slice(0, 120));
     }
     return call("save_charter_draft", {
@@ -83,11 +83,11 @@ export const deskSearchRule: FauxRule = (turn) => {
   if (turn.sections["charter-writer"] || turn.sections["card-writer"] || turn.sections["librarian"]) return undefined;
   const result = turn.results.find((r) => r.name === "search_papers");
   if (result) return say(result.text);
-  const m = turn.lastUser.match(
+  const match = turn.lastUser.match(
     /\b(?:find|search(?: for)?|look for)\b(?:\s+(?:recent|new))?(?:\s+papers?)?(?:\s+(?:on|about|for))?\s+(.+)/i,
   );
-  if (!m) return undefined;
-  return call("search_papers", { query: m[1].replace(/[?.!]+$/, "").slice(0, 200), limit: 5 });
+  if (!match) return undefined;
+  return call("search_papers", { query: match[1].replace(/[?.!]+$/, "").slice(0, 200), limit: 5 });
 };
 
 /**
@@ -146,13 +146,13 @@ export const deskJudgeRule: FauxRule = (turn) => {
   if (turn.sections["charter-writer"] || turn.sections["card-writer"] || turn.sections["librarian"]) return undefined;
   const result = turn.results.find((r) => r.name === "judge_card");
   if (result) return say(result.text);
-  const m = turn.lastUser.match(
+  const match = turn.lastUser.match(
     /\b(star|upvote|like|downvote|dislike)\s+(?:the\s+)?(?:card\s+)?(first|second|third|fourth|fifth|sixth|seventh|\d+)(?:st|nd|rd|th)?\s*(?:card)?[,.:;-]?\s*(.*)$/i,
   );
-  if (!m) return undefined;
-  const verdict = verdictFrom(m[1]);
-  const position = ORDINALS[m[2].toLowerCase()] ?? Number(m[2]);
-  return call("judge_card", { verdict, position, ...(m[3].trim() ? { reason: m[3].trim() } : {}) });
+  if (!match) return undefined;
+  const verdict = verdictFrom(match[1]);
+  const position = ORDINALS[match[2].toLowerCase()] ?? Number(match[2]);
+  return call("judge_card", { verdict, position, ...(match[3].trim() ? { reason: match[3].trim() } : {}) });
 };
 
 /**
@@ -186,17 +186,17 @@ export const librarianRule: FauxRule = (turn) => {
 /** The offline desk calls a named tool when told to: "use sample_echo {"text": "hi"}" (plugin tools, offline). */
 export const deskToolRule: FauxRule = (turn) => {
   if (turn.sections["charter-writer"] || turn.sections["card-writer"] || turn.sections["librarian"]) return undefined;
-  const m = turn.lastUser.match(/^use\s+([a-z][a-z0-9_]*)\s*(\{.*\})?\s*$/is);
-  if (!m) return undefined;
-  const result = turn.results.find((r) => r.name === m[1]);
+  const match = turn.lastUser.match(/^use\s+([a-z][a-z0-9_]*)\s*(\{.*\})?\s*$/is);
+  if (!match) return undefined;
+  const result = turn.results.find((r) => r.name === match[1]);
   if (result) return say(result.text);
   let args: Record<string, unknown> = {};
   try {
-    args = m[2] ? JSON.parse(m[2]) : {};
+    args = match[2] ? JSON.parse(match[2]) : {};
   } catch {
-    return say(`The arguments for ${m[1]} are not valid JSON.`);
+    return say(`The arguments for ${match[1]} are not valid JSON.`);
   }
-  return call(m[1], args);
+  return call(match[1], args);
 };
 
 /** Default scripted rules for offline mode. */

@@ -93,10 +93,10 @@ export function markdownToSections(md: string): Section[] {
   const sections: Section[] = [];
   let current: Section = { title: "", text: "" };
   for (const line of md.split("\n")) {
-    const h = line.match(/^#{1,2}\s+(.+?)\s*#*\s*$/);
-    if (h) {
+    const heading = line.match(/^#{1,2}\s+(.+?)\s*#*\s*$/);
+    if (heading) {
       if (current.text.trim() || current.title) sections.push(current);
-      current = { title: h[1].replace(/^[\dIVX]+(\.\d+)*\.?\s+/, (m) => m), text: "" };
+      current = { title: heading[1].replace(/^[\dIVX]+(\.\d+)*\.?\s+/, (m) => m), text: "" };
     } else if (!/^<!--.*-->$/.test(line.trim())) current.text += `${line}\n`;
   }
   sections.push(current);
@@ -109,16 +109,16 @@ const NUMBERED = /^((\d{1,2}(\.\d{1,2}){0,2})|([IVX]{1,4}))\.?\s+([A-Z][^.!?]{1,
 
 /** Is this PDF line a section heading? Numbered top-level ("2 Methods", "II. RESULTS") or a known name. */
 export function headingOf(line: string): string | undefined {
-  const t = line.trim();
-  if (t.length > 90 || t.length < 4) return undefined;
-  if (KNOWN_HEADINGS.test(t)) return t;
-  const m = t.match(NUMBERED);
-  if (!m) return undefined;
+  const trimmed = line.trim();
+  if (trimmed.length > 90 || trimmed.length < 4) return undefined;
+  if (KNOWN_HEADINGS.test(trimmed)) return trimmed;
+  const match = trimmed.match(NUMBERED);
+  if (!match) return undefined;
   // Subsections (2.1) stay inside their section; a numbered line ending in a digit is likely a table row.
-  if (m[3] || /\d$/.test(t) || /^0\b/.test(t)) return undefined;
+  if (match[3] || /\d$/.test(trimmed) || /^0\b/.test(trimmed)) return undefined;
   // Affiliations and sentences ("2. Department of Physics, University of …") are not headings.
-  if (/[,@;]/.test(m[5]) || m[5].split(/\s+/).length > 10) return undefined;
-  return t;
+  if (/[,@;]/.test(match[5]) || match[5].split(/\s+/).length > 10) return undefined;
+  return trimmed;
 }
 
 /**

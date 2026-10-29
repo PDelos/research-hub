@@ -109,7 +109,7 @@ export function externalModule(plugin: DiscoveredPlugin, options: ExternalOption
     }
   };
 
-  const call = (fn: number | string, args: unknown[]): Promise<unknown> => {
+  const call = (target: number | string, args: unknown[]): Promise<unknown> => {
     if (stopping || !child?.connected) return Promise.reject(new Error(`${id} is not running`));
     const callId = nextCall++;
     const timeoutMs = options.callTimeoutMs ?? 30_000;
@@ -117,7 +117,7 @@ export function externalModule(plugin: DiscoveredPlugin, options: ExternalOption
       const timer = setTimeout(() => void fail(`did not answer within ${timeoutMs / 1000} s`), timeoutMs);
       timer.unref?.();
       pending.set(callId, { resolve, reject, timer });
-      child!.send({ t: "call", id: callId, fn, args: encode(args) });
+      child!.send({ t: "call", id: callId, fn: target, args: encode(args) });
     });
   };
 
@@ -139,14 +139,14 @@ export function externalModule(plugin: DiscoveredPlugin, options: ExternalOption
       return;
     }
     if (message.t !== "call") return;
-    const fn = typeof message.fn === "number" ? local.get(message.fn) : named[message.fn];
+    const handler = typeof message.fn === "number" ? local.get(message.fn) : named[message.fn];
     try {
-      if (!fn) throw new Error(`${id} may not call ${message.fn}`);
-      const value = await fn(...(decode(message.args) as unknown[]));
+      if (!handler) throw new Error(`${id} may not call ${message.fn}`);
+      const value = await handler(...(decode(message.args) as unknown[]));
       child?.send({ t: "reply", id: message.id, value: encode(value) });
     } catch (error) {
-      const e = error instanceof Error ? error : new Error(String(error));
-      child?.send({ t: "reply", id: message.id, error: { name: e.name, message: e.message } });
+      const failure = error instanceof Error ? error : new Error(String(error));
+      child?.send({ t: "reply", id: message.id, error: { name: failure.name, message: failure.message } });
     }
   };
 

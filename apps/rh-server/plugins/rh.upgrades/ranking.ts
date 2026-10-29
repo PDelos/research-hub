@@ -75,10 +75,10 @@ export interface CandidateVariant {
 
 /** At most 12 variants around the current settings, the ones the analysis points at first. */
 export function rankingGrid(current: SweepSettings, analysis: Analysis): CandidateVariant[] {
-  const d = analysis.disliked;
-  const off = d["off-topic"] ?? 0;
-  const level = (d["too-basic"] ?? 0) + (d["too-advanced"] ?? 0);
-  const trust = d["low-trust"] ?? 0;
+  const disliked = analysis.disliked;
+  const off = disliked["off-topic"] ?? 0;
+  const level = (disliked["too-basic"] ?? 0) + (disliked["too-advanced"] ?? 0);
+  const trust = disliked["low-trust"] ?? 0;
   const out: CandidateVariant[] = [];
   const add = (variant: Variant, why: string, score: number) => out.push({ variant, why, score });
   const clamp = (x: number) => round(Math.min(1, Math.max(0, x)));
