@@ -1,0 +1,32 @@
+{
+  "id": "rh.embedder-local",
+  "version": "1.0.0",
+  "displayName": "Local embedder",
+  "kind": "slot",
+  "topic": "understanding",
+  "slot": "embedder",
+  "description": "Embeds papers with a model stored in this project (e.g. one the engineer fine-tuned on Kaggle), through sentence-transformers. Needs the research-hub:full image (RH_LOCAL_EMBED=on) or an embedding server at RH_LOCAL_EMBED_URL.",
+  "engines": { "research-hub": "^1.0.0" },
+  "main": "main.ts",
+  "activationEvents": ["onExtensionPoint:papers.embedder"],
+  "contributes": {
+    "papers.embedder": [{ "id": "local", "title": "Local model" }],
+    "settings": {
+      "properties": {
+        "model": {
+          "type": "string",
+          "maxLength": 300,
+          "description": "The model folder, relative to the project's data folder (e.g. engineer/models/3)."
+        },
+        "dims": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4096,
+          "default": 0,
+          "description": "Vector size (0: learned from the model)."
+        }
+      }
+    }
+  },
+  "permissions": {}
+}

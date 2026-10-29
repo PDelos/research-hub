@@ -35,16 +35,20 @@ export async function activate(context: PluginContext): Promise<PapersExports> {
   const jev = context.exports["rh.decision-jev"] as DecisionExports;
   const { contributions } = host.services;
 
-  const choice = contributions.activeContribution("papers.embedder", context.settings);
-  if (!choice) throw new Error("no plugin contributing papers.embedder is enabled");
-  const provider = await host.exportsOf<EmbedderExports>(choice.pluginId);
-  /** Delegates to the provider's current model, so a change of model applies without a restart. */
+  /** The active embedder plugin (its setting `papers.embedder`); a change applies live (v1-8). */
+  const resolveProvider = async () => {
+    const choice = contributions.activeContribution("papers.embedder", context.settings);
+    if (!choice) throw new Error("no plugin contributing papers.embedder is enabled");
+    return { pluginId: choice.pluginId, provider: await host.exportsOf<EmbedderExports>(choice.pluginId) };
+  };
+  let active = await resolveProvider();
+  /** Delegates to the active provider's current model, so a change of model or plugin applies without a restart. */
   const delegating = (ledger: EmbeddingLedger): Embedder => {
     let cache: { key: string; embedder: Embedder } | undefined;
     const current = () => {
-      const { model, dims } = provider.config();
-      const key = `${model}:${dims}`;
-      if (cache?.key !== key) cache = { key, embedder: provider.createEmbedder({ ledger }) };
+      const { model, dims } = active.provider.config();
+      const key = `${active.pluginId}:${model}:${dims}`;
+      if (cache?.key !== key) cache = { key, embedder: active.provider.createEmbedder({ ledger }) };
       return cache.embedder;
     };
     return {
@@ -88,6 +92,12 @@ export async function activate(context: PluginContext): Promise<PapersExports> {
   });
   context.subscriptions.push({ dispose: () => papers.close() });
   // A new embedder (approved upgrade, settings): resize the vector tables if needed, drop the old vectors, re-embed.
+  context.onSettingsChange(async () => {
+    const next = await resolveProvider();
+    if (next.pluginId === active.pluginId) return;
+    active = next;
+    context.rh.events.emit("embedder.changed", next.provider.config());
+  });
   context.rh.events.on("embedder.changed", () => {
     if (papers.vectors.syncModel()) context.log.info("papers.embedder_changed", { model: papers.vectors.model });
     papers.start();

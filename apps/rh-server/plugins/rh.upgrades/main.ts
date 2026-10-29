@@ -391,7 +391,7 @@ export function activate(context: PluginContext): UpgradesExports {
     }));
   };
   const embedder = async () => {
-    const choice = host.services.contributions.activeContribution("papers.embedder", {});
+    const choice = host.services.contributions.activeContribution("papers.embedder", host.settingsOf("rh.papers"));
     return host.exportsOf<EmbedderExports>(choice?.pluginId ?? "rh.embedder-openrouter");
   };
   const embedderRun = async (runId: number): Promise<Outcome> => {

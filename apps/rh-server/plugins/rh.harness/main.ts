@@ -303,12 +303,17 @@ export async function activate(context: PluginContext): Promise<HarnessExports> 
       if (slotId === "embedder") {
         const model = candidate.model;
         const dims = candidate.dims;
-        if (model !== undefined && (typeof model !== "string" || !/^[a-z0-9-]+\/[\w.:-]+$/i.test(model)))
+        const local = candidate.provider === "local";
+        if (local && (typeof model !== "string" || !model))
+          throw new BenchmarkInvalid("a local candidate needs model (a folder inside the data folder)");
+        if (!local && model !== undefined && (typeof model !== "string" || !/^[a-z0-9-]+\/[\w.:-]+$/i.test(model)))
           throw new BenchmarkInvalid("model must be an OpenRouter model id like google/gemini-embedding-2");
         if (dims !== undefined && (!Number.isInteger(dims) || (dims as number) < 32 || (dims as number) > 4096))
           throw new BenchmarkInvalid("dims must be a whole number from 32 to 4096");
-        const choice = host.services.contributions.activeContribution("papers.embedder", {});
-        const provider = await host.exportsOf<EmbedderExports>(choice?.pluginId ?? "rh.embedder-openrouter");
+        const choice = host.services.contributions.activeContribution("papers.embedder", host.settingsOf("rh.papers"));
+        const provider = await host.exportsOf<EmbedderExports>(
+          local ? "rh.embedder-local" : (choice?.pluginId ?? "rh.embedder-openrouter"),
+        );
         const embedder = provider.createEmbedder({
           ledger: papers.embeddingLedger,
           ...(typeof model === "string" ? { model } : {}),
@@ -326,9 +331,10 @@ export async function activate(context: PluginContext): Promise<HarnessExports> 
           "embedder",
           // The model asked for (offline, the fake embedder stands in for it).
           {
-            model: typeof model === "string" ? model : embedder.model,
+            model: typeof model === "string" ? (local ? `local/${model}` : model) : embedder.model,
             dims: embedder.dims,
             ...(model ? { candidate: true } : {}),
+            ...(local ? { provider: "local" } : {}),
           },
           { tasks, value, label: value === null ? "no result" : `nDCG@10 ${value.toFixed(3)}` },
           costSince(started),

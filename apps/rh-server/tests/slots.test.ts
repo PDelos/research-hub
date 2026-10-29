@@ -25,6 +25,7 @@ test("every built-in plugin is classified; core plugins are required; slot plugi
   assert.deepEqual(kinds("slot"), [
     "rh.converter-docling",
     "rh.converter-pdf",
+    "rh.embedder-local",
     "rh.embedder-openrouter",
     "rh.provider-openrouter",
   ]);
@@ -67,7 +68,7 @@ test("the slot catalog lists each slot with its active implementation, alternati
     assert.match(embedder.active.name, /dimensions/);
     assert.equal(embedder.preset?.title, "SCIDOCS, LitSearch, your stars");
     assert.equal(embedder.last, null);
-    assert.deepEqual(embedder.alternatives, []);
+    assert.deepEqual(embedder.alternatives, [{ pluginId: "rh.embedder-local", name: "Local embedder" }]);
     assert.equal(slots.find((s) => s.id === "kb-search")!.preset, null);
     assert.equal(slots.find((s) => s.id === "ranking")!.active.detail?.cardsPerSweep, 7);
     const converter = slots.find((s) => s.id === "converter")!;

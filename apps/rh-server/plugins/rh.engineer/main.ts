@@ -15,6 +15,9 @@ import {
 import type { CharterExports } from "../rh.charter/main.ts";
 import type { ProviderExports } from "../rh.provider-openrouter/main.ts";
 import type { SourceExports } from "../rh.papers/main.ts";
+import type { HarnessExports } from "../rh.harness/main.ts";
+import type { LocalEmbedderExports } from "../rh.embedder-local/main.ts";
+import { finetuneBuilder } from "./finetune-builder.ts";
 
 export const ENGINEER_ASSESS_MARKER = "engineer-assess";
 export const IDEA_KINDS = ["paper-source", "embedder-finetune", "other"] as const;
@@ -294,6 +297,18 @@ export function activate(context: PluginContext): EngineerExports {
     throw new EngineerInvalid(`the plugin did not pass its test in ${maxAttempts()} attempts: ${feedback}`);
   });
   const hostManage = host.manage;
+  builders.set(
+    "embedder-finetune",
+    finetuneBuilder({
+      db,
+      rh,
+      dataDir: host.dir,
+      project: host.name,
+      charter: () => charters.approved()?.charter,
+      harness: context.exports["rh.harness"] as HarnessExports,
+      local: () => host.exportsOf<LocalEmbedderExports>("rh.embedder-local"),
+    }),
+  );
 
   const running = new Map<number, Promise<void>>();
   const runInBackground = (id: number, work: () => Promise<void>) => {
@@ -358,8 +373,20 @@ export function activate(context: PluginContext): EngineerExports {
     },
     async enable(id) {
       const current = idea(id);
-      if (current.stage !== "proposed" || !current.pluginId)
-        throw new EngineerInvalid(`idea ${id} has no plugin waiting`);
+      if (current.stage !== "proposed") throw new EngineerInvalid(`idea ${id} has nothing waiting`);
+      if (current.assessment?.kind === "embedder-finetune") {
+        // Switch the Embedder slot to the fine-tuned model: two undoable settings; papers re-embed in the background.
+        const { model, dims } = current.numbers as { model: string; dims: number };
+        await host.configure("rh.embedder-local", { model, dims }, `proposal:engineer-${id}`);
+        await host.configure("rh.papers", { "papers.embedder": "local" }, `proposal:engineer-${id}`);
+        update(id, { stage: "installed" });
+        say(
+          id,
+          `Switched the embedder to the fine-tuned model (${model}); the papers are re-embedded in the background.`,
+        );
+        return idea(id);
+      }
+      if (!current.pluginId) throw new EngineerInvalid(`idea ${id} has no plugin waiting`);
       await hostManage.setEnabled(current.pluginId, true, "user");
       update(id, { stage: "installed" });
       say(id, `Enabled ${current.pluginId}.`);

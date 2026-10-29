@@ -9,6 +9,7 @@ export const BUILTIN_MODULES: Record<string, () => Promise<PluginModule>> = {
   "rh.decision-jev": () => import("../../plugins/rh.decision-jev/main.ts") as Promise<PluginModule>,
   "rh.digest": () => import("../../plugins/rh.digest/main.ts") as Promise<PluginModule>,
   "rh.desk": () => import("../../plugins/rh.desk/main.ts") as Promise<PluginModule>,
+  "rh.embedder-local": () => import("../../plugins/rh.embedder-local/main.ts") as Promise<PluginModule>,
   "rh.embedder-openrouter": () => import("../../plugins/rh.embedder-openrouter/main.ts") as Promise<PluginModule>,
   "rh.engineer": () => import("../../plugins/rh.engineer/main.ts") as Promise<PluginModule>,
   "rh.feedback": () => import("../../plugins/rh.feedback/main.ts") as Promise<PluginModule>,

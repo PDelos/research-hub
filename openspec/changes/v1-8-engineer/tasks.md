@@ -5,8 +5,8 @@
 
 ## 2. Fine-tuning
 
-- [ ] 2.1 Kaggle runner and the training script with inlined data; verify with a fake Kaggle API
-- [ ] 2.2 `rh.embedder-local`, live provider switching in rh.papers, harness local candidates, proposal; verify with a fake embedding server
+- [x] 2.1 Kaggle runner and the training script with inlined data; verify with a fake Kaggle API
+- [x] 2.2 `rh.embedder-local`, live provider switching in rh.papers, harness local candidates, proposal; verify with a fake embedding server
 
 ## 3. API, UI, image
 
