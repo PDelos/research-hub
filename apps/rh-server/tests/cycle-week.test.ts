@@ -32,11 +32,11 @@ test("a simulated week runs 7 sweeps, 7 nightly runs and 1 digest, each once, wi
       paperFetch: arxivOnlyFetch(fakePapers(10)),
     },
   });
-  const p = server.hub.project;
-  p.brief.write("# Protein LMs");
-  p.charters.saveDraft(validateCharter(sampleCharter()), "agent");
-  p.charters.approve();
-  const s = p.scheduler;
+  const projectRuntime = server.hub.project;
+  projectRuntime.brief.write("# Protein LMs");
+  projectRuntime.charters.saveDraft(validateCharter(sampleCharter()), "agent");
+  projectRuntime.charters.approve();
+  const s = projectRuntime.scheduler;
   const runs = () => s.runs(500);
   const settled = async (slot: string) => {
     await until(
@@ -44,8 +44,8 @@ test("a simulated week runs 7 sweeps, 7 nightly runs and 1 digest, each once, wi
       30_000,
       slot,
     );
-    const sweep = p.sweeps.list(1)[0];
-    if (slot.startsWith("sweep:") && sweep) await p.sweeps.settled(sweep.id, 30_000);
+    const sweep = projectRuntime.sweeps.list(1)[0];
+    if (slot.startsWith("sweep:") && sweep) await projectRuntime.sweeps.settled(sweep.id, 30_000);
   };
   try {
     // Day 0 (Sunday the 18th, evening): the cycle starts; its earlier slots are not part of the week.
@@ -82,7 +82,7 @@ test("a simulated week runs 7 sweeps, 7 nightly runs and 1 digest, each once, wi
     const digests = await server.client.digests();
     const w43 = digests.find((d) => d.week === "2026-W43")!;
     const digest = await server.client.digest(w43.id);
-    const weekSweeps = p.sweeps
+    const weekSweeps = projectRuntime.sweeps
       .list(50)
       .filter((sw) => week.some((r) => r.kind === "sweep" && r.id === sw.scheduledRunId));
     assert.equal(weekSweeps.length, 7);
@@ -108,12 +108,12 @@ test("a simulated week runs 7 sweeps, 7 nightly runs and 1 digest, each once, wi
 
     // A comment is stored and shown in the next digest; it is also an event for later plugins.
     const events: unknown[] = [];
-    p.plugins.services.events.on("digest.comment", (e) => void events.push(e));
+    projectRuntime.plugins.services.events.on("digest.comment", (e) => void events.push(e));
     await server.client.commentDigest(w43.id, "judgments", "too many reviews, more methods papers");
     await assert.rejects(server.client.commentDigest(w43.id, "nonsense" as never, "x"), /section must be one of/);
     await assert.rejects(server.client.commentDigest(9999, "general", "x"), /No digest 9999/);
     assert.equal(events.length, 1);
-    const next = await (await p.plugins.exportsOf<DigestExports>("rh.digest")).buildDigest();
+    const next = await (await projectRuntime.plugins.exportsOf<DigestExports>("rh.digest")).buildDigest();
     assert.deepEqual(
       next.lastComments.map((c) => [c.section, c.text]),
       [["judgments", "too many reviews, more methods papers"]],
@@ -133,15 +133,15 @@ test("the digest lists the week's judgments, precision, knowledge-base notes and
       paperFetch: arxivOnlyFetch(fakePapers(10)),
     },
   });
-  const p = server.hub.project;
-  p.brief.write("# Protein LMs");
-  p.charters.saveDraft(validateCharter(sampleCharter()), "agent");
-  p.charters.approve();
-  p.syncVault();
+  const projectRuntime = server.hub.project;
+  projectRuntime.brief.write("# Protein LMs");
+  projectRuntime.charters.saveDraft(validateCharter(sampleCharter()), "agent");
+  projectRuntime.charters.approve();
+  projectRuntime.syncVault();
   try {
-    p.scheduler.trigger("sweep");
-    await until(() => p.sweeps.list(1).length === 1, 10_000, "sweep");
-    await p.sweeps.settled(p.sweeps.list(1)[0].id, 30_000);
+    projectRuntime.scheduler.trigger("sweep");
+    await until(() => projectRuntime.sweeps.list(1).length === 1, 10_000, "sweep");
+    await projectRuntime.sweeps.settled(projectRuntime.sweeps.list(1)[0].id, 30_000);
     const cards = (await server.client.cards()).groups[0].cards;
     await server.client.judge(cards[0].id, "star", "foundational");
     await server.client.judge(cards[1].id, "up");
@@ -149,7 +149,7 @@ test("the digest lists the week's judgments, precision, knowledge-base notes and
     await until(async () => (await server.client.kbPapers()).some((k) => k.status === "done"), 30_000, "note written");
     await server.client.setPluginEnabled("rh.source-europepmc", false);
 
-    const digest = await (await p.plugins.exportsOf<DigestExports>("rh.digest")).buildDigest();
+    const digest = await (await projectRuntime.plugins.exportsOf<DigestExports>("rh.digest")).buildDigest();
     assert.deepEqual(
       [digest.judgments.star, digest.judgments.up, digest.judgments.down, digest.judgments.total],
       [1, 1, 1, 3],
@@ -161,7 +161,7 @@ test("the digest lists the week's judgments, precision, knowledge-base notes and
     assert.ok(digest.changes.some((c) => c.message === "disable rh.source-europepmc" && c.actor === "user"));
     assert.equal(digest.cycle.sweeps.length, 1);
     // Building the digest made no model call.
-    const generations = p.db
+    const generations = projectRuntime.db
       .prepare("SELECT COUNT(*) n FROM generations WHERE started_at >= ?")
       .get(Date.parse(digest.to)) as {
       n: number;

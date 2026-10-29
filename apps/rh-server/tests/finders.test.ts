@@ -99,10 +99,10 @@ test("a review credits its finder, proposes level up and a taste rule; approvals
       paperFetch: arxivOnlyFetch(papers),
     },
   });
-  const p = server.hub.project;
+  const projectRuntime = server.hub.project;
   try {
-    p.brief.write("# x");
-    p.charters.saveDraft(
+    projectRuntime.brief.write("# x");
+    projectRuntime.charters.saveDraft(
       validateCharter(
         sampleCharter({
           questions: ["How is translation measured?", "Which trials matter?", "What is missing?"].map((text) => ({
@@ -112,22 +112,22 @@ test("a review credits its finder, proposes level up and a taste rule; approvals
       ),
       "agent",
     );
-    p.charters.approve();
-    await p.plugins.kernel.configure("rh.sweep", { cardsPerSweep: 12, explorationPicks: 0 });
+    projectRuntime.charters.approve();
+    await projectRuntime.plugins.kernel.configure("rh.sweep", { cardsPerSweep: 12, explorationPicks: 0 });
     const sweep = async () => {
-      const n = p.sweeps.list().length;
-      p.scheduler.trigger("sweep");
-      await until(() => p.sweeps.list().length === n + 1, 10_000, "sweep");
-      await p.sweeps.settled(p.sweeps.list(1)[0].id, 30_000);
+      const n = projectRuntime.sweeps.list().length;
+      projectRuntime.scheduler.trigger("sweep");
+      await until(() => projectRuntime.sweeps.list().length === n + 1, 10_000, "sweep");
+      await projectRuntime.sweeps.settled(projectRuntime.sweeps.list(1)[0].id, 30_000);
     };
     await sweep();
     for (const group of (await server.client.cards(200)).groups)
       for (const card of group.cards)
         await server.client.judge(card.id, card.paper.title.startsWith("Ribosome") ? "star" : "down");
     // Level up by the "too basic" route: the eight 👎 are marked too basic.
-    p.db.exec("UPDATE judgments SET reason_kind = 'too-basic' WHERE verdict = 'down'");
-    const card = p.cards.list()[1];
-    p.db
+    projectRuntime.db.exec("UPDATE judgments SET reason_kind = 'too-basic' WHERE verdict = 'down'");
+    const card = projectRuntime.cards.list()[1];
+    projectRuntime.db
       .prepare(
         "INSERT INTO rule_candidates (card_id, reason, reason_kind, probability, status, created_at) VALUES (?, ?, 'off-topic', 0.9, 'open', ?)",
       )
@@ -136,21 +136,23 @@ test("a review credits its finder, proposes level up and a taste rule; approvals
     // History for rising topics: an older sweep (30 days ago) of 20 papers about something else.
     const old = new Date(Date.now() - 30 * 86_400_000).toISOString();
     const oldSweep = Number(
-      p.db
+      projectRuntime.db
         .prepare("INSERT INTO sweeps (trigger, status, phase, started_at) VALUES ('manual', 'completed', 'cards', ?)")
         .run(old).lastInsertRowid,
     );
     for (let i = 0; i < 20; i++) {
-      const id = p.papers.store.upsert({
+      const id = projectRuntime.papers.store.upsert({
         source: "arxiv",
         externalId: `old-${i}`,
         ids: { arxiv: `2601.${10000 + i}` },
         title: `Translation elongation kinetics ${i}`,
         authors: [],
       } as never).id;
-      p.db.prepare("INSERT INTO sweep_papers (sweep_id, paper_id, status) VALUES (?, ?, 'rejected')").run(oldSweep, id);
+      projectRuntime.db
+        .prepare("INSERT INTO sweep_papers (sweep_id, paper_id, status) VALUES (?, ?, 'rejected')")
+        .run(oldSweep, id);
     }
-    const knowledge = await p.plugins.exportsOf<KnowledgeExports>("rh.knowledge");
+    const knowledge = await projectRuntime.plugins.exportsOf<KnowledgeExports>("rh.knowledge");
     const review = await knowledge.review();
     assert.ok(
       review.report.leads?.some((l) => l.finder === "rising-topics"),
@@ -165,19 +167,19 @@ test("a review credits its finder, proposes level up and a taste rule; approvals
     assert.equal(rule.change.rule, "Avoid: no clinical trials");
 
     await knowledge.approve(level.id);
-    assert.equal(p.plugins.kernel.settings("rh.sweep").level, "advanced");
+    assert.equal(projectRuntime.plugins.kernel.settings("rh.sweep").level, "advanced");
     await knowledge.approve(rule.id);
-    assert.deepEqual(p.plugins.kernel.settings("rh.sweep").tasteRules, ["Avoid: no clinical trials"]);
+    assert.deepEqual(projectRuntime.plugins.kernel.settings("rh.sweep").tasteRules, ["Avoid: no clinical trials"]);
     assert.equal(
-      (p.db.prepare("SELECT status FROM rule_candidates WHERE card_id = ?").get(card.id) as any).status,
+      (projectRuntime.db.prepare("SELECT status FROM rule_candidates WHERE card_id = ?").get(card.id) as any).status,
       "accepted",
     );
     await knowledge.undo(rule.id);
-    assert.deepEqual(p.plugins.kernel.settings("rh.sweep").tasteRules, []);
+    assert.deepEqual(projectRuntime.plugins.kernel.settings("rh.sweep").tasteRules, []);
 
     await knowledge.approve(add.id);
     // A liked card matched to the new question after its approval counts for the finder.
-    p.db
+    projectRuntime.db
       .prepare(
         "UPDATE cards SET matched_question = 'Q4', created_at = ? WHERE id = (SELECT card_id FROM judgments WHERE verdict = 'star' LIMIT 1)",
       )

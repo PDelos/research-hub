@@ -12,8 +12,8 @@ function watch(server: TestServer) {
     try {
       for await (const f of server.client.stream(abort.signal) as AsyncGenerator<Frame>)
         if (f.type === "agent.batch") events.push(...f.events);
-    } catch (e) {
-      if (!abort.signal.aborted) throw e;
+    } catch (error) {
+      if (!abort.signal.aborted) throw error;
     }
   })();
   return { events, stop: async () => (abort.abort(), done) };

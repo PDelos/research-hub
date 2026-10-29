@@ -180,13 +180,13 @@ export function activate(context: PluginContext): EngineerExports {
     let notes = "(web research unavailable)";
     let citations: Assessment["citations"] = [];
     try {
-      const r = await provider.research(
+      const researchResult = await provider.research(
         `A self-hosted research assistant for a scientist could add this: "${text}". Search the web: does it exist and work (for an API: is it free, its base URL, its search endpoint and response format; for fine-tuning: is it likely to help on a few hundred labelled papers)? Answer in at most 10 short lines.`,
         { maxResults: 5 },
       );
-      charge(id, r.costUsd);
-      notes = r.text.slice(0, 4_000);
-      citations = r.citations.slice(0, 8);
+      charge(id, researchResult.costUsd);
+      notes = researchResult.text.slice(0, 4_000);
+      citations = researchResult.citations.slice(0, 8);
     } catch (error) {
       say(id, `Web research unavailable: ${error instanceof Error ? error.message : String(error)}`);
     }

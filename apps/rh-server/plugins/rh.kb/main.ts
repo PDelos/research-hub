@@ -93,10 +93,10 @@ export function activate(context: PluginContext): KbExports {
     switching = switching.then(async () => {
       await contributions.contributionsTo("kb.viewer", { activate: true });
       const active = activeViewer();
-      for (const [id, impl] of viewers)
+      for (const [id, implementation] of viewers)
         // A viewer that cannot run here is still asked to start, so it reports why (e.g. no Ignis in this image).
-        if (id === active?.id || !impl.usable().ok) await impl.show();
-        else await impl.hide(`the ${active?.title ?? "selected"} viewer is active`);
+        if (id === active?.id || !implementation.usable().ok) await implementation.show();
+        else await implementation.hide(`the ${active?.title ?? "selected"} viewer is active`);
     });
     switching = switching.catch((error) => context.log.warn("kb.viewer_switch_failed", { error: String(error) }));
     return switching;
@@ -113,11 +113,11 @@ export function activate(context: PluginContext): KbExports {
       ingest.pickUp();
       void applyViewer();
     },
-    registerViewer(id, impl) {
-      viewers.set(id, impl);
+    registerViewer(id, implementation) {
+      viewers.set(id, implementation);
       // A viewer enabled while the project runs is shown or paused at once.
       void applyViewer();
-      return { dispose: () => void (viewers.get(id) === impl && viewers.delete(id)) };
+      return { dispose: () => void (viewers.get(id) === implementation && viewers.delete(id)) };
     },
     activeViewer,
     kbViewer() {
@@ -139,7 +139,7 @@ export function activate(context: PluginContext): KbExports {
     },
     agentExtensions: [kbTools(() => ({ vault, index: kbIndex }))],
     separateExtensions: [ingest.extension],
-    attach: (harness, ctx) => ingest.attach(harness, ctx),
+    attach: (harness, context) => ingest.attach(harness, context),
     ready() {
       ingest.pickUp();
       kbIndex.start();

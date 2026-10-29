@@ -22,12 +22,12 @@ async function project(kbViewer: Record<string, unknown>) {
     dataDir: t.dir,
     hub: { ticker: false, kbViewer: { dir: FAKE, restartDelays: [200], ...kbViewer } },
   });
-  const p = server.hub.project;
-  p.brief.write("# x");
-  p.charters.saveDraft(validateCharter(sampleCharter()), "agent");
-  p.charters.approve();
-  p.syncVault();
-  return { server, p, dir: t.dir, done: async () => (await server.stop(), t.cleanup()) };
+  const projectRuntime = server.hub.project;
+  projectRuntime.brief.write("# x");
+  projectRuntime.charters.saveDraft(validateCharter(sampleCharter()), "agent");
+  projectRuntime.charters.approve();
+  projectRuntime.syncVault();
+  return { server, p: projectRuntime, dir: t.dir, done: async () => (await server.stop(), t.cleanup()) };
 }
 
 const state = (p: ProjectRuntime) => p.kbViewer.status().state;

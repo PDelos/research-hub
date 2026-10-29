@@ -18,9 +18,9 @@ test("5.1 daily and weekly slots in UTC", () => {
   assert.equal(dailySlot(at("2026-10-23T05:59:00Z"), "06:00", "UTC").key, "sweep:2026-10-22");
   assert.equal(dailySlot(at("2026-10-23T10:00:00Z"), "06:00", "UTC", 2).key, "sweep:2026-10-21");
   // Friday 2026-10-23: the latest Sunday 07:00 slot is 2026-10-18, ISO week 42.
-  const w = weeklySlot(at("2026-10-23T10:00:00Z"), "sun", "07:00", "UTC");
-  assert.equal(w.key, "review:2026-W42");
-  assert.equal(w.at, at("2026-10-18T07:00:00Z"));
+  const slot = weeklySlot(at("2026-10-23T10:00:00Z"), "sun", "07:00", "UTC");
+  assert.equal(slot.key, "review:2026-W42");
+  assert.equal(slot.at, at("2026-10-18T07:00:00Z"));
   assert.equal(weeklySlot(at("2026-10-18T06:59:00Z"), "sun", "07:00", "UTC").key, "review:2026-W41");
 });
 
@@ -175,12 +175,12 @@ test("5.4 catch-up, charter not approved, and paused slots", async () => {
   }
   const draftOnly = await startTestServer({ hub: { ticker: false } });
   try {
-    const p = draftOnly.hub.project;
-    p.brief.write("# x");
-    p.charters.saveDraft(validateCharter(sampleCharter()), "agent");
-    p.scheduler.setSchedule({ review: { enabled: false }, nightly: { enabled: false } });
+    const projectRuntime = draftOnly.hub.project;
+    projectRuntime.brief.write("# x");
+    projectRuntime.charters.saveDraft(validateCharter(sampleCharter()), "agent");
+    projectRuntime.scheduler.setSchedule({ review: { enabled: false }, nightly: { enabled: false } });
     assert.deepEqual(
-      p.scheduler.tick(at("2026-10-23T06:00:30Z")).map((r) => [r.status, r.reason]),
+      projectRuntime.scheduler.tick(at("2026-10-23T06:00:30Z")).map((r) => [r.status, r.reason]),
       [["skipped", "charter not approved"]],
     );
   } finally {
@@ -193,12 +193,12 @@ test("5.5 + 5.6 manual runs never take the scheduled slot; one active run per ki
   try {
     const s = server.hub.project.scheduler;
     s.setSchedule({ review: { enabled: false }, nightly: { enabled: false } });
-    const res = await fetch(`${server.url}/v1/runs/sweep`, {
+    const response = await fetch(`${server.url}/v1/runs/sweep`, {
       method: "POST",
       headers: { authorization: `Bearer ${TOKEN}` },
     });
-    assert.equal(res.status, 202);
-    assert.equal(((await res.json()) as any).trigger, "manual");
+    assert.equal(response.status, 202);
+    assert.equal(((await response.json()) as any).trigger, "manual");
     assert.deepEqual(
       s.tick(at("2026-10-23T06:00:30Z")).map((r) => [r.slot, r.status]),
       [["sweep:2026-10-23", "requested"]],

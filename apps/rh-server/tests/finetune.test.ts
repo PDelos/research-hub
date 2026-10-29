@@ -93,11 +93,11 @@ test("the Kaggle runner pushes a private GPU script, waits for COMPLETE and list
 
 test("the engineer fine-tunes an embedder on Kaggle, benchmarks it locally, and Enable switches the embedder live", async () => {
   // The fake embedding server: texts about ribosomes and the first research question point the same way.
-  const embedServer = createServer((req, res) => {
-    if (req.url === "/health") return void res.end("{}");
+  const embedServer = createServer((request, response) => {
+    if (request.url === "/health") return void response.end("{}");
     let body = "";
-    req.on("data", (d) => (body += d));
-    req.on("end", () => {
+    request.on("data", (d) => (body += d));
+    request.on("end", () => {
       const { texts } = JSON.parse(body) as { texts: string[] };
       const vectors = texts.map((t, i) => {
         const near = /Ribosome|transfer to structure/.test(t);
@@ -107,7 +107,7 @@ test("the engineer fine-tunes an embedder on Kaggle, benchmarks it locally, and 
         const n = Math.hypot(...v) || 1;
         return v.map((x) => x / n);
       });
-      res.end(JSON.stringify({ vectors }));
+      response.end(JSON.stringify({ vectors }));
     });
   });
   await new Promise<void>((r) => embedServer.listen(0, "127.0.0.1", r));
@@ -147,23 +147,23 @@ test("the engineer fine-tunes an embedder on Kaggle, benchmarks it locally, and 
           : arxivOnlyFetch(batches[batch])(input, init))) as typeof fetch,
     },
   });
-  const p = server.hub.project;
+  const projectRuntime = server.hub.project;
   try {
-    p.brief.write("# x");
-    p.charters.saveDraft(validateCharter(sampleCharter()), "agent");
-    p.charters.approve();
-    await p.plugins.kernel.configure("rh.sweep", { cardsPerSweep: 12, explorationPicks: 0 });
+    projectRuntime.brief.write("# x");
+    projectRuntime.charters.saveDraft(validateCharter(sampleCharter()), "agent");
+    projectRuntime.charters.approve();
+    await projectRuntime.plugins.kernel.configure("rh.sweep", { cardsPerSweep: 12, explorationPicks: 0 });
     for (const b of [0, 1]) {
       batch = b;
-      p.db.exec("DELETE FROM metadata_cache");
-      p.scheduler.trigger("sweep");
-      await until(() => p.sweeps.list().length === b + 1, 10_000, "sweep");
-      await p.sweeps.settled(p.sweeps.list(1)[0].id, 30_000);
+      projectRuntime.db.exec("DELETE FROM metadata_cache");
+      projectRuntime.scheduler.trigger("sweep");
+      await until(() => projectRuntime.sweeps.list().length === b + 1, 10_000, "sweep");
+      await projectRuntime.sweeps.settled(projectRuntime.sweeps.list(1)[0].id, 30_000);
     }
     for (const group of (await server.client.cards(200)).groups)
       for (const c of group.cards) await server.client.judge(c.id, "star");
     // Decoys sharing the question's words: the offline embedder ranks them high, the fine-tuned one does not.
-    const { papers: store } = await p.plugins.exportsOf<PapersExports>("rh.papers");
+    const { papers: store } = await projectRuntime.plugins.exportsOf<PapersExports>("rh.papers");
     for (let i = 0; i < 30; i++)
       store.store.upsert({
         source: "openalex",
@@ -174,7 +174,7 @@ test("the engineer fine-tunes an embedder on Kaggle, benchmarks it locally, and 
         authors: [],
       } as never);
 
-    const engineer = await p.plugins.exportsOf<EngineerExports>("rh.engineer");
+    const engineer = await projectRuntime.plugins.exportsOf<EngineerExports>("rh.engineer");
     const idea = engineer.propose("Try fine-tuning the embedder on my stars");
     assert.equal((await engineer.settled(idea.id)).assessment!.kind, "embedder-finetune");
     engineer.build(idea.id);
@@ -190,8 +190,8 @@ test("the engineer fine-tunes an embedder on Kaggle, benchmarks it locally, and 
     assert.match(pushed.text, /MultipleNegativesRankingLoss/);
 
     await engineer.enable(idea.id);
-    assert.equal(p.plugins.kernel.settings("rh.papers")["papers.embedder"], "local");
-    const { papers } = await p.plugins.exportsOf<PapersExports>("rh.papers");
+    assert.equal(projectRuntime.plugins.kernel.settings("rh.papers")["papers.embedder"], "local");
+    const { papers } = await projectRuntime.plugins.exportsOf<PapersExports>("rh.papers");
     await until(() => papers.vectors.model === `local/engineer/${idea.id}/model`, 10_000, "embedder switched");
     await until(() => papers.vectors.pending() === 0, 20_000, "re-embedded");
   } finally {
@@ -205,11 +205,11 @@ test("the engineer fine-tunes an embedder on Kaggle, benchmarks it locally, and 
 test("without a Kaggle token the fine-tune stops and says what to set", async () => {
   const server = await startTestServer({ hub: { fauxRules: [engineerRule] } });
   try {
-    const p = server.hub.project;
-    p.brief.write("# x");
-    p.charters.saveDraft(validateCharter(sampleCharter()), "agent");
-    p.charters.approve();
-    const engineer = await p.plugins.exportsOf<EngineerExports>("rh.engineer");
+    const projectRuntime = server.hub.project;
+    projectRuntime.brief.write("# x");
+    projectRuntime.charters.saveDraft(validateCharter(sampleCharter()), "agent");
+    projectRuntime.charters.approve();
+    const engineer = await projectRuntime.plugins.exportsOf<EngineerExports>("rh.engineer");
     const idea = engineer.propose("Try fine-tuning the embedder on my stars");
     await engineer.settled(idea.id);
     engineer.build(idea.id);

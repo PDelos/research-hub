@@ -191,14 +191,14 @@ export function rankScore(
     levelFit: number;
     freshness: number;
   },
-  w: RankWeights = DEFAULT_RANK_WEIGHTS,
+  rankWeights: RankWeights = DEFAULT_RANK_WEIGHTS,
 ): number {
   return (
-    w.importance * x.importance +
-    w.relevance * x.relevance +
-    w.question * Math.min(1, x.questionWeight / 2) +
-    w.level * x.levelFit +
-    w.freshness * x.freshness
+    rankWeights.importance * x.importance +
+    rankWeights.relevance * x.relevance +
+    rankWeights.question * Math.min(1, x.questionWeight / 2) +
+    rankWeights.level * x.levelFit +
+    rankWeights.freshness * x.freshness
   );
 }
 
@@ -894,23 +894,23 @@ interface SweepPaperRow {
 
 const opt = <T>(v: T | null): T | undefined => (v === null ? undefined : v);
 
-function toSweepPaper(r: SweepPaperRow): SweepPaper {
+function toSweepPaper(sweepPaperRow: SweepPaperRow): SweepPaper {
   return {
-    sweepId: Number(r.sweep_id),
-    paperId: Number(r.paper_id),
-    status: r.status,
-    reason: opt(r.reason),
-    borderline: !!r.borderline,
-    relevance: opt(r.relevance),
-    matchedQuestion: opt(r.matched_question),
-    kind: opt(r.kind),
-    worth: opt(r.worth),
-    novelty: opt(r.novelty),
-    level: opt(r.level),
-    prereqHeavy: opt(r.prereq_heavy),
-    importance: opt(r.importance),
-    rankScore: opt(r.rank_score),
-    rank: r.rank === null ? undefined : Number(r.rank),
+    sweepId: Number(sweepPaperRow.sweep_id),
+    paperId: Number(sweepPaperRow.paper_id),
+    status: sweepPaperRow.status,
+    reason: opt(sweepPaperRow.reason),
+    borderline: !!sweepPaperRow.borderline,
+    relevance: opt(sweepPaperRow.relevance),
+    matchedQuestion: opt(sweepPaperRow.matched_question),
+    kind: opt(sweepPaperRow.kind),
+    worth: opt(sweepPaperRow.worth),
+    novelty: opt(sweepPaperRow.novelty),
+    level: opt(sweepPaperRow.level),
+    prereqHeavy: opt(sweepPaperRow.prereq_heavy),
+    importance: opt(sweepPaperRow.importance),
+    rankScore: opt(sweepPaperRow.rank_score),
+    rank: sweepPaperRow.rank === null ? undefined : Number(sweepPaperRow.rank),
   };
 }
 
@@ -936,27 +936,27 @@ interface SweepRow {
   ended_at: string | null;
 }
 
-function toRecord(r: SweepRow): SweepRecord {
+function toRecord(sweepRow: SweepRow): SweepRecord {
   return {
-    id: Number(r.id),
-    scheduledRunId: r.scheduled_run_id === null ? undefined : Number(r.scheduled_run_id),
-    trigger: r.trigger,
-    status: r.status,
-    phase: r.phase,
-    orientation: !!r.orientation,
-    queries: JSON.parse(r.queries_json),
-    windowSince: opt(r.window_since),
-    counts: JSON.parse(r.counts_json),
-    phases: JSON.parse(r.phases_json),
-    attempts: Number(r.attempts),
-    nextRetryAt: r.next_retry_at === null ? undefined : Number(r.next_retry_at),
-    error: opt(r.error),
-    conversationId: r.conversation_id === null ? undefined : Number(r.conversation_id),
-    submissionId: r.submission_id === null ? undefined : Number(r.submission_id),
-    completion: r.completion_json ? JSON.parse(r.completion_json) : undefined,
-    cost: r.cost_json ? JSON.parse(r.cost_json) : undefined,
-    startedAt: r.started_at,
-    endedAt: opt(r.ended_at),
+    id: Number(sweepRow.id),
+    scheduledRunId: sweepRow.scheduled_run_id === null ? undefined : Number(sweepRow.scheduled_run_id),
+    trigger: sweepRow.trigger,
+    status: sweepRow.status,
+    phase: sweepRow.phase,
+    orientation: !!sweepRow.orientation,
+    queries: JSON.parse(sweepRow.queries_json),
+    windowSince: opt(sweepRow.window_since),
+    counts: JSON.parse(sweepRow.counts_json),
+    phases: JSON.parse(sweepRow.phases_json),
+    attempts: Number(sweepRow.attempts),
+    nextRetryAt: sweepRow.next_retry_at === null ? undefined : Number(sweepRow.next_retry_at),
+    error: opt(sweepRow.error),
+    conversationId: sweepRow.conversation_id === null ? undefined : Number(sweepRow.conversation_id),
+    submissionId: sweepRow.submission_id === null ? undefined : Number(sweepRow.submission_id),
+    completion: sweepRow.completion_json ? JSON.parse(sweepRow.completion_json) : undefined,
+    cost: sweepRow.cost_json ? JSON.parse(sweepRow.cost_json) : undefined,
+    startedAt: sweepRow.started_at,
+    endedAt: opt(sweepRow.ended_at),
   };
 }
 

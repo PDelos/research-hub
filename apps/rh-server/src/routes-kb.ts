@@ -24,11 +24,11 @@ export function parseNote(text: string): { properties: Record<string, unknown>; 
 }
 
 export function kbRoutes(hub: Hub): Router {
-  const r = express.Router();
-  r.use("/v1", requireAuth(hub.log));
+  const router = express.Router();
+  router.use("/v1", requireAuth(hub.log));
   const p = () => hub.project;
 
-  r.get("/v1/kb/papers", (_req, res) => {
+  router.get("/v1/kb/papers", (_request, response) => {
     const project = p();
     const rows = project.db
       .prepare(
@@ -53,11 +53,11 @@ export function kbRoutes(hub: Hub): Router {
         addedAt: row.created_at,
       };
     });
-    res.json(papers);
+    response.json(papers);
   });
 
-  r.get("/v1/kb/notes/:stem", (req, res) => {
-    const stem = String(req.params.stem);
+  router.get("/v1/kb/notes/:stem", (request, response) => {
+    const stem = String(request.params.stem);
     if (!/^[a-z0-9][a-z0-9-]{0,150}$/.test(stem)) throw invalid("stem must be lowercase letters, digits and dashes");
     const vault = p().vault;
     for (const folder of ["sources", "concepts", "questions"]) {
@@ -65,22 +65,22 @@ export function kbRoutes(hub: Hub): Router {
       const text = vault.read(path);
       if (text !== undefined) {
         const note: KbNote = { stem, path, ...parseNote(text) };
-        return void res.json(note);
+        return void response.json(note);
       }
     }
     throw notFound(`No note ${stem}`);
   });
 
-  r.get("/v1/kb/search", (req, res) => {
-    const q = String(req.query.q ?? "").trim();
+  router.get("/v1/kb/search", (request, response) => {
+    const q = String(request.query.q ?? "").trim();
     if (!q) throw invalid("q is required");
-    const limit = Math.min(20, Math.max(1, int(req.query.limit, "limit", 8)));
-    res.json(
+    const limit = Math.min(20, Math.max(1, int(request.query.limit, "limit", 8)));
+    response.json(
       p()
         .kbIndex.search(q, limit)
         .map(({ path, stem, title, excerpt }) => ({ path, stem, title, excerpt })),
     );
   });
 
-  return r;
+  return router;
 }

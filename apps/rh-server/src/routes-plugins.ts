@@ -34,22 +34,22 @@ function fault(error: unknown): never {
 }
 
 export function pluginRoutes(hub: Hub): Router {
-  const r = express.Router();
+  const router = express.Router();
   const host = () => hub.project.plugins;
 
   // External plugins' UI modules (public like the UI's own assets): only files beside the manifest's `browser` entry.
-  r.get(/^\/plugins\/([a-z0-9.-]+)\/(.+)$/, (req, res, next) => {
-    const [id, path] = [req.params[0] as string, req.params[1] as string];
+  router.get(/^\/plugins\/([a-z0-9.-]+)\/(.+)$/, (request, response, next) => {
+    const [id, path] = [request.params[0] as string, request.params[1] as string];
     const plugin = hub.current?.plugins.discovery.plugins.get(id);
     const state = hub.current?.plugins.kernel.get(id)?.state;
     if (!plugin?.manifest.browser || plugin.builtin || state === "disabled" || state === "incompatible") return next();
     const root = resolve(plugin.dir, dirname(plugin.manifest.browser));
     const file = resolve(root, path);
     if (!file.startsWith(root + sep) || !existsSync(file)) return next();
-    res.set("cache-control", "no-cache").sendFile(file);
+    response.set("cache-control", "no-cache").sendFile(file);
   });
 
-  r.use("/v1", requireAuth(hub.log));
+  router.use("/v1", requireAuth(hub.log));
 
   const pluginId = (raw: unknown) => {
     const id = String(raw);
@@ -117,9 +117,9 @@ export function pluginRoutes(hub: Hub): Router {
     };
   };
 
-  r.get("/v1/plugins", (_req, res) => void res.json(list()));
+  router.get("/v1/plugins", (_request, response) => void response.json(list()));
 
-  r.get("/v1/plugins/contributions", async (_req, res) => {
+  router.get("/v1/plugins/contributions", async (_request, response) => {
     const { kernel, contributions, discovery } = host();
     const viewers = contributions.extensionPoints().has("kb.viewer")
       ? (await host().exportsOf<KbExports>("rh.kb")).activeViewer()
@@ -170,24 +170,24 @@ export function pluginRoutes(hub: Hub): Router {
           values: kernel.settings(p.manifest.id),
         })),
     };
-    res.json(view);
+    response.json(view);
   });
 
   // The UI opened a tab: plugins waiting for onView:<tab> start now (lazy activation).
-  r.post("/v1/plugins/views/:tab/open", async (req, res) => {
-    const tab = String(req.params.tab);
+  router.post("/v1/plugins/views/:tab/open", async (request, response) => {
+    const tab = String(request.params.tab);
     if (!/^[a-z0-9-]+$/.test(tab)) throw invalid("tab must be a tab id");
     await host().kernel.fire(`onView:${tab}`);
-    res.status(204).end();
+    response.status(204).end();
   });
 
-  r.get("/v1/plugins/history", async (req, res) => {
-    const limit = Math.min(500, Math.max(1, optInt(req.query.limit, "limit") ?? 100));
-    res.json(await host().state.history(limit));
+  router.get("/v1/plugins/history", async (request, response) => {
+    const limit = Math.min(500, Math.max(1, optInt(request.query.limit, "limit") ?? 100));
+    response.json(await host().state.history(limit));
   });
 
-  r.post("/v1/plugins/rollback", async (req, res) => {
-    const commit = req.body?.commit;
+  router.post("/v1/plugins/rollback", async (request, response) => {
+    const commit = request.body?.commit;
     if (typeof commit !== "string" || !/^[0-9a-f]{4,40}$/.test(commit))
       throw invalid("commit must be a commit id from the history");
     try {
@@ -197,66 +197,69 @@ export function pluginRoutes(hub: Hub): Router {
         throw notFound(`No commit ${commit}`);
       throw error;
     }
-    res.json(list());
+    response.json(list());
   });
 
   // Undo one change from the history; later changes stay (refused when a later change touched the same thing).
-  r.post("/v1/plugins/undo", async (req, res) => {
-    const commit = req.body?.commit;
+  router.post("/v1/plugins/undo", async (request, response) => {
+    const commit = request.body?.commit;
     if (typeof commit !== "string" || !/^[0-9a-f]{4,40}$/.test(commit))
       throw invalid("commit must be a commit id from the history");
     const result = await host().kernel.undo(commit).catch(fault);
-    res.json({ commit: result.id ?? null, plugins: result.plugins, history: await host().state.history(20) });
+    response.json({ commit: result.id ?? null, plugins: result.plugins, history: await host().state.history(20) });
   });
 
-  r.post("/v1/plugins/install", async (req, res) => {
-    const source = req.body?.source as PluginInstallSource | undefined;
+  router.post("/v1/plugins/install", async (request, response) => {
+    const source = request.body?.source as PluginInstallSource | undefined;
     const ok =
       source &&
       (("folder" in source && typeof source.folder === "string" && source.folder.length > 0) ||
         ("git" in source && typeof source.git === "string" && /^https?:\/\//.test(source.git)));
     if (!ok) throw invalid('source must be {"folder": "<path on the server>"} or {"git": "https://…"}');
-    res.json(await host().installer.prepare(source).catch(fault));
+    response.json(await host().installer.prepare(source).catch(fault));
   });
 
-  r.post("/v1/plugins/install/:planId/approve", async (req, res) => {
-    const plan = await host().installer.confirm(String(req.params.planId)).catch(fault);
-    res.json(await details(plan.id));
+  router.post("/v1/plugins/install/:planId/approve", async (request, response) => {
+    const plan = await host().installer.confirm(String(request.params.planId)).catch(fault);
+    response.json(await details(plan.id));
   });
 
-  r.delete("/v1/plugins/install/:planId", (req, res) => {
-    host().installer.cancel(String(req.params.planId));
-    res.status(204).end();
+  router.delete("/v1/plugins/install/:planId", (request, response) => {
+    host().installer.cancel(String(request.params.planId));
+    response.status(204).end();
   });
 
-  r.get("/v1/plugins/:id", async (req, res) => void res.json(await details(pluginId(req.params.id))));
+  router.get(
+    "/v1/plugins/:id",
+    async (request, response) => void response.json(await details(pluginId(request.params.id))),
+  );
 
   for (const action of ["enable", "disable"] as const)
-    r.post(`/v1/plugins/:id/${action}`, async (req, res) => {
-      const id = pluginId(req.params.id);
+    router.post(`/v1/plugins/:id/${action}`, async (request, response) => {
+      const id = pluginId(request.params.id);
       await host()
-        .kernel.setEnabled(id, action === "enable", { cascade: req.body?.cascade === true })
+        .kernel.setEnabled(id, action === "enable", { cascade: request.body?.cascade === true })
         .catch(fault);
-      res.json(await details(id));
+      response.json(await details(id));
     });
 
-  r.put("/v1/plugins/:id/settings", async (req, res) => {
-    const id = pluginId(req.params.id);
-    const values = req.body?.values;
+  router.put("/v1/plugins/:id/settings", async (request, response) => {
+    const id = pluginId(request.params.id);
+    const values = request.body?.values;
     if (!values || typeof values !== "object" || Array.isArray(values))
       throw invalid("values must be an object of settings");
     const changes = Object.fromEntries(Object.entries(values).map(([k, v]) => [k, v === null ? undefined : v]));
     await host().kernel.configure(id, changes).catch(fault);
-    res.json(await details(id));
+    response.json(await details(id));
   });
 
-  r.delete("/v1/plugins/:id", async (req, res) => {
-    const id = pluginId(req.params.id);
+  router.delete("/v1/plugins/:id", async (request, response) => {
+    const id = pluginId(request.params.id);
     await host()
-      .installer.uninstall(id, { deleteData: req.query.deleteData === "true" })
+      .installer.uninstall(id, { deleteData: request.query.deleteData === "true" })
       .catch(fault);
-    res.status(204).end();
+    response.status(204).end();
   });
 
-  return r;
+  return router;
 }

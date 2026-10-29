@@ -70,13 +70,13 @@ export function gainOf(labels: Labels, paperId: number): number | undefined {
   return p === undefined ? undefined : p * 1.5;
 }
 
-function cosine(a: Float32Array, b: Float32Array): number {
+function cosine(float32Array: Float32Array, b: Float32Array): number {
   let dot = 0;
   let na = 0;
   let nb = 0;
-  for (let i = 0; i < a.length; i++) {
-    dot += a[i] * b[i];
-    na += a[i] * a[i];
+  for (let i = 0; i < float32Array.length; i++) {
+    dot += float32Array[i] * b[i];
+    na += float32Array[i] * float32Array[i];
     nb += b[i] * b[i];
   }
   return na && nb ? dot / Math.sqrt(na * nb) : 0;
@@ -89,23 +89,28 @@ const median = (xs: number[]) => {
 };
 
 /** The cards a sweep would have shown with these settings, best first, and how many used estimated features. */
-export function replayCards(h: SweepHistory, settings: SweepSettings): { cards: number[]; estimated: number } {
-  const passed = h.pool.filter((p) => p.relevance >= settings.relevanceMin && p.worth >= settings.worthMin);
-  const known = h.pool.filter((p) => p.importance !== undefined).map((p) => p.importance!);
+export function replayCards(
+  sweepHistory: SweepHistory,
+  settings: SweepSettings,
+): { cards: number[]; estimated: number } {
+  const passed = sweepHistory.pool.filter((p) => p.relevance >= settings.relevanceMin && p.worth >= settings.worthMin);
+  const known = sweepHistory.pool.filter((p) => p.importance !== undefined).map((p) => p.importance!);
   const fallback = median(known);
   let estimated = 0;
   const scored = passed
-    .map((p) => {
-      if (p.importance === undefined || p.level === undefined) estimated++;
+    .map((poolPaper) => {
+      if (poolPaper.importance === undefined || poolPaper.level === undefined) estimated++;
       return {
-        id: p.paperId,
+        id: poolPaper.paperId,
         score: rankScore(
           {
-            importance: p.importance ?? fallback,
-            relevance: p.relevance,
-            questionWeight: h.charter ? questionWeight(h.charter, p.matchedQuestion) : 0.5,
-            levelFit: levelFit(p.level ?? "core", h.orientation, settings.level ?? "auto"),
-            freshness: h.orientation ? 0.5 : freshness(p.publishedAt, h.startedAt),
+            importance: poolPaper.importance ?? fallback,
+            relevance: poolPaper.relevance,
+            questionWeight: sweepHistory.charter
+              ? questionWeight(sweepHistory.charter, poolPaper.matchedQuestion)
+              : 0.5,
+            levelFit: levelFit(poolPaper.level ?? "core", sweepHistory.orientation, settings.level ?? "auto"),
+            freshness: sweepHistory.orientation ? 0.5 : freshness(poolPaper.publishedAt, sweepHistory.startedAt),
           },
           settings.rankWeights,
         ),
@@ -115,12 +120,12 @@ export function replayCards(h: SweepHistory, settings: SweepSettings): { cards: 
   const n = settings.cardsPerSweep;
   const picks = Math.min(settings.explorationPicks, n - 1);
   let explore: number[] = [];
-  if (picks > 0 && h.liked.length) {
+  if (picks > 0 && sweepHistory.liked.length) {
     explore = scored
       .slice(n - picks)
       .map((s, i) => {
-        const v = h.vectors.get(s.id);
-        return v ? { id: s.id, i, sim: Math.max(...h.liked.map((l) => cosine(v, l))) } : undefined;
+        const v = sweepHistory.vectors.get(s.id);
+        return v ? { id: s.id, i, sim: Math.max(...sweepHistory.liked.map((l) => cosine(v, l))) } : undefined;
       })
       .filter((x): x is { id: number; i: number; sim: number } => !!x)
       .toSorted((a, b) => a.sim - b.sim || a.i - b.i)
@@ -140,18 +145,18 @@ export interface SweepMetrics {
   coverage: number;
 }
 
-export function sweepMetrics(h: SweepHistory, cards: number[], labels: Labels): SweepMetrics {
+export function sweepMetrics(sweepHistory: SweepHistory, cards: number[], labels: Labels): SweepMetrics {
   const gains = cards.map((id) => gainOf(labels, id)).filter((g): g is number => g !== undefined);
   const coverage = cards.length ? gains.length / cards.length : 0;
   const dcg = gains.reduce((s, g, i) => s + g / Math.log2(i + 2), 0);
-  const ideal = h.pool
+  const ideal = sweepHistory.pool
     .map((p) => gainOf(labels, p.paperId))
     .filter((g): g is number => g !== undefined)
     .toSorted((a, b) => b - a)
     .slice(0, cards.length || 1);
   const idcg = ideal.reduce((s, g, i) => s + g / Math.log2(i + 2), 0);
   const first5 = gains.slice(0, 5);
-  const stars = h.pool.filter((p) => labels.user.get(p.paperId) === "star").map((p) => p.paperId);
+  const stars = sweepHistory.pool.filter((p) => labels.user.get(p.paperId) === "star").map((p) => p.paperId);
   return {
     ...(idcg > 0 ? { ndcg: dcg / idcg } : {}),
     ...(first5.length ? { precision5: first5.filter((g) => g > 0.75).length / first5.length } : {}),
@@ -224,11 +229,15 @@ export function replay(
   let estimated = 0;
   const rows = history
     .toSorted((a, b) => a.startedAt - b.startedAt)
-    .map((h) => {
-      const base = replayCards(h, current);
-      const next = replayCards(h, candidate);
+    .map((sweepHistory) => {
+      const base = replayCards(sweepHistory, current);
+      const next = replayCards(sweepHistory, candidate);
       estimated += next.estimated;
-      return { h, current: sweepMetrics(h, base.cards, labels), candidate: sweepMetrics(h, next.cards, labels) };
+      return {
+        h: sweepHistory,
+        current: sweepMetrics(sweepHistory, base.cards, labels),
+        candidate: sweepMetrics(sweepHistory, next.cards, labels),
+      };
     });
   const labelled = rows.filter((r) => r.current.ndcg !== undefined && r.candidate.ndcg !== undefined);
   const heldN = labelled.length ? Math.max(1, Math.ceil(0.3 * labelled.length)) : 0;

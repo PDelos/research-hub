@@ -19,22 +19,22 @@ const problems = (input: unknown): string[] => {
   try {
     validateCharter(input);
     return [];
-  } catch (e) {
-    assert.ok(e instanceof CharterInvalid);
-    return e.problems;
+  } catch (error) {
+    assert.ok(error instanceof CharterInvalid);
+    return error.problems;
   }
 };
 
 test("3.1 a valid charter is normalized: Q1..Qn, default weight 1, queries as objects", () => {
-  const c = validateCharter(sampleCharter());
+  const charter = validateCharter(sampleCharter());
   assert.deepEqual(
-    c.questions.map((q) => q.id),
+    charter.questions.map((q) => q.id),
     ["Q1", "Q2", "Q3"],
   );
-  assert.equal(c.questions[0].weight, 1);
-  assert.equal(c.questions[1].weight, 1.5);
-  assert.deepEqual(c.queries[0], { text: "protein language model", weight: 1 });
-  assert.deepEqual(c.queries[4], { text: "PLM benchmark", weight: 0.5 });
+  assert.equal(charter.questions[0].weight, 1);
+  assert.equal(charter.questions[1].weight, 1.5);
+  assert.deepEqual(charter.queries[0], { text: "protein language model", weight: 1 });
+  assert.deepEqual(charter.queries[4], { text: "PLM benchmark", weight: 0.5 });
 });
 
 test("3.1 every bound is enforced with an exact message", () => {
@@ -161,13 +161,13 @@ test("brief: ≤ 50,000 characters of nonblank text, nothing stored on failure",
 });
 
 test("lists sent as JSON-encoded strings are accepted; other non-lists name the expected type", () => {
-  const c = validateCharter({
+  const charter = validateCharter({
     ...sampleCharter(),
     concepts: JSON.stringify(["protein language model", "ESM"]),
     queries: JSON.stringify(["a b", "c d", "e f", "g h", "i j"]),
   });
-  assert.deepEqual(c.concepts, ["protein language model", "ESM"]);
-  assert.equal(c.queries.length, 5);
+  assert.deepEqual(charter.concepts, ["protein language model", "ESM"]);
+  assert.equal(charter.queries.length, 5);
   assert.deepEqual(problems(sampleCharter({ concepts: "just text" })), [
     "concepts: must be a list (a JSON array), not string",
   ]);

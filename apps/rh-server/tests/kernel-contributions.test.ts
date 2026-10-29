@@ -115,11 +115,11 @@ test("tabs, commands, chat tools, Jev commands, prompts and processes follow the
     const activated: string[] = [];
     const modules: Record<string, PluginModule> = {
       "rh.kb": {
-        activate(ctx: PluginContext) {
-          activated.push(ctx.id);
-          ctx.subscriptions.push(
-            registry.registerChatTool(ctx.id, "search_kb", (args) => ({ hits: [(args as { q: string }).q] })),
-            registry.registerCommand(ctx.id, "kb.reindex", () => "reindexed"),
+        activate(context: PluginContext) {
+          activated.push(context.id);
+          context.subscriptions.push(
+            registry.registerChatTool(context.id, "search_kb", (args) => ({ hits: [(args as { q: string }).q] })),
+            registry.registerCommand(context.id, "kb.reindex", () => "reindexed"),
           );
         },
       },
@@ -264,7 +264,7 @@ test("settings: schema and environment defaults, saved values, validation with t
     const { kernel, state } = await boot(
       root,
       join(t.dir, "data"),
-      { "rh.sweep": { activate: (ctx) => void (seen = ctx.settings) } },
+      { "rh.sweep": { activate: (context) => void (seen = context.settings) } },
       env,
     );
 

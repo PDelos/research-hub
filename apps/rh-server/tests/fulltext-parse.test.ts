@@ -18,23 +18,23 @@ import { ARXIV_HTML, DOCLING_MD, JATS_XML } from "./fixtures/fulltext/documents.
 const titles = (s: { title: string }[]) => s.map((x) => x.title);
 
 test("arXiv HTML: abstract and sections in order, math as TeX, no bibliography or appendix", () => {
-  const s = arxivHtmlToSections(ARXIV_HTML);
-  assert.deepEqual(titles(s), ["Abstract", "Introduction", "Our kernels", "Results"]);
-  assert.match(s[1].text, /with k=3 frames/);
-  assert.equal(s[0].text, "We report an AUROC of 0.87 on held-out genes.");
+  const sections = arxivHtmlToSections(ARXIV_HTML);
+  assert.deepEqual(titles(sections), ["Abstract", "Introduction", "Our kernels", "Results"]);
+  assert.match(sections[1].text, /with k=3 frames/);
+  assert.equal(sections[0].text, "We report an AUROC of 0.87 on held-out genes.");
 });
 
 test("JATS: abstract and top-level sections with nested ones inside, without tables, citations as text", () => {
-  const s = jatsToSections(JATS_XML);
-  assert.deepEqual(titles(s), ["Abstract", "Main", "Methods", "Results"]);
-  assert.match(s[1].text, /Proteins fold 1\.\nThe Evoformer block\./);
-  assert.doesNotMatch(s[2].text, /table text/);
+  const sections = jatsToSections(JATS_XML);
+  assert.deepEqual(titles(sections), ["Abstract", "Main", "Methods", "Results"]);
+  assert.match(sections[1].text, /Proteins fold 1\.\nThe Evoformer block\./);
+  assert.doesNotMatch(sections[2].text, /table text/);
 });
 
 test("Docling markdown: split at # and ## headings, deeper ones kept inside, references and empty sections dropped", () => {
-  const s = markdownToSections(DOCLING_MD);
-  assert.deepEqual(titles(s), ["Abstract", "1 Introduction", "2 Methods"], "the title alone has no text");
-  assert.match(s[1].text, /### 1.1 Scope\nOnly yeast/);
+  const sections = markdownToSections(DOCLING_MD);
+  assert.deepEqual(titles(sections), ["Abstract", "1 Introduction", "2 Methods"], "the title alone has no text");
+  assert.match(sections[1].text, /### 1.1 Scope\nOnly yeast/);
 });
 
 test("PDF text: headings, running headers removed, hyphenation joined, references dropped (a real PDF)", async () => {
@@ -42,11 +42,11 @@ test("PDF text: headings, running headers removed, hyphenation joined, reference
     new Uint8Array(readFileSync(join(import.meta.dirname, "fixtures/fulltext/paper.pdf"))),
   );
   const { text } = await extractText(pdf, { mergePages: false });
-  const s = pdfTextToSections(text as string[]);
-  assert.deepEqual(titles(s).slice(1), ["Abstract", "1 Introduction", "2 Methods", "3 Results", "4 Discussion"]);
-  assert.ok(!s.some((x) => x.text.includes("Fixture paper on ribosome profiling")), "running header removed");
-  assert.match(s[2].text, /linear models/);
-  assert.ok(!s.some((x) => /Ingolia/.test(x.text)));
+  const sections = pdfTextToSections(text as string[]);
+  assert.deepEqual(titles(sections).slice(1), ["Abstract", "1 Introduction", "2 Methods", "3 Results", "4 Discussion"]);
+  assert.ok(!sections.some((x) => x.text.includes("Fixture paper on ribosome profiling")), "running header removed");
+  assert.match(sections[2].text, /linear models/);
+  assert.ok(!sections.some((x) => /Ingolia/.test(x.text)));
   assert.equal(headingOf("0. Due to the inclusion of the product kernel"), undefined);
   assert.equal(headingOf("2.1 Datasets"), undefined, "subsections stay inside");
   assert.equal(headingOf("II. RESULTS"), "II. RESULTS");

@@ -271,13 +271,13 @@ export class PaperVectors {
   }
 }
 
-export function cosineDistance(a: Float32Array, b: Float32Array): number {
+export function cosineDistance(float32Array: Float32Array, b: Float32Array): number {
   let dot = 0;
   let na = 0;
   let nb = 0;
-  for (let i = 0; i < a.length; i++) {
-    dot += a[i] * b[i];
-    na += a[i] * a[i];
+  for (let i = 0; i < float32Array.length; i++) {
+    dot += float32Array[i] * b[i];
+    na += float32Array[i] * float32Array[i];
     nb += b[i] * b[i];
   }
   return na && nb ? 1 - dot / Math.sqrt(na * nb) : 1;

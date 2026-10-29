@@ -57,13 +57,13 @@ export function analyze(db: Db, sinceDays = 60, now = Date.now()): Analysis {
 const round = (x: number) => Math.round(x * 100) / 100;
 
 /** Move `amount` of weight to `key`, taken from the others in proportion; still summing to the same total. */
-export function shiftWeights(w: RankWeights, key: keyof RankWeights, amount = 0.1): RankWeights {
-  const others = (Object.keys(w) as (keyof RankWeights)[]).filter((k) => k !== key);
-  const pool = others.reduce((s, k) => s + w[k], 0);
-  if (pool <= 0) return w;
+export function shiftWeights(rankWeights: RankWeights, key: keyof RankWeights, amount = 0.1): RankWeights {
+  const others = (Object.keys(rankWeights) as (keyof RankWeights)[]).filter((k) => k !== key);
+  const pool = others.reduce((s, k) => s + rankWeights[k], 0);
+  if (pool <= 0) return rankWeights;
   const take = Math.min(amount, pool);
-  const out = { ...w, [key]: round(Math.min(1, w[key] + take)) } as RankWeights;
-  for (const k of others) out[k] = round(Math.max(0, w[k] - (take * w[k]) / pool));
+  const out = { ...rankWeights, [key]: round(Math.min(1, rankWeights[key] + take)) } as RankWeights;
+  for (const k of others) out[k] = round(Math.max(0, rankWeights[k] - (take * rankWeights[k]) / pool));
   return out;
 }
 
@@ -74,8 +74,8 @@ export interface CandidateVariant {
 }
 
 /** At most 12 variants around the current settings, the ones the analysis points at first. */
-export function rankingGrid(current: SweepSettings, a: Analysis): CandidateVariant[] {
-  const d = a.disliked;
+export function rankingGrid(current: SweepSettings, analysis: Analysis): CandidateVariant[] {
+  const d = analysis.disliked;
   const off = d["off-topic"] ?? 0;
   const level = (d["too-basic"] ?? 0) + (d["too-advanced"] ?? 0);
   const trust = d["low-trust"] ?? 0;
@@ -88,8 +88,8 @@ export function rankingGrid(current: SweepSettings, a: Analysis): CandidateVaria
   add({ worthMin: clamp(current.worthMin - 0.05) }, "looser worth gate", 0.4);
   add(
     { rankWeights: shiftWeights(current.rankWeights, "relevance") },
-    `more weight on relevance (${a.likedRankedLow} liked cards ranked low)`,
-    0.9 + off + a.likedRankedLow,
+    `more weight on relevance (${analysis.likedRankedLow} liked cards ranked low)`,
+    0.9 + off + analysis.likedRankedLow,
   );
   add({ rankWeights: shiftWeights(current.rankWeights, "importance") }, "more weight on importance", 0.6);
   add(
@@ -105,22 +105,22 @@ export function rankingGrid(current: SweepSettings, a: Analysis): CandidateVaria
   if (current.cardsPerSweep > 3)
     add(
       { cardsPerSweep: current.cardsPerSweep - 2 },
-      `fewer cards (${Math.round(a.unjudgedShare * 100)} % left unjudged)`,
-      0.5 + 3 * a.unjudgedShare,
+      `fewer cards (${Math.round(analysis.unjudgedShare * 100)} % left unjudged)`,
+      0.5 + 3 * analysis.unjudgedShare,
     );
   if (current.cardsPerSweep < 14)
-    add({ cardsPerSweep: current.cardsPerSweep + 2 }, "more cards", 0.5 + (a.unjudgedShare < 0.2 ? 0.5 : 0));
+    add({ cardsPerSweep: current.cardsPerSweep + 2 }, "more cards", 0.5 + (analysis.unjudgedShare < 0.2 ? 0.5 : 0));
   if (current.explorationPicks < 2)
     add(
       { explorationPicks: current.explorationPicks + 1 },
-      `more exploration (${a.explorationLiked} exploration picks liked)`,
-      0.5 + a.explorationLiked,
+      `more exploration (${analysis.explorationLiked} exploration picks liked)`,
+      0.5 + analysis.explorationLiked,
     );
   if (current.explorationPicks > 0)
     add(
       { explorationPicks: current.explorationPicks - 1 },
-      `less exploration (${a.explorationDisliked} disliked)`,
-      0.5 + a.explorationDisliked,
+      `less exploration (${analysis.explorationDisliked} disliked)`,
+      0.5 + analysis.explorationDisliked,
     );
   return out.toSorted((x, y) => y.score - x.score).slice(0, 12);
 }

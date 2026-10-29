@@ -12,23 +12,23 @@ export class OpenAlexSource implements PaperSource {
   readonly name = "openalex" as const;
   constructor(private readonly deps: SourceDeps) {}
 
-  async search(q: SourceQuery): Promise<SourcePaper[]> {
-    const search = queryTerms(q.query).join(" ");
+  async search(sourceQuery: SourceQuery): Promise<SourcePaper[]> {
+    const search = queryTerms(sourceQuery.query).join(" ");
     if (!search) return [];
     const filters: string[] = [];
-    if (q.since) filters.push(`from_publication_date:${q.since}`);
-    if (q.until) filters.push(`to_publication_date:${q.until}`);
+    if (sourceQuery.since) filters.push(`from_publication_date:${sourceQuery.since}`);
+    if (sourceQuery.until) filters.push(`to_publication_date:${sourceQuery.until}`);
     const body = await this.deps.http.json<{ results: any[] }>(
       this.url("/works", {
         search,
         ...(filters.length ? { filter: filters.join(",") } : {}),
-        "per-page": String(Math.min(q.limit, 100)),
+        "per-page": String(Math.min(sourceQuery.limit, 100)),
       }),
-      { source: this.name, budgetMs: q.budgetMs },
+      { source: this.name, budgetMs: sourceQuery.budgetMs },
     );
     return body.results
       .map(mapOpenAlexWork)
-      .filter((p): p is SourcePaper => !!p && inWindow(p.publishedAt, q.since, q.until));
+      .filter((p): p is SourcePaper => !!p && inWindow(p.publishedAt, sourceQuery.since, sourceQuery.until));
   }
 
   /** Works for up to 50 DOIs in one request; DOIs not in OpenAlex are absent from the map. */

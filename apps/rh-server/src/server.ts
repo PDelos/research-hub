@@ -45,10 +45,10 @@ export async function startServer(config: Config, log: Logger, options: HubOptio
   // Upgraded (WebSocket) connections are not closed by server.close(); track them and end them on stop.
   const upgraded = new Set<import("node:net").Socket>();
   const upgrade = kbUpgrade(() => hub.current?.kbViewer, config.allowedHosts);
-  server.on("upgrade", (req, socket, head) => {
+  server.on("upgrade", (request, socket, head) => {
     upgraded.add(socket as import("node:net").Socket);
     socket.on("close", () => upgraded.delete(socket as import("node:net").Socket));
-    upgrade(req, socket as import("node:net").Socket, head);
+    upgrade(request, socket as import("node:net").Socket, head);
   });
   const port = (server.address() as AddressInfo).port;
   let stopping: Promise<void> | undefined;

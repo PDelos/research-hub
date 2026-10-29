@@ -58,12 +58,12 @@ export class EmbeddingLedger {
   }
 }
 
-export function l2normalize(v: Float32Array): Float32Array {
+export function l2normalize(float32Array: Float32Array): Float32Array {
   let sum = 0;
-  for (const x of v) sum += x * x;
+  for (const x of float32Array) sum += x * x;
   const norm = Math.sqrt(sum);
-  if (norm > 0) for (let i = 0; i < v.length; i++) v[i] /= norm;
-  return v;
+  if (norm > 0) for (let i = 0; i < float32Array.length; i++) float32Array[i] /= norm;
+  return float32Array;
 }
 
 export class OpenRouterEmbedder implements Embedder {
@@ -169,7 +169,7 @@ export class FakeEmbedder implements Embedder {
   }
 
   private vector(text: string): Float32Array {
-    const v = new Float32Array(this.dims);
+    const float32Array = new Float32Array(this.dims);
     for (const word of fakeWords(text)) {
       const seed = createHash("sha256").update(word).digest();
       let state = seed.readUInt32LE(0) || 1;
@@ -177,10 +177,10 @@ export class FakeEmbedder implements Embedder {
         state ^= state << 13;
         state ^= state >>> 17;
         state ^= state << 5;
-        v[i] += ((state >>> 0) / 0xffffffff) * 2 - 1;
+        float32Array[i] += ((state >>> 0) / 0xffffffff) * 2 - 1;
       }
     }
-    return l2normalize(v);
+    return l2normalize(float32Array);
   }
 }
 

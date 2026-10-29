@@ -29,7 +29,7 @@ export function paperTools(papers: () => PaperService): Extension {
         Type.Number({ description: `1 to ${SEARCH_PAPERS_MAX} results, default ${SEARCH_PAPERS_DEFAULT}` }),
       ),
     }),
-    execute: async (args, api, ctx) => {
+    execute: async (args, api, context) => {
       const query = args.query.trim();
       const limit = args.limit ?? SEARCH_PAPERS_DEFAULT;
       const problems: string[] = [];
@@ -47,7 +47,7 @@ export function paperTools(papers: () => PaperService): Extension {
         ]);
 
       const memo = JSON.parse(
-        await once<string>(api, "search", ctx, async () => {
+        await once<string>(api, "search", context, async () => {
           let value: Memo;
           try {
             const result = await papers().find({ query, since: args.since, limit });
@@ -82,15 +82,15 @@ export function paperTools(papers: () => PaperService): Extension {
 }
 
 /** One line: title (year) · venue or server · citations · sources · link. */
-export function formatPaper(p: Paper): string {
-  const where = p.venue ?? p.server ?? "unknown venue";
-  const link = p.ids.doi ? `https://doi.org/${p.ids.doi}` : (p.url ?? p.oaUrl ?? "");
+export function formatPaper(paper: Paper): string {
+  const where = paper.venue ?? paper.server ?? "unknown venue";
+  const link = paper.ids.doi ? `https://doi.org/${paper.ids.doi}` : (paper.url ?? paper.oaUrl ?? "");
   const parts = [
-    `${p.title} (${p.year ?? "n.d."})`,
+    `${paper.title} (${paper.year ?? "n.d."})`,
     where,
-    p.citedByCount !== undefined ? `${p.citedByCount} citations` : "citations unknown",
-    `sources: ${p.sources.join(", ")}`,
-    ...(p.retracted ? ["RETRACTED"] : []),
+    paper.citedByCount !== undefined ? `${paper.citedByCount} citations` : "citations unknown",
+    `sources: ${paper.sources.join(", ")}`,
+    ...(paper.retracted ? ["RETRACTED"] : []),
     link,
   ];
   return parts.filter(Boolean).join(" · ");

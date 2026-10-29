@@ -19,8 +19,8 @@ const env = (file: string) =>
 test("two projects get distinct ports, compose names, tokens and sweep times 20 minutes apart", () => {
   const t = tempDir();
   try {
-    const a = run(["proteins", "--base", t.dir]);
-    assert.equal(a.status, 0, a.stderr);
+    const spawnSyncReturns = run(["proteins", "--base", t.dir]);
+    assert.equal(spawnSyncReturns.status, 0, spawnSyncReturns.stderr);
     const b = run(["genomics", "--base", t.dir]);
     assert.equal(b.status, 0, b.stderr);
     const ea = env(join(t.dir, "proteins/.env"));

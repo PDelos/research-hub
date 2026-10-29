@@ -80,7 +80,7 @@ async function boot(dir: string, modules: Record<string, PluginModule>, extra: P
 
 /** Capture a plugin's rh API from its activate. */
 function capture(into: { rh?: RhApi }): PluginModule {
-  return { activate: (ctx) => void (into.rh = ctx.rh) };
+  return { activate: (context) => void (into.rh = context.rh) };
 }
 
 test("the API reports its version and a plugin reaches only its declared hosts, logged when refused", async () => {
@@ -126,19 +126,19 @@ test("files: own storage always, the vault only as declared, never outside a sco
     const reader: { rh?: RhApi } = {};
     const writer: { rh?: RhApi } = {};
     await boot(t.dir, { "acme.reader": capture(reader), "acme.writer": capture(writer) });
-    const r = reader.rh!;
-    r.files.write("storage", "cache/state.json", "{}");
-    assert.equal(r.files.read("storage", "cache/state.json"), "{}");
-    assert.equal(r.files.read("vault", "sources/a.md"), "# A");
-    assert.deepEqual(r.files.list("vault", "sources"), ["a.md"]);
-    assert.throws(() => r.files.write("vault", "sources/a.md", "changed"), /acme\.reader may not write vault files/);
+    const api = reader.rh!;
+    api.files.write("storage", "cache/state.json", "{}");
+    assert.equal(api.files.read("storage", "cache/state.json"), "{}");
+    assert.equal(api.files.read("vault", "sources/a.md"), "# A");
+    assert.deepEqual(api.files.list("vault", "sources"), ["a.md"]);
+    assert.throws(() => api.files.write("vault", "sources/a.md", "changed"), /acme\.reader may not write vault files/);
     assert.throws(
-      () => r.files.read("storage", "../../../../etc/passwd"),
+      () => api.files.read("storage", "../../../../etc/passwd"),
       /may not reach .* outside its storage folder/,
     );
-    assert.throws(() => r.files.write("plugin", "rh-plugin.json", "{}"), /may not change its own installed files/);
-    assert.equal(r.secrets.get("OPENROUTER_API_KEY"), "sk-test-key-123456");
-    assert.throws(() => r.secrets.get("OTHER_TOKEN"), /acme\.reader may not read the secret OTHER_TOKEN/);
+    assert.throws(() => api.files.write("plugin", "rh-plugin.json", "{}"), /may not change its own installed files/);
+    assert.equal(api.secrets.get("OPENROUTER_API_KEY"), "sk-test-key-123456");
+    assert.throws(() => api.secrets.get("OTHER_TOKEN"), /acme\.reader may not read the secret OTHER_TOKEN/);
 
     writer.rh!.files.write("vault", "concepts/new.md", "# New");
     assert.equal(readFileSync(join(t.dir, "vault", "concepts", "new.md"), "utf8"), "# New");

@@ -89,14 +89,15 @@ export class KbViewer {
 
   /** Start the viewer if it can run (enabled, Ignis present, a vault, Obsidian available). Safe to call again. */
   async start(): Promise<void> {
-    const o = this.options;
-    if (!o.enabled || this.stopping || this.child || this.state === "starting") return;
-    const server = join(o.ignisDir, "apps", "ignis-server", "server", "index.js");
+    const kbViewerOptions = this.options;
+    if (!kbViewerOptions.enabled || this.stopping || this.child || this.state === "starting") return;
+    const server = join(kbViewerOptions.ignisDir, "apps", "ignis-server", "server", "index.js");
     if (!existsSync(server))
       return this.unavailable(
-        `Ignis is not installed in this image (looked in ${o.ignisDir}; use the research-hub:obsidian image or set RH_KB_VIEWER_DIR)`,
+        `Ignis is not installed in this image (looked in ${kbViewerOptions.ignisDir}; use the research-hub:obsidian image or set RH_KB_VIEWER_DIR)`,
       );
-    if (!existsSync(o.vaultDir)) return this.unavailable("there is no vault yet (approve a charter first)");
+    if (!existsSync(kbViewerOptions.vaultDir))
+      return this.unavailable("there is no vault yet (approve a charter first)");
     this.state = "starting";
     this.reason = undefined;
     try {
@@ -108,34 +109,38 @@ export class KbViewer {
     this.port = await freePort();
     const env: NodeJS.ProcessEnv = {
       PATH: process.env.PATH,
-      HOME: o.stateDir,
+      HOME: kbViewerOptions.stateDir,
       PORT: String(this.port),
-      VAULT_ROOT: join(o.stateDir, "vaults"),
-      DATA_ROOT: join(o.stateDir, "data"),
-      OBSIDIAN_ASSETS_PATH: join(o.stateDir, "obsidian-app"),
-      IGNIS_OBSIDIAN_PIN: o.obsidianVersion,
+      VAULT_ROOT: join(kbViewerOptions.stateDir, "vaults"),
+      DATA_ROOT: join(kbViewerOptions.stateDir, "data"),
+      OBSIDIAN_ASSETS_PATH: join(kbViewerOptions.stateDir, "obsidian-app"),
+      IGNIS_OBSIDIAN_PIN: kbViewerOptions.obsidianVersion,
       NODE_ENV: "production",
     };
     const child = spawn(process.execPath, ["--require", LOOPBACK_PRELOAD, server], {
-      cwd: o.ignisDir,
+      cwd: kbViewerOptions.ignisDir,
       env,
       stdio: ["ignore", "pipe", "pipe"],
     });
     this.child = child;
     const forward = (level: "info" | "warn") => (chunk: Buffer) => {
       for (const line of chunk.toString().split("\n").filter(Boolean))
-        o.log[level]("kb.viewer_output", { line: line.slice(0, 500) });
+        kbViewerOptions.log[level]("kb.viewer_output", { line: line.slice(0, 500) });
     };
     child.stdout?.on("data", forward("info"));
     child.stderr?.on("data", forward("warn"));
     child.once("exit", (code, signal) => this.exited(child, code, signal));
-    if (await this.waitReady(o.readyTimeoutMs ?? 60_000)) {
+    if (await this.waitReady(kbViewerOptions.readyTimeoutMs ?? 60_000)) {
       if (this.child !== child) return;
       this.state = "running";
       this.healthySince = Date.now();
-      o.log.info("kb.viewer_running", { port: this.port, ignis: this.ignisVersion(), obsidian: o.obsidianVersion });
+      kbViewerOptions.log.info("kb.viewer_running", {
+        port: this.port,
+        ignis: this.ignisVersion(),
+        obsidian: kbViewerOptions.obsidianVersion,
+      });
     } else if (this.child === child) {
-      o.log.warn("kb.viewer_not_ready", { port: this.port });
+      kbViewerOptions.log.warn("kb.viewer_not_ready", { port: this.port });
       child.kill("SIGKILL");
     }
   }
@@ -204,9 +209,9 @@ export class KbViewer {
     const end = Date.now() + timeoutMs;
     while (Date.now() < end && this.child && this.child.exitCode === null) {
       try {
-        const res = await fetch(`http://127.0.0.1:${this.port}/`, { signal: AbortSignal.timeout(1_000) });
-        await res.body?.cancel();
-        if (res.status < 500) return true;
+        const response = await fetch(`http://127.0.0.1:${this.port}/`, { signal: AbortSignal.timeout(1_000) });
+        await response.body?.cancel();
+        if (response.status < 500) return true;
       } catch {
         // not listening yet
       }
@@ -232,31 +237,34 @@ export class KbViewer {
 
   /** Download and unpack the pinned Obsidian package once (official release; never in offline mode). */
   private async ensureObsidian(): Promise<void> {
-    const o = this.options;
-    const dir = join(o.stateDir, "obsidian-app");
+    const kbViewerOptions = this.options;
+    const dir = join(kbViewerOptions.stateDir, "obsidian-app");
     const stamp = join(dir, ".obsidian-version");
     if (
       existsSync(join(dir, "index.html")) &&
       existsSync(stamp) &&
-      readFileSync(stamp, "utf8").trim() === o.obsidianVersion
+      readFileSync(stamp, "utf8").trim() === kbViewerOptions.obsidianVersion
     )
       return;
-    if (o.offline)
-      throw new Error(`Obsidian ${o.obsidianVersion} is not downloaded yet, and offline mode makes no downloads`);
-    const url = `https://github.com/obsidianmd/obsidian-releases/releases/download/v${o.obsidianVersion}/obsidian-${o.obsidianVersion}.asar.gz`;
-    o.log.info("kb.obsidian_download", { url });
-    const res = await (o.fetch ?? fetch)(url, { signal: AbortSignal.timeout(120_000) });
-    if (!res.ok) throw new Error(`downloading Obsidian ${o.obsidianVersion} failed: HTTP ${res.status}`);
-    const asarFile = join(o.stateDir, `obsidian-${o.obsidianVersion}.asar`);
-    mkdirSync(o.stateDir, { recursive: true });
-    writeFileSync(asarFile, gunzipSync(Buffer.from(await res.arrayBuffer())));
+    if (kbViewerOptions.offline)
+      throw new Error(
+        `Obsidian ${kbViewerOptions.obsidianVersion} is not downloaded yet, and offline mode makes no downloads`,
+      );
+    const url = `https://github.com/obsidianmd/obsidian-releases/releases/download/v${kbViewerOptions.obsidianVersion}/obsidian-${kbViewerOptions.obsidianVersion}.asar.gz`;
+    kbViewerOptions.log.info("kb.obsidian_download", { url });
+    const response = await (kbViewerOptions.fetch ?? fetch)(url, { signal: AbortSignal.timeout(120_000) });
+    if (!response.ok)
+      throw new Error(`downloading Obsidian ${kbViewerOptions.obsidianVersion} failed: HTTP ${response.status}`);
+    const asarFile = join(kbViewerOptions.stateDir, `obsidian-${kbViewerOptions.obsidianVersion}.asar`);
+    mkdirSync(kbViewerOptions.stateDir, { recursive: true });
+    writeFileSync(asarFile, gunzipSync(Buffer.from(await response.arrayBuffer())));
     rmSync(dir, { recursive: true, force: true });
     const { extractAll } = await import("@electron/asar");
     extractAll(asarFile, dir);
     rmSync(asarFile, { force: true });
     if (!existsSync(join(dir, "index.html"))) throw new Error("the Obsidian package did not contain index.html");
-    writeFileSync(stamp, o.obsidianVersion);
-    o.log.info("kb.obsidian_ready", { version: o.obsidianVersion });
+    writeFileSync(stamp, kbViewerOptions.obsidianVersion);
+    kbViewerOptions.log.info("kb.obsidian_ready", { version: kbViewerOptions.obsidianVersion });
   }
 }
 

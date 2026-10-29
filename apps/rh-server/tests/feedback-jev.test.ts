@@ -114,9 +114,9 @@ test("judgments in quick succession never send a reason to Jev twice", async () 
   const { env, cards } = await withCards(4);
   try {
     const parses = Promise.all(
-      cards.map((c, i) => {
+      cards.map((card, i) => {
         env.feedback.judge(
-          c.id,
+          card.id,
           "up",
           ["Skip any paper without released code", "Maybe prefer shorter papers", "Nice figure 3", "Nice figure 3"][i],
         );

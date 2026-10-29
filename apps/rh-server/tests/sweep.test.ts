@@ -125,7 +125,7 @@ test("gate: relevance 0.2 is rejected with the reason, 0.5 passes as borderline,
   ];
   const env = sweepEnv({
     fetch: arxivOnlyFetch(papers),
-    script: (id, cmd, q, state: any) => {
+    script: (id, cmd, question, state: any) => {
       const title = String(state.paper?.title ?? "");
       if (id === "relevance")
         return score(
@@ -136,7 +136,7 @@ test("gate: relevance 0.2 is rejected with the reason, 0.5 passes as borderline,
               : 1,
           5,
         );
-      return passAll(id, cmd, q, state);
+      return passAll(id, cmd, question, state);
     },
   });
   try {

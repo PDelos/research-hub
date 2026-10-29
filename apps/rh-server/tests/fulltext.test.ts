@@ -36,8 +36,8 @@ function fakeWeb() {
 async function setup() {
   const web = fakeWeb();
   const server = await startTestServer({ hub: { paperFetch: web.fetch } });
-  const p = server.hub.project;
-  const { papers } = await p.plugins.exportsOf<PapersExports>("rh.papers");
+  const projectRuntime = server.hub.project;
+  const { papers } = await projectRuntime.plugins.exportsOf<PapersExports>("rh.papers");
   const add = (ids: Record<string, string>, extra: Record<string, unknown> = {}) =>
     papers.store.upsert({
       source: "openalex",
@@ -48,8 +48,8 @@ async function setup() {
       authors: [],
       ...extra,
     } as never).id;
-  const fulltext = await p.plugins.exportsOf<FullTextExports>("rh.fulltext");
-  return { server, p, papers, add, fulltext, web };
+  const fulltext = await projectRuntime.plugins.exportsOf<FullTextExports>("rh.fulltext");
+  return { server, p: projectRuntime, papers, add, fulltext, web };
 }
 
 test("sources in order: arXiv HTML, Europe PMC, bioRxiv, the PDF through the converter; misses say why", async () => {
@@ -95,17 +95,18 @@ test("sources in order: arXiv HTML, Europe PMC, bioRxiv, the PDF through the con
 test("the converter slot: pdf-text is active; Docling is unavailable without its image, and works with a Docling Serve", async () => {
   let docling: Server | undefined;
   const received: string[] = [];
-  docling = createServer((req, res) => {
-    if (req.url === "/health") return void res.end("ok");
-    res.setHeader("content-type", "application/json");
-    if (req.url?.startsWith("/v1/status/poll/")) return void res.end(JSON.stringify({ task_status: "success" }));
-    if (req.url?.startsWith("/v1/result/"))
-      return void res.end(JSON.stringify({ document: { md_content: DOCLING_MD }, status: "success" }));
+  docling = createServer((request, response) => {
+    if (request.url === "/health") return void response.end("ok");
+    response.setHeader("content-type", "application/json");
+    if (request.url?.startsWith("/v1/status/poll/"))
+      return void response.end(JSON.stringify({ task_status: "success" }));
+    if (request.url?.startsWith("/v1/result/"))
+      return void response.end(JSON.stringify({ document: { md_content: DOCLING_MD }, status: "success" }));
     let body = "";
-    req.on("data", (d: Buffer) => (body += d.toString("latin1")));
-    req.on("end", () => {
-      received.push(`${req.url} ${body}`);
-      res.end(JSON.stringify({ task_id: "t1", task_status: "pending" }));
+    request.on("data", (d: Buffer) => (body += d.toString("latin1")));
+    request.on("end", () => {
+      received.push(`${request.url} ${body}`);
+      response.end(JSON.stringify({ task_id: "t1", task_status: "pending" }));
     });
   });
   await new Promise<void>((r) => docling!.listen(0, "127.0.0.1", r));
@@ -140,8 +141,8 @@ test("the converter slot: pdf-text is active; Docling is unavailable without its
     assert.match(received[0], /name="files"; filename="paper.pdf"/);
     assert.match(received[0], /name="to_formats"\r\n\r\nmd/);
     await s.p.plugins.kernel.configure("rh.fulltext", { "fulltext.converter": "docling" });
-    const t = await s.fulltext.ensure(s.add({ arxiv: "2601.00002" }));
-    assert.equal(t.source, "pdf:docling");
+    const fullText = await s.fulltext.ensure(s.add({ arxiv: "2601.00002" }));
+    assert.equal(fullText.source, "pdf:docling");
   } finally {
     delete process.env.RH_DOCLING_URL;
     await s.server.stop();
@@ -176,28 +177,30 @@ test("a starred paper's note is written with its full text; facet vectors come f
           : base(input, init)) as typeof fetch,
     },
   });
-  const p = server.hub.project;
+  const projectRuntime = server.hub.project;
   try {
-    p.brief.write("# Protein LMs");
-    p.charters.saveDraft(validateCharter(sampleCharter()), "agent");
-    p.charters.approve();
-    p.syncVault();
-    p.scheduler.trigger("sweep");
-    for (let i = 0; i < 500 && !p.sweeps.list()[0]; i++) await new Promise((r) => setTimeout(r, 10));
-    await p.sweeps.settled(p.sweeps.list()[0].id, 30_000);
-    const card = p.cards.list()[0];
-    p.feedback.judge(card.id, "star", "Great");
-    for (let i = 0; i < 1500 && !p.ingest.requests().some((r: any) => r.status === "done"); i++)
+    projectRuntime.brief.write("# Protein LMs");
+    projectRuntime.charters.saveDraft(validateCharter(sampleCharter()), "agent");
+    projectRuntime.charters.approve();
+    projectRuntime.syncVault();
+    projectRuntime.scheduler.trigger("sweep");
+    for (let i = 0; i < 500 && !projectRuntime.sweeps.list()[0]; i++) await new Promise((r) => setTimeout(r, 10));
+    await projectRuntime.sweeps.settled(projectRuntime.sweeps.list()[0].id, 30_000);
+    const card = projectRuntime.cards.list()[0];
+    projectRuntime.feedback.judge(card.id, "star", "Great");
+    for (let i = 0; i < 1500 && !projectRuntime.ingest.requests().some((r: any) => r.status === "done"); i++)
       await new Promise((r) => setTimeout(r, 20));
-    const fulltext = await p.plugins.exportsOf<FullTextExports>("rh.fulltext");
+    const fulltext = await projectRuntime.plugins.exportsOf<FullTextExports>("rh.fulltext");
     assert.equal(fulltext.get(card.paperId)?.source, "arxiv-html");
     const prompts = (
-      p.db.prepare("SELECT text FROM agent_runs WHERE text LIKE 'Add this starred paper%'").all() as { text: string }[]
+      projectRuntime.db.prepare("SELECT text FROM agent_runs WHERE text LIKE 'Add this starred paper%'").all() as {
+        text: string;
+      }[]
     ).map((r) => r.text);
     assert.equal(prompts.length, 1);
     assert.match(prompts[0], /FULL_TEXT \(sections, possibly trimmed\):\n## Abstract\nWe report an AUROC of 0.87/);
     assert.match(prompts[0], /## Our kernels\nWe fine-tune on 12,000 transcripts/);
-    const { papers: service } = await p.plugins.exportsOf<PapersExports>("rh.papers");
+    const { papers: service } = await projectRuntime.plugins.exportsOf<PapersExports>("rh.papers");
     assert.ok(service.vectors.kinds(card.paperId).includes("method"));
   } finally {
     await server.stop();

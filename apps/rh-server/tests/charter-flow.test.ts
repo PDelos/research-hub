@@ -12,13 +12,13 @@ const BRIEF =
 
 function api(server: TestServer) {
   return async (method: string, path: string, body?: unknown) => {
-    const res = await fetch(`${server.url}${path}`, {
+    const response = await fetch(`${server.url}${path}`, {
       method,
       headers: { authorization: `Bearer ${TOKEN}`, ...(body ? { "content-type": "application/json" } : {}) },
       body: body ? JSON.stringify(body) : undefined,
     });
-    const text = await res.text();
-    return { status: res.status, body: text ? JSON.parse(text) : undefined };
+    const text = await response.text();
+    return { status: response.status, body: text ? JSON.parse(text) : undefined };
   };
 }
 

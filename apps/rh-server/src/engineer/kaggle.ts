@@ -46,13 +46,13 @@ export class KaggleRunner {
   }
 
   private async call<T>(method: string, body: Record<string, unknown>): Promise<T> {
-    const res = await this.deps.request(`${KAGGLE_API}/${method}`, {
+    const response = await this.deps.request(`${KAGGLE_API}/${method}`, {
       method: "POST",
       headers: { authorization: this.auth, "content-type": "application/json", accept: "application/json" },
       body: JSON.stringify(body),
     });
-    const text = await res.text();
-    if (!res.ok) throw new Error(`Kaggle ${method}: HTTP ${res.status} ${text.slice(0, 300)}`);
+    const text = await response.text();
+    if (!response.ok) throw new Error(`Kaggle ${method}: HTTP ${response.status} ${text.slice(0, 300)}`);
     return (text ? JSON.parse(text) : {}) as T;
   }
 

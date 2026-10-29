@@ -52,16 +52,16 @@ async function project(o: { sweeps?: number; focus?: [string, number] } = {}) {
           : arxivOnlyFetch(batches[batch] ?? [])(i, init)) as typeof fetch,
     },
   });
-  const p = server.hub.project;
-  p.brief.write("# x");
-  p.charters.saveDraft(validateCharter(sampleCharter()), "agent");
-  p.charters.approve();
-  await p.plugins.kernel.configure("rh.sweep", { cardsPerSweep: 12, explorationPicks: 0 });
+  const projectRuntime = server.hub.project;
+  projectRuntime.brief.write("# x");
+  projectRuntime.charters.saveDraft(validateCharter(sampleCharter()), "agent");
+  projectRuntime.charters.approve();
+  await projectRuntime.plugins.kernel.configure("rh.sweep", { cardsPerSweep: 12, explorationPicks: 0 });
   for (let b = 0; b < batches.length; b++) {
     batch = b;
-    p.scheduler.trigger("sweep");
-    await until(() => p.sweeps.list().length === b + 1, 10_000, "sweep");
-    await p.sweeps.settled(p.sweeps.list(1)[0].id, 30_000);
+    projectRuntime.scheduler.trigger("sweep");
+    await until(() => projectRuntime.sweeps.list().length === b + 1, 10_000, "sweep");
+    await projectRuntime.sweeps.settled(projectRuntime.sweeps.list(1)[0].id, 30_000);
   }
   for (const group of (await server.client.cards(200)).groups)
     for (const card of group.cards)
@@ -70,9 +70,9 @@ async function project(o: { sweeps?: number; focus?: [string, number] } = {}) {
         card.paper.title.startsWith("Good") ? "up" : "down",
         card.paper.title.startsWith("Good") ? undefined : "off topic",
       );
-  const upgrades = await p.plugins.exportsOf<UpgradesExports>("rh.upgrades");
-  const harness = await p.plugins.exportsOf<HarnessExports>("rh.harness");
-  return { server, p, upgrades, harness, or, jev };
+  const upgrades = await projectRuntime.plugins.exportsOf<UpgradesExports>("rh.upgrades");
+  const harness = await projectRuntime.plugins.exportsOf<HarnessExports>("rh.harness");
+  return { server, p: projectRuntime, upgrades, harness, or, jev };
 }
 
 test("the grid starts from what the analysis points at and keeps rank weights summing to the same total", () => {

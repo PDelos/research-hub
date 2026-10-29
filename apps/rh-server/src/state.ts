@@ -3,9 +3,9 @@ import type { AgentState } from "@rh/sdk";
 import type { ProjectRuntime } from "./project.ts";
 
 export async function agentState(project: ProjectRuntime): Promise<AgentState> {
-  const { harness, ctx } = project.harness;
+  const { harness, ctx: context } = project.harness;
   const model = await project.model();
-  const graph = await harness.taskGraph(ctx);
+  const graph = await harness.taskGraph(context);
   let busy: boolean;
   try {
     busy = Object.values(graph.value.tasks).some(

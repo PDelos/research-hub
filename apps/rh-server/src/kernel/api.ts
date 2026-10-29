@@ -292,8 +292,8 @@ export function createRhApi(plugin: DiscoveredPlugin, services: KernelServices, 
       prepare: (sql) => services.db.prepare(sql),
       run(sql, ...params) {
         ownTables(sql);
-        const r = services.db.prepare(sql).run(...params);
-        return { changes: Number(r.changes), lastInsertRowid: Number(r.lastInsertRowid) };
+        const written = services.db.prepare(sql).run(...params);
+        return { changes: Number(written.changes), lastInsertRowid: Number(written.lastInsertRowid) };
       },
       all(sql, ...params) {
         ownTables(sql);

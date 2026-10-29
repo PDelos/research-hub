@@ -29,16 +29,17 @@ test("exploration picks: none before likes, one marked last card after, none whe
   const server = await startTestServer({
     hub: { ticker: false, fauxRules: [cardWriterRule], jevDecide: scripted(passAll).decide, paperFetch: fetchBy },
   });
-  const p = server.hub.project;
-  p.brief.write("# Protein LMs");
-  p.charters.saveDraft(validateCharter(sampleCharter()), "agent");
-  p.charters.approve();
+  const projectRuntime = server.hub.project;
+  projectRuntime.brief.write("# Protein LMs");
+  projectRuntime.charters.saveDraft(validateCharter(sampleCharter()), "agent");
+  projectRuntime.charters.approve();
   const sweep = async (b: number) => {
     batch = b;
-    p.scheduler.trigger("sweep");
-    for (let i = 0; i < 500 && p.sweeps.list().length < b + 1; i++) await new Promise((r) => setTimeout(r, 10));
-    const id = p.sweeps.list()[0].id;
-    await p.sweeps.settled(id, 30_000);
+    projectRuntime.scheduler.trigger("sweep");
+    for (let i = 0; i < 500 && projectRuntime.sweeps.list().length < b + 1; i++)
+      await new Promise((r) => setTimeout(r, 10));
+    const id = projectRuntime.sweeps.list()[0].id;
+    await projectRuntime.sweeps.settled(id, 30_000);
     return server.client.sweep(id);
   };
   try {
@@ -60,7 +61,7 @@ test("exploration picks: none before likes, one marked last card after, none whe
     const cards = (await server.client.cards()).groups[0].cards;
     assert.equal(cards.filter((c) => c.exploration).length, 1);
 
-    await p.plugins.kernel.configure("rh.sweep", { explorationPicks: 0 });
+    await projectRuntime.plugins.kernel.configure("rh.sweep", { explorationPicks: 0 });
     const third = await sweep(2);
     assert.ok(third.papers.every((x) => !x.exploration));
   } finally {

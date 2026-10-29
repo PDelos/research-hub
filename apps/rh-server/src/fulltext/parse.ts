@@ -34,10 +34,10 @@ export function finish(sections: Section[]): Section[] {
 }
 
 /** The text of an element with math replaced by its TeX (alttext) and citations' brackets kept. */
-function textOf(el: HTMLElement): string {
-  for (const m of el.querySelectorAll("math")) m.replaceWith(` ${m.getAttribute("alttext") ?? ""} `);
-  for (const a of el.querySelectorAll(".ltx_note, .ltx_tag_note")) a.remove();
-  return el.textContent;
+function textOf(element: HTMLElement): string {
+  for (const m of element.querySelectorAll("math")) m.replaceWith(` ${m.getAttribute("alttext") ?? ""} `);
+  for (const a of element.querySelectorAll(".ltx_note, .ltx_tag_note")) a.remove();
+  return element.textContent;
 }
 
 /** arXiv's LaTeXML HTML: the abstract, then each top-level section with its paragraphs (appendices dropped). */
@@ -80,12 +80,12 @@ export function jatsToSections(xml: string): Section[] {
   return finish(sections);
 }
 
-function paragraphs(el: HTMLElement): string[] {
-  for (const x of el.querySelectorAll("xref, table-wrap, fig, disp-formula")) {
+function paragraphs(element: HTMLElement): string[] {
+  for (const x of element.querySelectorAll("xref, table-wrap, fig, disp-formula")) {
     if (x.tagName === "XREF") x.replaceWith(x.textContent);
     else x.remove();
   }
-  return el.querySelectorAll("p").map((p) => p.textContent.trim());
+  return element.querySelectorAll("p").map((p) => p.textContent.trim());
 }
 
 /** Docling's markdown: split at `#` and `##` headings (deeper headings stay in their section). */
@@ -170,14 +170,17 @@ export function facetTexts(
   const facets = sections.map((s) => FACET_OF_HEADING.find(([re]) => re.test(s.title))?.[1]);
   const firstBackground = facets.indexOf("background");
   const firstResult = facets.indexOf("result");
-  sections.forEach((s, i) => {
+  sections.forEach((section, i) => {
     const facet =
       facets[i] ??
-      (firstBackground >= 0 && i > firstBackground && (firstResult < 0 || i < firstResult) && !/abstract/i.test(s.title)
+      (firstBackground >= 0 &&
+      i > firstBackground &&
+      (firstResult < 0 || i < firstResult) &&
+      !/abstract/i.test(section.title)
         ? "method"
         : undefined);
     if (!facet) return;
-    out[facet] = `${out[facet] ? `${out[facet]}\n` : ""}${s.text}`.slice(0, max);
+    out[facet] = `${out[facet] ? `${out[facet]}\n` : ""}${section.text}`.slice(0, max);
   });
   return out;
 }

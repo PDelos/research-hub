@@ -14,43 +14,43 @@ const note = (title: string, body: string) =>
 
 async function withVault(rules?: FauxRule[]) {
   const server = await startTestServer({ hub: { ticker: false, ...(rules ? { fauxRules: rules } : {}) } });
-  const p = server.hub.project;
-  p.brief.write("# x");
-  p.charters.saveDraft(validateCharter(sampleCharter()), "agent");
-  p.charters.approve();
-  p.syncVault();
-  p.vault.create(
+  const projectRuntime = server.hub.project;
+  projectRuntime.brief.write("# x");
+  projectRuntime.charters.saveDraft(validateCharter(sampleCharter()), "agent");
+  projectRuntime.charters.approve();
+  projectRuntime.syncVault();
+  projectRuntime.vault.create(
     "sources/lin-2023-evolutionary-scale.md",
     note("Evolutionary-scale prediction", "ESM-2 predicts a contact map from attention; contact maps guide folding."),
   );
-  p.vault.create(
+  projectRuntime.vault.create(
     "sources/rao-2021-msa-transformer.md",
     note("MSA Transformer", "Alignments improve contact precision for Q2 tasks."),
   );
-  p.vault.create(
+  projectRuntime.vault.create(
     "concepts/protein-language-models.md",
     "# Protein language models\n\n## Papers\n\n- [[lin-2023-evolutionary-scale]]\n",
   );
-  p.vault.appendIndex('- [[lin-2023-evolutionary-scale]] · ESM-2 and ESMFold · advanced · "foundation"');
-  p.vault.appendIndex("- [[rao-2021-msa-transformer]] · MSA Transformer for contacts (Q2) · core");
-  p.kbIndex.sync();
-  return { server, p };
+  projectRuntime.vault.appendIndex('- [[lin-2023-evolutionary-scale]] · ESM-2 and ESMFold · advanced · "foundation"');
+  projectRuntime.vault.appendIndex("- [[rao-2021-msa-transformer]] · MSA Transformer for contacts (Q2) · core");
+  projectRuntime.kbIndex.sync();
+  return { server, p: projectRuntime };
 }
 
 test("keyword search ranks notes with an excerpt; rebuilding from the files gives the same results", async () => {
-  const { server, p } = await withVault();
+  const { server, p: projectRuntime } = await withVault();
   try {
-    const hits = p.kbIndex.search("contact map");
+    const hits = projectRuntime.kbIndex.search("contact map");
     assert.ok(hits.length >= 2);
     assert.equal(hits[0].stem, "lin-2023-evolutionary-scale", "two mentions rank first");
     assert.match(hits[0].excerpt, /\*\*contact\*\* \*\*map/i);
     assert.equal(hits[0].title, "Evolutionary-scale prediction");
     const before = JSON.stringify(hits);
-    p.db.exec("DELETE FROM kb_fts; DELETE FROM kb_files;");
-    assert.deepEqual(p.kbIndex.search("contact map"), []);
-    p.kbIndex.rebuild();
-    assert.equal(JSON.stringify(p.kbIndex.search("contact map")), before);
-    assert.deepEqual(p.kbIndex.search('NEAR("x") OR *'), [], "query syntax is never passed through");
+    projectRuntime.db.exec("DELETE FROM kb_fts; DELETE FROM kb_files;");
+    assert.deepEqual(projectRuntime.kbIndex.search("contact map"), []);
+    projectRuntime.kbIndex.rebuild();
+    assert.equal(JSON.stringify(projectRuntime.kbIndex.search("contact map")), before);
+    assert.deepEqual(projectRuntime.kbIndex.search('NEAR("x") OR *'), [], "query syntax is never passed through");
     assert.equal(ftsQuery('ESM-2 "contact"'), '"esm" "2" "contact"');
     assert.equal(noteTitle("a/b.md", "# Heading\n"), "Heading");
   } finally {
@@ -59,16 +59,16 @@ test("keyword search ranks notes with an excerpt; rebuilding from the files give
 });
 
 test("an external edit (as in Obsidian) is searchable within 10 seconds", async () => {
-  const { server, p } = await withVault();
+  const { server, p: projectRuntime } = await withVault();
   try {
-    p.kbIndex.start();
+    projectRuntime.kbIndex.start();
     const started = Date.now();
     appendFileSync(
-      join(p.vault.dir, "sources/rao-2021-msa-transformer.md"),
+      join(projectRuntime.vault.dir, "sources/rao-2021-msa-transformer.md"),
       "\nThe user added: zinc fingers matter.\n",
     );
-    writeFileSync(join(p.vault.dir, "questions/q9-new-page.md"), "# Q9\n\nAbout zinc fingers too.\n");
-    while (p.kbIndex.search("zinc fingers").length < 2) {
+    writeFileSync(join(projectRuntime.vault.dir, "questions/q9-new-page.md"), "# Q9\n\nAbout zinc fingers too.\n");
+    while (projectRuntime.kbIndex.search("zinc fingers").length < 2) {
       if (Date.now() - started > 10_000) throw new Error("not indexed within 10 s");
       await new Promise((r) => setTimeout(r, 100));
     }
@@ -88,12 +88,12 @@ test("the desk always sees the index and opens only the notes it cites", async (
     if (!turn.results.length && stem) return call("query_kb", { stem });
     return say(`From the index: ${stem} covers Q2. ${turn.results[0]?.text.split("\n")[0] ?? ""}`);
   };
-  const { server, p } = await withVault([rule]);
+  const { server, p: projectRuntime } = await withVault([rule]);
   try {
     const sent = await server.client.send("Which knowledge-base papers cover Q2?", { waitMs: 10_000 });
     assert.match(seen, /## Knowledge base index \(2 papers;/);
     assert.match(sent.answer!.text, /rao-2021-msa-transformer covers Q2\. sources\/rao-2021-msa-transformer\.md/);
-    const calls = p.db.prepare("SELECT tool_name FROM tool_calls").all() as any[];
+    const calls = projectRuntime.db.prepare("SELECT tool_name FROM tool_calls").all() as any[];
     assert.deepEqual(
       calls.map((c) => c.tool_name),
       ["query_kb"],

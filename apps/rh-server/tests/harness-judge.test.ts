@@ -37,23 +37,23 @@ async function project(judgeLikes: (title: string) => number) {
       paperFetch: ((i: any, o: any) => arxivOnlyFetch(batches[batch])(i, o)) as typeof fetch,
     },
   });
-  const p = server.hub.project;
-  p.brief.write("# x");
-  p.charters.saveDraft(validateCharter(sampleCharter()), "agent");
-  p.charters.approve();
-  await p.plugins.kernel.configure("rh.sweep", { cardsPerSweep: 10, explorationPicks: 0 });
+  const projectRuntime = server.hub.project;
+  projectRuntime.brief.write("# x");
+  projectRuntime.charters.saveDraft(validateCharter(sampleCharter()), "agent");
+  projectRuntime.charters.approve();
+  await projectRuntime.plugins.kernel.configure("rh.sweep", { cardsPerSweep: 10, explorationPicks: 0 });
   for (const b of [0, 1, 2]) {
     batch = b;
-    p.scheduler.trigger("sweep");
-    await until(() => p.sweeps.list().length === b + 1, 10_000, "sweep");
-    await p.sweeps.settled(p.sweeps.list(1)[0].id, 30_000);
+    projectRuntime.scheduler.trigger("sweep");
+    await until(() => projectRuntime.sweeps.list().length === b + 1, 10_000, "sweep");
+    await projectRuntime.sweeps.settled(projectRuntime.sweeps.list(1)[0].id, 30_000);
   }
   for (const group of (await server.client.cards(100)).groups)
     for (const card of group.cards)
       await server.client.judge(card.id, card.paper.title.startsWith("Good") ? (card.id % 2 ? "star" : "up") : "down");
-  const harness = await p.plugins.exportsOf<HarnessExports>("rh.harness");
+  const harness = await projectRuntime.plugins.exportsOf<HarnessExports>("rh.harness");
   const likeCalls = () => jev.calls.filter((c) => c.questions.includes("like")).length;
-  return { server, p, harness, likeCalls };
+  return { server, p: projectRuntime, harness, likeCalls };
 }
 
 test("a judge that agrees with the user is trusted, its labels are cached, and the budget stops labelling", async () => {
@@ -79,12 +79,12 @@ test("a judge that agrees with the user is trusted, its labels are cached, and t
     // A replay makes no Jev, model or embedding call.
     const count = (t: string) => Number((s.p.db.prepare(`SELECT COUNT(*) n FROM ${t}`).get() as { n: number }).n);
     const before = [count("jev_calls"), count("generations"), count("embedding_calls")];
-    const r = await s.harness.replay({ cardsPerSweep: 5 });
+    const storedReplay = await s.harness.replay({ cardsPerSweep: 5 });
     assert.deepEqual([count("jev_calls"), count("generations"), count("embedding_calls")], before);
-    assert.equal(r.report.sweeps.total, 3);
-    assert.equal(r.report.sweeps.labelled, 3);
-    assert.ok(["better", "worse", "inconclusive"].includes(r.report.verdict));
-    assert.equal(r.report.judgeUsed, true);
+    assert.equal(storedReplay.report.sweeps.total, 3);
+    assert.equal(storedReplay.report.sweeps.labelled, 3);
+    assert.ok(["better", "worse", "inconclusive"].includes(storedReplay.report.verdict));
+    assert.equal(storedReplay.report.judgeUsed, true);
   } finally {
     await s.server.stop();
   }
@@ -97,8 +97,8 @@ test("a judge that disagrees is not trusted: replays use only the user's verdict
     assert.equal(night.calibration.trusted, false);
     assert.ok(night.calibration.agreement! < 0.7);
     assert.equal(s.harness.judge.labelsIfTrusted(), undefined);
-    const r = await s.harness.replay({ cardsPerSweep: 5 });
-    assert.equal(r.report.judgeUsed, false);
+    const storedReplay = await s.harness.replay({ cardsPerSweep: 5 });
+    assert.equal(storedReplay.report.judgeUsed, false);
     assert.equal(s.harness.quality().judge?.trusted, false);
   } finally {
     await s.server.stop();

@@ -38,17 +38,17 @@ async function project(
       ...extra,
     },
   });
-  const p = server.hub.project;
-  if (!p.charters.approved()) {
-    p.brief.write("# Protein LMs");
-    p.charters.saveDraft(validateCharter(sampleCharter()), "agent");
-    p.charters.approve();
-    p.syncVault();
-    p.scheduler.trigger("sweep");
-    for (let i = 0; i < 500 && !p.sweeps.list()[0]; i++) await new Promise((r) => setTimeout(r, 10));
-    await p.sweeps.settled(p.sweeps.list()[0].id, 30_000);
+  const projectRuntime = server.hub.project;
+  if (!projectRuntime.charters.approved()) {
+    projectRuntime.brief.write("# Protein LMs");
+    projectRuntime.charters.saveDraft(validateCharter(sampleCharter()), "agent");
+    projectRuntime.charters.approve();
+    projectRuntime.syncVault();
+    projectRuntime.scheduler.trigger("sweep");
+    for (let i = 0; i < 500 && !projectRuntime.sweeps.list()[0]; i++) await new Promise((r) => setTimeout(r, 10));
+    await projectRuntime.sweeps.settled(projectRuntime.sweeps.list()[0].id, 30_000);
   }
-  return { server, p };
+  return { server, p: projectRuntime };
 }
 
 const done = async (p: any, n: number, ms = 15_000) => {
@@ -62,15 +62,15 @@ const done = async (p: any, n: number, ms = 15_000) => {
 test("a starred paper becomes one connected evidence note with all properties and sections; index and log grow", async () => {
   const papers = fakePapers(4);
   papers[3].abstract = "Protein language models are widely used. We use attention maps as features.";
-  const { server, p } = await project(papers);
+  const { server, p: projectRuntime } = await project(papers);
   try {
-    const cards = p.cards.list();
-    p.feedback.judge(cards[0].id, "star", "Exactly the foundation I need");
-    await done(p, 1);
-    const paper = p.papers.store.get(cards[0].paperId)!;
-    const stem = p.ingest.note(paper.id)!;
+    const cards = projectRuntime.cards.list();
+    projectRuntime.feedback.judge(cards[0].id, "star", "Exactly the foundation I need");
+    await done(projectRuntime, 1);
+    const paper = projectRuntime.papers.store.get(cards[0].paperId)!;
+    const stem = projectRuntime.ingest.note(paper.id)!;
     assert.match(stem, /^author-2026-paper-\d+-on-protein-language$/);
-    const note = p.vault.read(`sources/${stem}.md`)!;
+    const note = projectRuntime.vault.read(`sources/${stem}.md`)!;
     for (const prop of [
       "title",
       "authors",
@@ -100,30 +100,30 @@ test("a starred paper becomes one connected evidence note with all properties an
     assert.match(note, /## Limitations\n\nNot stated in the abstract/);
     // First paper of a concept: the page is created and links back; the note links to it and to Q1's page.
     const concept =
-      p.vault.read("concepts/how-do-protein-lms-transfer-to-structure.md") ??
-      p.vault.read("concepts/protein-language-models.md")!;
+      projectRuntime.vault.read("concepts/how-do-protein-lms-transfer-to-structure.md") ??
+      projectRuntime.vault.read("concepts/protein-language-models.md")!;
     assert.ok(concept.includes(`[[${stem}]]`));
     assert.match(note, /- Concept: \[\[protein-language-models\]\]/);
     assert.match(note, /- Question: \[\[q1-how-do-protein-lms-transfer-to\]\]/);
-    assert.ok(p.vault.read("questions/q1-how-do-protein-lms-transfer-to.md")!.includes(`[[${stem}]]`));
+    assert.ok(projectRuntime.vault.read("questions/q1-how-do-protein-lms-transfer-to.md")!.includes(`[[${stem}]]`));
 
     // Two more: the index has three paper lines and the log three entries; a paper with no results says so.
-    p.feedback.judge(cards[1].id, "star");
+    projectRuntime.feedback.judge(cards[1].id, "star");
     const noResults = cards.find((c) =>
-      p.papers.store.get(c.paperId)!.abstract!.startsWith("Protein language models are widely used"),
+      projectRuntime.papers.store.get(c.paperId)!.abstract!.startsWith("Protein language models are widely used"),
     )!;
-    p.feedback.judge(noResults.id, "star", "simple and clear");
-    await done(p, 3);
-    const index = p.vault.read("index.md")!;
+    projectRuntime.feedback.judge(noResults.id, "star", "simple and clear");
+    await done(projectRuntime, 3);
+    const index = projectRuntime.vault.read("index.md")!;
     assert.equal(index.match(/^- \[\[/gm)!.length, 3);
     assert.match(
       index,
       /- \[\[author-2026-paper-\d+-on-protein-language\]\] · .+ · advanced · "Exactly the foundation I need"/,
     );
-    assert.equal(p.vault.read("log.md")!.match(/ingested \[\[/g)!.length, 3);
-    const plain = p.vault.read(`sources/${p.ingest.note(noResults.paperId)}.md`)!;
+    assert.equal(projectRuntime.vault.read("log.md")!.match(/ingested \[\[/g)!.length, 3);
+    const plain = projectRuntime.vault.read(`sources/${projectRuntime.ingest.note(noResults.paperId)}.md`)!;
     assert.match(plain, /## Results\n\nNot stated in the abstract/);
-    assert.equal((p.db.prepare("SELECT COUNT(*) n FROM kb_notes").get() as any).n, 3);
+    assert.equal((projectRuntime.db.prepare("SELECT COUNT(*) n FROM kb_notes").get() as any).n, 3);
     const library = await server.client.kbPapers();
     assert.equal(library.length, 3);
     assert.ok(library.every((x) => x.status === "done" && x.stem && x.level));
@@ -158,24 +158,24 @@ test("an invented number is refused; an edited note keeps the user's Summary whe
     }
     return librarianRule(turn);
   };
-  const { server, p } = await project(fakePapers(3), [cardWriterRule, strict]);
+  const { server, p: projectRuntime } = await project(fakePapers(3), [cardWriterRule, strict]);
   try {
-    const cards = p.cards.list();
-    p.feedback.judge(cards[0].id, "star");
-    await done(p, 1);
-    const first = p.ingest.note(cards[0].paperId)!;
+    const cards = projectRuntime.cards.list();
+    projectRuntime.feedback.judge(cards[0].id, "star");
+    await done(projectRuntime, 1);
+    const first = projectRuntime.ingest.note(cards[0].paperId)!;
     const view = JSON.stringify(
-      p.db.prepare("SELECT result_text FROM tool_calls WHERE tool_name = 'write_evidence_note'").all(),
+      projectRuntime.db.prepare("SELECT result_text FROM tool_calls WHERE tool_name = 'write_evidence_note'").all(),
     );
     assert.match(view, /numbers not in the title, abstract, full text or reason: 99/);
     // The user rewrites the Summary in Obsidian.
-    const path = join(p.vault.dir, "sources", `${first}.md`);
+    const path = join(projectRuntime.vault.dir, "sources", `${first}.md`);
     const edited = readFileSync(path, "utf8").replace(/## Summary\n\n[^\n]*/, "## Summary\n\nMy own summary, keep it.");
     writeFileSync(path, edited);
-    p.feedback.judge(cards[1].id, "star");
-    await done(p, 2);
+    projectRuntime.feedback.judge(cards[1].id, "star");
+    await done(projectRuntime, 2);
     const after = readFileSync(path, "utf8");
-    const second = p.ingest.note(cards[1].paperId)!;
+    const second = projectRuntime.ingest.note(cards[1].paperId)!;
     assert.match(after, /## Summary\n\nMy own summary, keep it\./);
     assert.equal(after, `${edited.trimEnd()}\n- [[${second}]]\n`, "only one line was added, under Related papers");
   } finally {

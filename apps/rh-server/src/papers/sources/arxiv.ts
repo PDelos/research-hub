@@ -17,24 +17,27 @@ export class ArxivSource implements PaperSource {
   readonly name = "arxiv" as const;
   constructor(private readonly deps: SourceDeps) {}
 
-  async search(q: SourceQuery): Promise<SourcePaper[]> {
-    const terms = queryTerms(q.query).map((t) => `all:${t.includes(" ") ? t : t.replace(/"/g, "")}`);
+  async search(sourceQuery: SourceQuery): Promise<SourcePaper[]> {
+    const terms = queryTerms(sourceQuery.query).map((t) => `all:${t.includes(" ") ? t : t.replace(/"/g, "")}`);
     if (!terms.length) return [];
     let query = terms.join(" AND ");
-    if (q.since || q.until) {
-      const from = (q.since ?? "1991-01-01").replace(/-/g, "") + "0000";
-      const to = (q.until ?? "2999-12-31").replace(/-/g, "") + "2359";
+    if (sourceQuery.since || sourceQuery.until) {
+      const from = (sourceQuery.since ?? "1991-01-01").replace(/-/g, "") + "0000";
+      const to = (sourceQuery.until ?? "2999-12-31").replace(/-/g, "") + "2359";
       query += ` AND submittedDate:[${from} TO ${to}]`;
     }
     const params = new URLSearchParams({
       search_query: query,
       start: "0",
-      max_results: String(q.limit),
-      sortBy: q.since ? "submittedDate" : "relevance",
+      max_results: String(sourceQuery.limit),
+      sortBy: sourceQuery.since ? "submittedDate" : "relevance",
       sortOrder: "descending",
     });
-    const xml = await this.deps.http.text(`${ARXIV_API}?${params}`, { source: this.name, budgetMs: q.budgetMs });
-    return parseArxivFeed(xml).filter((p) => inWindow(p.publishedAt, q.since, q.until));
+    const xml = await this.deps.http.text(`${ARXIV_API}?${params}`, {
+      source: this.name,
+      budgetMs: sourceQuery.budgetMs,
+    });
+    return parseArxivFeed(xml).filter((p) => inWindow(p.publishedAt, sourceQuery.since, sourceQuery.until));
   }
 }
 

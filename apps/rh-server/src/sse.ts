@@ -20,21 +20,21 @@ export interface Sse {
   readonly closed: boolean;
 }
 
-export function openSse(res: Response): Sse {
-  res.status(200).set({
+export function openSse(response: Response): Sse {
+  response.status(200).set({
     "content-type": "text/event-stream; charset=utf-8",
     "cache-control": "no-cache, no-transform",
     connection: "keep-alive",
     "x-accel-buffering": "no",
   });
-  res.flushHeaders();
-  res.socket?.setNoDelay(true);
+  response.flushHeaders();
+  response.socket?.setNoDelay(true);
   let seq = 0;
   let closed = false;
   const cleanups: (() => void)[] = [];
   const last = new Map<string, string>();
   const ping = setInterval(() => {
-    if (!closed) res.write(": ping\n\n");
+    if (!closed) response.write(": ping\n\n");
   }, 15_000);
   const close = () => {
     if (closed) return;
@@ -46,15 +46,15 @@ export function openSse(res: Response): Sse {
       } catch {}
     }
   };
-  res.on("close", close);
+  response.on("close", close);
   const send = (frame: Frame) => {
     if (closed) return;
-    if (res.writableLength > MAX_BUFFER) {
-      res.end();
+    if (response.writableLength > MAX_BUFFER) {
+      response.end();
       close();
       return;
     }
-    res.write(`id: ${++seq}\nevent: ${frame.type}\ndata: ${JSON.stringify(frame)}\n\n`);
+    response.write(`id: ${++seq}\nevent: ${frame.type}\ndata: ${JSON.stringify(frame)}\n\n`);
   };
   return {
     send,
@@ -69,7 +69,7 @@ export function openSse(res: Response): Sse {
       else cleanups.push(fn);
     },
     close() {
-      res.end();
+      response.end();
       close();
     },
     get closed() {
@@ -92,8 +92,8 @@ export function coalesce(fn: () => Promise<void>, ms: number, onError: (e: unkno
     running = true;
     try {
       await fn();
-    } catch (e) {
-      onError(e);
+    } catch (error) {
+      onError(error);
     } finally {
       running = false;
       if (again) {
@@ -112,10 +112,10 @@ export class StreamHub {
   private readonly open = new Set<Sse>();
   closing = false;
 
-  async serve(project: ProjectRuntime, log: Logger, req: Request, res: Response): Promise<void> {
-    const { harness, ctx } = project.harness;
+  async serve(project: ProjectRuntime, log: Logger, request: Request, response: Response): Promise<void> {
+    const { harness, ctx: context } = project.harness;
     const id = project.root.id;
-    const sse = openSse(res);
+    const sse = openSse(response);
     this.open.add(sse);
     sse.onClose(() => this.open.delete(sse));
     const slog = log.child({ stream: true });
@@ -127,7 +127,7 @@ export class StreamHub {
       project: project.name,
       mainConversationId: id as number,
     });
-    const stream = await watchEvents(harness, id, ctx);
+    const stream = await watchEvents(harness, id, context);
     sse.send({
       type: "agent.snapshot",
       conversationId: id as number,
@@ -165,7 +165,7 @@ export class StreamHub {
     const kernel = project.plugins.kernel;
     sse.sendIfChanged("plugins", { type: "plugins", plugins: kernel.list() });
     sse.onClose(kernel.onChange((plugins) => sse.sendIfChanged("plugins", { type: "plugins", plugins })));
-    void req;
+    void request;
   }
 
   closeAll(): void {

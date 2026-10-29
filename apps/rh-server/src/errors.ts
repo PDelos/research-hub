@@ -41,7 +41,7 @@ export const invalid = (message: string) => new ApiFault("invalid", message);
 export const notFound = (message: string) => new ApiFault("not_found", message);
 
 export function errorMiddleware(log: Logger): ErrorRequestHandler {
-  return (err, req, res, _next) => {
+  return (err, request, response, _next) => {
     let fault: ApiFault;
     if (err instanceof ApiFault) fault = err;
     else if (err instanceof ConversationBusy) fault = new ApiFault("busy", "The agent is busy");
@@ -49,15 +49,15 @@ export function errorMiddleware(log: Logger): ErrorRequestHandler {
     else if (err?.type === "entity.too.large") fault = invalid("Body too large");
     else {
       log.error("http.error", {
-        method: req.method,
-        path: req.path,
+        method: request.method,
+        path: request.path,
         error: err instanceof Error ? err.message : String(err),
         stack: err instanceof Error ? err.stack : undefined,
       });
       fault = new ApiFault("internal", "Internal error");
     }
-    if (res.headersSent) return void res.end();
-    res.status(fault.status).json({
+    if (response.headersSent) return void response.end();
+    response.status(fault.status).json({
       error: {
         code: fault.code,
         message: fault.message,

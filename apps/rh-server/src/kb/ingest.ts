@@ -84,7 +84,7 @@ export class Ingest {
         limitations: sectionText("Stated limitations"),
         open_questions: sectionText("Questions the paper leaves open"),
       }),
-      execute: async (args, api, ctx) => {
+      execute: async (args, api, context) => {
         const request = this.active();
         if (!request) return toolError("No paper is being ingested.", ["Stop here."]);
         const paper = this.deps.store.get(request.paperId)!;
@@ -104,7 +104,7 @@ export class Ingest {
           return toolError(`The note was not written: ${problems.join("; ")}.`, [
             "Fix exactly these and call write_evidence_note again.",
           ]);
-        const stem = await once<string>(api, "note", ctx, async () => this.writeNote(paper, request, sections));
+        const stem = await once<string>(api, "note", context, async () => this.writeNote(paper, request, sections));
         return toolText(`Wrote sources/${stem}.md. Now call link_note with at least one concept or research question.`);
       },
     });
@@ -118,7 +118,7 @@ export class Ingest {
         questions: Type.Optional(Type.Array(Type.String(), { maxItems: 7 })),
         related: Type.Optional(Type.Array(Type.String(), { maxItems: 5, description: "Stems of existing notes" })),
       }),
-      execute: async (args, api, ctx) => {
+      execute: async (args, api, context) => {
         const request = this.active();
         if (!request) return toolError("No paper is being ingested.", ["Stop here."]);
         const stem = this.note(request.paperId);
@@ -132,7 +132,7 @@ export class Ingest {
           return toolError("Nothing to link: give at least one concept or a research question id from the list.", [
             "Call link_note again.",
           ]);
-        const result = await once<string>(api, "link", ctx, async () =>
+        const result = await once<string>(api, "link", context, async () =>
           this.link(stem, concepts, questions, args.related ?? []),
         );
         this.tryComplete(request.paperId);
@@ -152,9 +152,9 @@ export class Ingest {
     return () => this.listeners.delete(listener);
   }
 
-  attach(harness: Harness, ctx: Context): void {
+  attach(harness: Harness, context: Context): void {
     this.harness = harness;
-    this.ctx = ctx;
+    this.ctx = context;
   }
 
   private now(): number {
@@ -295,11 +295,11 @@ export class Ingest {
   private watch(request: KbRequest): void {
     if (request.submissionId === undefined || this.watching.has(request.paperId) || !this.harness || !this.ctx) return;
     this.watching.add(request.paperId);
-    const { harness, ctx } = this;
+    const { harness, ctx: context } = this;
     void (async () => {
       try {
-        const submission = await harness.submission(request.submissionId as SubmissionId, ctx);
-        if (submission) await submission.wait(ctx);
+        const submission = await harness.submission(request.submissionId as SubmissionId, context);
+        if (submission) await submission.wait(context);
         this.settle(request.paperId);
       } catch (error) {
         this.deps.log.warn("kb.ingest_watch_failed", { paperId: request.paperId, error: String(error) });
@@ -445,9 +445,9 @@ export class Ingest {
       linked.push(`concepts/${page}`);
     }
     for (const id of questions) {
-      const q = charter.questions.find((x) => x.id === id)!;
-      const page = `${id.toLowerCase()}-${slug(q.text, 6)}`;
-      ensurePage(`questions/${page}.md`, `${id}: ${q.text}`);
+      const charterQuestion = charter.questions.find((x) => x.id === id)!;
+      const page = `${id.toLowerCase()}-${slug(charterQuestion.text, 6)}`;
+      ensurePage(`questions/${page}.md`, `${id}: ${charterQuestion.text}`);
       vault.appendUnderHeading(`sources/${stem}.md`, "## Related papers", `- Question: [[${page}]]`);
       linked.push(`questions/${page}`);
     }

@@ -48,8 +48,8 @@ export function createHttpApp(hub: Hub) {
     // The page title names the project, so several project tabs are easy to tell apart.
     const title = `${config.projectName} · Research Hub`;
     const page = readFileSync(indexFile, "utf8").replace(/<title>[^<]*<\/title>/, `<title>${title}</title>`);
-    const sendPage = (_req: express.Request, res: express.Response) =>
-      void res.type("html").set("cache-control", "no-cache").send(page);
+    const sendPage = (_request: express.Request, response: express.Response) =>
+      void response.type("html").set("cache-control", "no-cache").send(page);
     http.get("/", sendPage);
     http.get("/index.html", sendPage);
     http.use(express.static(config.uiDir, { index: false, maxAge: "1h" }));
@@ -59,8 +59,8 @@ export function createHttpApp(hub: Hub) {
   } else {
     log.warn("ui.missing", { uiDir: config.uiDir, hint: "npm run build -w rh-client-browser" });
   }
-  http.use((req) => {
-    throw notFound(`No route ${req.method} ${req.path}`);
+  http.use((request) => {
+    throw notFound(`No route ${request.method} ${request.path}`);
   });
   http.use(errorMiddleware(log));
   return { http, streams };

@@ -31,15 +31,15 @@ test("judging through the API: verdicts on cards, weight effects in details, wei
       paperFetch: arxivOnlyFetch(fakePapers(7)),
     },
   });
-  const p = server.hub.project;
+  const projectRuntime = server.hub.project;
   try {
-    p.brief.write("# Protein LMs");
-    p.charters.saveDraft(validateCharter(sampleCharter()), "agent");
-    p.charters.approve();
-    p.feedback.replay();
-    p.scheduler.trigger("sweep");
-    for (let i = 0; i < 500 && !p.sweeps.list()[0]; i++) await new Promise((r) => setTimeout(r, 10));
-    await p.sweeps.settled(p.sweeps.list()[0].id, 30_000);
+    projectRuntime.brief.write("# Protein LMs");
+    projectRuntime.charters.saveDraft(validateCharter(sampleCharter()), "agent");
+    projectRuntime.charters.approve();
+    projectRuntime.feedback.replay();
+    projectRuntime.scheduler.trigger("sweep");
+    for (let i = 0; i < 500 && !projectRuntime.sweeps.list()[0]; i++) await new Promise((r) => setTimeout(r, 10));
+    await projectRuntime.sweeps.settled(projectRuntime.sweeps.list()[0].id, 30_000);
     const cards = (await server.client.cards()).groups[0].cards;
     assert.equal(cards.length, 7);
     assert.equal(cards[0].judgment, null);
@@ -70,13 +70,17 @@ test("judging through the API: verdicts on cards, weight effects in details, wei
     const regrouped = (await server.client.cards()).groups[0].cards;
     assert.equal(regrouped[2].judgment!.verdict, "down");
     await new Promise((r) => setTimeout(r, 200));
-    assert.equal(p.feedback.get(cards[0].id)!.ruleStatus, "none", "the reason was parsed in the background");
-    assert.equal(p.feedback.get(cards[0].id)!.reasonKind, "great-foundation");
+    assert.equal(
+      projectRuntime.feedback.get(cards[0].id)!.ruleStatus,
+      "none",
+      "the reason was parsed in the background",
+    );
+    assert.equal(projectRuntime.feedback.get(cards[0].id)!.reasonKind, "great-foundation");
 
     const cleared = await server.client.clearJudgment(cards[1].id);
     assert.equal(cleared.judgment, null);
     assert.deepEqual(
-      p.feedback
+      projectRuntime.feedback
         .kbRequests()
         .map((r) => r.status)
         .sort(),
@@ -100,21 +104,21 @@ test('in chat, "star the second card, great foundation" records a ⭐ with that 
       paperFetch: arxivOnlyFetch(fakePapers(4)),
     },
   });
-  const p = server.hub.project;
+  const projectRuntime = server.hub.project;
   try {
-    p.brief.write("# Protein LMs");
-    p.charters.saveDraft(validateCharter(sampleCharter()), "agent");
-    p.charters.approve();
-    p.scheduler.trigger("sweep");
-    for (let i = 0; i < 500 && !p.sweeps.list()[0]; i++) await new Promise((r) => setTimeout(r, 10));
-    await p.sweeps.settled(p.sweeps.list()[0].id, 30_000);
+    projectRuntime.brief.write("# Protein LMs");
+    projectRuntime.charters.saveDraft(validateCharter(sampleCharter()), "agent");
+    projectRuntime.charters.approve();
+    projectRuntime.scheduler.trigger("sweep");
+    for (let i = 0; i < 500 && !projectRuntime.sweeps.list()[0]; i++) await new Promise((r) => setTimeout(r, 10));
+    await projectRuntime.sweeps.settled(projectRuntime.sweeps.list()[0].id, 30_000);
     const second = (await server.client.cards()).groups[0].cards[1];
     const sent = await server.client.send("star the second card, great foundation", { waitMs: 15_000 });
     assert.equal(sent.status, "done");
     assert.match(sent.answer!.text, /⭐ recorded on card \d+ .* with the reason "great foundation"/);
-    const j = p.feedback.get(second.id)!;
+    const j = projectRuntime.feedback.get(second.id)!;
     assert.deepEqual({ verdict: j.verdict, reason: j.reason }, { verdict: "star", reason: "great foundation" });
-    assert.equal(p.feedback.kbRequests().length, 1);
+    assert.equal(projectRuntime.feedback.kbRequests().length, 1);
   } finally {
     await server.stop();
   }

@@ -19,7 +19,7 @@ test("level fit: auto keeps the earlier table; a target level fits best and less
 });
 
 test("a replay with a level ranks papers at that level first", () => {
-  const h: SweepHistory = {
+  const sweepHistory: SweepHistory = {
     sweepId: 1,
     startedAt: Date.now(),
     orientation: false,
@@ -31,8 +31,8 @@ test("a replay with a level ranks papers at that level first", () => {
     ],
   } as never;
   const s = { ...DEFAULT_SETTINGS, cardsPerSweep: 1, explorationPicks: 0 };
-  assert.deepEqual(replayCards(h, { ...s, level: "frontier" }).cards, [2]);
-  assert.deepEqual(replayCards(h, { ...s, level: "foundational" }).cards, [1]);
+  assert.deepEqual(replayCards(sweepHistory, { ...s, level: "frontier" }).cards, [2]);
+  assert.deepEqual(replayCards(sweepHistory, { ...s, level: "foundational" }).cards, [1]);
 });
 
 test("approved taste rules go with every paper decision; settings are validated", async () => {
@@ -54,15 +54,18 @@ test("approved taste rules go with every paper decision; settings are validated"
     },
   });
   try {
-    const p = server.hub.project;
-    p.brief.write("# x");
-    p.charters.saveDraft(validateCharter(sampleCharter()), "agent");
-    p.charters.approve();
-    await assert.rejects(p.plugins.kernel.configure("rh.sweep", { level: "expert" }));
-    await p.plugins.kernel.configure("rh.sweep", { tasteRules: ["No clinical trials"], level: "advanced" });
-    p.scheduler.trigger("sweep");
-    await until(() => p.sweeps.list().length === 1, 10_000, "sweep");
-    await p.sweeps.settled(p.sweeps.list(1)[0].id, 30_000);
+    const projectRuntime = server.hub.project;
+    projectRuntime.brief.write("# x");
+    projectRuntime.charters.saveDraft(validateCharter(sampleCharter()), "agent");
+    projectRuntime.charters.approve();
+    await assert.rejects(projectRuntime.plugins.kernel.configure("rh.sweep", { level: "expert" }));
+    await projectRuntime.plugins.kernel.configure("rh.sweep", {
+      tasteRules: ["No clinical trials"],
+      level: "advanced",
+    });
+    projectRuntime.scheduler.trigger("sweep");
+    await until(() => projectRuntime.sweeps.list().length === 1, 10_000, "sweep");
+    await projectRuntime.sweeps.settled(projectRuntime.sweeps.list(1)[0].id, 30_000);
     const withRules = jev.calls.filter((c) => (c.state as any).taste_rules);
     assert.ok(withRules.length > 0);
     assert.deepEqual((withRules[0].state as any).taste_rules.rules, ["No clinical trials"]);

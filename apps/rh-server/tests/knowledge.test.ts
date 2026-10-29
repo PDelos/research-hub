@@ -45,16 +45,19 @@ async function project(o: { promise?: number; sweeps?: number } = {}) {
       paperFetch: ((i: any, init: any) => arxivOnlyFetch(batches[batch] ?? [])(i, init)) as typeof fetch,
     },
   });
-  const p = server.hub.project;
-  p.brief.write("# x");
-  p.charters.saveDraft(validateCharter(sampleCharter({ questions: QUESTIONS.map((text) => ({ text })) })), "agent");
-  p.charters.approve();
-  await p.plugins.kernel.configure("rh.sweep", { cardsPerSweep: 12, explorationPicks: 0 });
+  const projectRuntime = server.hub.project;
+  projectRuntime.brief.write("# x");
+  projectRuntime.charters.saveDraft(
+    validateCharter(sampleCharter({ questions: QUESTIONS.map((text) => ({ text })) })),
+    "agent",
+  );
+  projectRuntime.charters.approve();
+  await projectRuntime.plugins.kernel.configure("rh.sweep", { cardsPerSweep: 12, explorationPicks: 0 });
   const sweep = async () => {
-    const n = p.sweeps.list().length;
-    p.scheduler.trigger("sweep");
-    await until(() => p.sweeps.list().length === n + 1, 10_000, "sweep");
-    await p.sweeps.settled(p.sweeps.list(1)[0].id, 30_000);
+    const n = projectRuntime.sweeps.list().length;
+    projectRuntime.scheduler.trigger("sweep");
+    await until(() => projectRuntime.sweeps.list().length === n + 1, 10_000, "sweep");
+    await projectRuntime.sweeps.settled(projectRuntime.sweeps.list(1)[0].id, 30_000);
   };
   for (let b = 0; b < batches.length; b++) {
     batch = b;
@@ -65,14 +68,14 @@ async function project(o: { promise?: number; sweeps?: number } = {}) {
       const good = card.paper.title.startsWith("Ribosome");
       await server.client.judge(card.id, good ? "star" : "down", good ? undefined : "not my field");
     }
-  p.db.exec("UPDATE judgments SET reason_kind = 'off-topic' WHERE verdict = 'down'");
-  const knowledge = await p.plugins.exportsOf<KnowledgeExports>("rh.knowledge");
-  return { server, p, knowledge, jev, sweep, setBatch: (b: number) => (batch = b) };
+  projectRuntime.db.exec("UPDATE judgments SET reason_kind = 'off-topic' WHERE verdict = 'down'");
+  const knowledge = await projectRuntime.plugins.exportsOf<KnowledgeExports>("rh.knowledge");
+  return { server, p: projectRuntime, knowledge, jev, sweep, setBatch: (b: number) => (batch = b) };
 }
 
 test("applyChange keeps ids, refuses to go under the minimums and reports a vanished target as stale", () => {
-  const c = validateCharter(sampleCharter({ questions: QUESTIONS.map((text) => ({ text })) }), { keepIds: true });
-  const retired = applyChange(c, { kind: "retire-question", target: "Q2" });
+  const charter = validateCharter(sampleCharter({ questions: QUESTIONS.map((text) => ({ text })) }), { keepIds: true });
+  const retired = applyChange(charter, { kind: "retire-question", target: "Q2" });
   assert.deepEqual(
     retired.questions.map((q) => q.id),
     ["Q1", "Q3", "Q4"],
@@ -170,9 +173,9 @@ test("rejected proposals are not proposed again; low-promise directions are drop
   }
   const empty = await project({ sweeps: 0 });
   try {
-    const r = await empty.knowledge.review();
-    assert.deepEqual(r.report.proposals, []);
-    assert.match(r.report.notes.join(" "), /No judgments or comments/);
+    const knowledgeReview = await empty.knowledge.review();
+    assert.deepEqual(knowledgeReview.report.proposals, []);
+    assert.match(knowledgeReview.report.notes.join(" "), /No judgments or comments/);
   } finally {
     await empty.server.stop();
   }

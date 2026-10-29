@@ -22,9 +22,9 @@ export async function embedAll(
   return out;
 }
 
-const dot = (a: Float32Array, b: Float32Array) => {
+const dot = (float32Array: Float32Array, b: Float32Array) => {
   let s = 0;
-  for (let i = 0; i < a.length; i++) s += a[i] * b[i];
+  for (let i = 0; i < float32Array.length; i++) s += float32Array[i] * b[i];
   return s;
 };
 
@@ -86,16 +86,16 @@ export async function facetsTask(
     );
     a.sentences.forEach((s, i) => {
       sentences++;
-      const p = predicted[i] ?? "other";
+      const facetLabel = predicted[i] ?? "other";
       for (const c of classes) {
-        if (p === c && s.label === c) tally[c].tp++;
-        else if (p === c) tally[c].fp++;
+        if (facetLabel === c && s.label === c) tally[c].tp++;
+        else if (facetLabel === c) tally[c].fp++;
         else if (s.label === c) tally[c].fn++;
       }
     });
   }
-  const f1 = classes.map((c) => {
-    const { tp, fp, fn } = tally[c];
+  const f1 = classes.map((facetLabel) => {
+    const { tp, fp, fn } = tally[facetLabel];
     const precision = tp + fp ? tp / (tp + fp) : 0;
     const recall = tp + fn ? tp / (tp + fn) : 0;
     return precision + recall ? (2 * precision * recall) / (precision + recall) : 0;

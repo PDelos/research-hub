@@ -22,15 +22,15 @@ import { KERNEL_API_VERSION } from "./kernel/manifest.ts";
 
 const MAX_MESSAGE = 100_000;
 
-function bodyOf(req: Request): Record<string, unknown> {
-  const body = req.body;
+function bodyOf(request: Request): Record<string, unknown> {
+  const body = request.body;
   if (body === undefined) return {};
   if (typeof body !== "object" || body === null || Array.isArray(body)) throw invalid("Body must be a JSON object");
   return body as Record<string, unknown>;
 }
 
 export function routes(hub: Hub, streams: StreamHub): Router {
-  const r = express.Router();
+  const router = express.Router();
   const health = (): Health => ({
     ok: true,
     project: hub.name,
@@ -39,9 +39,9 @@ export function routes(hub: Hub, streams: StreamHub): Router {
     providers: hub.providers,
   });
 
-  r.get("/v1/health", (_req, res) => void res.json(health()));
-  r.use("/v1", requireAuth(hub.log));
-  r.get("/v1/info", (_req, res) => {
+  router.get("/v1/health", (_request, response) => void response.json(health()));
+  router.use("/v1", requireAuth(hub.log));
+  router.get("/v1/info", (_request, response) => {
     const info: Info = {
       ...health(),
       piDurable: packageVersion("@earendil-works/pi-durable"),
@@ -52,16 +52,16 @@ export function routes(hub: Hub, streams: StreamHub): Router {
       kernelApi: KERNEL_API_VERSION,
       plugins: hub.project.plugins.kernel.list().map(({ id, version, state }) => ({ id, version, state })),
     };
-    res.json(info);
+    response.json(info);
   });
 
-  const project = (_req?: Request): Promise<ProjectRuntime> => Promise.resolve(hub.project);
+  const project = (_request?: Request): Promise<ProjectRuntime> => Promise.resolve(hub.project);
 
-  r.get("/v1/agent", async (req, res) => void res.json(await agentState(await project(req))));
+  router.get("/v1/agent", async (request, response) => void response.json(await agentState(await project(request))));
 
-  r.post("/v1/chat", async (req, res) => {
-    const p = await project(req);
-    const body = bodyOf(req);
+  router.post("/v1/chat", async (request, response) => {
+    const projectRuntime = await project(request);
+    const body = bodyOf(request);
     const content = body.content;
     if (typeof content !== "string" || !content.trim()) throw invalid("content must be a nonblank string");
     if (content.length > MAX_MESSAGE) throw invalid(`content must be at most ${MAX_MESSAGE} characters`);
@@ -70,25 +70,25 @@ export function routes(hub: Hub, streams: StreamHub): Router {
       throw invalid("requestId must be a string of at most 128 characters");
     const waitMs = body.waitMs === undefined ? 0 : Number(body.waitMs);
     if (!Number.isInteger(waitMs) || waitMs < 0 || waitMs > 300_000) throw invalid("waitMs must be 0 to 300000");
-    const { harness, ctx } = p.harness;
-    const submission = await p.root.submit(
+    const { harness, ctx: context } = projectRuntime.harness;
+    const submission = await projectRuntime.root.submit(
       { type: "input", content, requestId: `chat:${requestId}`, whenBusy: "followUp" },
-      ctx,
+      context,
     );
     hub.log.info("agent.message", { submissionId: submission.id, chars: content.length });
-    let record = await submission.status(ctx);
+    let record = await submission.status(context);
     if (waitMs > 0 && record.status !== "done" && record.status !== "unanswered") {
       const closed = new AbortController();
-      res.on("close", () => closed.abort());
+      response.on("close", () => closed.abort());
       const stop = AbortSignal.any([AbortSignal.timeout(waitMs), closed.signal]);
       const aborted = new Promise<undefined>((ok) =>
         stop.addEventListener("abort", () => ok(undefined), { once: true }),
       );
-      record = (await Promise.race([submission.wait(ctx), aborted])) ?? (await submission.status(ctx));
+      record = (await Promise.race([submission.wait(context), aborted])) ?? (await submission.status(context));
     }
     let result: SendResult;
     if (record.status === "done" && record.answer !== undefined) {
-      const entry = await harness.commit((tx) => tx.entry(record.answer as EntryId), ctx);
+      const entry = await harness.commit((tx) => tx.entry(record.answer as EntryId), context);
       const text = (entry?.model ?? [])
         .map((m) => messageText(m as WireMessage))
         .join("")
@@ -107,58 +107,61 @@ export function routes(hub: Hub, streams: StreamHub): Router {
     } else {
       result = { submissionId: submission.id as number, status: record.status === "queued" ? "queued" : "pending" };
     }
-    res.status(result.status === "done" || result.status === "unanswered" ? 200 : 202).json(result);
+    response.status(result.status === "done" || result.status === "unanswered" ? 200 : 202).json(result);
   });
 
-  r.get("/v1/submissions/:id", async (req, res) => {
-    const p = await project(req);
-    const submission = await p.harness.harness.submission(int(req.params.id, "id") as unknown as SubmissionId, p.ctx);
-    if (!submission) throw notFound(`No submission ${req.params.id}`);
-    res.json(await submission.status(p.ctx));
+  router.get("/v1/submissions/:id", async (request, response) => {
+    const projectRuntime = await project(request);
+    const submission = await projectRuntime.harness.harness.submission(
+      int(request.params.id, "id") as unknown as SubmissionId,
+      projectRuntime.ctx,
+    );
+    if (!submission) throw notFound(`No submission ${request.params.id}`);
+    response.json(await submission.status(projectRuntime.ctx));
   });
 
-  r.get("/v1/transcript", async (req, res) => {
-    const p = await project(req);
-    const view = await p.root.viewState(p.ctx);
+  router.get("/v1/transcript", async (request, response) => {
+    const projectRuntime = await project(request);
+    const view = await projectRuntime.root.viewState(projectRuntime.ctx);
     let entries: WireEntry[];
     try {
       entries = JSON.parse(JSON.stringify(view.value.entries)) as WireEntry[];
     } finally {
       view.dispose();
     }
-    res.json({ conversationId: p.root.id, items: toTranscript(entries) });
+    response.json({ conversationId: projectRuntime.root.id, items: toTranscript(entries) });
   });
 
-  r.get("/v1/runs", async (req, res) => {
-    const p = await project(req);
-    res.json(
-      p.telemetry.runs({
-        limit: Math.min(int(req.query.limit, "limit", 50), 200),
-        before: optInt(req.query.before, "before"),
+  router.get("/v1/runs", async (request, response) => {
+    const projectRuntime = await project(request);
+    response.json(
+      projectRuntime.telemetry.runs({
+        limit: Math.min(int(request.query.limit, "limit", 50), 200),
+        before: optInt(request.query.before, "before"),
       }),
     );
   });
 
-  r.get("/v1/runs/:id", async (req, res) => {
-    const run = (await project(req)).telemetry.run(int(req.params.id, "id"));
-    if (!run) throw notFound(`No run ${req.params.id}`);
-    res.json(run);
+  router.get("/v1/runs/:id", async (request, response) => {
+    const run = (await project(request)).telemetry.run(int(request.params.id, "id"));
+    if (!run) throw notFound(`No run ${request.params.id}`);
+    response.json(run);
   });
 
-  r.get("/v1/usage", async (req, res) => void res.json((await project(req)).telemetry.totals()));
+  router.get("/v1/usage", async (request, response) => void response.json((await project(request)).telemetry.totals()));
 
-  r.post("/v1/jev/ping", async (req, res) => {
-    const p = await project(req);
-    const text = bodyOf(req).text;
+  router.post("/v1/jev/ping", async (request, response) => {
+    const projectRuntime = await project(request);
+    const text = bodyOf(request).text;
     if (text !== undefined && (typeof text !== "string" || text.length > 1000))
       throw invalid("text must be a string of at most 1000 characters");
-    res.json(await p.jevPing(text as string | undefined));
+    response.json(await projectRuntime.jevPing(text as string | undefined));
   });
 
-  r.get("/v1/stream", async (req, res) => {
+  router.get("/v1/stream", async (request, response) => {
     if (streams.closing) throw new ApiFault("unavailable", "The server is shutting down");
-    await streams.serve(await project(req), hub.log, req, res);
+    await streams.serve(await project(request), hub.log, request, response);
   });
 
-  return r;
+  return router;
 }

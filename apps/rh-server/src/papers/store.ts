@@ -173,7 +173,7 @@ export class PaperStore {
     return [...owners].sort((a, b) => a - b);
   }
 
-  private insert(p: SourcePaper): number {
+  private insert(sourcePaper: SourcePaper): number {
     const now = nowIso();
     const result = this.db
       .prepare(
@@ -184,20 +184,20 @@ export class PaperStore {
       )
       .run(
         bind({
-          title: p.title,
-          title_norm: normalizeTitle(p.title),
-          abstract: p.abstract || null,
-          authors_json: p.authors,
-          year: p.year ?? (p.publishedAt ? Number(p.publishedAt.slice(0, 4)) : null),
-          published_at: p.publishedAt,
-          venue: p.venue,
-          server: p.server,
-          oa_url: p.oaUrl,
-          url: p.url,
-          cited_by_count: p.citedByCount,
-          references_count: p.referencesCount,
-          retracted: p.retracted ?? false,
-          categories_json: p.categories?.length ? JSON.stringify(p.categories) : null,
+          title: sourcePaper.title,
+          title_norm: normalizeTitle(sourcePaper.title),
+          abstract: sourcePaper.abstract || null,
+          authors_json: sourcePaper.authors,
+          year: sourcePaper.year ?? (sourcePaper.publishedAt ? Number(sourcePaper.publishedAt.slice(0, 4)) : null),
+          published_at: sourcePaper.publishedAt,
+          venue: sourcePaper.venue,
+          server: sourcePaper.server,
+          oa_url: sourcePaper.oaUrl,
+          url: sourcePaper.url,
+          cited_by_count: sourcePaper.citedByCount,
+          references_count: sourcePaper.referencesCount,
+          retracted: sourcePaper.retracted ?? false,
+          categories_json: sourcePaper.categories?.length ? JSON.stringify(sourcePaper.categories) : null,
           now,
         }),
       );
@@ -205,33 +205,36 @@ export class PaperStore {
   }
 
   /** Fill gaps from a new result; OpenAlex overwrites the enrichment fields; the earliest date and longest abstract win. */
-  private mergeFields(id: number, p: SourcePaper): void {
+  private mergeFields(id: number, sourcePaper: SourcePaper): void {
     const row = this.db.prepare("SELECT * FROM papers WHERE id = ?").get(id) as unknown as PaperRow;
-    const authority = p.source === "openalex";
+    const authority = sourcePaper.source === "openalex";
     const next: Record<string, unknown> = {};
     const fill = (column: keyof PaperRow, value: unknown) => {
       if (value === undefined || value === null || value === "") return;
       const enriched = (ENRICHED as readonly string[]).includes(column);
       if (row[column] === null || (enriched && authority)) next[column] = value;
     };
-    fill("venue", p.venue);
-    fill("server", p.server);
-    fill("oa_url", p.oaUrl);
-    fill("url", p.url);
-    fill("cited_by_count", p.citedByCount);
-    fill("references_count", p.referencesCount);
-    if (p.retracted !== undefined && (authority || p.retracted)) next.retracted = p.retracted ? 1 : 0;
-    if (p.publishedAt && (!row.published_at || p.publishedAt < row.published_at)) {
-      next.published_at = p.publishedAt;
-      next.year = Number(p.publishedAt.slice(0, 4));
-    } else if (!row.year && p.year) next.year = p.year;
-    if (p.abstract && p.abstract.length > (row.abstract?.length ?? 0)) next.abstract = p.abstract;
-    if (p.categories?.length && !row.categories_json) next.categories_json = JSON.stringify(p.categories);
-    if (p.authors.length > (JSON.parse(row.authors_json) as string[]).length)
-      next.authors_json = JSON.stringify(p.authors);
-    if (!row.title && p.title) {
-      next.title = p.title;
-      next.title_norm = normalizeTitle(p.title);
+    fill("venue", sourcePaper.venue);
+    fill("server", sourcePaper.server);
+    fill("oa_url", sourcePaper.oaUrl);
+    fill("url", sourcePaper.url);
+    fill("cited_by_count", sourcePaper.citedByCount);
+    fill("references_count", sourcePaper.referencesCount);
+    if (sourcePaper.retracted !== undefined && (authority || sourcePaper.retracted))
+      next.retracted = sourcePaper.retracted ? 1 : 0;
+    if (sourcePaper.publishedAt && (!row.published_at || sourcePaper.publishedAt < row.published_at)) {
+      next.published_at = sourcePaper.publishedAt;
+      next.year = Number(sourcePaper.publishedAt.slice(0, 4));
+    } else if (!row.year && sourcePaper.year) next.year = sourcePaper.year;
+    if (sourcePaper.abstract && sourcePaper.abstract.length > (row.abstract?.length ?? 0))
+      next.abstract = sourcePaper.abstract;
+    if (sourcePaper.categories?.length && !row.categories_json)
+      next.categories_json = JSON.stringify(sourcePaper.categories);
+    if (sourcePaper.authors.length > (JSON.parse(row.authors_json) as string[]).length)
+      next.authors_json = JSON.stringify(sourcePaper.authors);
+    if (!row.title && sourcePaper.title) {
+      next.title = sourcePaper.title;
+      next.title_norm = normalizeTitle(sourcePaper.title);
     }
     if (!Object.keys(next).length) return;
     // A title-only paper that gains an abstract is represented again (whole vector from title + abstract, facets).

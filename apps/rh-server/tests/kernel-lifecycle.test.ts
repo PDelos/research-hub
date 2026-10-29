@@ -51,10 +51,10 @@ async function setup(dir: string, specs: Record<string, Spec>, options: { timeou
     Object.entries(specs).map(([id, s]) => [
       id,
       s.module?.(calls) ?? {
-        activate: (ctx: PluginContext) => {
+        activate: (context: PluginContext) => {
           calls.push(`activate ${id}`);
-          ctx.subscriptions.push({ dispose: () => void calls.push(`dispose ${id}`) });
-          return { from: id, deps: Object.keys(ctx.exports) };
+          context.subscriptions.push({ dispose: () => void calls.push(`dispose ${id}`) });
+          return { from: id, deps: Object.keys(context.exports) };
         },
         deactivate: () => void calls.push(`deactivate ${id}`),
       },
@@ -75,9 +75,9 @@ async function setup(dir: string, specs: Record<string, Spec>, options: { timeou
     state,
     log,
     activationTimeoutMs: options.timeoutMs ?? 10_000,
-    load: async (p) => {
-      loaded.push(p.manifest.id);
-      return modules[p.manifest.id];
+    load: async (discoveredPlugin) => {
+      loaded.push(discoveredPlugin.manifest.id);
+      return modules[discoveredPlugin.manifest.id];
     },
   });
   const frames: PluginSummary[][] = [];
@@ -118,9 +118,9 @@ test("dependencies activate first and their exports reach the dependent", async 
       "rh.sweep": {
         deps: { "rh.papers": "^1.0.0" },
         module: (c) => ({
-          activate: (ctx) => {
+          activate: (context) => {
             c.push("activate rh.sweep");
-            seen = ctx.exports;
+            seen = context.exports;
           },
         }),
       },

@@ -89,8 +89,8 @@ test("👍 then 👎 nets one 👎; weights clamp at 2; effects show before and 
 
     // A query already at 2.0 receives a ⭐ and stays 2.0 (the 👎 is cleared first, so the query is back at 2.0).
     a.env.feedback.clear(a.cards[0].id);
-    const star = a.cards.slice(1).find((c) => {
-      const row = a.env.db.prepare("SELECT queries_json FROM sweep_papers WHERE paper_id = ?").get(c.paperId) as any;
+    const star = a.cards.slice(1).find((card) => {
+      const row = a.env.db.prepare("SELECT queries_json FROM sweep_papers WHERE paper_id = ?").get(card.paperId) as any;
       return (JSON.parse(row.queries_json) as string[]).includes("protein language model");
     })!;
     assert.ok(star, "a card found by the weight-2 query");

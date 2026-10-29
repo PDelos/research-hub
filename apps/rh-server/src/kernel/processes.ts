@@ -39,29 +39,41 @@ export class Supervisor {
   async start(): Promise<void> {
     if (this.child) return;
     this.stopping = false;
-    const o = this.options;
+    const supervisorOptions = this.options;
     this.port ??= await freePort();
     this.state = "starting";
-    const child = spawn(process.execPath, ["--require", LOOPBACK_PRELOAD, o.entry, ...(o.args ?? [])], {
-      cwd: o.cwd,
-      env: { PATH: process.env.PATH ?? "", HOME: o.home, PORT: String(this.port), ...o.env },
-      stdio: ["ignore", "pipe", "pipe"],
-    });
+    const child = spawn(
+      process.execPath,
+      ["--require", LOOPBACK_PRELOAD, supervisorOptions.entry, ...(supervisorOptions.args ?? [])],
+      {
+        cwd: supervisorOptions.cwd,
+        env: {
+          PATH: process.env.PATH ?? "",
+          HOME: supervisorOptions.home,
+          PORT: String(this.port),
+          ...supervisorOptions.env,
+        },
+        stdio: ["ignore", "pipe", "pipe"],
+      },
+    );
     this.child = child;
     const forward = (level: "info" | "warn") => (chunk: Buffer) => {
       for (const line of chunk.toString().split("\n").filter(Boolean))
-        o.log[level]("plugin.process_output", { process: o.name, line: line.slice(0, 500) });
+        supervisorOptions.log[level]("plugin.process_output", {
+          process: supervisorOptions.name,
+          line: line.slice(0, 500),
+        });
     };
     child.stdout?.on("data", forward("info"));
     child.stderr?.on("data", forward("warn"));
     child.once("exit", (code, signal) => this.exited(child, code, signal));
-    if (o.http === false || (await this.waitReady(o.readyTimeoutMs ?? 30_000))) {
+    if (supervisorOptions.http === false || (await this.waitReady(supervisorOptions.readyTimeoutMs ?? 30_000))) {
       if (this.child !== child) return;
       this.state = "running";
       this.healthySince = Date.now();
-      o.log.info("plugin.process_running", { process: o.name, port: this.port });
+      supervisorOptions.log.info("plugin.process_running", { process: supervisorOptions.name, port: this.port });
     } else if (this.child === child) {
-      o.log.warn("plugin.process_not_ready", { process: o.name });
+      supervisorOptions.log.warn("plugin.process_not_ready", { process: supervisorOptions.name });
       child.kill("SIGKILL");
     }
   }
@@ -103,9 +115,9 @@ export class Supervisor {
     const end = Date.now() + timeoutMs;
     while (Date.now() < end && this.child && this.child.exitCode === null) {
       try {
-        const res = await fetch(`http://127.0.0.1:${this.port}/`, { signal: AbortSignal.timeout(1_000) });
-        await res.body?.cancel();
-        if (res.status < 500) return true;
+        const response = await fetch(`http://127.0.0.1:${this.port}/`, { signal: AbortSignal.timeout(1_000) });
+        await response.body?.cancel();
+        if (response.status < 500) return true;
       } catch {
         // not listening yet
       }

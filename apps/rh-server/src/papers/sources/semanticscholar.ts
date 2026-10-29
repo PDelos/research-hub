@@ -10,19 +10,20 @@ export class SemanticScholarSource implements PaperSource {
   readonly name = "semanticscholar" as const;
   constructor(private readonly deps: SourceDeps & { apiKey: string }) {}
 
-  async search(q: SourceQuery): Promise<SourcePaper[]> {
-    const query = queryTerms(q.query).join(" ");
+  async search(sourceQuery: SourceQuery): Promise<SourcePaper[]> {
+    const query = queryTerms(sourceQuery.query).join(" ");
     if (!query) return [];
-    const params = new URLSearchParams({ query, limit: String(Math.min(q.limit, 100)), fields: FIELDS });
-    if (q.since || q.until) params.set("publicationDateOrYear", `${q.since ?? ""}:${q.until ?? ""}`);
+    const params = new URLSearchParams({ query, limit: String(Math.min(sourceQuery.limit, 100)), fields: FIELDS });
+    if (sourceQuery.since || sourceQuery.until)
+      params.set("publicationDateOrYear", `${sourceQuery.since ?? ""}:${sourceQuery.until ?? ""}`);
     const body = await this.deps.http.json<{ data?: any[] }>(`${S2_API}?${params}`, {
       source: this.name,
-      budgetMs: q.budgetMs,
+      budgetMs: sourceQuery.budgetMs,
       headers: { "x-api-key": this.deps.apiKey },
     });
     return (body.data ?? [])
       .map(mapS2Paper)
-      .filter((p): p is SourcePaper => !!p && inWindow(p.publishedAt, q.since, q.until));
+      .filter((p): p is SourcePaper => !!p && inWindow(p.publishedAt, sourceQuery.since, sourceQuery.until));
   }
 }
 

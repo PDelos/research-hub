@@ -105,13 +105,13 @@ test("each source is credited with the cards it brought and the ones you liked, 
     },
   });
   try {
-    const p = server.hub.project;
-    p.brief.write("# x");
-    p.charters.saveDraft(validateCharter(sampleCharter()), "agent");
-    p.charters.approve();
-    p.scheduler.trigger("sweep");
-    await until(() => p.sweeps.list().length === 1, 10_000, "sweep");
-    await p.sweeps.settled(p.sweeps.list(1)[0].id, 30_000);
+    const projectRuntime = server.hub.project;
+    projectRuntime.brief.write("# x");
+    projectRuntime.charters.saveDraft(validateCharter(sampleCharter()), "agent");
+    projectRuntime.charters.approve();
+    projectRuntime.scheduler.trigger("sweep");
+    await until(() => projectRuntime.sweeps.list().length === 1, 10_000, "sweep");
+    await projectRuntime.sweeps.settled(projectRuntime.sweeps.list(1)[0].id, 30_000);
     const cards = (await server.client.cards()).groups[0].cards;
     await server.client.judge(cards[0].id, "star");
     await server.client.judge(cards[1].id, "up");
@@ -120,7 +120,7 @@ test("each source is credited with the cards it brought and the ones you liked, 
       { source: "arxiv", pluginId: "rh.source-arxiv", cards: cards.length, liked: 2 },
     ]);
     const digest = await (
-      await p.plugins.exportsOf<import("../plugins/rh.digest/main.ts").DigestExports>("rh.digest")
+      await projectRuntime.plugins.exportsOf<import("../plugins/rh.digest/main.ts").DigestExports>("rh.digest")
     ).buildDigest();
     assert.deepEqual(digest.sources, [{ source: "arxiv", pluginId: "rh.source-arxiv", cards: cards.length, liked: 2 }]);
   } finally {

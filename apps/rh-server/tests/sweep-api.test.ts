@@ -28,30 +28,31 @@ test("cards are grouped by sweep newest first, card details trace each score, sw
   const server = await startTestServer({
     hub: { ticker: false, fauxRules: [cardWriterRule], jevDecide: jev.decide, paperFetch: fetchBy },
   });
-  const p = server.hub.project;
-  p.brief.write("# Protein LMs");
-  p.charters.saveDraft(validateCharter(sampleCharter()), "agent");
-  p.charters.approve();
+  const projectRuntime = server.hub.project;
+  projectRuntime.brief.write("# Protein LMs");
+  projectRuntime.charters.saveDraft(validateCharter(sampleCharter()), "agent");
+  projectRuntime.charters.approve();
   const frames: Frame[] = [];
   const abort = new AbortController();
   const streaming = (async () => {
-    const res = await fetch(`${server.url}/v1/stream`, {
+    const response = await fetch(`${server.url}/v1/stream`, {
       headers: { authorization: "Bearer test-api-token-0123456789" },
       signal: abort.signal,
     });
-    for await (const message of readSse(res.body!)) frames.push(JSON.parse(message.data) as Frame);
+    for await (const message of readSse(response.body!)) frames.push(JSON.parse(message.data) as Frame);
   })().catch(() => {});
   try {
     await new Promise((r) => setTimeout(r, 200));
     for (const b of [0, 1]) {
       batch = b;
-      const res = await fetch(`${server.url}/v1/runs/sweep`, {
+      const response = await fetch(`${server.url}/v1/runs/sweep`, {
         method: "POST",
         headers: { authorization: "Bearer test-api-token-0123456789" },
       });
-      assert.equal(res.status, 202);
-      for (let i = 0; i < 500 && p.sweeps.list().length < b + 1; i++) await new Promise((r) => setTimeout(r, 10));
-      await p.sweeps.settled(p.sweeps.list()[0].id, 30_000);
+      assert.equal(response.status, 202);
+      for (let i = 0; i < 500 && projectRuntime.sweeps.list().length < b + 1; i++)
+        await new Promise((r) => setTimeout(r, 10));
+      await projectRuntime.sweeps.settled(projectRuntime.sweeps.list()[0].id, 30_000);
     }
     const { groups } = await server.client.cards();
     assert.deepEqual(

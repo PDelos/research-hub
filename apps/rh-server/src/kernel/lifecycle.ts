@@ -130,8 +130,8 @@ export class PluginKernel {
     );
     if (forced.length)
       await this.options.state.update(
-        (l) => {
-          for (const r of forced) l.plugins[r.plugin.manifest.id].enabled = true;
+        (lockfile) => {
+          for (const r of forced) lockfile.plugins[r.plugin.manifest.id].enabled = true;
         },
         `re-enable required ${forced.map((r) => r.plugin.manifest.id).join(", ")}`,
         "kernel",
@@ -144,9 +144,10 @@ export class PluginKernel {
     );
     if (missing.length || stale.length)
       await this.options.state.update(
-        (l) => {
-          for (const r of missing) l.plugins[r.plugin.manifest.id] = builtinEntry(r.plugin.manifest, this.options.env);
-          for (const r of stale) l.plugins[r.plugin.manifest.id].version = r.plugin.manifest.version;
+        (lockfile) => {
+          for (const r of missing)
+            lockfile.plugins[r.plugin.manifest.id] = builtinEntry(r.plugin.manifest, this.options.env);
+          for (const r of stale) lockfile.plugins[r.plugin.manifest.id].version = r.plugin.manifest.version;
         },
         missing.length
           ? `add built-in ${missing.map((r) => r.plugin.manifest.id).join(", ")}`
@@ -197,8 +198,8 @@ export class PluginKernel {
   async fire(event: string): Promise<void> {
     this.fired.add(event);
     const targets = this.order.filter((id) => {
-      const r = this.records.get(id)!;
-      return r.state === "inactive" && matches(r.plugin.manifest.activationEvents, event);
+      const entry = this.records.get(id)!;
+      return entry.state === "inactive" && matches(entry.plugin.manifest.activationEvents, event);
     });
     await Promise.all(targets.map((id) => this.activate(id).catch(() => undefined)));
   }
@@ -214,23 +215,23 @@ export class PluginKernel {
     return r.activation;
   }
 
-  private async doActivate(r: Record_): Promise<unknown> {
-    const { manifest, dir } = r.plugin;
+  private async doActivate(entry: Record_): Promise<unknown> {
+    const { manifest, dir } = entry.plugin;
     const exports: Record<string, unknown> = {};
     for (const dep of Object.keys(manifest.dependencies)) exports[dep] = await this.activate(dep);
     const log = this.options.log.child({ plugin: manifest.id });
-    this.set(r, "activating");
+    this.set(entry, "activating");
     const storageDir = join(this.options.state.dir, "data", manifest.id);
     const settings = this.settings(manifest.id);
     const timeoutMs = this.options.activationTimeoutMs ?? 10_000;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let context: PluginContext | undefined;
     try {
-      const module = await (this.options.load ?? defaultLoad)(r.plugin);
+      const module = await (this.options.load ?? defaultLoad)(entry.plugin);
       const subscriptions: Disposable[] = [];
       mkdirSync(storageDir, { recursive: true });
       const handlers = new Set<(settings: Readonly<Record<string, unknown>>) => void | Promise<void>>();
-      r.settingsHandlers = handlers;
+      entry.settingsHandlers = handlers;
       const current = () => this.settings(manifest.id);
       const saved = () => structuredClone(this.options.state.current().plugins[manifest.id]?.settings ?? {});
       context = {
@@ -254,8 +255,8 @@ export class PluginKernel {
         exports,
         log,
         // Without an API factory (unit tests of the lifecycle) plugins get no `rh`.
-        rh: this.options.api?.(r.plugin, subscriptions) as RhApi,
-        ...(r.plugin.builtin && this.options.builtinHost !== undefined ? { host: this.options.builtinHost } : {}),
+        rh: this.options.api?.(entry.plugin, subscriptions) as RhApi,
+        ...(entry.plugin.builtin && this.options.builtinHost !== undefined ? { host: this.options.builtinHost } : {}),
       };
       const result = await Promise.race([
         Promise.resolve(module.activate?.(context)),
@@ -264,12 +265,12 @@ export class PluginKernel {
           timer.unref?.();
         }),
       ]);
-      if (r.state !== "activating") {
+      if (entry.state !== "activating") {
         // Disabled while activating: undo.
         await dispose(module, context, log);
-        throw new PluginUnavailable(manifest.id, r.reason ?? r.state);
+        throw new PluginUnavailable(manifest.id, entry.reason ?? entry.state);
       }
-      Object.assign(r, {
+      Object.assign(entry, {
         module,
         context,
         exports: result,
@@ -278,14 +279,14 @@ export class PluginKernel {
       });
       this.activeOrder.push(manifest.id);
       log.info("plugin.activated", { version: manifest.version });
-      this.set(r, "active");
+      this.set(entry, "active");
       return result;
     } catch (error) {
       if (error instanceof PluginUnavailable) throw error;
       const message = error instanceof Error ? error.message : String(error);
       log.warn("plugin.activation_failed", { error: message });
       if (context) await dispose(undefined, context, log);
-      this.set(r, "failed", message);
+      this.set(entry, "failed", message);
       this.recompute();
       throw new PluginUnavailable(manifest.id, `failed: ${message}`);
     } finally {
@@ -304,12 +305,12 @@ export class PluginKernel {
   }
 
   private async deactivateOne(id: string): Promise<void> {
-    const r = this.records.get(id)!;
-    if (r.activation) await r.activation.catch(() => undefined);
-    if (r.state !== "active") return;
+    const entry = this.records.get(id)!;
+    if (entry.activation) await entry.activation.catch(() => undefined);
+    if (entry.state !== "active") return;
     const log = this.options.log.child({ plugin: id });
-    await dispose(r.module, r.context!, log);
-    Object.assign(r, {
+    await dispose(entry.module, entry.context!, log);
+    Object.assign(entry, {
       module: undefined,
       context: undefined,
       exports: undefined,
@@ -319,7 +320,7 @@ export class PluginKernel {
     });
     this.activeOrder.splice(this.activeOrder.indexOf(id), 1);
     log.info("plugin.deactivated", {});
-    this.set(r, "inactive");
+    this.set(entry, "inactive");
   }
 
   /**
@@ -338,8 +339,8 @@ export class PluginKernel {
     if (affected.length && !options.cascade) throw new HasDependents(id, affected);
     const ids = [id, ...affected];
     await this.options.state.update(
-      (l) => {
-        for (const p of ids) if (l.plugins[p]) l.plugins[p].enabled = enabled;
+      (lockfile) => {
+        for (const p of ids) if (lockfile.plugins[p]) lockfile.plugins[p].enabled = enabled;
       },
       `${enabled ? "enable" : "disable"} ${ids.join(", ")}`,
       options.actor ?? "user",
@@ -353,17 +354,17 @@ export class PluginKernel {
     // Deactivate what is now disabled or configured differently, dependents first.
     for (const id of this.activeOrder.toReversed()) {
       const entry = lock.plugins[id];
-      const r = this.records.get(id)!;
+      const pluginRecord = this.records.get(id)!;
       if (!entry?.enabled) {
         await this.deactivate(id);
         continue;
       }
       const settings = this.settings(id);
       const json = JSON.stringify(settings);
-      if (json === r.settingsJson) continue;
-      if (r.settingsHandlers?.size) {
-        r.settingsJson = json;
-        for (const handler of r.settingsHandlers) {
+      if (json === pluginRecord.settingsJson) continue;
+      if (pluginRecord.settingsHandlers?.size) {
+        pluginRecord.settingsJson = json;
+        for (const handler of pluginRecord.settingsHandlers) {
           try {
             await handler(settings);
           } catch (error) {
@@ -402,9 +403,9 @@ export class PluginKernel {
       else saved[key] = value;
     validateSettings(r.plugin.manifest, resolveSettings(r.plugin.manifest, saved, this.options.env));
     await this.options.state.update(
-      (l) => {
-        if (!l.plugins[id]) throw new PluginUnavailable(id, "not in the lockfile");
-        l.plugins[id].settings = saved;
+      (lockfile) => {
+        if (!lockfile.plugins[id]) throw new PluginUnavailable(id, "not in the lockfile");
+        lockfile.plugins[id].settings = saved;
       },
       `configure ${id}: ${Object.keys(changes).join(", ")}`,
       actor,
@@ -513,9 +514,9 @@ export class PluginKernel {
     if (changed) this.emit();
   }
 
-  private set(r: Record_, state: PluginRunState, reason?: string): void {
-    r.state = state;
-    r.reason = reason;
+  private set(entry: Record_, state: PluginRunState, reason?: string): void {
+    entry.state = state;
+    entry.reason = reason;
     this.emit();
   }
 

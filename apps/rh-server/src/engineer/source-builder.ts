@@ -47,7 +47,7 @@ export function slug(text: string, max = 30): string {
 }
 
 /** The manifest the hub writes (never the model's): one source contribution, one network host. */
-export function sourceManifest(opts: {
+export function sourceManifest(options: {
   id: string;
   name: string;
   sourceId: string;
@@ -55,17 +55,17 @@ export function sourceManifest(opts: {
   description: string;
 }) {
   return {
-    id: opts.id,
+    id: options.id,
     version: "0.1.0",
-    displayName: opts.name,
+    displayName: options.name,
     kind: "addon",
     topic: "finding",
-    description: opts.description.slice(0, 300),
+    description: options.description.slice(0, 300),
     engines: { "research-hub": "^1.0.0" },
     main: "main.mjs",
     activationEvents: ["onExtensionPoint:papers.source"],
-    contributes: { "papers.source": [{ id: opts.sourceId, title: opts.name }] },
-    permissions: { network: [opts.host] },
+    contributes: { "papers.source": [{ id: options.sourceId, title: options.name }] },
+    permissions: { network: [options.host] },
   };
 }
 

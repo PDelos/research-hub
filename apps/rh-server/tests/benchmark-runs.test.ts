@@ -75,9 +75,9 @@ test("offline without a cached sample, a task says why and the others still run"
   try {
     const harness = await server.hub.project.plugins.exportsOf<HarnessExports>("rh.harness");
     await seedSamples(join(server.dataDir, "plugins", "data", "rh.harness"), ["scidocs"]);
-    const r = await harness.runBenchmark("embedder");
-    assert.ok(r.result.tasks[0].value !== null);
-    assert.match(r.result.tasks[1].note!, /not downloaded yet, and offline mode makes no downloads/);
+    const benchmarkRecord = await harness.runBenchmark("embedder");
+    assert.ok(benchmarkRecord.result.tasks[0].value !== null);
+    assert.match(benchmarkRecord.result.tasks[1].note!, /not downloaded yet, and offline mode makes no downloads/);
   } finally {
     await server.stop();
   }

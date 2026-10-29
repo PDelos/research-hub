@@ -242,24 +242,24 @@ export async function openProject(options: OpenProjectOptions): Promise<ProjectR
       ),
     logger: plog,
   });
-  const ctx = harness.ctx;
+  const context = harness.ctx;
   const stopProjector = startProjector(harness.harness, telemetry, plog);
   const chatModel = catalog.forJob("chat");
-  const root = await harness.harness.root(ctx, { agent: { model: chatModel, thinkingLevel: "low" } });
+  const root = await harness.harness.root(context, { agent: { model: chatModel, thinkingLevel: "low" } });
   // The root conversation keeps the model it was created with; apply the configured chat model on every start.
-  const current = (await root.agent(ctx)).model;
+  const current = (await root.agent(context)).model;
   if (current?.modelId !== chatModel.modelId || current?.provider !== chatModel.provider) {
-    await root.configure({ model: chatModel }, ctx);
+    await root.configure({ model: chatModel }, context);
     plog.info("agent.model_applied", { from: current?.modelId, to: chatModel.modelId });
   }
   const model = async () => {
-    const agent = await root.agent(ctx);
+    const agent = await root.agent(context);
     const id = agent.model?.modelId ?? chatModel.modelId;
     return { id, window: catalog.info(id)?.contextWindow ?? 1_000_000 };
   };
   window = (await model()).window;
   harness.harness.resume();
-  for (const h of hooks) h?.attach?.(harness.harness, ctx);
+  for (const h of hooks) h?.attach?.(harness.harness, context);
   for (const h of hooks) h?.ready?.();
 
   plog.info("project.opened", { dir, rootConversation: root.id, model: (await model()).id, check });
@@ -272,7 +272,7 @@ export async function openProject(options: OpenProjectOptions): Promise<ProjectR
     settings,
     telemetry,
     harness,
-    ctx,
+    ctx: context,
     root,
     agents,
     jevLedger,

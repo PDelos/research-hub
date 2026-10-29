@@ -90,7 +90,7 @@ export class CardWriter implements CardStage {
         paper_id: Type.Number({ description: "The candidate's id (the number after #)" }),
         summary: Type.String({ description: `At most ${SUMMARY_MAX_WORDS} words, grounded in the abstract` }),
       }),
-      execute: async (args, api, ctx) => {
+      execute: async (args, api, context) => {
         const sweep = this.current();
         if (!sweep) return toolError("No sweep is waiting for cards.", ["Stop here."]);
         const entry = this.candidates(sweep, true).find(({ paper }) => paper.id === args.paper_id);
@@ -110,7 +110,7 @@ export class CardWriter implements CardStage {
             `The summary states numbers that are not in the title or abstract: ${invented.join(", ")}.`,
             ["Remove them and describe only what the abstract says."],
           );
-        const cardId = await once<number>(api, "card", ctx, async () => {
+        const cardId = await once<number>(api, "card", context, async () => {
           const { card } = this.deps.cards.create({
             paperId: entry.paper.id,
             sweepId: sweep.id,
@@ -141,7 +141,7 @@ export class CardWriter implements CardStage {
           }),
         ),
       }),
-      execute: async (args, api, ctx) => {
+      execute: async (args, api, context) => {
         const sweep = this.current();
         if (!sweep) return toolError("No sweep is waiting for cards.", ["Stop here."]);
         const skipped = (args.skipped ?? []).map((s) => ({ paperId: s.paper_id, reason: s.reason.trim() }));
@@ -154,7 +154,7 @@ export class CardWriter implements CardStage {
             `Not complete: ${open.map(({ paper }) => `#${paper.id}`).join(", ")} have neither a card nor a skip reason.`,
             ["Present them with present_paper or list them in skipped with a reason."],
           );
-        const result = await once<string>(api, "complete", ctx, async () => {
+        const result = await once<string>(api, "complete", context, async () => {
           const mark = this.deps.db.prepare(
             "UPDATE sweep_papers SET status = 'skipped', reason = ? WHERE sweep_id = ? AND paper_id = ? AND status = 'candidate'",
           );
@@ -180,9 +180,9 @@ export class CardWriter implements CardStage {
     });
   }
 
-  attach(harness: Harness, ctx: Context): void {
+  attach(harness: Harness, context: Context): void {
     this.harness = harness;
-    this.ctx = ctx;
+    this.ctx = context;
   }
 
   /** The sweep in its cards phase (one sweep runs at a time per project). */
@@ -223,7 +223,7 @@ export class CardWriter implements CardStage {
 
   async start(sweep: SweepRecord): Promise<void> {
     if (sweep.submissionId !== undefined) return this.resume(sweep);
-    const { harness, ctx } = this.ready();
+    const { harness, ctx: context } = this.ready();
     const conversation = await harness.createConversation(
       {
         ownership: { kind: "ownerless" },
@@ -233,7 +233,7 @@ export class CardWriter implements CardStage {
           extensions: [this.extension, this.deps.observe],
         },
       },
-      ctx,
+      context,
     );
     const prompt = loadPrompt(join(this.deps.promptsDir, "agents"), "card-writer", "USER_PROMPT_cards.md", {
       sweep_id: String(sweep.id),
@@ -242,7 +242,7 @@ export class CardWriter implements CardStage {
     });
     const submission = await conversation.submit(
       { type: "input", content: prompt, requestId: `cards:${sweep.id}` },
-      ctx,
+      context,
     );
     this.deps.runner.cardsStarted(sweep.id, conversation.id as number, submission.id as number);
     this.deps.log.info("cards.run_started", {
@@ -256,11 +256,11 @@ export class CardWriter implements CardStage {
   resume(sweep: SweepRecord): void {
     if (sweep.submissionId === undefined || this.watching.has(sweep.id)) return;
     this.watching.add(sweep.id);
-    const { harness, ctx } = this.ready();
+    const { harness, ctx: context } = this.ready();
     void (async () => {
       try {
-        const submission = await harness.submission(sweep.submissionId as SubmissionId, ctx);
-        if (submission) await submission.wait(ctx);
+        const submission = await harness.submission(sweep.submissionId as SubmissionId, context);
+        if (submission) await submission.wait(context);
         this.settle(sweep.id);
       } catch (error) {
         this.deps.log.warn("cards.watch_failed", { sweep: sweep.id, error: String(error) });

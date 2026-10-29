@@ -156,17 +156,17 @@ test("every built-in plugin with code is in the static module map the bundle use
 test("cards per sweep is an rh.sweep setting: a v0 value carries over, and changes apply live with a history entry", async () => {
   const server = await startTestServer();
   try {
-    const p = server.hub.project;
-    const sweepsBefore = p.sweeps;
-    const activatedAt = p.plugins.kernel.get("rh.sweep")?.activatedAt;
-    p.settings.set("cards_per_sweep", 5);
-    assert.equal(p.sweeps.cardsPerSweep(), 5, "a value saved by v0 counts");
+    const projectRuntime = server.hub.project;
+    const sweepsBefore = projectRuntime.sweeps;
+    const activatedAt = projectRuntime.plugins.kernel.get("rh.sweep")?.activatedAt;
+    projectRuntime.settings.set("cards_per_sweep", 5);
+    assert.equal(projectRuntime.sweeps.cardsPerSweep(), 5, "a value saved by v0 counts");
     assert.deepEqual(await server.client.setSweepSettings({ cardsPerSweep: 9 }), { cardsPerSweep: 9 });
-    assert.equal(p.sweeps.cardsPerSweep(), 9);
-    assert.equal((await p.plugins.state.history())[0].message, "configure rh.sweep: cardsPerSweep");
-    assert.equal(p.plugins.kernel.get("rh.sweep")?.activatedAt, activatedAt, "no restart");
-    assert.equal(p.sweeps, sweepsBefore);
-    assert.equal(p.plugins.kernel.settings("rh.sweep").explorationPicks, 1);
+    assert.equal(projectRuntime.sweeps.cardsPerSweep(), 9);
+    assert.equal((await projectRuntime.plugins.state.history())[0].message, "configure rh.sweep: cardsPerSweep");
+    assert.equal(projectRuntime.plugins.kernel.get("rh.sweep")?.activatedAt, activatedAt, "no restart");
+    assert.equal(projectRuntime.sweeps, sweepsBefore);
+    assert.equal(projectRuntime.plugins.kernel.settings("rh.sweep").explorationPicks, 1);
     await assert.rejects(
       server.client.setSweepSettings({ cardsPerSweep: 40 }),
       /cardsPerSweep: must be an integer from 1 to 15/,

@@ -14,23 +14,23 @@ export function identify(tokens: { api: string; client: string }): RequestHandle
     ["api", digest(tokens.api)],
     ["client", digest(tokens.client)],
   ] as const;
-  return (req, res, next) => {
-    const header = req.get("authorization") ?? "";
+  return (request, response, next) => {
+    const header = request.get("authorization") ?? "";
     const presented = header.startsWith("Bearer ") ? header.slice(7).trim() : "";
     if (presented) {
       const actual = digest(presented);
       for (const [principal, expected] of known)
-        if (timingSafeEqual(actual, expected)) res.locals.principal = principal;
+        if (timingSafeEqual(actual, expected)) response.locals.principal = principal;
     }
     next();
   };
 }
 
 export function requireAuth(log: Logger): RequestHandler {
-  return (req, res, next) => {
-    if (res.locals.principal) return next();
-    log.warn("auth.unauthorized", { method: req.method, path: req.path });
-    res.set("WWW-Authenticate", 'Bearer realm="research-hub"');
+  return (request, response, next) => {
+    if (response.locals.principal) return next();
+    log.warn("auth.unauthorized", { method: request.method, path: request.path });
+    response.set("WWW-Authenticate", 'Bearer realm="research-hub"');
     throw new ApiFault("unauthorized", "Missing or invalid token");
   };
 }
@@ -41,34 +41,34 @@ export function requireAuth(log: Logger): RequestHandler {
  * CORS preflight that cross-origin pages cannot pass).
  */
 export function uiProxy(options: { clientToken: string; allowedHosts: Set<string> }): RequestHandler {
-  const fault = (res: any, status: number, code: string, message: string) =>
-    void res.status(status).json({ error: { code, message } });
+  const fault = (response: any, status: number, code: string, message: string) =>
+    void response.status(status).json({ error: { code, message } });
   // Compare host names only: a rebinding attack controls the name, and ports may be remapped (Docker, tests).
   const hostname = (host: string) =>
     host
       .toLowerCase()
       .replace(/:\d+$/, "")
       .replace(/^\[(.*)\]$/, "$1");
-  return (req, res, next) => {
-    if (!req.url.startsWith("/ui/v1/")) return next();
-    const host = hostname(req.headers.host ?? "");
-    if (!options.allowedHosts.has(host)) return fault(res, 421, "invalid", `Unknown Host header: ${host}`);
-    const origin = req.headers.origin;
+  return (request, response, next) => {
+    if (!request.url.startsWith("/ui/v1/")) return next();
+    const host = hostname(request.headers.host ?? "");
+    if (!options.allowedHosts.has(host)) return fault(response, 421, "invalid", `Unknown Host header: ${host}`);
+    const origin = request.headers.origin;
     if (origin) {
       let originHost = "";
       try {
         originHost = hostname(new URL(origin).host);
       } catch {}
       if (!options.allowedHosts.has(originHost))
-        return fault(res, 403, "forbidden", "Cross origin requests are not allowed");
+        return fault(response, 403, "forbidden", "Cross origin requests are not allowed");
     }
-    const site = req.headers["sec-fetch-site"];
+    const site = request.headers["sec-fetch-site"];
     if (site && site !== "same-origin" && site !== "none")
-      return fault(res, 403, "forbidden", "Cross site requests are not allowed");
-    if (["POST", "PUT", "PATCH"].includes(req.method) && !req.is("application/json"))
-      return fault(res, 415, "invalid", "JSON required");
-    req.url = req.url.slice(3);
-    req.headers.authorization = `Bearer ${options.clientToken}`;
+      return fault(response, 403, "forbidden", "Cross site requests are not allowed");
+    if (["POST", "PUT", "PATCH"].includes(request.method) && !request.is("application/json"))
+      return fault(response, 415, "invalid", "JSON required");
+    request.url = request.url.slice(3);
+    request.headers.authorization = `Bearer ${options.clientToken}`;
     next();
   };
 }

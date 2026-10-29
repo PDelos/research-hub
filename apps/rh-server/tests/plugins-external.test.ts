@@ -21,7 +21,7 @@ async function host(options: { callTimeoutMs?: number } = {}) {
   const { db } = openProjectDb(join(t.dir, "project.sqlite"));
   const lines: Record<string, unknown>[] = [];
   const log = createLogger({ write: (l) => lines.push(JSON.parse(l)) });
-  const h = await startPluginHost({
+  const pluginHost = await startPluginHost({
     dataDir: t.dir,
     db,
     vaultDir: join(t.dir, "vault"),
@@ -30,12 +30,13 @@ async function host(options: { callTimeoutMs?: number } = {}) {
     ...(options.callTimeoutMs ? { pluginCallTimeoutMs: options.callTimeoutMs } : {}),
   });
   return {
-    h,
+    h: pluginHost,
     t,
     lines,
     db,
-    install: async (folder: string) => h.installer.confirm((await h.installer.prepare({ folder })).planId),
-    done: async () => (await h.stop(), db.close(), t.cleanup()),
+    install: async (folder: string) =>
+      pluginHost.installer.confirm((await pluginHost.installer.prepare({ folder })).planId),
+    done: async () => (await pluginHost.stop(), db.close(), t.cleanup()),
   };
 }
 
@@ -185,8 +186,8 @@ function git(cwd: string, ...args: string[]) {
 
 /** A git smart-HTTP server (git http-backend as CGI) for one repository folder. */
 function gitServer(root: string): Promise<{ url: string; close: () => void }> {
-  const server = http.createServer((req, res) => {
-    const url = new URL(req.url!, "http://x");
+  const server = http.createServer((request, response) => {
+    const url = new URL(request.url!, "http://x");
     const cgi = spawn("git", ["http-backend"], {
       env: {
         ...process.env,
@@ -194,11 +195,11 @@ function gitServer(root: string): Promise<{ url: string; close: () => void }> {
         GIT_HTTP_EXPORT_ALL: "1",
         PATH_INFO: url.pathname,
         QUERY_STRING: url.search.slice(1),
-        REQUEST_METHOD: req.method!,
-        CONTENT_TYPE: req.headers["content-type"] ?? "",
+        REQUEST_METHOD: request.method!,
+        CONTENT_TYPE: request.headers["content-type"] ?? "",
       },
     });
-    req.pipe(cgi.stdin);
+    request.pipe(cgi.stdin);
     const chunks: Buffer[] = [];
     cgi.stdout.on("data", (c) => chunks.push(c));
     cgi.on("close", () => {
@@ -209,10 +210,10 @@ function gitServer(root: string): Promise<{ url: string; close: () => void }> {
       for (const line of head) {
         const [k, ...v] = line.split(": ");
         if (k.toLowerCase() === "status") status = Number(v.join(": ").split(" ")[0]);
-        else res.setHeader(k, v.join(": "));
+        else response.setHeader(k, v.join(": "));
       }
-      res.statusCode = status;
-      res.end(raw.subarray(split + 4));
+      response.statusCode = status;
+      response.end(raw.subarray(split + 4));
     });
   });
   return new Promise((resolve) =>

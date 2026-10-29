@@ -61,9 +61,9 @@ const sp: SweepPaper = {
 
 test("trust is field-aware: an arXiv cs.LG preprint is penalized less than a bioRxiv preprint, and both reasons say so", () => {
   const charter = validateCharter(sampleCharter());
-  const opts = { orientation: true, now: Date.parse("2026-10-23"), decisions: {}, hasMethodFacet: false };
-  const ai = computeScores(basePaper({ server: "arXiv", categories: ["cs.LG"] }), sp, charter, opts);
-  const bio = computeScores(basePaper({ server: "bioRxiv" }), sp, charter, opts);
+  const options = { orientation: true, now: Date.parse("2026-10-23"), decisions: {}, hasMethodFacet: false };
+  const ai = computeScores(basePaper({ server: "arXiv", categories: ["cs.LG"] }), sp, charter, options);
+  const bio = computeScores(basePaper({ server: "bioRxiv" }), sp, charter, options);
   assert.equal(ai.trust - bio.trust, 10);
   assert.match(ai.trustReason, /arXiv preprint \(cs\.LG: preprints are the norm, −5\)/);
   assert.match(bio.trustReason, /bioRxiv preprint, not peer-reviewed \(−15\)/);
@@ -71,7 +71,7 @@ test("trust is field-aware: an arXiv cs.LG preprint is penalized less than a bio
     basePaper({ venue: "Nature Methods", citedByCount: 40, publishedAt: "2024-10-23", oaUrl: "https://x" }),
     sp,
     charter,
-    { ...opts, hasMethodFacet: true },
+    { ...options, hasMethodFacet: true },
   );
   assert.ok(journal.trust > ai.trust);
   assert.match(
@@ -96,7 +96,7 @@ test("trust is field-aware: an arXiv cs.LG preprint is penalized less than a bio
         ],
       }),
     ),
-    opts,
+    options,
   );
   assert.ok(
     long.relevanceReason.length <= 120 && long.relevanceReason.endsWith("…") && long.relevanceReason.includes("Q1"),
@@ -128,23 +128,23 @@ async function activeServer(
   const server = await startTestServer({
     hub: { ticker: false, fauxRules: rules, jevDecide: jev.decide, paperFetch: arxivOnlyFetch(papers, works) },
   });
-  const p = server.hub.project;
-  p.brief.write("# Protein LMs");
-  p.charters.saveDraft(validateCharter(sampleCharter()), "agent");
-  p.charters.approve();
-  return { server, p, jev };
+  const projectRuntime = server.hub.project;
+  projectRuntime.brief.write("# Protein LMs");
+  projectRuntime.charters.saveDraft(validateCharter(sampleCharter()), "agent");
+  projectRuntime.charters.approve();
+  return { server, p: projectRuntime, jev };
 }
 
-async function sweepOnce(p: Awaited<ReturnType<typeof activeServer>>["p"]) {
-  p.scheduler.trigger("sweep");
-  for (let i = 0; i < 500 && !p.sweeps.list()[0]; i++) await new Promise((r) => setTimeout(r, 10));
-  return p.sweeps.settled(p.sweeps.list()[0].id, 30_000);
+async function sweepOnce(projectRuntime: Awaited<ReturnType<typeof activeServer>>["p"]) {
+  projectRuntime.scheduler.trigger("sweep");
+  for (let i = 0; i < 500 && !projectRuntime.sweeps.list()[0]; i++) await new Promise((r) => setTimeout(r, 10));
+  return projectRuntime.sweeps.settled(projectRuntime.sweeps.list()[0].id, 30_000);
 }
 
 test("a sweep's candidates become complete cards written by the card writer, and the sweep completes", async () => {
   const papers = fakePapers(9);
   const retracted = `10.48550/arxiv.${papers[8].id}`;
-  const { server, p } = await activeServer(papers, [cardWriterRule], (doi) =>
+  const { server, p: projectRuntime } = await activeServer(papers, [cardWriterRule], (doi) =>
     doi === retracted
       ? {
           id: "https://openalex.org/W9",
@@ -155,12 +155,12 @@ test("a sweep's candidates become complete cards written by the card writer, and
       : undefined,
   );
   try {
-    const sweep = await sweepOnce(p);
+    const sweep = await sweepOnce(projectRuntime);
     assert.equal(sweep.status, "completed", sweep.error ?? "");
-    const cards = p.cards.list();
+    const cards = projectRuntime.cards.list();
     assert.equal(cards.length, 7);
     for (const card of cards) {
-      const paper = p.papers.store.get(card.paperId)!;
+      const paper = projectRuntime.papers.store.get(card.paperId)!;
       assert.ok(
         paper.title &&
           paper.authors.length &&
@@ -188,7 +188,7 @@ test("a sweep's candidates become complete cards written by the card writer, and
       [1, 2, 3, 4, 5, 6, 7],
     );
     assert.equal(
-      p.cards.byPaper(p.papers.store.find({ arxiv: papers[8].id })!.id),
+      projectRuntime.cards.byPaper(projectRuntime.papers.store.find({ arxiv: papers[8].id })!.id),
       undefined,
       "the retracted paper has no card",
     );
@@ -230,20 +230,20 @@ test("an invented number is refused; presenting a paper twice keeps one card; a 
       });
     return say("done");
   };
-  const { server, p } = await activeServer(fakePapers(4), [tricky]);
+  const { server, p: projectRuntime } = await activeServer(fakePapers(4), [tricky]);
   try {
-    const sweep = await sweepOnce(p);
+    const sweep = await sweepOnce(projectRuntime);
     assert.equal(sweep.status, "completed", sweep.error ?? "");
     // Tool results as recorded by telemetry.
     await new Promise((r) => setTimeout(r, 200));
     const view = JSON.stringify(
-      p.db.prepare("SELECT tool_name, is_error, result_text FROM tool_calls ORDER BY id").all(),
+      projectRuntime.db.prepare("SELECT tool_name, is_error, result_text FROM tool_calls ORDER BY id").all(),
     );
     assert.match(view, /states numbers that are not in the title or abstract: 99/);
     assert.match(view, /have neither a card nor a skip reason/);
-    assert.equal(p.cards.count(), 3, "one card per paper even when presented twice");
-    assert.ok(p.cards.list().every((c) => !/99/.test(c.summary)));
-    const skipped = p.sweeps.papers(sweep.id).find((x) => x.status === "skipped")!;
+    assert.equal(projectRuntime.cards.count(), 3, "one card per paper even when presented twice");
+    assert.ok(projectRuntime.cards.list().every((c) => !/99/.test(c.summary)));
+    const skipped = projectRuntime.sweeps.papers(sweep.id).find((x) => x.status === "skipped")!;
     assert.equal(skipped.reason, "duplicate of a paper already in the feed");
     assert.deepEqual(
       sweep.completion!.skipped.map((s) => s.reason),
@@ -266,12 +266,12 @@ test("a card turn that ends without complete_sweep fails the sweep and keeps its
       });
     return say("I am done.");
   };
-  const { server, p } = await activeServer(fakePapers(3), [lazy]);
+  const { server, p: projectRuntime } = await activeServer(fakePapers(3), [lazy]);
   try {
-    const sweep = await sweepOnce(p);
+    const sweep = await sweepOnce(projectRuntime);
     assert.equal(sweep.status, "failed");
     assert.equal(sweep.error, "the card writer ended without calling complete_sweep");
-    assert.equal(p.cards.count(), 1);
+    assert.equal(projectRuntime.cards.count(), 1);
   } finally {
     await server.stop();
   }
@@ -283,7 +283,7 @@ test("a restart during the card turn re-attaches and completes the sweep with on
   try {
     const papers = fakePapers(3);
     const jev = scripted(passAll);
-    const opts = {
+    const options = {
       dataDir: t.dir,
       hub: {
         ticker: false,
@@ -293,19 +293,23 @@ test("a restart during the card turn re-attaches and completes the sweep with on
         paperFetch: arxivOnlyFetch(papers),
       },
     };
-    const first = await startTestServer(opts);
-    const p = first.hub.project;
-    p.brief.write("# Protein LMs");
-    p.charters.saveDraft(validateCharter(sampleCharter()), "agent");
-    p.charters.approve();
-    p.scheduler.trigger("sweep");
-    for (let i = 0; i < 1000 && !(p.sweeps.list()[0]?.phase === "cards" && p.cards.count() >= 1); i++)
+    const first = await startTestServer(options);
+    const projectRuntime = first.hub.project;
+    projectRuntime.brief.write("# Protein LMs");
+    projectRuntime.charters.saveDraft(validateCharter(sampleCharter()), "agent");
+    projectRuntime.charters.approve();
+    projectRuntime.scheduler.trigger("sweep");
+    for (
+      let i = 0;
+      i < 1000 && !(projectRuntime.sweeps.list()[0]?.phase === "cards" && projectRuntime.cards.count() >= 1);
+      i++
+    )
       await new Promise((r) => setTimeout(r, 10));
-    const id = p.sweeps.list()[0].id;
-    assert.equal(p.sweeps.get(id)!.status, "running", "stopped in the middle of the card turn");
+    const id = projectRuntime.sweeps.list()[0].id;
+    assert.equal(projectRuntime.sweeps.get(id)!.status, "running", "stopped in the middle of the card turn");
     await first.stop();
 
-    const second = await startTestServer({ ...opts, hub: { ...opts.hub, fauxTokensPerSecond: undefined } });
+    const second = await startTestServer({ ...options, hub: { ...options.hub, fauxTokensPerSecond: undefined } });
     try {
       const sweep = await second.hub.project.sweeps.settled(id, 30_000);
       assert.equal(sweep.status, "completed", sweep.error ?? "");

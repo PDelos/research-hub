@@ -73,35 +73,35 @@ function cardDetail(project: ProjectRuntime, card: Card): CardDetail {
   };
 }
 
-export function sweepSummary(project: ProjectRuntime, s: SweepRecord): SweepSummary {
+export function sweepSummary(project: ProjectRuntime, sweepRecord: SweepRecord): SweepSummary {
   const cards = Number(
-    (project.db.prepare("SELECT COUNT(*) n FROM cards WHERE sweep_id = ?").get(s.id) as { n: number }).n,
+    (project.db.prepare("SELECT COUNT(*) n FROM cards WHERE sweep_id = ?").get(sweepRecord.id) as { n: number }).n,
   );
   return {
-    id: s.id,
-    trigger: s.trigger,
-    status: s.status,
-    phase: s.phase,
-    orientation: s.orientation,
-    counts: s.counts,
-    error: s.error,
-    nextRetryAt: s.nextRetryAt,
-    cost: s.cost,
+    id: sweepRecord.id,
+    trigger: sweepRecord.trigger,
+    status: sweepRecord.status,
+    phase: sweepRecord.phase,
+    orientation: sweepRecord.orientation,
+    counts: sweepRecord.counts,
+    error: sweepRecord.error,
+    nextRetryAt: sweepRecord.nextRetryAt,
+    cost: sweepRecord.cost,
     cards,
-    startedAt: s.startedAt,
-    endedAt: s.endedAt,
+    startedAt: sweepRecord.startedAt,
+    endedAt: sweepRecord.endedAt,
   };
 }
 
 export function sweepRoutes(hub: Hub): Router {
-  const r = express.Router();
-  r.use("/v1", requireAuth(hub.log));
+  const router = express.Router();
+  router.use("/v1", requireAuth(hub.log));
   const p = () => hub.project;
 
-  r.get("/v1/cards", (req, res) => {
+  router.get("/v1/cards", (request, response) => {
     const project = p();
     const groups: CardGroup[] = [];
-    for (const card of project.cards.list(Math.min(int(req.query.limit, "limit", 100), 500))) {
+    for (const card of project.cards.list(Math.min(int(request.query.limit, "limit", 100), 500))) {
       let group = groups.at(-1);
       if (!group || group.sweep.id !== card.sweepId) {
         group = { sweep: sweepSummary(project, project.sweeps.get(card.sweepId)!), cards: [] };
@@ -109,52 +109,52 @@ export function sweepRoutes(hub: Hub): Router {
       }
       group.cards.push(cardView(project, card));
     }
-    res.json({ groups });
+    response.json({ groups });
   });
 
-  r.get("/v1/cards/:id", (req, res) => {
+  router.get("/v1/cards/:id", (request, response) => {
     const project = p();
-    const card = project.cards.get(int(req.params.id, "id"));
-    if (!card) throw notFound(`No card ${req.params.id}`);
-    res.json(cardDetail(project, card));
+    const card = project.cards.get(int(request.params.id, "id"));
+    if (!card) throw notFound(`No card ${request.params.id}`);
+    response.json(cardDetail(project, card));
   });
 
-  r.put("/v1/cards/:id/judgment", (req, res) => {
+  router.put("/v1/cards/:id/judgment", (request, response) => {
     const project = p();
-    const card = project.cards.get(int(req.params.id, "id"));
-    if (!card) throw notFound(`No card ${req.params.id}`);
-    const body = (req.body ?? {}) as Record<string, unknown>;
+    const card = project.cards.get(int(request.params.id, "id"));
+    if (!card) throw notFound(`No card ${request.params.id}`);
+    const body = (request.body ?? {}) as Record<string, unknown>;
     try {
       project.feedback.judge(card.id, body.verdict, body.reason);
     } catch (error) {
       if (error instanceof JudgmentInvalid) throw invalid(error.message);
       throw error;
     }
-    res.json(cardDetail(project, card));
+    response.json(cardDetail(project, card));
   });
 
-  r.delete("/v1/cards/:id/judgment", (req, res) => {
+  router.delete("/v1/cards/:id/judgment", (request, response) => {
     const project = p();
-    const card = project.cards.get(int(req.params.id, "id"));
-    if (!card) throw notFound(`No card ${req.params.id}`);
+    const card = project.cards.get(int(request.params.id, "id"));
+    if (!card) throw notFound(`No card ${request.params.id}`);
     project.feedback.clear(card.id);
-    res.json(cardDetail(project, card));
+    response.json(cardDetail(project, card));
   });
 
-  r.get("/v1/feedback/precision", (_req, res) => void res.json(p().feedback.precision()));
-  r.get("/v1/weights", (_req, res) => void res.json(p().feedback.weights()));
+  router.get("/v1/feedback/precision", (_request, response) => void response.json(p().feedback.precision()));
+  router.get("/v1/weights", (_request, response) => void response.json(p().feedback.weights()));
 
-  r.get("/v1/sweeps", (req, res) => {
+  router.get("/v1/sweeps", (request, response) => {
     const project = p();
-    res.json(
-      project.sweeps.list(Math.min(int(req.query.limit, "limit", 50), 200)).map((s) => sweepSummary(project, s)),
+    response.json(
+      project.sweeps.list(Math.min(int(request.query.limit, "limit", 50), 200)).map((s) => sweepSummary(project, s)),
     );
   });
 
-  r.get("/v1/sweeps/:id", (req, res) => {
+  router.get("/v1/sweeps/:id", (request, response) => {
     const project = p();
-    const sweep = project.sweeps.get(int(req.params.id, "id"));
-    if (!sweep) throw notFound(`No sweep ${req.params.id}`);
+    const sweep = project.sweeps.get(int(request.params.id, "id"));
+    if (!sweep) throw notFound(`No sweep ${request.params.id}`);
     const detail: SweepDetail = {
       ...sweepSummary(project, sweep),
       queries: sweep.queries,
@@ -175,13 +175,16 @@ export function sweepRoutes(hub: Hub): Router {
         exploration: isExploration(project.db, sweep.id, sp.paperId),
       })),
     };
-    res.json(detail);
+    response.json(detail);
   });
 
-  r.get("/v1/sweep-settings", (_req, res) => void res.json({ cardsPerSweep: p().sweeps.cardsPerSweep() }));
+  router.get(
+    "/v1/sweep-settings",
+    (_request, response) => void response.json({ cardsPerSweep: p().sweeps.cardsPerSweep() }),
+  );
 
-  r.put("/v1/sweep-settings", async (req, res) => {
-    const body = (req.body ?? {}) as Record<string, unknown>;
+  router.put("/v1/sweep-settings", async (request, response) => {
+    const body = (request.body ?? {}) as Record<string, unknown>;
     if (body.cardsPerSweep !== undefined) {
       // A plugin setting since v1-1: the change is recorded in the plugin history and can be undone.
       try {
@@ -191,8 +194,8 @@ export function sweepRoutes(hub: Hub): Router {
         throw error;
       }
     }
-    res.json({ cardsPerSweep: p().sweeps.cardsPerSweep() });
+    response.json({ cardsPerSweep: p().sweeps.cardsPerSweep() });
   });
 
-  return r;
+  return router;
 }

@@ -22,13 +22,13 @@ const openalexKnowsNothing: Route = (url) =>
 
 const pubmed: PaperSource = {
   name: "pubmed",
-  async search(q) {
+  async search(sourceQuery) {
     return [
       {
         source: "pubmed",
         externalId: "PMID1",
         ids: { doi: "10.1000/pubmed.1" },
-        title: `A PubMed paper about ${q.query}`,
+        title: `A PubMed paper about ${sourceQuery.query}`,
         abstract: "Background. Methods. Results.",
         authors: ["Ada Rivera"],
         publishedAt: "2026-10-01",

@@ -11,25 +11,26 @@ export class EuropePmcSource implements PaperSource {
   readonly name = "europepmc" as const;
   constructor(private readonly deps: SourceDeps) {}
 
-  async search(q: SourceQuery): Promise<SourcePaper[]> {
-    const terms = queryTerms(q.query);
+  async search(sourceQuery: SourceQuery): Promise<SourcePaper[]> {
+    const terms = queryTerms(sourceQuery.query);
     if (!terms.length) return [];
     let query = `(${terms.join(" AND ")})`;
-    if (q.since || q.until) query += ` AND FIRST_PDATE:[${q.since ?? "1900-01-01"} TO ${q.until ?? "2999-12-31"}]`;
+    if (sourceQuery.since || sourceQuery.until)
+      query += ` AND FIRST_PDATE:[${sourceQuery.since ?? "1900-01-01"} TO ${sourceQuery.until ?? "2999-12-31"}]`;
     const params = new URLSearchParams({
       query,
       resultType: "core",
       format: "json",
-      pageSize: String(Math.min(q.limit, 100)),
+      pageSize: String(Math.min(sourceQuery.limit, 100)),
     });
     if (this.deps.http.contactEmail) params.set("email", this.deps.http.contactEmail);
     const body = await this.deps.http.json<{ resultList?: { result?: any[] } }>(`${EUROPEPMC_API}?${params}`, {
       source: this.name,
-      budgetMs: q.budgetMs,
+      budgetMs: sourceQuery.budgetMs,
     });
     return (body.resultList?.result ?? [])
       .map(mapEuropePmcRecord)
-      .filter((p): p is SourcePaper => !!p && inWindow(p.publishedAt, q.since, q.until));
+      .filter((p): p is SourcePaper => !!p && inWindow(p.publishedAt, sourceQuery.since, sourceQuery.until));
   }
 }
 

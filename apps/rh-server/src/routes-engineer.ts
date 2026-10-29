@@ -6,8 +6,8 @@ import type { Hub } from "./hub.ts";
 import { EngineerInvalid, type EngineerExports } from "../plugins/rh.engineer/main.ts";
 
 export function engineerRoutes(hub: Hub): Router {
-  const r = express.Router();
-  r.use("/v1", requireAuth(hub.log));
+  const router = express.Router();
+  router.use("/v1", requireAuth(hub.log));
   const engineer = () => hub.project.plugins.exportsOf<EngineerExports>("rh.engineer");
   const guard = async <T>(fn: () => T | Promise<T>) => {
     try {
@@ -17,17 +17,17 @@ export function engineerRoutes(hub: Hub): Router {
       throw error;
     }
   };
-  r.get("/v1/engineer/ideas", async (_req, res) => void res.json((await engineer()).ideas()));
-  r.post("/v1/engineer/ideas", async (req, res) => {
-    const text = req.body?.text;
+  router.get("/v1/engineer/ideas", async (_request, response) => void response.json((await engineer()).ideas()));
+  router.post("/v1/engineer/ideas", async (request, response) => {
+    const text = request.body?.text;
     if (typeof text !== "string") throw invalid("text must be the idea in words");
-    const source = req.body?.source === "suggestion" ? "suggestion" : "user";
-    res.status(202).json(await guard(async () => (await engineer()).propose(text, source)));
+    const source = request.body?.source === "suggestion" ? "suggestion" : "user";
+    response.status(202).json(await guard(async () => (await engineer()).propose(text, source)));
   });
   for (const action of ["build", "reject", "enable"] as const)
-    r.post(`/v1/engineer/ideas/:id/${action}`, async (req, res) => {
-      const id = int(req.params.id, "id");
-      res.json(await guard(async () => (await engineer())[action](id)));
+    router.post(`/v1/engineer/ideas/:id/${action}`, async (request, response) => {
+      const id = int(request.params.id, "id");
+      response.json(await guard(async () => (await engineer())[action](id)));
     });
-  return r;
+  return router;
 }

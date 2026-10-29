@@ -45,11 +45,14 @@ test("the converter preset runs on the cached sample; the weekly upgrade skips t
     seed(server.dataDir);
     const harness = await server.hub.project.plugins.exportsOf<HarnessExports>("rh.harness");
     assert.ok(harness.slots().some((s) => s.id === "converter" && s.active.name === "PDF text (pdf.js)"));
-    const r = await server.client.runBenchmark("converter");
-    assert.equal(r.candidate.converter, "pdf-text");
-    assert.equal(r.result.tasks[0].items, 2);
-    assert.ok(r.result.value! > 0 && r.result.value! < 1, String(r.result.value));
-    assert.match(r.result.tasks[0].note!, /offline and not cached/);
+    const benchmarkRecord = await server.client.runBenchmark("converter");
+    assert.equal(benchmarkRecord.candidate.converter, "pdf-text");
+    assert.equal(benchmarkRecord.result.tasks[0].items, 2);
+    assert.ok(
+      benchmarkRecord.result.value! > 0 && benchmarkRecord.result.value! < 1,
+      String(benchmarkRecord.result.value),
+    );
+    assert.match(benchmarkRecord.result.tasks[0].note!, /offline and not cached/);
     await assert.rejects(server.client.runBenchmark("converter", { converter: "docling" }), /not available here/);
 
     const upgrades = await server.hub.project.plugins.exportsOf<UpgradesExports>("rh.upgrades");
@@ -62,13 +65,14 @@ test("the converter preset runs on the cached sample; the weekly upgrade skips t
 
 test("with Docling available, a better converter is proposed and approving switches the slot", async () => {
   const md = TRUTH.map((s) => `## ${s.title}\n\n${s.text}`).join("\n\n");
-  const docling = createServer((req, res) => {
-    if (req.url === "/health") return void res.end("ok");
-    if (req.url?.startsWith("/v1/status/poll/")) return void res.end(JSON.stringify({ task_status: "success" }));
-    if (req.url?.startsWith("/v1/result/"))
-      return void res.end(JSON.stringify({ document: { md_content: md }, status: "success" }));
-    req.resume();
-    req.on("end", () => res.end(JSON.stringify({ task_id: "t1", task_status: "pending" })));
+  const docling = createServer((request, response) => {
+    if (request.url === "/health") return void response.end("ok");
+    if (request.url?.startsWith("/v1/status/poll/"))
+      return void response.end(JSON.stringify({ task_status: "success" }));
+    if (request.url?.startsWith("/v1/result/"))
+      return void response.end(JSON.stringify({ document: { md_content: md }, status: "success" }));
+    request.resume();
+    request.on("end", () => response.end(JSON.stringify({ task_id: "t1", task_status: "pending" })));
   });
   await new Promise<void>((r) => docling.listen(0, "127.0.0.1", r));
   process.env.RH_DOCLING_URL = `http://127.0.0.1:${(docling.address() as { port: number }).port}`;
@@ -79,10 +83,10 @@ test("with Docling available, a better converter is proposed and approving switc
     const run = await upgrades.run({ focus: "converter" });
     assert.equal(run.report!.tried.length, 2, run.report!.result);
     assert.equal(run.report!.tried[1].verdict, "better");
-    const [p] = upgrades.proposals("proposed");
-    assert.equal(p.kind, "converter");
-    assert.equal(p.payload.converter, "docling");
-    await upgrades.approve(p.id);
+    const [proposal] = upgrades.proposals("proposed");
+    assert.equal(proposal.kind, "converter");
+    assert.equal(proposal.payload.converter, "docling");
+    await upgrades.approve(proposal.id);
     assert.equal(server.hub.project.plugins.kernel.settings("rh.fulltext")["fulltext.converter"], "docling");
   } finally {
     delete process.env.RH_DOCLING_URL;

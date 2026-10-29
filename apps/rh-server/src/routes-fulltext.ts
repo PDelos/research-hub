@@ -10,8 +10,8 @@ const view = (paperId: number, t: FullText | undefined): FullTextView =>
   t ?? { paperId, status: "none", source: null, sections: [], chars: 0, notes: [], fetchedAt: null };
 
 export function fullTextRoutes(hub: Hub): Router {
-  const r = express.Router();
-  r.use("/v1", requireAuth(hub.log));
+  const router = express.Router();
+  router.use("/v1", requireAuth(hub.log));
   const fulltext = () => hub.project.plugins.exportsOf<FullTextExports>("rh.fulltext");
   const paper = (raw: unknown) => {
     const id = int(raw, "id");
@@ -19,22 +19,22 @@ export function fullTextRoutes(hub: Hub): Router {
     return id;
   };
 
-  r.get("/v1/papers/:id/fulltext", async (req, res) => {
-    const id = paper(req.params.id);
-    res.json(view(id, (await fulltext()).get(id)));
+  router.get("/v1/papers/:id/fulltext", async (request, response) => {
+    const id = paper(request.params.id);
+    response.json(view(id, (await fulltext()).get(id)));
   });
-  r.post("/v1/papers/:id/fulltext", async (req, res) => {
-    const id = paper(req.params.id);
+  router.post("/v1/papers/:id/fulltext", async (request, response) => {
+    const id = paper(request.params.id);
     try {
-      res.json(view(id, await (await fulltext()).refetch(id)));
+      response.json(view(id, await (await fulltext()).refetch(id)));
     } catch (error) {
       if (error instanceof FullTextInvalid) throw invalid(error.message);
       throw error;
     }
   });
-  r.get("/v1/fulltext/converters", async (_req, res) => {
+  router.get("/v1/fulltext/converters", async (_request, response) => {
     const list: ConverterInfo[] = await (await fulltext()).converters();
-    res.json(list);
+    response.json(list);
   });
-  return r;
+  return router;
 }

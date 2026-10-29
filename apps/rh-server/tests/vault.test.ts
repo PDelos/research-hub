@@ -47,17 +47,17 @@ test("appendUnderHeading adds a line at the end of a section and leaves every ot
 
 test("approving a charter creates the vault with the layout, the hub theme and charter.md; a user-edited charter.md is kept", async () => {
   const server = await startTestServer({ hub: { ticker: false } });
-  const p = server.hub.project;
+  const projectRuntime = server.hub.project;
   try {
-    assert.equal(p.vault.exists(), false, "no vault before a charter is approved");
-    p.brief.write("# Protein LMs");
-    p.charters.saveDraft(validateCharter(sampleCharter()), "agent");
-    const res = await fetch(`${server.url}/v1/charter/approve`, {
+    assert.equal(projectRuntime.vault.exists(), false, "no vault before a charter is approved");
+    projectRuntime.brief.write("# Protein LMs");
+    projectRuntime.charters.saveDraft(validateCharter(sampleCharter()), "agent");
+    const response = await fetch(`${server.url}/v1/charter/approve`, {
       method: "POST",
       headers: { authorization: "Bearer test-api-token-0123456789", "content-type": "application/json" },
       body: "{}",
     });
-    assert.equal(res.status, 200);
+    assert.equal(response.status, 200);
     for (const f of [
       "index.md",
       "log.md",
@@ -68,27 +68,30 @@ test("approving a charter creates the vault with the layout, the hub theme and c
       ".obsidian/snippets/research-hub.css",
       ".obsidian/appearance.json",
     ])
-      assert.ok(existsSync(join(p.vault.dir, f)), f);
+      assert.ok(existsSync(join(projectRuntime.vault.dir, f)), f);
     assert.match(
-      p.vault.read("charter.md")!,
+      projectRuntime.vault.read("charter.md")!,
       /^# Charter \(version 1\)[\s\S]*\*\*Q2\*\* \(weight 1\.5\): Which tasks need fine-tuning\?/,
     );
-    assert.equal(JSON.parse(p.vault.read(".obsidian/appearance.json")!).enabledCssSnippets[0], "research-hub");
+    assert.equal(
+      JSON.parse(projectRuntime.vault.read(".obsidian/appearance.json")!).enabledCssSnippets[0],
+      "research-hub",
+    );
 
     // Version 2 refreshes charter.md while untouched; after a user edit it is kept.
-    p.charters.saveDraft(validateCharter(sampleCharter({ concepts: ["contact maps"] })), "user");
-    p.charters.approve();
-    p.syncVault();
-    assert.match(p.vault.read("charter.md")!, /version 2/);
-    writeFileSync(join(p.vault.dir, "charter.md"), "# My charter notes\n");
-    writeFileSync(join(p.vault.dir, ".obsidian/appearance.json"), '{"theme":"obsidian"}');
-    p.charters.saveDraft(validateCharter(sampleCharter({ concepts: ["embeddings"] })), "user");
-    p.charters.approve();
-    p.syncVault();
-    p.vault.ensure();
-    assert.equal(p.vault.read("charter.md"), "# My charter notes\n", "user edits win");
+    projectRuntime.charters.saveDraft(validateCharter(sampleCharter({ concepts: ["contact maps"] })), "user");
+    projectRuntime.charters.approve();
+    projectRuntime.syncVault();
+    assert.match(projectRuntime.vault.read("charter.md")!, /version 2/);
+    writeFileSync(join(projectRuntime.vault.dir, "charter.md"), "# My charter notes\n");
+    writeFileSync(join(projectRuntime.vault.dir, ".obsidian/appearance.json"), '{"theme":"obsidian"}');
+    projectRuntime.charters.saveDraft(validateCharter(sampleCharter({ concepts: ["embeddings"] })), "user");
+    projectRuntime.charters.approve();
+    projectRuntime.syncVault();
+    projectRuntime.vault.ensure();
+    assert.equal(projectRuntime.vault.read("charter.md"), "# My charter notes\n", "user edits win");
     assert.equal(
-      p.vault.read(".obsidian/appearance.json"),
+      projectRuntime.vault.read(".obsidian/appearance.json"),
       '{"theme":"obsidian"}',
       "the user's Obsidian theme choice is kept",
     );
@@ -101,10 +104,10 @@ test("an existing project with an approved charter but no vault gets one at star
   const t = tempDir();
   try {
     let server = await startTestServer({ dataDir: t.dir, hub: { ticker: false } });
-    const p = server.hub.project;
-    p.brief.write("# x");
-    p.charters.saveDraft(validateCharter(sampleCharter()), "agent");
-    p.charters.approve();
+    const projectRuntime = server.hub.project;
+    projectRuntime.brief.write("# x");
+    projectRuntime.charters.saveDraft(validateCharter(sampleCharter()), "agent");
+    projectRuntime.charters.approve();
     await server.stop();
     server = await startTestServer({ dataDir: t.dir, hub: { ticker: false } });
     try {

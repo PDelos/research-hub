@@ -31,9 +31,9 @@ function history(sweeps: number): { history: SweepHistory[]; labels: Labels } {
 const settings = { ...DEFAULT_SETTINGS, cardsPerSweep: 3, explorationPicks: 0 };
 
 test("a variant that ranks by relevance wins on held-out sweeps; one that ranks by importance alone loses", () => {
-  const { history: h, labels } = history(10);
+  const { history: sweepHistories, labels } = history(10);
   const better = replay(
-    h,
+    sweepHistories,
     settings,
     { rankWeights: { importance: 0, relevance: 1, question: 0, level: 0, freshness: 0 } },
     labels,
@@ -54,7 +54,7 @@ test("a variant that ranks by relevance wins on held-out sweeps; one that ranks 
   );
 
   const worse = replay(
-    h,
+    sweepHistories,
     { ...settings, rankWeights: { importance: 0, relevance: 1, question: 0, level: 0, freshness: 0 } },
     { rankWeights: { importance: 1, relevance: 0, question: 0, level: 0, freshness: 0 } },
     labels,
@@ -62,30 +62,30 @@ test("a variant that ranks by relevance wins on held-out sweeps; one that ranks 
   assert.equal(worse.verdict, "worse");
   assert.ok(worse.heldOut.high < 0);
 
-  const same = replay(h, settings, {}, labels);
+  const same = replay(sweepHistories, settings, {}, labels);
   assert.equal(same.verdict, "inconclusive");
   assert.equal(same.heldOut.diff, 0);
 });
 
 test("too few labelled sweeps say so; unlabelled cards lower coverage instead of counting as bad", () => {
-  const { history: h, labels } = history(2);
-  assert.equal(replay(h, settings, { cardsPerSweep: 5 }, labels).verdict, "not enough data");
+  const { history: sweepHistories, labels } = history(2);
+  assert.equal(replay(sweepHistories, settings, { cardsPerSweep: 5 }, labels).verdict, "not enough data");
   const sparse: Labels = { user: new Map([...labels.user].filter(([id]) => id % 2 === 0)) };
-  const r = replay(history(4).history, settings, {}, sparse);
-  assert.ok(r.mean.current.coverage > 0 && r.mean.current.coverage < 1);
-  assert.ok(r.mean.current.ndcg! >= 0 && r.mean.current.ndcg! <= 1);
+  const replayReport = replay(history(4).history, settings, {}, sparse);
+  assert.ok(replayReport.mean.current.coverage > 0 && replayReport.mean.current.coverage < 1);
+  assert.ok(replayReport.mean.current.ndcg! >= 0 && replayReport.mean.current.ndcg! <= 1);
 });
 
 test("a lower threshold admits rejected papers, which use estimated features and are counted", () => {
-  const { history: h, labels } = history(4);
-  for (const sweep of h)
+  const { history: sweepHistories, labels } = history(4);
+  for (const sweep of sweepHistories)
     sweep.pool.push(
       { paperId: sweep.sweepId * 100 + 50, relevance: 0.4, worth: 0.8 },
       { paperId: sweep.sweepId * 100 + 51, relevance: 0.2, worth: 0.8 },
     );
-  const r = replay(h, settings, { relevanceMin: 0.35 }, labels);
-  assert.equal(r.estimated, 4, "one admitted paper per sweep (0.4), not the 0.2 one");
-  assert.ok(replayCards(h[0], { ...settings, relevanceMin: 0.1 }).estimated === 2);
+  const replayReport = replay(sweepHistories, settings, { relevanceMin: 0.35 }, labels);
+  assert.equal(replayReport.estimated, 4, "one admitted paper per sweep (0.4), not the 0.2 one");
+  assert.ok(replayCards(sweepHistories[0], { ...settings, relevanceMin: 0.1 }).estimated === 2);
 });
 
 test("the bootstrap is reproducible and brackets the mean", () => {

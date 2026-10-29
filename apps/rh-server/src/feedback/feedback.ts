@@ -315,16 +315,16 @@ interface JudgmentRow {
   updated_at: string;
 }
 
-function toJudgment(r: JudgmentRow): Judgment {
+function toJudgment(judgmentRow: JudgmentRow): Judgment {
   return {
-    cardId: Number(r.card_id),
-    paperId: Number(r.paper_id),
-    verdict: r.verdict,
-    reason: r.reason ?? undefined,
-    reasonKind: r.reason_kind ?? undefined,
-    ruleProbability: r.rule_probability ?? undefined,
-    ruleStatus: r.rule_status,
-    createdAt: r.created_at,
-    updatedAt: r.updated_at,
+    cardId: Number(judgmentRow.card_id),
+    paperId: Number(judgmentRow.paper_id),
+    verdict: judgmentRow.verdict,
+    reason: judgmentRow.reason ?? undefined,
+    reasonKind: judgmentRow.reason_kind ?? undefined,
+    ruleProbability: judgmentRow.rule_probability ?? undefined,
+    ruleStatus: judgmentRow.rule_status,
+    createdAt: judgmentRow.created_at,
+    updatedAt: judgmentRow.updated_at,
   };
 }

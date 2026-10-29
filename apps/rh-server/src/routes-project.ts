@@ -7,8 +7,8 @@ import { ApiFault, int, invalid, notFound } from "./errors.ts";
 import { ScheduleInvalid } from "./schedule.ts";
 import type { Hub } from "./hub.ts";
 
-function bodyOf(req: Request): Record<string, unknown> {
-  const body = req.body;
+function bodyOf(request: Request): Record<string, unknown> {
+  const body = request.body;
   if (body === undefined) return {};
   if (typeof body !== "object" || body === null || Array.isArray(body)) throw invalid("Body must be a JSON object");
   return body as Record<string, unknown>;
@@ -25,8 +25,8 @@ function fault(error: unknown): never {
 }
 
 export function projectRoutes(hub: Hub): Router {
-  const r = express.Router();
-  r.use("/v1", requireAuth(hub.log));
+  const router = express.Router();
+  router.use("/v1", requireAuth(hub.log));
   const p = () => hub.project;
   const charterView = () => {
     const { charters, questions, charterWriter } = p();
@@ -41,42 +41,42 @@ export function projectRoutes(hub: Hub): Router {
       run: run ? { ...run, prompt: undefined } : null,
     };
   };
-  r.get("/v1/brief", (_req, res) => {
+  router.get("/v1/brief", (_request, response) => {
     const text = p().brief.read();
-    res.json({ brief: text ?? null, chars: text ? [...text].length : 0, status: p().state.status() });
+    response.json({ brief: text ?? null, chars: text ? [...text].length : 0, status: p().state.status() });
   });
 
-  r.put("/v1/brief", async (req, res) => {
+  router.put("/v1/brief", async (request, response) => {
     if (p().charterWriter.run()?.status === "running") throw busy();
     try {
-      p().brief.write(bodyOf(req).brief);
+      p().brief.write(bodyOf(request).brief);
       await p().charterWriter.draft();
     } catch (error) {
       fault(error);
     }
-    res.json(charterView());
+    response.json(charterView());
   });
 
-  r.get("/v1/charter", (_req, res) => void res.json(charterView()));
+  router.get("/v1/charter", (_request, response) => void response.json(charterView()));
 
-  r.get("/v1/charter/versions/:n", (req, res) => {
-    const record = p().charters.version(int(req.params.n, "n"));
-    if (!record) throw notFound(`No charter version ${req.params.n}`);
-    res.json(record);
+  router.get("/v1/charter/versions/:n", (request, response) => {
+    const record = p().charters.version(int(request.params.n, "n"));
+    if (!record) throw notFound(`No charter version ${request.params.n}`);
+    response.json(record);
   });
 
-  r.put("/v1/charter", (req, res) => {
+  router.put("/v1/charter", (request, response) => {
     if (p().charterWriter.run()?.status === "running") throw busy();
     try {
-      p().charters.saveDraft(validateCharter(bodyOf(req).charter), "user");
+      p().charters.saveDraft(validateCharter(bodyOf(request).charter), "user");
     } catch (error) {
       fault(error);
     }
-    res.json(charterView());
+    response.json(charterView());
   });
 
-  r.post("/v1/charter/answers", async (req, res) => {
-    const answers = bodyOf(req).answers;
+  router.post("/v1/charter/answers", async (request, response) => {
+    const answers = bodyOf(request).answers;
     if (!Array.isArray(answers) || !answers.length) throw invalid("answers must be a nonempty list of {id, answer}");
     const open = new Map(
       p()
@@ -98,10 +98,10 @@ export function projectRoutes(hub: Hub): Router {
     } catch (error) {
       fault(error);
     }
-    res.json(charterView());
+    response.json(charterView());
   });
 
-  r.post("/v1/charter/approve", (_req, res) => {
+  router.post("/v1/charter/approve", (_request, response) => {
     if (p().charterWriter.run()?.status === "running") throw busy();
     const approved = p().charters.approve();
     if (!approved) throw new ApiFault("conflict", "There is no draft to approve");
@@ -109,10 +109,10 @@ export function projectRoutes(hub: Hub): Router {
     // Weights replay onto the new version's base weights.
     p().feedback.replay();
     p().syncVault();
-    res.json(charterView());
+    response.json(charterView());
   });
 
-  r.post("/v1/charter/retry", async (_req, res) => {
+  router.post("/v1/charter/retry", async (_request, response) => {
     const run = p().charterWriter.run();
     if (!run || run.status !== "failed") throw new ApiFault("conflict", "There is no failed charter run to retry");
     try {
@@ -120,13 +120,13 @@ export function projectRoutes(hub: Hub): Router {
     } catch (error) {
       fault(error);
     }
-    res.json(charterView());
+    response.json(charterView());
   });
 
-  r.get("/v1/project", (_req, res) => {
+  router.get("/v1/project", (_request, response) => {
     const project = p();
     const approved = project.charters.approved();
-    res.json({
+    response.json({
       name: project.name,
       status: project.state.status(),
       charterVersion: approved?.version ?? null,
@@ -138,39 +138,39 @@ export function projectRoutes(hub: Hub): Router {
     });
   });
 
-  r.get("/v1/schedule", (_req, res) => void res.json(p().scheduler.schedule()));
+  router.get("/v1/schedule", (_request, response) => void response.json(p().scheduler.schedule()));
 
-  r.put("/v1/schedule", (req, res) => {
+  router.put("/v1/schedule", (request, response) => {
     try {
-      res.json(p().scheduler.setSchedule(bodyOf(req)));
+      response.json(p().scheduler.setSchedule(bodyOf(request)));
     } catch (error) {
       if (error instanceof ScheduleInvalid) throw invalid(error.message);
       throw error;
     }
   });
 
-  r.get("/v1/scheduled-runs", (req, res) => {
-    res.json(p().scheduler.runs(Math.min(int(req.query.limit, "limit", 100), 500)));
+  router.get("/v1/scheduled-runs", (request, response) => {
+    response.json(p().scheduler.runs(Math.min(int(request.query.limit, "limit", 100), 500)));
   });
 
-  r.post("/v1/runs/:kind", (req, res) => {
-    const kind = req.params.kind;
+  router.post("/v1/runs/:kind", (request, response) => {
+    const kind = request.params.kind;
     if (kind !== "sweep" && kind !== "nightly" && kind !== "review") throw notFound(`No run kind ${kind}`);
     const run = p().scheduler.trigger(kind);
-    res.status(run.status === "requested" ? 202 : 200).json(run);
+    response.status(run.status === "requested" ? 202 : 200).json(run);
   });
 
-  r.post("/v1/project/pause", (_req, res) => {
+  router.post("/v1/project/pause", (_request, response) => {
     p().state.pause();
     hub.log.info("project.paused", {});
-    res.json({ status: p().state.status() });
+    response.json({ status: p().state.status() });
   });
 
-  r.post("/v1/project/resume", (_req, res) => {
+  router.post("/v1/project/resume", (_request, response) => {
     p().state.resume();
     hub.log.info("project.resumed", {});
-    res.json({ status: p().state.status() });
+    response.json({ status: p().state.status() });
   });
 
-  return r;
+  return router;
 }

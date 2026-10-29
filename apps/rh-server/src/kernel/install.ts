@@ -143,13 +143,13 @@ export class PluginInstaller {
     renameSync(dir, target);
     const hash = hashFolder(target);
     await state.update(
-      (l) => {
-        l.plugins[plan.id] = {
+      (lockfile) => {
+        lockfile.plugins[plan.id] = {
           version: plan.version,
           source: plan.source,
           hash,
           enabled: true,
-          settings: l.plugins[plan.id]?.settings ?? {},
+          settings: lockfile.plugins[plan.id]?.settings ?? {},
         };
       },
       `${plan.replaces ? "update" : "install"} ${plan.id} ${plan.version}`,
@@ -188,8 +188,8 @@ export class PluginInstaller {
       if (migrations) this.options.db.prepare("DELETE FROM plugin_migrations WHERE plugin_id = ?").run(id);
     }
     await state.update(
-      (l) => {
-        delete l.plugins[id];
+      (lockfile) => {
+        delete lockfile.plugins[id];
       },
       `uninstall ${id}${options.deleteData ? " and delete its data" : ""}`,
       options.actor ?? "user",

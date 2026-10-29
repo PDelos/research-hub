@@ -15,7 +15,7 @@ test("OpenRouter embeddings: 70 texts go out in batches of 32, 32 and 6 with dim
   try {
     const bodies: any[] = [];
     let auth = "";
-    const fetchImpl = (async (_url: string, init: RequestInit) => {
+    const fetchImplementation = (async (_url: string, init: RequestInit) => {
       const body = JSON.parse(String(init.body));
       bodies.push(body);
       auth = new Headers(init.headers).get("authorization") ?? "";
@@ -34,7 +34,7 @@ test("OpenRouter embeddings: 70 texts go out in batches of 32, 32 and 6 with dim
       model: "qwen/qwen3-embedding-8b",
       dims: 4,
       ledger,
-      http: new PoliteHttp({ fetch: fetchImpl }),
+      http: new PoliteHttp({ fetch: fetchImplementation }),
     });
     const texts = Array.from({ length: 70 }, (_, i) => `text ${i}`);
     const vectors = await embedder.embed(texts);
@@ -94,14 +94,17 @@ test("a wrong dimension or an error answer fails the call and is recorded as an 
 
 test("the offline fake is deterministic, unit length, and closer for texts sharing words", async () => {
   const fake = new FakeEmbedder(256);
-  const [a, a2, b, c] = await fake.embed([
+  const [float32Array, a2, b, c] = await fake.embed([
     "graph neural network for protein contact prediction",
     "graph neural network for protein contact prediction",
     "graph neural network for single-cell gene regulation",
     "a survey of hospital staffing policies",
   ]);
-  assert.deepEqual([...a], [...a2]);
-  assert.ok(Math.abs(cosine(a, a) - 1) < 1e-5);
-  assert.ok(cosine(a, b) > cosine(a, c), `${cosine(a, b)} > ${cosine(a, c)}`);
-  assert.ok(cosine(a, b) > 0.3);
+  assert.deepEqual([...float32Array], [...a2]);
+  assert.ok(Math.abs(cosine(float32Array, float32Array) - 1) < 1e-5);
+  assert.ok(
+    cosine(float32Array, b) > cosine(float32Array, c),
+    `${cosine(float32Array, b)} > ${cosine(float32Array, c)}`,
+  );
+  assert.ok(cosine(float32Array, b) > 0.3);
 });

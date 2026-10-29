@@ -13,28 +13,28 @@ const same = (a: string, b: string) => {
 };
 
 export function mcpRoutes(hub: Hub): Router {
-  const r = express.Router();
-  const refuse = (res: express.Response, status: number, message: string) =>
-    void res.status(status).json({ jsonrpc: "2.0", error: { code: -32000, message }, id: null });
+  const router = express.Router();
+  const refuse = (response: express.Response, status: number, message: string) =>
+    void response.status(status).json({ jsonrpc: "2.0", error: { code: -32000, message }, id: null });
 
-  r.post("/mcp", express.json({ limit: "1mb" }), async (req, res) => {
+  router.post("/mcp", express.json({ limit: "1mb" }), async (request, response) => {
     const token = hub.config.mcpToken;
-    if (!token) return refuse(res, 404, "MCP is off: set RH_MCP_TOKEN in this project's .env");
-    const given = (req.headers.authorization ?? "").replace(/^Bearer\s+/i, "");
+    if (!token) return refuse(response, 404, "MCP is off: set RH_MCP_TOKEN in this project's .env");
+    const given = (request.headers.authorization ?? "").replace(/^Bearer\s+/i, "");
     if (!given || !same(given, token))
-      return refuse(res, 401, "a valid MCP token is required (Authorization: Bearer <RH_MCP_TOKEN>)");
+      return refuse(response, 401, "a valid MCP token is required (Authorization: Bearer <RH_MCP_TOKEN>)");
     const plugin = hub.project.plugins.kernel.list().find((p) => p.id === "rh.mcp");
     if (!plugin || plugin.state === "disabled")
-      return refuse(res, 404, "MCP is off: the MCP server add-on is disabled");
+      return refuse(response, 404, "MCP is off: the MCP server add-on is disabled");
     const server = (await hub.project.plugins.exportsOf<McpExports>("rh.mcp")).server();
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
-    res.on("close", () => {
+    response.on("close", () => {
       void transport.close();
       void server.close();
     });
     await server.connect(transport);
-    await transport.handleRequest(req, res, req.body);
+    await transport.handleRequest(request, response, request.body);
   });
-  r.all("/mcp", (_req, res) => refuse(res, 405, "use POST (Streamable HTTP without sessions)"));
-  return r;
+  router.all("/mcp", (_request, response) => refuse(response, 405, "use POST (Streamable HTTP without sessions)"));
+  return router;
 }

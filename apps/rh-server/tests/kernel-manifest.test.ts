@@ -28,10 +28,10 @@ function problems(raw: unknown): string[] {
 }
 
 test("a valid manifest gets defaults for contributes, dependencies and permissions", () => {
-  const m = parseManifest(base);
-  assert.deepEqual(m.contributes, {});
-  assert.deepEqual(m.dependencies, {});
-  assert.deepEqual(m.permissions, {});
+  const pluginManifest = parseManifest(base);
+  assert.deepEqual(pluginManifest.contributes, {});
+  assert.deepEqual(pluginManifest.dependencies, {});
+  assert.deepEqual(pluginManifest.permissions, {});
 });
 
 test("a manifest without engines.research-hub is rejected naming the field", () => {
@@ -60,8 +60,8 @@ test("every problem is reported with its field", () => {
 });
 
 test("an incompatible engines range names both versions", () => {
-  const m = parseManifest({ ...base, engines: { "research-hub": "^2.0.0" } });
-  assert.equal(engineProblem(m, "1.0.0"), "needs kernel API ^2.0.0, this hub has 1.0.0");
+  const pluginManifest = parseManifest({ ...base, engines: { "research-hub": "^2.0.0" } });
+  assert.equal(engineProblem(pluginManifest, "1.0.0"), "needs kernel API ^2.0.0, this hub has 1.0.0");
   assert.equal(engineProblem(parseManifest(base), "1.0.0"), undefined);
 });
 

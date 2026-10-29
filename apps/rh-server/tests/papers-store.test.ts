@@ -69,7 +69,7 @@ test(
 test(
   "a result whose identifiers point at two records merges them into the older one",
   withStore((store) => {
-    const a = store.upsert({ ...arxivPreprint, ids: { arxiv: "2401.01234" } });
+    const upsertResult = store.upsert({ ...arxivPreprint, ids: { arxiv: "2401.01234" } });
     const b = store.upsert({
       source: "europepmc",
       externalId: "PPR1",
@@ -86,9 +86,9 @@ test(
       title: "Contact prediction with protein language models",
       authors: [],
     });
-    assert.deepEqual(bridge, { id: a.id, created: false, merged: [b.id] });
+    assert.deepEqual(bridge, { id: upsertResult.id, created: false, merged: [b.id] });
     assert.equal(store.count(), 1);
-    const paper = store.get(a.id)!;
+    const paper = store.get(upsertResult.id)!;
     assert.deepEqual(paper.ids, { arxiv: "2401.01234", pmid: "38000001", openalex: "W9" });
     assert.deepEqual(paper.sources.sort(), ["arxiv", "europepmc", "openalex"]);
     assert.equal(paper.venue, "Bioinformatics");
@@ -99,7 +99,7 @@ test(
 test(
   "two results with the same normalized title but no shared identifier stay two records, flagged",
   withStore((store) => {
-    const a = store.upsert({
+    const upsertResult = store.upsert({
       source: "arxiv",
       externalId: "x",
       ids: { arxiv: "2401.00001" },
@@ -113,10 +113,10 @@ test(
       title: "Graph neural networks for gene regulation.",
       authors: [],
     });
-    assert.notEqual(a.id, b.id);
+    assert.notEqual(upsertResult.id, b.id);
     assert.equal(store.count(), 2);
-    assert.equal(store.get(b.id)!.possibleDuplicateOf, a.id);
-    assert.equal(store.get(a.id)!.possibleDuplicateOf, undefined);
+    assert.equal(store.get(b.id)!.possibleDuplicateOf, upsertResult.id);
+    assert.equal(store.get(upsertResult.id)!.possibleDuplicateOf, undefined);
   }),
 );
 
@@ -161,7 +161,7 @@ test(
 test(
   "citation links resolve to known papers, also when the cited paper arrives later",
   withStore((store, db) => {
-    const a = store.upsert({
+    const upsertResult = store.upsert({
       source: "openalex",
       externalId: "W1",
       ids: { openalex: "W1" },
@@ -178,7 +178,7 @@ test(
     });
     const links = db
       .prepare("SELECT cited_value, cited_paper_id FROM citation_links WHERE citing_paper_id = ? ORDER BY cited_value")
-      .all(a.id) as any[];
+      .all(upsertResult.id) as any[];
     assert.deepEqual(
       links.map((l) => [l.cited_value, l.cited_paper_id === null ? null : Number(l.cited_paper_id)]),
       [

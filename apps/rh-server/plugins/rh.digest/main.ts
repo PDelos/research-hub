@@ -158,10 +158,10 @@ export function activate(context: PluginContext): DigestExports {
       if (!body) throw new CommentInvalid("the comment is empty");
       if (body.length > COMMENT_MAX) throw new CommentInvalid(`a comment is at most ${COMMENT_MAX} characters`);
       const createdAt = new Date().toISOString();
-      const r = db
+      const written = db
         .prepare(`INSERT INTO ${T.comments} (digest_id, section, text, created_at) VALUES (?, ?, ?, ?)`)
         .run(id, section, body, createdAt);
-      const comment = { id: Number(r.lastInsertRowid), section, text: body, createdAt };
+      const comment = { id: Number(written.lastInsertRowid), section, text: body, createdAt };
       // Later changes (self-improvement, the knowledge loop) act on comments.
       rh.events.emit("digest.comment", { digestId: id, ...comment });
       return comment;
@@ -259,17 +259,17 @@ export function activate(context: PluginContext): DigestExports {
           reviewNotes,
           finders: await knowledge.finders(),
         };
-      const r = db
+      const written = db
         .prepare(
           `INSERT INTO ${T.digests} (week, period_from, period_to, body_json, created_at) VALUES (?, ?, ?, ?, ?)`,
         )
         .run(label, from, to, JSON.stringify(body), to);
       context.log.info("digest.built", {
-        id: Number(r.lastInsertRowid),
+        id: Number(written.lastInsertRowid),
         week: label,
         sweeps: body.cycle.sweeps.length,
       });
-      return exports.digest(Number(r.lastInsertRowid))!;
+      return exports.digest(Number(written.lastInsertRowid))!;
     },
     recordNight(now = Date.now(), day = new Date(now).toISOString().slice(0, 10)) {
       const since = new Date(now - 86_400_000).toISOString();

@@ -26,23 +26,23 @@ async function viewerServer(over: Record<string, unknown> = {}) {
     env: { RH_UI_DIR: DIST },
     hub: { ticker: false, kbViewer: { enabled: true, dir: FAKE, restartDelays: [200], ...over } },
   });
-  const p = server.hub.project;
-  p.brief.write("# x");
-  p.charters.saveDraft(validateCharter(sampleCharter()), "agent");
-  p.charters.approve();
-  p.syncVault();
+  const projectRuntime = server.hub.project;
+  projectRuntime.brief.write("# x");
+  projectRuntime.charters.saveDraft(validateCharter(sampleCharter()), "agent");
+  projectRuntime.charters.approve();
+  projectRuntime.syncVault();
   const end = Date.now() + 15_000;
-  while (p.kbViewer.status().state !== "running" && over.enabled !== false) {
-    if (Date.now() > end) throw new Error(JSON.stringify(p.kbViewer.status()));
+  while (projectRuntime.kbViewer.status().state !== "running" && over.enabled !== false) {
+    if (Date.now() > end) throw new Error(JSON.stringify(projectRuntime.kbViewer.status()));
     await new Promise((r) => setTimeout(r, 50));
   }
-  return { server, p, done: async () => (await server.stop(), t.cleanup()) };
+  return { server, p: projectRuntime, done: async () => (await server.stop(), t.cleanup()) };
 }
 
 const host = (server: { port: number }) => `localhost:${server.port}`;
 
 test("the viewer is served on the hub's origin: /kb/ and its own API paths, with the vault linked and no token passed on", async () => {
-  const { server, p, done } = await viewerServer();
+  const { server, p: projectRuntime, done } = await viewerServer();
   try {
     const page = await fetch(`http://${host(server)}/kb/`);
     assert.equal(page.status, 200);
@@ -74,7 +74,7 @@ test("the viewer is served on the hub's origin: /kb/ and its own API paths, with
       { state: info.kbViewer.state, ignis: info.kbViewer.ignisVersion, obsidian: info.kbViewer.obsidianVersion },
       { state: "running", ignis: "0.0.1-test", obsidian: "1.14.4" },
     );
-    assert.equal(p.kbViewer.target()!.host, "127.0.0.1");
+    assert.equal(projectRuntime.kbViewer.target()!.host, "127.0.0.1");
   } finally {
     await done();
   }
@@ -100,20 +100,20 @@ test("cross-site requests, foreign hosts and foreign WebSocket origins are refus
     assert.equal(foreign, 403, "a foreign Host header (DNS rebinding) is refused");
     const upgrade = (origin: string) =>
       new Promise<string>((resolve) => {
-        const s = net.connect(server.port, "127.0.0.1", () =>
-          s.write(
+        const socket = net.connect(server.port, "127.0.0.1", () =>
+          socket.write(
             `GET /ws?vault=research HTTP/1.1\r\nHost: ${host(server)}\r\nOrigin: ${origin}\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n`,
           ),
         );
         let data = "";
-        s.on("data", (d) => {
+        socket.on("data", (d) => {
           data += d.toString("latin1");
           if (data.includes("hello") || data.includes("403")) {
-            s.end();
+            socket.end();
             resolve(data);
           }
         });
-        s.on("close", () => resolve(data));
+        socket.on("close", () => resolve(data));
       });
     const ok = await upgrade(`http://${host(server)}`);
     assert.match(ok, /^HTTP\/1\.1 101/);
@@ -126,31 +126,31 @@ test("cross-site requests, foreign hosts and foreign WebSocket origins are refus
 });
 
 test("the viewer listens on loopback only and restarts within 10 seconds after a crash; chat keeps working", async () => {
-  const { server, p, done } = await viewerServer();
+  const { server, p: projectRuntime, done } = await viewerServer();
   try {
-    const { port } = p.kbViewer.target()!;
+    const { port } = projectRuntime.kbViewer.target()!;
     const external = Object.values(networkInterfaces())
       .flat()
       .find((i) => i && i.family === "IPv4" && !i.internal)?.address;
     if (external) {
       const refused = await new Promise<boolean>((resolve) => {
-        const s = net.connect(port, external);
-        s.on("connect", () => (s.destroy(), resolve(false)));
-        s.on("error", () => resolve(true));
+        const socket = net.connect(port, external);
+        socket.on("connect", () => (socket.destroy(), resolve(false)));
+        socket.on("error", () => resolve(true));
       });
       assert.ok(refused, `connecting to ${external}:${port} must fail`);
     }
     const crashedAt = Date.now();
     await fetch(`http://${host(server)}/api/crash`);
     await new Promise((r) => setTimeout(r, 100));
-    assert.notEqual(p.kbViewer.status().state, "running");
+    assert.notEqual(projectRuntime.kbViewer.status().state, "running");
     assert.equal((await fetch(`http://${host(server)}/kb/`)).status, 503, "a styled page while it is down");
     assert.equal((await server.client.health()).ok, true, "the hub is unaffected");
-    while (p.kbViewer.status().state !== "running") {
+    while (projectRuntime.kbViewer.status().state !== "running") {
       assert.ok(Date.now() - crashedAt < 10_000, "restarted within 10 s");
       await new Promise((r) => setTimeout(r, 50));
     }
-    assert.equal(p.kbViewer.status().restarts, 1);
+    assert.equal(projectRuntime.kbViewer.status().restarts, 1);
     assert.equal((await fetch(`http://${host(server)}/kb/`)).status, 200);
   } finally {
     await done();
@@ -178,14 +178,14 @@ test("disabled (RH_KB_VIEWER=off) and unavailable (no Ignis, or offline without 
     hub: { ticker: false, kbViewer: { enabled: true, dir: join(t.dir, "nowhere") } },
   });
   try {
-    const p = missing.hub.project;
-    p.brief.write("# x");
-    p.charters.saveDraft(validateCharter(sampleCharter()), "agent");
-    p.charters.approve();
-    p.syncVault();
+    const projectRuntime = missing.hub.project;
+    projectRuntime.brief.write("# x");
+    projectRuntime.charters.saveDraft(validateCharter(sampleCharter()), "agent");
+    projectRuntime.charters.approve();
+    projectRuntime.syncVault();
     await new Promise((r) => setTimeout(r, 100));
-    assert.equal(p.kbViewer.status().state, "unavailable");
-    assert.match(p.kbViewer.status().reason!, /Ignis is not installed/);
+    assert.equal(projectRuntime.kbViewer.status().state, "unavailable");
+    assert.match(projectRuntime.kbViewer.status().reason!, /Ignis is not installed/);
   } finally {
     await missing.stop();
     t.cleanup();

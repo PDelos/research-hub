@@ -74,15 +74,15 @@ function describe(error: ErrorObject, properties: Record<string, SettingProperty
   const key = error.instancePath.replace(/^\//, "").split("/")[0];
   if (error.keyword === "additionalProperties")
     return `${(error.params as { additionalProperty: string }).additionalProperty}: not a known setting`;
-  const p = properties[key] ?? {};
+  const settingProperty = properties[key] ?? {};
   if (
     (error.keyword === "minimum" || error.keyword === "maximum") &&
-    p.minimum !== undefined &&
-    p.maximum !== undefined
+    settingProperty.minimum !== undefined &&
+    settingProperty.maximum !== undefined
   )
-    return `${key}: must be ${p.type === "integer" ? "an integer" : "a number"} from ${p.minimum} to ${p.maximum}`;
+    return `${key}: must be ${settingProperty.type === "integer" ? "an integer" : "a number"} from ${settingProperty.minimum} to ${settingProperty.maximum}`;
   if (error.keyword === "enum")
-    return `${key}: must be one of ${(p.enum ?? []).map((v) => JSON.stringify(v)).join(", ")}`;
+    return `${key}: must be one of ${(settingProperty.enum ?? []).map((v) => JSON.stringify(v)).join(", ")}`;
   return `${key || "settings"}: ${error.message}`;
 }
 

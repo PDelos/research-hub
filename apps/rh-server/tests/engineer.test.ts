@@ -35,12 +35,12 @@ function web() {
 async function setup() {
   const w = web();
   const server = await startTestServer({ hub: { paperFetch: w.fetch, fauxRules: [engineerRule] } });
-  const p = server.hub.project;
-  p.brief.write("# x");
-  p.charters.saveDraft(validateCharter(sampleCharter()), "agent");
-  p.charters.approve();
-  const engineer = await p.plugins.exportsOf<EngineerExports>("rh.engineer");
-  return { server, p, engineer, w };
+  const projectRuntime = server.hub.project;
+  projectRuntime.brief.write("# x");
+  projectRuntime.charters.saveDraft(validateCharter(sampleCharter()), "agent");
+  projectRuntime.charters.approve();
+  const engineer = await projectRuntime.plugins.exportsOf<EngineerExports>("rh.engineer");
+  return { server, p: projectRuntime, engineer, w };
 }
 
 test("contract and code checks name what is wrong", () => {
@@ -105,14 +105,14 @@ test("an idea is researched and assessed; Build writes, tests and fixes a source
 test("rejecting a built plugin removes it; ideas the engineer cannot build say so", async () => {
   const s = await setup();
   try {
-    const a = s.engineer.propose("Add Paperbase (https://api.paperbase.org/docs) as a paper source");
-    await s.engineer.settled(a.id);
-    s.engineer.build(a.id);
-    await s.engineer.settled(a.id);
-    const rejected = await s.engineer.reject(a.id);
+    const idea = s.engineer.propose("Add Paperbase (https://api.paperbase.org/docs) as a paper source");
+    await s.engineer.settled(idea.id);
+    s.engineer.build(idea.id);
+    await s.engineer.settled(idea.id);
+    const rejected = await s.engineer.reject(idea.id);
     assert.equal(rejected.stage, "rejected");
     assert.ok(!s.p.plugins.kernel.list().some((x) => x.id === "eng.paperbase"), "uninstalled");
-    assert.throws(() => s.engineer.build(a.id), /is rejected/);
+    assert.throws(() => s.engineer.build(idea.id), /is rejected/);
 
     const other = s.engineer.propose("Make the interface purple");
     const done = await s.engineer.settled(other.id);

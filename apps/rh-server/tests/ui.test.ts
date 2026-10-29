@@ -71,14 +71,14 @@ test("the proxy refuses foreign hosts, cross-origin pages and non-JSON writes", 
     // fetch cannot set Host, so the rebinding case uses http.request.
     const url = new URL(`${server.url}/ui/v1/info`);
     const rebinding = await new Promise<number>((resolve, reject) => {
-      const req = http.get(
+      const request = http.get(
         { host: url.hostname, port: url.port, path: url.pathname, headers: { host: "evil.example" } },
-        (res) => {
-          res.resume();
-          resolve(res.statusCode ?? 0);
+        (response) => {
+          response.resume();
+          resolve(response.statusCode ?? 0);
         },
       );
-      req.on("error", reject);
+      request.on("error", reject);
     });
     assert.equal(rebinding, 421);
     const crossOrigin = await fetch(`${server.url}/ui/v1/info`, { headers: { origin: "https://evil.example" } });

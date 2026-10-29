@@ -90,7 +90,7 @@ export class CharterWriter {
         queries: Type.Array(weighted, { description: "5 to 20 search queries" }),
         outOfScope: Type.Optional(strings("0 to 20 topics that are out of scope")),
       }),
-      execute: async (args, api, ctx) => {
+      execute: async (args, api, context) => {
         const run = this.run();
         if (run?.status === "failed")
           return toolError("This drafting run has already failed; stop here.", ["Reply with one short sentence."]);
@@ -99,7 +99,7 @@ export class CharterWriter {
           charter = validateCharter(args);
         } catch (error) {
           if (!(error instanceof CharterInvalid)) throw error;
-          const invalid = await once(api, "invalid", ctx, async () => {
+          const invalid = await once(api, "invalid", context, async () => {
             const current = this.run();
             if (!current) return 0;
             const next = current.invalidSaves + 1;
@@ -115,7 +115,7 @@ export class CharterWriter {
               : error.problems.map((p) => `Correct ${p.split(":")[0]} and call save_charter_draft again.`),
           );
         }
-        const id = await once(api, "saved", ctx, async () => {
+        const id = await once(api, "saved", context, async () => {
           const record = deps.charters.saveDraft(charter, "agent");
           this.update({ saved: true });
           return record.id;
@@ -135,10 +135,10 @@ export class CharterWriter {
           maxItems: MAX_SCOPING_QUESTIONS,
         }),
       }),
-      execute: async (args, api, ctx) => {
+      execute: async (args, api, context) => {
         const round = this.run()?.round ?? 1;
         // Memoized as text: "ok:<n>" or "error:<message>", so a replay neither asks twice nor changes the answer.
-        const result = await once<string>(api, "asked", ctx, async () => {
+        const result = await once<string>(api, "asked", context, async () => {
           try {
             return `ok:${
               deps.questions.ask(
@@ -166,9 +166,9 @@ export class CharterWriter {
   }
 
   /** Called once the project's harness is open: re-attach to a run that was in flight before a restart. */
-  attach(harness: Harness, ctx: Context): void {
+  attach(harness: Harness, context: Context): void {
     this.harness = harness;
-    this.ctx = ctx;
+    this.ctx = context;
     const run = this.run();
     if (run?.status === "running" && run.submissionId !== undefined) this.watch(run);
   }
@@ -188,10 +188,10 @@ export class CharterWriter {
   }
 
   private async conversation() {
-    const { harness, ctx } = this.ready();
+    const { harness, ctx: context } = this.ready();
     const known = this.conversationId();
     if (known !== undefined) {
-      const existing = await harness.conversation(known as ConversationId, ctx);
+      const existing = await harness.conversation(known as ConversationId, context);
       if (existing) return existing;
     }
     const created = await harness.createConversation(
@@ -203,7 +203,7 @@ export class CharterWriter {
           extensions: [this.extension, this.deps.observe],
         },
       },
-      ctx,
+      context,
     );
     this.deps.settings.set("charter_conversation", created.id as number);
     return created;
@@ -257,11 +257,11 @@ export class CharterWriter {
       prompt,
     };
     this.deps.settings.set("charter_run", run);
-    const { ctx } = this.ready();
+    const { ctx: context } = this.ready();
     const conversation = await this.conversation();
     const submission = await conversation.submit(
       { type: "input", content: prompt, requestId: `charter:${run.id}` },
-      ctx,
+      context,
     );
     this.update({ submissionId: submission.id as number });
     this.deps.log.info("charter.run_started", { run: run.id, kind, submissionId: submission.id });
@@ -273,11 +273,11 @@ export class CharterWriter {
   private watch(run: CharterRun): void {
     if (run.submissionId === undefined || this.watching.has(run.id)) return;
     this.watching.add(run.id);
-    const { harness, ctx } = this.ready();
+    const { harness, ctx: context } = this.ready();
     void (async () => {
       try {
-        const submission = await harness.submission(run.submissionId as SubmissionId, ctx);
-        if (submission) await submission.wait(ctx);
+        const submission = await harness.submission(run.submissionId as SubmissionId, context);
+        if (submission) await submission.wait(context);
         this.settle(run.id);
       } catch (error) {
         this.deps.log.warn("charter.watch_failed", { run: run.id, error: String(error) });

@@ -14,14 +14,14 @@ function host(dataDir: string, port: number, tps: number) {
     env: { ...process.env, NODE_NO_WARNINGS: "1", FAUX_TPS: String(tps) },
     stdio: ["ignore", "pipe", "pipe"],
   });
-  let err = "";
-  child.stderr.on("data", (d) => (err += d));
+  let error = "";
+  child.stderr.on("data", (d) => (error += d));
   const url = new Promise<string>((resolve, reject) => {
     child.stdout.once("data", (d) => resolve(String(d).trim()));
-    child.once("exit", (code) => reject(new Error(`host exited ${code}: ${err}`)));
+    child.once("exit", (code) => reject(new Error(`host exited ${code}: ${error}`)));
   });
   const exited = new Promise<void>((resolve) => child.on("exit", () => resolve()));
-  return { child, url, exited, err: () => err };
+  return { child, url, exited, err: () => error };
 }
 
 test("SIGKILL mid-turn: after restart the turn completes once with no duplicates", { timeout: 120_000 }, async () => {
@@ -42,10 +42,10 @@ test("SIGKILL mid-turn: after restart the turn completes once with no duplicates
     try {
       const client2 = new HubClient({ base: `${await second.url}/v1`, token: TOKEN });
       await until(async () => (await client2.runs())[0]?.status === "done", 60_000, "turn completed after restart");
-      const res = await fetch(`${await second.url}/v1/transcript`, {
+      const response = await fetch(`${await second.url}/v1/transcript`, {
         headers: { authorization: `Bearer ${TOKEN}` },
       });
-      const { items } = (await res.json()) as {
+      const { items } = (await response.json()) as {
         items: { kind: string; text?: string; blocks?: { text?: string }[]; error?: string }[];
       };
       const all = JSON.stringify(items, null, 1);

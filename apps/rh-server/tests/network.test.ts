@@ -35,8 +35,8 @@ test("the guard sees outbound fetch and http.request attempts", async () => {
   try {
     await fetch("https://example.invalid/", { signal: AbortSignal.timeout(2000) }).catch(() => undefined);
     await new Promise<void>((resolve) => {
-      const req = http.get("http://example.invalid/", () => resolve());
-      req.on("error", () => resolve());
+      const request = http.get("http://example.invalid/", () => resolve());
+      request.on("error", () => resolve());
     });
   } finally {
     g.stop();

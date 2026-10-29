@@ -77,14 +77,14 @@ export function activate(context: PluginContext): LocalEmbedderExports {
     const started = Date.now();
     const out: Float32Array[] = [];
     for (let i = 0; i < texts.length; i += 64) {
-      const res = await fetch(`${base}/embed`, {
+      const response = await fetch(`${base}/embed`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ model: modelPath(model), texts: texts.slice(i, i + 64) }),
         signal: AbortSignal.timeout(300_000),
       });
-      const body = (await res.json()) as { vectors?: number[][]; error?: string };
-      if (!res.ok || !body.vectors) throw new Error(`local embedder: ${body.error ?? `HTTP ${res.status}`}`);
+      const body = (await response.json()) as { vectors?: number[][]; error?: string };
+      if (!response.ok || !body.vectors) throw new Error(`local embedder: ${body.error ?? `HTTP ${response.status}`}`);
       out.push(...body.vectors.map((v) => new Float32Array(v)));
     }
     ledger?.record({

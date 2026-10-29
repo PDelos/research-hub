@@ -85,17 +85,17 @@ export interface HarnessExports extends AgentHooks {
 }
 
 /** One line a person can read: "better: nDCG 0.62 → 0.71 on held-out sweeps (+0.09, 95 % interval 0.04 to 0.12)". */
-export function summarize(r: ReplayReport): string {
+export function summarize(replayReport: ReplayReport): string {
   const n = (x: number | undefined) => (x === undefined ? "–" : x.toFixed(2));
   const sign = (x: number) => `${x >= 0 ? "+" : ""}${x.toFixed(2)}`;
-  if (r.verdict === "not enough data")
-    return `not enough data: ${r.sweeps.labelled} of ${r.sweeps.total} sweeps have judged cards (3 needed).`;
+  if (replayReport.verdict === "not enough data")
+    return `not enough data: ${replayReport.sweeps.labelled} of ${replayReport.sweeps.total} sweeps have judged cards (3 needed).`;
   return (
-    `${r.verdict}: nDCG ${n(r.mean.current.ndcg)} → ${n(r.mean.candidate.ndcg)}; on the ${r.heldOut.n} latest sweeps ` +
-    `${sign(r.heldOut.diff)} (95 % interval ${sign(r.heldOut.low)} to ${sign(r.heldOut.high)}), earlier sweeps ${sign(r.train.diff)}; ` +
-    `precision@5 ${n(r.mean.current.precision5)} → ${n(r.mean.candidate.precision5)}` +
-    (r.estimated ? `; ${r.estimated} papers scored with estimated importance` : "") +
-    (r.judgeUsed ? "; unjudged papers labelled by the calibrated judge" : "; only your judgments used")
+    `${replayReport.verdict}: nDCG ${n(replayReport.mean.current.ndcg)} → ${n(replayReport.mean.candidate.ndcg)}; on the ${replayReport.heldOut.n} latest sweeps ` +
+    `${sign(replayReport.heldOut.diff)} (95 % interval ${sign(replayReport.heldOut.low)} to ${sign(replayReport.heldOut.high)}), earlier sweeps ${sign(replayReport.train.diff)}; ` +
+    `precision@5 ${n(replayReport.mean.current.precision5)} → ${n(replayReport.mean.candidate.precision5)}` +
+    (replayReport.estimated ? `; ${replayReport.estimated} papers scored with estimated importance` : "") +
+    (replayReport.judgeUsed ? "; unjudged papers labelled by the calibrated judge" : "; only your judgments used")
   );
 }
 
@@ -168,9 +168,9 @@ export async function activate(context: PluginContext): Promise<HarnessExports> 
   const datasetIo: DatasetIo = {
     offline: host.offline,
     fetchBytes: async (url) => {
-      const res = await rh.http.request(url, { timeoutMs: 300_000, budgetMs: 600_000, attempts: 2 });
-      if (!res.ok) throw new Error(`downloading ${url} failed: HTTP ${res.status}`);
-      return new Uint8Array(await res.arrayBuffer());
+      const response = await rh.http.request(url, { timeoutMs: 300_000, budgetMs: 600_000, attempts: 2 });
+      if (!response.ok) throw new Error(`downloading ${url} failed: HTTP ${response.status}`);
+      return new Uint8Array(await response.arrayBuffer());
     },
     readCache: (name) => (rh.files.exists("storage", name) ? rh.files.read("storage", name) : undefined),
     writeCache: (name, content) => rh.files.write("storage", name, content),
@@ -466,13 +466,13 @@ export async function activate(context: PluginContext): Promise<HarnessExports> 
       }
       const report = replay(loadHistory(db, papers.vectors), sweep.currentSettings(), variant, labels());
       const createdAt = new Date().toISOString();
-      const r = db
+      const written = db
         .prepare(
           `INSERT INTO ${replaysTable} (variant_json, report_json, verdict, requested_by, created_at) VALUES (?, ?, ?, ?, ?)`,
         )
         .run(JSON.stringify(variant), JSON.stringify(report), report.verdict, requestedBy, createdAt);
       context.log.info("harness.replayed", { variant, verdict: report.verdict, requestedBy });
-      return { id: Number(r.lastInsertRowid), variant, requestedBy, createdAt, report };
+      return { id: Number(written.lastInsertRowid), variant, requestedBy, createdAt, report };
     },
     replays(limit = 50) {
       return (
@@ -533,9 +533,9 @@ export async function activate(context: PluginContext): Promise<HarnessExports> 
     parameters: Type.Object({
       variant: Type.Unsafe<Variant>({ type: "object", description: 'e.g. {"cardsPerSweep": 10}' }),
     }),
-    execute: async (args, api, ctx) => {
+    execute: async (args, api, context) => {
       const answer = JSON.parse(
-        await once<string>(api, "replay", ctx, async () => {
+        await once<string>(api, "replay", context, async () => {
           try {
             return JSON.stringify({ text: summarize((await exports.replay(args.variant, "desk")).report) });
           } catch (error) {

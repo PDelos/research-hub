@@ -10,9 +10,9 @@ function io(offline = false) {
   const value: DatasetIo = {
     offline,
     fetchBytes: async (url) => {
-      const res = await fetch(url);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return new Uint8Array(await res.arrayBuffer());
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return new Uint8Array(await response.arrayBuffer());
     },
     readCache: (name) => cache.get(name),
     writeCache: (name, content) => void cache.set(name, content),

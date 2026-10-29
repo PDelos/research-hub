@@ -64,11 +64,11 @@ export function finetuneBuilder(deps: {
     if (!modelFiles.length) throw new Error("the Kaggle run finished without a model/ folder");
     const modelDir = join(dir, "model");
     for (const f of modelFiles) {
-      const res = await deps.rh.http.request(f.url, { timeoutMs: 600_000, attempts: 2 });
-      if (!res.ok) throw new Error(`downloading ${f.fileName}: HTTP ${res.status}`);
+      const response = await deps.rh.http.request(f.url, { timeoutMs: 600_000, attempts: 2 });
+      if (!response.ok) throw new Error(`downloading ${f.fileName}: HTTP ${response.status}`);
       const target = join(modelDir, f.fileName.slice("model/".length));
       mkdirSync(dirname(target), { recursive: true });
-      writeFileSync(target, new Uint8Array(await res.arrayBuffer()));
+      writeFileSync(target, new Uint8Array(await response.arrayBuffer()));
     }
     const model = relative(deps.dataDir, modelDir);
     say(`Downloaded the model (${modelFiles.length} files) to ${model}.`);

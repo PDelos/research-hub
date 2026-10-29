@@ -41,18 +41,18 @@ test("an MCP client lists the read-only tools and reads the knowledge base, pape
       paperFetch: arxivOnlyFetch(fakePapers(3)),
     },
   });
-  const p = server.hub.project;
+  const projectRuntime = server.hub.project;
   try {
-    p.brief.write("# Protein LMs");
-    p.charters.saveDraft(validateCharter(sampleCharter()), "agent");
-    p.charters.approve();
-    p.syncVault();
-    p.scheduler.trigger("sweep");
-    for (let i = 0; i < 500 && !p.sweeps.list()[0]; i++) await new Promise((r) => setTimeout(r, 10));
-    await p.sweeps.settled(p.sweeps.list()[0].id, 30_000);
-    const card = p.cards.list()[0];
-    p.feedback.judge(card.id, "star", "Exactly the foundation I need");
-    for (let i = 0; i < 1000 && !p.ingest.requests().some((r: any) => r.status === "done"); i++)
+    projectRuntime.brief.write("# Protein LMs");
+    projectRuntime.charters.saveDraft(validateCharter(sampleCharter()), "agent");
+    projectRuntime.charters.approve();
+    projectRuntime.syncVault();
+    projectRuntime.scheduler.trigger("sweep");
+    for (let i = 0; i < 500 && !projectRuntime.sweeps.list()[0]; i++) await new Promise((r) => setTimeout(r, 10));
+    await projectRuntime.sweeps.settled(projectRuntime.sweeps.list()[0].id, 30_000);
+    const card = projectRuntime.cards.list()[0];
+    projectRuntime.feedback.judge(card.id, "star", "Exactly the foundation I need");
+    for (let i = 0; i < 1000 && !projectRuntime.ingest.requests().some((r: any) => r.status === "done"); i++)
       await new Promise((r) => setTimeout(r, 20));
 
     const client = await connect(server.url, MCP_TOKEN);
@@ -97,7 +97,7 @@ test("an MCP client lists the read-only tools and reads the knowledge base, pape
 
     // The API token is not the MCP token; disabling the add-on closes /mcp.
     await assert.rejects(connect(server.url, TOKEN), /401|valid MCP token/);
-    await p.plugins.kernel.setEnabled("rh.mcp", false);
+    await projectRuntime.plugins.kernel.setEnabled("rh.mcp", false);
     await assert.rejects(connect(server.url, MCP_TOKEN), /404|disabled/);
     const get = await fetch(`${server.url}/mcp`);
     assert.equal(get.status, 405);
@@ -109,13 +109,13 @@ test("an MCP client lists the read-only tools and reads the knowledge base, pape
 test("without RH_MCP_TOKEN the endpoint says MCP is off", async () => {
   const server = await startTestServer();
   try {
-    const res = await fetch(`${server.url}/mcp`, {
+    const response = await fetch(`${server.url}/mcp`, {
       method: "POST",
       headers: { "content-type": "application/json", accept: "application/json, text/event-stream" },
       body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" }),
     });
-    assert.equal(res.status, 404);
-    assert.match(((await res.json()) as { error: { message: string } }).error.message, /set RH_MCP_TOKEN/);
+    assert.equal(response.status, 404);
+    assert.match(((await response.json()) as { error: { message: string } }).error.message, /set RH_MCP_TOKEN/);
   } finally {
     await server.stop();
   }

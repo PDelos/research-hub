@@ -7,9 +7,9 @@ import { startTestServer, TOKEN } from "./helpers.ts";
 test("/v1/health is open and carries version, mode and providers but no secrets", async () => {
   const server = await startTestServer();
   try {
-    const res = await fetch(`${server.url}/v1/health`);
-    assert.equal(res.status, 200);
-    const text = await res.text();
+    const response = await fetch(`${server.url}/v1/health`);
+    assert.equal(response.status, 200);
+    const text = await response.text();
     const body = JSON.parse(text);
     assert.deepEqual(Object.keys(body).sort(), ["mode", "ok", "project", "providers", "version"]);
     assert.equal(body.project, "research");
@@ -43,8 +43,8 @@ test("an unknown route is a 404 and the old project-scoped routes are gone", asy
   const server = await startTestServer();
   try {
     for (const path of ["/v1/nope", "/v1/p/default/agent"]) {
-      const res = await fetch(`${server.url}${path}`, { headers: { authorization: `Bearer ${TOKEN}` } });
-      assert.equal(res.status, 404, path);
+      const response = await fetch(`${server.url}${path}`, { headers: { authorization: `Bearer ${TOKEN}` } });
+      assert.equal(response.status, 404, path);
     }
   } finally {
     await server.stop();
@@ -86,12 +86,12 @@ test("bad chat bodies are 400s", async () => {
   const server = await startTestServer();
   try {
     for (const body of [{}, { content: "" }, { content: 5 }, { content: "x", waitMs: -1 }]) {
-      const res = await fetch(`${server.url}/v1/chat`, {
+      const response = await fetch(`${server.url}/v1/chat`, {
         method: "POST",
         headers: { "content-type": "application/json", authorization: `Bearer ${TOKEN}` },
         body: JSON.stringify(body),
       });
-      assert.equal(res.status, 400, JSON.stringify(body));
+      assert.equal(response.status, 400, JSON.stringify(body));
     }
   } finally {
     await server.stop();

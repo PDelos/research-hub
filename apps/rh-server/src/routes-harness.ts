@@ -7,41 +7,41 @@ import type { Hub } from "./hub.ts";
 import { BenchmarkInvalid, VariantInvalid, type HarnessExports } from "../plugins/rh.harness/main.ts";
 
 export function harnessRoutes(hub: Hub): Router {
-  const r = express.Router();
-  r.use("/v1", requireAuth(hub.log));
+  const router = express.Router();
+  router.use("/v1", requireAuth(hub.log));
   const harness = () => hub.project.plugins.exportsOf<HarnessExports>("rh.harness");
 
-  r.get("/v1/harness/quality", async (_req, res) => void res.json((await harness()).quality()));
-  r.get("/v1/harness/replays", async (req, res) => {
-    res.json((await harness()).replays(Math.min(int(req.query.limit, "limit", 50), 200)));
+  router.get("/v1/harness/quality", async (_request, response) => void response.json((await harness()).quality()));
+  router.get("/v1/harness/replays", async (request, response) => {
+    response.json((await harness()).replays(Math.min(int(request.query.limit, "limit", 50), 200)));
   });
-  r.get("/v1/attribution", async (req, res) => {
-    const days = Math.min(Math.max(int(req.query.days, "days", 30), 1), 365);
-    res.json((await harness()).attribution(new Date(Date.now() - days * 86_400_000).toISOString()));
+  router.get("/v1/attribution", async (request, response) => {
+    const days = Math.min(Math.max(int(request.query.days, "days", 30), 1), 365);
+    response.json((await harness()).attribution(new Date(Date.now() - days * 86_400_000).toISOString()));
   });
-  r.get("/v1/slots", async (_req, res) => void res.json((await harness()).slots()));
-  r.get("/v1/slots/benchmarks", async (req, res) => {
-    const slot = typeof req.query.slot === "string" ? req.query.slot : undefined;
-    res.json((await harness()).benchmarks(slot, 50));
+  router.get("/v1/slots", async (_request, response) => void response.json((await harness()).slots()));
+  router.get("/v1/slots/benchmarks", async (request, response) => {
+    const slot = typeof request.query.slot === "string" ? request.query.slot : undefined;
+    response.json((await harness()).benchmarks(slot, 50));
   });
-  r.post("/v1/slots/:id/benchmark", async (req, res) => {
-    const candidate = req.body?.candidate ?? {};
+  router.post("/v1/slots/:id/benchmark", async (request, response) => {
+    const candidate = request.body?.candidate ?? {};
     if (typeof candidate !== "object" || Array.isArray(candidate)) throw invalid("candidate must be an object");
     try {
-      res.json(await (await harness()).runBenchmark(String(req.params.id), candidate));
+      response.json(await (await harness()).runBenchmark(String(request.params.id), candidate));
     } catch (error) {
       if (error instanceof BenchmarkInvalid) throw invalid(error.message);
       throw error;
     }
   });
 
-  r.post("/v1/harness/replay", async (req, res) => {
+  router.post("/v1/harness/replay", async (request, response) => {
     try {
-      res.json(await (await harness()).replay(req.body?.variant, "user"));
+      response.json(await (await harness()).replay(request.body?.variant, "user"));
     } catch (error) {
       if (error instanceof VariantInvalid) throw invalid(error.message);
       throw error;
     }
   });
-  return r;
+  return router;
 }

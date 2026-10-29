@@ -196,25 +196,25 @@ export function contributionProblems(manifest: PluginManifest, dir?: string): st
     const validate = shapeValidators[kind];
     if (!validate(value)) problems.push(...(validate.errors ?? []).map((e) => field(`contributes.${key}`, e)));
   }
-  const c = contributionsOf(manifest);
+  const contributions = contributionsOf(manifest);
   const seen = new Set<string>();
   for (const [key, list] of [
-    ["tabs", c.tabs.map((t) => t.id)],
-    ["commands", c.commands.map((t) => t.id)],
-    ["chatTools", c.chatTools.map((t) => t.name)],
+    ["tabs", contributions.tabs.map((t) => t.id)],
+    ["commands", contributions.commands.map((t) => t.id)],
+    ["chatTools", contributions.chatTools.map((t) => t.name)],
   ] as const)
     for (const id of list) {
       if (seen.has(`${key}:${id}`)) problems.push(`contributes.${key}: "${id}" is declared twice`);
       seen.add(`${key}:${id}`);
     }
-  for (const id of c.commands.map((cmd) => cmd.id))
+  for (const id of contributions.commands.map((cmd) => cmd.id))
     if (
       !manifest.activationEvents.includes(`onCommand:${id}`) &&
       !manifest.activationEvents.includes("*") &&
       !manifest.activationEvents.includes("onStartup")
     )
       problems.push(`contributes.commands: "${id}" needs the activation event onCommand:${id}`);
-  for (const tool of c.chatTools)
+  for (const tool of contributions.chatTools)
     if (
       !manifest.activationEvents.includes(`onChatTool:${tool.name}`) &&
       !manifest.activationEvents.includes("*") &&
@@ -222,10 +222,10 @@ export function contributionProblems(manifest: PluginManifest, dir?: string): st
     )
       problems.push(`contributes.chatTools: "${tool.name}" needs the activation event onChatTool:${tool.name}`);
   if (dir) {
-    for (const path of c.jevCommands)
+    for (const path of contributions.jevCommands)
       if (!existsSync(join(resolvePath(dir, path), "command.json")))
         problems.push(`contributes.jevCommands: ${path} has no command.json`);
-    for (const p of c.prompts)
+    for (const p of contributions.prompts)
       if (!existsSync(resolvePath(dir, p.path))) problems.push(`contributes.prompts: ${p.path} does not exist`);
   }
   return problems;
@@ -480,10 +480,10 @@ export class ContributionRegistry {
   problems(pluginId: string): string[] {
     const plugin = this.discovery.plugins.get(pluginId);
     if (!plugin) return [];
-    const c = contributionsOf(plugin.manifest);
+    const contributions = contributionsOf(plugin.manifest);
     const offers = this.extensionPoints();
     const out: string[] = [];
-    for (const [point, list] of Object.entries(c.points)) {
+    for (const [point, list] of Object.entries(contributions.points)) {
       const offer = offers.get(point);
       if (!offer) {
         out.push(`contributes to ${point}, which no enabled plugin offers`);
@@ -497,15 +497,15 @@ export class ContributionRegistry {
           );
     }
     const tools = owners(this.chatTools(), (t) => t.name);
-    for (const t of c.chatTools)
+    for (const t of contributions.chatTools)
       if (tools.has(t.name) && tools.get(t.name) !== pluginId)
         out.push(`chat tool ${t.name} is already offered by ${tools.get(t.name)}`);
     const tabs = owners(this.tabs(), (t) => t.id);
-    for (const t of c.tabs)
+    for (const t of contributions.tabs)
       if (tabs.has(t.id) && tabs.get(t.id) !== pluginId)
         out.push(`tab ${t.id} is already contributed by ${tabs.get(t.id)}`);
     const jev = this.jevCommands();
-    for (const path of c.jevCommands) {
+    for (const path of contributions.jevCommands) {
       const folder = resolvePath(plugin.dir, path);
       const name = folder.split("/").at(-1)!;
       if (jev.has(name) && jev.get(name) !== folder)

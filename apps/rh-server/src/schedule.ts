@@ -179,13 +179,18 @@ export class Scheduler {
   }
 
   schedule(): ScheduleSettings {
-    const d = this.deps.defaults;
+    const scheduleDefaults = this.deps.defaults;
     const saved = this.deps.settings.get<Partial<Omit<ScheduleSettings, "timeZone">>>("schedule", {});
     return {
-      timeZone: d.timeZone,
-      sweep: { enabled: true, time: d.sweepTime, ...saved.sweep },
-      nightly: { enabled: true, time: d.nightlyTime ?? "02:00", ...saved.nightly },
-      review: { enabled: true, weekday: d.review.weekday, time: d.review.time, ...saved.review },
+      timeZone: scheduleDefaults.timeZone,
+      sweep: { enabled: true, time: scheduleDefaults.sweepTime, ...saved.sweep },
+      nightly: { enabled: true, time: scheduleDefaults.nightlyTime ?? "02:00", ...saved.nightly },
+      review: {
+        enabled: true,
+        weekday: scheduleDefaults.review.weekday,
+        time: scheduleDefaults.review.time,
+        ...saved.review,
+      },
     };
   }
 
@@ -227,10 +232,10 @@ export class Scheduler {
   }
 
   private latest(kind: RunKind, now: number, back = 0): Slot {
-    const s = this.schedule();
+    const scheduleSettings = this.schedule();
     return kind === "review"
-      ? weeklySlot(now, s.review.weekday, s.review.time, s.timeZone, back)
-      : dailySlot(now, s[kind].time, s.timeZone, back, kind);
+      ? weeklySlot(now, scheduleSettings.review.weekday, scheduleSettings.review.time, scheduleSettings.timeZone, back)
+      : dailySlot(now, scheduleSettings[kind].time, scheduleSettings.timeZone, back, kind);
   }
 
   private record(
@@ -239,14 +244,14 @@ export class Scheduler {
     status: ScheduledRun["status"],
     reason?: string,
   ): ScheduledRun | undefined {
-    const res = this.deps.db
+    const response = this.deps.db
       .prepare(
         "INSERT OR IGNORE INTO scheduled_runs (kind, slot, slot_at, trigger, status, reason, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
       )
       .run(slot.kind, slot.key, slot.at, trigger, status, reason ?? null, nowIso());
-    if (Number(res.changes) === 0) return undefined;
+    if (Number(response.changes) === 0) return undefined;
     const run = toRun(
-      this.deps.db.prepare("SELECT * FROM scheduled_runs WHERE id = ?").get(Number(res.lastInsertRowid)),
+      this.deps.db.prepare("SELECT * FROM scheduled_runs WHERE id = ?").get(Number(response.lastInsertRowid)),
     );
     this.deps.log.info("schedule.recorded", { kind: run.kind, slot: run.slot, status: run.status, reason: run.reason });
     if (run.status === "requested")

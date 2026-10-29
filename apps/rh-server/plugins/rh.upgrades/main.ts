@@ -192,12 +192,12 @@ export function activate(context: PluginContext): UpgradesExports {
     status: Proposal["status"],
     commit: string | null = null,
   ) => {
-    const r = db
+    const written = db
       .prepare(
         `INSERT INTO ${T.proposals} (run_id, kind, payload_json, status, commit_id, created_at, decided_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(runId, kind, JSON.stringify(payload), status, commit, now(), status === "applied" ? now() : null);
-    return proposal(Number(r.lastInsertRowid));
+    return proposal(Number(written.lastInsertRowid));
   };
   /** What the run spent: embeddings and Jev calls since it started, plus the web research. */
   const spentSince = (since: string) =>
@@ -215,10 +215,10 @@ export function activate(context: PluginContext): UpgradesExports {
   let researchUsd = 0;
   const research: ProviderExports["research"] = async (prompt, o) => {
     host.services.budgets.assertWithin(context.id, context.manifest.permissions.budgetUsdPerDay);
-    const r = await provider.research(prompt, o);
-    researchUsd += r.costUsd;
-    if (r.costUsd) host.services.budgets.charge(context.id, r.costUsd);
-    return r;
+    const researchResult = await provider.research(prompt, o);
+    researchUsd += researchResult.costUsd;
+    if (researchResult.costUsd) host.services.budgets.charge(context.id, researchResult.costUsd);
+    return researchResult;
   };
 
   // --- Focus ---------------------------------------------------------------------------------------------------
@@ -265,7 +265,7 @@ export function activate(context: PluginContext): UpgradesExports {
         lastResult: s.last?.result.label ?? "never measured",
         ageDays: ageDays(s.last?.createdAt),
       }));
-    const a = analyze(db);
+    const analysis = analyze(db);
     const recent = (
       db.prepare(`SELECT focus FROM ${T.runs} WHERE status = 'done' ORDER BY id DESC LIMIT 3`).all() as {
         focus: string;
@@ -281,7 +281,7 @@ export function activate(context: PluginContext): UpgradesExports {
           ),
         ),
         comments: comments.length ? JSON.stringify(comments) : "none",
-        failures: JSON.stringify(a),
+        failures: JSON.stringify(analysis),
         recent: recent.length ? recent.join(", ") : "none",
       });
       const answer = answers.focus as { choice?: string; confidence?: number; reason?: string } | undefined;
@@ -309,17 +309,20 @@ export function activate(context: PluginContext): UpgradesExports {
     const tried: UpgradeReport["tried"] = [];
     let best: { replay: StoredReplay; why: string } | undefined;
     for (const candidate of grid) {
-      const r = await harness.replay(candidate.variant, `upgrade-${runId}`);
+      const storedReplay = await harness.replay(candidate.variant, `upgrade-${runId}`);
       tried.push({
         what: JSON.stringify(candidate.variant),
         why: candidate.why,
-        verdict: r.report.verdict,
-        numbers: { heldOutDiff: r.report.heldOut.diff, heldOutLow: r.report.heldOut.low },
-        note: summarize(r.report),
+        verdict: storedReplay.report.verdict,
+        numbers: { heldOutDiff: storedReplay.report.heldOut.diff, heldOutLow: storedReplay.report.heldOut.low },
+        note: summarize(storedReplay.report),
       });
-      if (r.report.verdict === "not enough data") break;
-      if (r.report.verdict === "better" && (!best || r.report.heldOut.low > best.replay.report.heldOut.low))
-        best = { replay: r, why: candidate.why };
+      if (storedReplay.report.verdict === "not enough data") break;
+      if (
+        storedReplay.report.verdict === "better" &&
+        (!best || storedReplay.report.heldOut.low > best.replay.report.heldOut.low)
+      )
+        best = { replay: storedReplay, why: candidate.why };
     }
     if (!best)
       return {
@@ -403,17 +406,20 @@ export function activate(context: PluginContext): UpgradesExports {
     let winner: { id: string; value: number } | undefined;
     for (const c of alternatives) {
       try {
-        const r = await harness.runBenchmark("converter", { converter: c.id });
+        const benchmarkRecord = await harness.runBenchmark("converter", { converter: c.id });
         const wins =
-          r.result.value !== null && base.result.value !== null && r.result.value >= base.result.value + 0.02;
-        tried.push({ what: c.title, verdict: wins ? "better" : "not better", numbers: numbers(r) });
-        if (wins && (!winner || r.result.value! > winner.value)) winner = { id: c.id, value: r.result.value! };
+          benchmarkRecord.result.value !== null &&
+          base.result.value !== null &&
+          benchmarkRecord.result.value >= base.result.value + 0.02;
+        tried.push({ what: c.title, verdict: wins ? "better" : "not better", numbers: numbers(benchmarkRecord) });
+        if (wins && (!winner || benchmarkRecord.result.value! > winner.value))
+          winner = { id: c.id, value: benchmarkRecord.result.value! };
       } catch (error) {
         tried.push({ what: c.title, note: `failed: ${error instanceof Error ? error.message : String(error)}` });
       }
     }
     if (!winner) return { report: { tried, result: "Nothing changed: no converter beat the active one by 0.02." } };
-    const p = addProposal(
+    const proposal = addProposal(
       runId,
       "converter",
       { converter: winner.id, value: winner.value, activeValue: base.result.value, active: base.candidate.converter },
@@ -422,7 +428,7 @@ export function activate(context: PluginContext): UpgradesExports {
     return {
       report: {
         tried,
-        result: `Proposed switching the converter to ${winner.id}: ${winner.value.toFixed(3)} vs ${(base.result.value ?? 0).toFixed(3)}. Approve it in the Upgrades tab (proposal ${p.id}).`,
+        result: `Proposed switching the converter to ${winner.id}: ${winner.value.toFixed(3)} vs ${(base.result.value ?? 0).toFixed(3)}. Approve it in the Upgrades tab (proposal ${proposal.id}).`,
       },
     };
   };
@@ -603,8 +609,8 @@ export function activate(context: PluginContext): UpgradesExports {
       return proposal(id);
     },
     dismiss(id) {
-      const r = db.prepare(`UPDATE ${T.suggestions} SET status = 'dismissed' WHERE id = ?`).run(id);
-      if (!r.changes) throw new UpgradeInvalid(`no suggestion ${id}`);
+      const written = db.prepare(`UPDATE ${T.suggestions} SET status = 'dismissed' WHERE id = ?`).run(id);
+      if (!written.changes) throw new UpgradeInvalid(`no suggestion ${id}`);
       return toSuggestion(db.prepare(`SELECT * FROM ${T.suggestions} WHERE id = ?`).get(id) as SuggestionRow);
     },
     chooseFocus,

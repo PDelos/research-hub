@@ -127,7 +127,7 @@ export function activate(context: PluginContext): SweepExports {
     cards,
     cardWriter,
     separateExtensions: [cardWriter.extension],
-    attach: (harness, ctx) => cardWriter.attach(harness, ctx),
+    attach: (harness, context) => cardWriter.attach(harness, context),
     ready: () => {
       if (runSweeps) sweeps.pickUp();
     },

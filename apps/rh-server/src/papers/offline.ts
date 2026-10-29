@@ -93,28 +93,28 @@ function invertedIndex(text: string): Record<string, number[]> {
   return index;
 }
 
-function openalexWork(p: Synthetic, venue: string | null, references: string[]) {
-  const id = `W${hashInt(p.doi) % 1_000_000_000}`;
+function openalexWork(synthetic: Synthetic, venue: string | null, references: string[]) {
+  const id = `W${hashInt(synthetic.doi) % 1_000_000_000}`;
   return {
     id: `https://openalex.org/${id}`,
-    doi: `https://doi.org/${p.doi}`,
-    ids: { openalex: `https://openalex.org/${id}`, doi: `https://doi.org/${p.doi}` },
-    display_name: p.title,
-    publication_date: p.date,
-    publication_year: Number(p.date.slice(0, 4)),
-    authorships: p.authors.map((a) => ({ author: { display_name: a } })),
+    doi: `https://doi.org/${synthetic.doi}`,
+    ids: { openalex: `https://openalex.org/${id}`, doi: `https://doi.org/${synthetic.doi}` },
+    display_name: synthetic.title,
+    publication_date: synthetic.date,
+    publication_year: Number(synthetic.date.slice(0, 4)),
+    authorships: synthetic.authors.map((a) => ({ author: { display_name: a } })),
     primary_location: venue
-      ? { landing_page_url: `https://doi.org/${p.doi}`, source: { display_name: venue, type: "journal" } }
+      ? { landing_page_url: `https://doi.org/${synthetic.doi}`, source: { display_name: venue, type: "journal" } }
       : {
-          landing_page_url: `https://arxiv.org/abs/${p.arxiv}`,
+          landing_page_url: `https://arxiv.org/abs/${synthetic.arxiv}`,
           source: { display_name: "arXiv (Cornell University)", type: "repository" },
         },
-    best_oa_location: { pdf_url: `https://arxiv.org/pdf/${p.arxiv}` },
+    best_oa_location: { pdf_url: `https://arxiv.org/pdf/${synthetic.arxiv}` },
     cited_by_count: hashInt(id) % 50,
     referenced_works: references,
     referenced_works_count: references.length,
     is_retracted: false,
-    abstract_inverted_index: invertedIndex(p.abstract),
+    abstract_inverted_index: invertedIndex(synthetic.abstract),
   };
 }
 
@@ -129,18 +129,21 @@ const REFERENCES = [
 export function offlinePaperFetch(today: () => Date = () => new Date()): typeof fetch {
   return (async (input: string | URL | Request) => {
     const url = new URL(input instanceof Request ? input.url : String(input));
-    const p = url.searchParams;
+    const uRLSearchParams = url.searchParams;
     if (url.host === "export.arxiv.org") {
-      const query = (p.get("search_query") ?? "")
+      const query = (uRLSearchParams.get("search_query") ?? "")
         .replace(/all:/g, "")
         .replace(/ AND submittedDate:\[.*\]$/, "")
         .replace(/ AND /g, " ");
-      return new Response(arxivFeed(corpus(query, "arXiv", Math.min(Number(p.get("max_results") ?? 5), 10), today())), {
-        headers: { "content-type": "application/atom+xml" },
-      });
+      return new Response(
+        arxivFeed(corpus(query, "arXiv", Math.min(Number(uRLSearchParams.get("max_results") ?? 5), 10), today())),
+        {
+          headers: { "content-type": "application/atom+xml" },
+        },
+      );
     }
     if (url.host === "api.openalex.org" && url.pathname === "/works") {
-      const filter = p.get("filter") ?? "";
+      const filter = uRLSearchParams.get("filter") ?? "";
       if (filter.startsWith("doi:")) {
         // Enrichment lookups: known unless the DOI hashes to a multiple of five (not indexed yet).
         const results = filter
@@ -157,8 +160,8 @@ export function offlinePaperFetch(today: () => Date = () => new Date()): typeof 
           });
         return Response.json({ results });
       }
-      const search = p.get("search") ?? "";
-      const n = Math.min(Number(p.get("per-page") ?? 5), 10);
+      const search = uRLSearchParams.get("search") ?? "";
+      const n = Math.min(Number(uRLSearchParams.get("per-page") ?? 5), 10);
       // Every third arXiv paper reappears here as a journal version with the same DOI.
       const arxiv = corpus(search, "arXiv", n, today()).filter((_, i) => i % 3 === 0);
       const own = corpus(search, "OpenAlex", n - arxiv.length, today());
@@ -171,8 +174,8 @@ export function offlinePaperFetch(today: () => Date = () => new Date()): typeof 
     }
     if (url.host === "api.openalex.org") return new Response("", { status: 404 });
     if (url.host === "www.ebi.ac.uk") {
-      const query = (p.get("query") ?? "").replace(/ AND FIRST_PDATE:\[.*\]$/, "");
-      const papers = corpus(query, "bioRxiv", Math.min(Number(p.get("pageSize") ?? 5), 10), today());
+      const query = (uRLSearchParams.get("query") ?? "").replace(/ AND FIRST_PDATE:\[.*\]$/, "");
+      const papers = corpus(query, "bioRxiv", Math.min(Number(uRLSearchParams.get("pageSize") ?? 5), 10), today());
       return Response.json({
         resultList: {
           result: papers.map((w, i) => ({

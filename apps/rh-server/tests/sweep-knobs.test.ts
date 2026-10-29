@@ -30,16 +30,16 @@ test("gate thresholds and rank weights come from rh.sweep settings; unset means 
       paperFetch: ((i: any, o: any) => arxivOnlyFetch(batches[batch])(i, o)) as typeof fetch,
     },
   });
-  const p = server.hub.project;
-  p.brief.write("# x");
-  p.charters.saveDraft(validateCharter(sampleCharter()), "agent");
-  p.charters.approve();
+  const projectRuntime = server.hub.project;
+  projectRuntime.brief.write("# x");
+  projectRuntime.charters.saveDraft(validateCharter(sampleCharter()), "agent");
+  projectRuntime.charters.approve();
   const sweep = async (b: number) => {
     batch = b;
-    p.scheduler.trigger("sweep");
-    await until(() => p.sweeps.list().length === b + 1, 10_000, "sweep");
-    await p.sweeps.settled(p.sweeps.list(1)[0].id, 30_000);
-    return server.client.sweep(p.sweeps.list(1)[0].id);
+    projectRuntime.scheduler.trigger("sweep");
+    await until(() => projectRuntime.sweeps.list().length === b + 1, 10_000, "sweep");
+    await projectRuntime.sweeps.settled(projectRuntime.sweeps.list(1)[0].id, 30_000);
+    return server.client.sweep(projectRuntime.sweeps.list(1)[0].id);
   };
   try {
     const first = await sweep(0);
@@ -48,18 +48,21 @@ test("gate thresholds and rank weights come from rh.sweep settings; unset means 
       first.papers.every((x) => x.status !== "rejected"),
       "relevance clears the default 0.45",
     );
-    assert.equal(p.plugins.kernel.settings("rh.sweep").relevanceMin, undefined);
+    assert.equal(projectRuntime.plugins.kernel.settings("rh.sweep").relevanceMin, undefined);
 
-    await p.plugins.kernel.configure("rh.sweep", { relevanceMin: Math.min(1, relevance + 0.05) });
+    await projectRuntime.plugins.kernel.configure("rh.sweep", { relevanceMin: Math.min(1, relevance + 0.05) });
     const second = await sweep(1);
     assert.ok(second.papers.every((x) => x.status === "rejected"));
     assert.match(second.papers[0].reason!, new RegExp(`below relevance_min ${Math.min(1, relevance + 0.05)}`));
 
-    await assert.rejects(p.plugins.kernel.configure("rh.sweep", { rankWeights: { importance: 2 } }), /rankWeights/);
-    await p.plugins.kernel.configure("rh.sweep", {
+    await assert.rejects(
+      projectRuntime.plugins.kernel.configure("rh.sweep", { rankWeights: { importance: 2 } }),
+      /rankWeights/,
+    );
+    await projectRuntime.plugins.kernel.configure("rh.sweep", {
       rankWeights: { importance: 0, relevance: 1, question: 0, level: 0, freshness: 0 },
     });
-    assert.deepEqual(p.plugins.kernel.settings("rh.sweep").rankWeights, {
+    assert.deepEqual(projectRuntime.plugins.kernel.settings("rh.sweep").rankWeights, {
       importance: 0,
       relevance: 1,
       question: 0,

@@ -29,9 +29,9 @@ export function feedbackTools(deps: () => { cards: CardStore; feedback: Feedback
       if (!cards.length) return toolText("There are no cards yet.");
       return toolText(
         cards
-          .map((c, i) => {
-            const j = feedback.get(c.id);
-            return `${i + 1}. card ${c.id}: ${store.get(c.paperId)?.title ?? "?"}${j ? ` · ${ICON[j.verdict]}${j.reason ? ` "${j.reason}"` : ""}` : ""}`;
+          .map((card, i) => {
+            const j = feedback.get(card.id);
+            return `${i + 1}. card ${card.id}: ${store.get(card.paperId)?.title ?? "?"}${j ? ` · ${ICON[j.verdict]}${j.reason ? ` "${j.reason}"` : ""}` : ""}`;
           })
           .join("\n"),
       );
@@ -49,13 +49,13 @@ export function feedbackTools(deps: () => { cards: CardStore; feedback: Feedback
         Type.String({ description: `The user's reason in their words, at most ${REASON_MAX} characters` }),
       ),
     }),
-    execute: async (args, api, ctx) => {
+    execute: async (args, api, context) => {
       const { feedback, cards, store } = deps();
       let cardId = args.card_id;
       if (cardId === undefined && args.position !== undefined) cardId = latest()[args.position - 1]?.id;
       if (cardId === undefined || !cards.get(cardId))
         return toolError("No such card.", ["Call recent_cards and use a listed position or card id."]);
-      const result = await once<string>(api, "judge", ctx, async () => {
+      const result = await once<string>(api, "judge", context, async () => {
         try {
           const j = feedback.judge(cardId!, args.verdict, args.reason);
           return `ok:${ICON[j.verdict]} recorded on card ${cardId} (${store.get(j.paperId)?.title ?? "?"})${j.reason ? ` with the reason "${j.reason}"` : ""}.`;

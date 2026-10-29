@@ -108,9 +108,14 @@ export function activate(context: PluginContext): ConverterExports {
         if (Date.now() > deadline) throw new Error("docling-serve: conversion took more than 10 minutes");
         await new Promise((r) => setTimeout(r, POLL_MS));
       }
-      const res = await fetch(`${base}/v1/result/${task}`, { signal: AbortSignal.timeout(60_000) });
-      if (!res.ok) throw new Error(`docling-serve: HTTP ${res.status} ${(await res.text()).slice(0, 200)}`);
-      const body = (await res.json()) as { document?: { md_content?: string }; status?: string; errors?: unknown[] };
+      const response = await fetch(`${base}/v1/result/${task}`, { signal: AbortSignal.timeout(60_000) });
+      if (!response.ok)
+        throw new Error(`docling-serve: HTTP ${response.status} ${(await response.text()).slice(0, 200)}`);
+      const body = (await response.json()) as {
+        document?: { md_content?: string };
+        status?: string;
+        errors?: unknown[];
+      };
       if (!body.document?.md_content)
         throw new Error(
           `docling-serve: ${body.status ?? "no markdown"} ${JSON.stringify(body.errors ?? []).slice(0, 200)}`,

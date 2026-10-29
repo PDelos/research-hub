@@ -148,11 +148,14 @@ test("8.6 the UI proxy answers <name>.localhost and refuses other projects' host
     const url = new URL(`${server.url}/ui/v1/info`);
     const status = (host: string) =>
       new Promise<number>((resolve, reject) => {
-        const req = http.get({ host: url.hostname, port: url.port, path: url.pathname, headers: { host } }, (res) => {
-          res.resume();
-          resolve(res.statusCode ?? 0);
-        });
-        req.on("error", reject);
+        const request = http.get(
+          { host: url.hostname, port: url.port, path: url.pathname, headers: { host } },
+          (response) => {
+            response.resume();
+            resolve(response.statusCode ?? 0);
+          },
+        );
+        request.on("error", reject);
       });
     assert.equal(await status("proteins.localhost:4850"), 200);
     assert.equal(await status("genomics.localhost:4860"), 421);

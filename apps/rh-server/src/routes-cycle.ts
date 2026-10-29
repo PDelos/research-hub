@@ -7,26 +7,28 @@ import type { Hub } from "./hub.ts";
 import { CommentInvalid, type DigestExports } from "../plugins/rh.digest/main.ts";
 
 export function cycleRoutes(hub: Hub): Router {
-  const r = express.Router();
-  r.use("/v1", requireAuth(hub.log));
+  const router = express.Router();
+  router.use("/v1", requireAuth(hub.log));
   const digest = () => hub.project.plugins.exportsOf<DigestExports>("rh.digest");
 
-  r.get("/v1/cycle", async (_req, res) => void res.json((await digest()).cycle()));
+  router.get("/v1/cycle", async (_request, response) => void response.json((await digest()).cycle()));
 
-  r.get("/v1/digests", async (req, res) => {
-    res.json((await digest()).digests(Math.min(int(req.query.limit, "limit", 20), 200)));
+  router.get("/v1/digests", async (request, response) => {
+    response.json((await digest()).digests(Math.min(int(request.query.limit, "limit", 20), 200)));
   });
 
-  r.get("/v1/digests/:id", async (req, res) => {
-    const d = (await digest()).digest(int(req.params.id, "id"));
-    if (!d) throw notFound(`No digest ${req.params.id}`);
-    res.json(d);
+  router.get("/v1/digests/:id", async (request, response) => {
+    const d = (await digest()).digest(int(request.params.id, "id"));
+    if (!d) throw notFound(`No digest ${request.params.id}`);
+    response.json(d);
   });
 
-  r.post("/v1/digests/:id/comments", async (req, res) => {
-    const id = int(req.params.id, "id");
+  router.post("/v1/digests/:id/comments", async (request, response) => {
+    const id = int(request.params.id, "id");
     try {
-      res.status(201).json((await digest()).comment(id, req.body?.section as DigestSection, req.body?.text));
+      response
+        .status(201)
+        .json((await digest()).comment(id, request.body?.section as DigestSection, request.body?.text));
     } catch (error) {
       if (error instanceof CommentInvalid)
         throw error.message.startsWith("No digest") ? notFound(error.message) : invalid(error.message);
@@ -34,5 +36,5 @@ export function cycleRoutes(hub: Hub): Router {
     }
   });
 
-  return r;
+  return router;
 }

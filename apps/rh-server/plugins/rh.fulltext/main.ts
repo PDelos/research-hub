@@ -142,14 +142,18 @@ export function activate(context: PluginContext): FullTextExports {
   };
 
   const fetchText = async (url: string, accept: string) => {
-    const res = await rh.http.request(url, { headers: { accept }, timeoutMs: 60_000, attempts: 2 });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return res.text();
+    const response = await rh.http.request(url, { headers: { accept }, timeoutMs: 60_000, attempts: 2 });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return response.text();
   };
   const fetchPdf = async (url: string) => {
-    const res = await rh.http.request(url, { headers: { accept: "application/pdf" }, timeoutMs: 120_000, attempts: 2 });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const bytes = new Uint8Array(await res.arrayBuffer());
+    const response = await rh.http.request(url, {
+      headers: { accept: "application/pdf" },
+      timeoutMs: 120_000,
+      attempts: 2,
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const bytes = new Uint8Array(await response.arrayBuffer());
     if (bytes.length > MAX_PDF_BYTES) throw new Error(`the PDF is ${Math.round(bytes.length / 1e6)} MB`);
     if (String.fromCharCode(...bytes.slice(0, 5)) !== "%PDF-") throw new Error("not a PDF");
     return bytes;

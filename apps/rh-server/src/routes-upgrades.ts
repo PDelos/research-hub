@@ -8,8 +8,8 @@ import type { Hub } from "./hub.ts";
 import { FOCUSES, UpgradeInvalid, type Focus, type UpgradesExports } from "../plugins/rh.upgrades/main.ts";
 
 export function upgradeRoutes(hub: Hub): Router {
-  const r = express.Router();
-  r.use("/v1", requireAuth(hub.log));
+  const router = express.Router();
+  router.use("/v1", requireAuth(hub.log));
   const upgrades = () => hub.project.plugins.exportsOf<UpgradesExports>("rh.upgrades");
   const guard = async <T>(fn: () => T | Promise<T>) => {
     try {
@@ -20,42 +20,42 @@ export function upgradeRoutes(hub: Hub): Router {
     }
   };
 
-  r.get("/v1/upgrades", async (_req, res) => {
-    const u = await upgrades();
+  router.get("/v1/upgrades", async (_request, response) => {
+    const upgradesExports = await upgrades();
     const settings = hub.project.plugins.kernel.settings("rh.upgrades");
     const view: UpgradesView = {
       enabled: settings.enabled as boolean,
       everyDays: settings.everyDays as number,
-      running: u.busy(),
-      due: u.due(),
-      runs: u.runs(20),
-      proposals: u.proposals(),
-      suggestions: u.suggestions(),
+      running: upgradesExports.busy(),
+      due: upgradesExports.due(),
+      runs: upgradesExports.runs(20),
+      proposals: upgradesExports.proposals(),
+      suggestions: upgradesExports.suggestions(),
     };
-    res.json(view);
+    response.json(view);
   });
-  r.post("/v1/upgrades/run", async (req, res) => {
-    const focus = req.body?.focus as Focus | undefined;
+  router.post("/v1/upgrades/run", async (request, response) => {
+    const focus = request.body?.focus as Focus | undefined;
     if (focus !== undefined && !FOCUSES.includes(focus)) throw invalid(`focus must be one of ${FOCUSES.join(", ")}`);
-    const u = await upgrades();
-    if (u.busy()) throw invalid("an upgrade is already running");
+    const upgradesExports = await upgrades();
+    if (upgradesExports.busy()) throw invalid("an upgrade is already running");
     // A run can take minutes (benchmarks); it continues in the background and shows in GET /v1/upgrades.
-    void u
+    void upgradesExports
       .run({ ...(focus ? { focus } : {}), requestedBy: "user" })
       .catch((error) => hub.log.warn("upgrades.run_failed", { error: String(error) }));
-    res.status(202).json({ started: true });
+    response.status(202).json({ started: true });
   });
-  r.post("/v1/proposals/:id/approve", async (req, res) => {
-    const id = int(req.params.id, "id", 0);
-    res.json(await guard(async () => (await upgrades()).approve(id)));
+  router.post("/v1/proposals/:id/approve", async (request, response) => {
+    const id = int(request.params.id, "id", 0);
+    response.json(await guard(async () => (await upgrades()).approve(id)));
   });
-  r.post("/v1/proposals/:id/reject", async (req, res) => {
-    const id = int(req.params.id, "id", 0);
-    res.json(await guard(async () => (await upgrades()).reject(id)));
+  router.post("/v1/proposals/:id/reject", async (request, response) => {
+    const id = int(request.params.id, "id", 0);
+    response.json(await guard(async () => (await upgrades()).reject(id)));
   });
-  r.post("/v1/suggestions/:id/dismiss", async (req, res) => {
-    const id = int(req.params.id, "id", 0);
-    res.json(await guard(async () => (await upgrades()).dismiss(id)));
+  router.post("/v1/suggestions/:id/dismiss", async (request, response) => {
+    const id = int(request.params.id, "id", 0);
+    response.json(await guard(async () => (await upgrades()).dismiss(id)));
   });
-  return r;
+  return router;
 }

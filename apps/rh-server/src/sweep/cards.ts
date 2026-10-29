@@ -35,7 +35,7 @@ export class CardStore {
     card: Card;
     created: boolean;
   } {
-    const s = input.scores;
+    const cardScores = input.scores;
     const result = this.db
       .prepare(
         `INSERT OR IGNORE INTO cards (paper_id, sweep_id, rank, summary, relevance, relevance_reason, trust, trust_reason, value,
@@ -47,16 +47,16 @@ export class CardStore {
         input.sweepId,
         input.rank ?? null,
         input.summary,
-        s.relevance,
-        s.relevanceReason,
-        s.trust,
-        s.trustReason,
-        s.value,
-        s.valueReason,
-        s.level,
-        s.matchedQuestion ?? null,
-        s.borderline ? 1 : 0,
-        JSON.stringify(s.details),
+        cardScores.relevance,
+        cardScores.relevanceReason,
+        cardScores.trust,
+        cardScores.trustReason,
+        cardScores.value,
+        cardScores.valueReason,
+        cardScores.level,
+        cardScores.matchedQuestion ?? null,
+        cardScores.borderline ? 1 : 0,
+        JSON.stringify(cardScores.details),
         nowIso(),
       );
     const created = Number(result.changes) > 0;
@@ -107,23 +107,23 @@ interface CardRow {
   created_at: string;
 }
 
-function toCard(r: CardRow): Card {
+function toCard(cardRow: CardRow): Card {
   return {
-    id: Number(r.id),
-    paperId: Number(r.paper_id),
-    sweepId: Number(r.sweep_id),
-    rank: r.rank === null ? undefined : Number(r.rank),
-    summary: r.summary,
-    relevance: Number(r.relevance),
-    relevanceReason: r.relevance_reason,
-    trust: Number(r.trust),
-    trustReason: r.trust_reason,
-    value: Number(r.value),
-    valueReason: r.value_reason,
-    level: r.level,
-    matchedQuestion: r.matched_question ?? undefined,
-    borderline: !!r.borderline,
-    details: JSON.parse(r.details_json),
-    createdAt: r.created_at,
+    id: Number(cardRow.id),
+    paperId: Number(cardRow.paper_id),
+    sweepId: Number(cardRow.sweep_id),
+    rank: cardRow.rank === null ? undefined : Number(cardRow.rank),
+    summary: cardRow.summary,
+    relevance: Number(cardRow.relevance),
+    relevanceReason: cardRow.relevance_reason,
+    trust: Number(cardRow.trust),
+    trustReason: cardRow.trust_reason,
+    value: Number(cardRow.value),
+    valueReason: cardRow.value_reason,
+    level: cardRow.level,
+    matchedQuestion: cardRow.matched_question ?? undefined,
+    borderline: !!cardRow.borderline,
+    details: JSON.parse(cardRow.details_json),
+    createdAt: cardRow.created_at,
   };
 }

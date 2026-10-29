@@ -16,17 +16,17 @@ const hostname = (host: string) =>
     .replace(/^\[(.*)\]$/, "$1");
 
 /** Why a browser request to the viewer must be refused, or undefined when it may pass. */
-export function refusal(req: IncomingMessage, allowedHosts: Set<string>): string | undefined {
-  if (!allowedHosts.has(hostname(req.headers.host ?? ""))) return "unknown host";
-  const origin = req.headers.origin;
+export function refusal(request: IncomingMessage, allowedHosts: Set<string>): string | undefined {
+  if (!allowedHosts.has(hostname(request.headers.host ?? ""))) return "unknown host";
+  const origin = request.headers.origin;
   if (origin) {
     let originHost = "";
     try {
       originHost = new URL(origin).host;
     } catch {}
-    if (originHost.toLowerCase() !== String(req.headers.host).toLowerCase()) return "cross-origin request";
+    if (originHost.toLowerCase() !== String(request.headers.host).toLowerCase()) return "cross-origin request";
   }
-  const site = req.headers["sec-fetch-site"];
+  const site = request.headers["sec-fetch-site"];
   if (site && site !== "same-origin" && site !== "none") return "cross-site request";
   return undefined;
 }
@@ -50,34 +50,34 @@ export function kbProxy(
   allowedHosts: Set<string>,
   mode: "paths" | "assets" = "paths",
 ): RequestHandler {
-  return (req, res, next) => {
+  return (req, response, next) => {
     const path = mode === "assets" ? assetPath(req.url) : viewerPath(req.url);
     if (path === undefined) return next();
     const why = refusal(req, allowedHosts);
     if (why)
-      return void res.status(403).json({ error: { code: "forbidden", message: `Knowledge base viewer: ${why}` } });
+      return void response.status(403).json({ error: { code: "forbidden", message: `Knowledge base viewer: ${why}` } });
     const v = viewer();
     const target = v?.target();
     if (!target) {
       if (mode === "assets") return next();
-      return void res
+      return void response
         .status(503)
         .type("html")
         .send(unavailablePage(v?.status() ?? { state: "disabled", obsidianVersion: "", restarts: 0 }));
     }
     const headers = { ...req.headers, host: `127.0.0.1:${target.port}` };
     delete headers.authorization;
-    const upstream = http.request({ ...target, path, method: req.method, headers }, (r) => {
-      res.writeHead(r.statusCode ?? 502, r.headers);
-      r.pipe(res);
+    const upstream = http.request({ ...target, path, method: req.method, headers }, (incomingMessage) => {
+      response.writeHead(incomingMessage.statusCode ?? 502, incomingMessage.headers);
+      incomingMessage.pipe(response);
     });
     upstream.on("error", () => {
-      if (!res.headersSent)
-        res
+      if (!response.headersSent)
+        response
           .status(502)
           .type("html")
           .send(unavailablePage({ state: "crashed", obsidianVersion: "", restarts: 0 }));
-      else res.end();
+      else response.end();
     });
     req.pipe(upstream);
   };
@@ -85,20 +85,20 @@ export function kbProxy(
 
 /** WebSocket upgrades for the viewer's live sync (/ws, also /kb/ws). */
 export function kbUpgrade(viewer: () => KbViewer | undefined, allowedHosts: Set<string>) {
-  return (req: IncomingMessage, socket: Socket, head: Buffer) => {
-    const path = viewerPath(req.url ?? "");
+  return (request: IncomingMessage, socket: Socket, head: Buffer) => {
+    const path = viewerPath(request.url ?? "");
     const target = viewer()?.target();
-    if (!path || refusal(req, allowedHosts) || !target) {
+    if (!path || refusal(request, allowedHosts) || !target) {
       socket.end("HTTP/1.1 403 Forbidden\r\n\r\n");
       return;
     }
     const upstream = net.connect(target.port, target.host, () => {
-      const headers = { ...req.headers, host: `127.0.0.1:${target.port}` };
+      const headers = { ...request.headers, host: `127.0.0.1:${target.port}` };
       delete headers.authorization;
       const lines = Object.entries(headers).flatMap(([k, v]) =>
         Array.isArray(v) ? v.map((x) => `${k}: ${x}`) : [`${k}: ${v}`],
       );
-      upstream.write(`${req.method} ${path} HTTP/1.1\r\n${lines.join("\r\n")}\r\n\r\n`);
+      upstream.write(`${request.method} ${path} HTTP/1.1\r\n${lines.join("\r\n")}\r\n\r\n`);
       if (head.length) upstream.write(head);
       socket.pipe(upstream).pipe(socket);
     });

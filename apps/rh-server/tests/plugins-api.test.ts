@@ -48,14 +48,14 @@ test("the API lists plugins and their contributions, and /v1/info reports the ke
     assert.deepEqual(s2.permissions, { network: ["api.semanticscholar.org"] });
     assert.deepEqual(s2.contributions.points["papers.source"], [{ id: "semanticscholar", title: "Semantic Scholar" }]);
 
-    const c = await client.contributions();
+    const pluginContributionsView = await client.contributions();
     assert.deepEqual(
-      c.tabs.map((t) => t.id),
+      pluginContributionsView.tabs.map((t) => t.id),
       ["feed", "digest", "quality", "upgrades", "library", "kb", "charter", "runs", "settings", "plugins"],
     );
-    assert.equal(c.viewer.active?.id, "library");
-    assert.deepEqual(c.viewer.options.map((o) => o.id).toSorted(), ["library", "obsidian"]);
-    assert.ok(c.settings.some((g) => g.pluginId === "rh.kb" && "kb.viewer" in g.properties));
+    assert.equal(pluginContributionsView.viewer.active?.id, "library");
+    assert.deepEqual(pluginContributionsView.viewer.options.map((o) => o.id).toSorted(), ["library", "obsidian"]);
+    assert.ok(pluginContributionsView.settings.some((g) => g.pluginId === "rh.kb" && "kb.viewer" in g.properties));
     await rejects(client.plugin("acme.nothing"), "not_found", /No plugin acme\.nothing/);
   } finally {
     await server.stop();
@@ -196,10 +196,10 @@ test("undo reverses one change and keeps later ones; a later change to the same 
     assert.equal((await client.plugin("rh.source-europepmc")).state, "disabled", "the later change stays");
 
     await client.setSweepSettings({ cardsPerSweep: 4 });
-    const a = (await client.pluginHistory())[0];
+    const pluginHistoryEntry = (await client.pluginHistory())[0];
     await client.setSweepSettings({ cardsPerSweep: 5 });
     await rejects(
-      client.undoPluginChange(a.id),
+      client.undoPluginChange(pluginHistoryEntry.id),
       "conflict",
       /a later change touched the same setting \(rh\.sweep\.settings\.cardsPerSweep\)/,
     );
