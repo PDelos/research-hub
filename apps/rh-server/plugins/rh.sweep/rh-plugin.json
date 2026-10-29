@@ -101,6 +101,23 @@
               "maximum": 1
             }
           }
+        },
+        "level": {
+          "type": "string",
+          "enum": ["auto", "foundational", "core", "advanced", "frontier"],
+          "default": "auto",
+          "description": "Your level: papers at this level fit best (auto: core first, advanced and frontier close behind). Proposed by the knowledge review when you are ready for more."
+        },
+        "tasteRules": {
+          "type": "array",
+          "maxItems": 10,
+          "items": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 160
+          },
+          "default": [],
+          "description": "Rules you approved for what you want and do not want; they go with every paper decision."
         }
       }
     }

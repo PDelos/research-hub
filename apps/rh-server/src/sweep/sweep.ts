@@ -103,7 +103,7 @@ export interface SweepDeps {
    */
   explore?: (x: { sweepId: number; ranked: number[]; slots: number }) => number[];
   /** Gate thresholds and rank weights from rh.sweep settings (v1-2); the commands' policies and defaults otherwise. */
-  knobs?: () => { relevanceMin?: number; worthMin?: number; rankWeights?: RankWeights };
+  knobs?: () => { relevanceMin?: number; worthMin?: number; rankWeights?: RankWeights; level?: TargetLevel };
 }
 
 // ---------------------------------------------------------------- plan
@@ -145,7 +145,16 @@ export function levelFrom(answer: Answer | undefined): Level {
   return LEVELS[Math.min(3, Math.max(0, Math.round(scoreOf(answer) * 3)))];
 }
 
-export function levelFit(level: Level, orientation: boolean): number {
+export type TargetLevel = Level | "auto";
+export const TARGET_LEVELS: readonly TargetLevel[] = ["auto", ...LEVELS];
+
+/**
+ * How well a paper's level fits (design D3; v1-7 D4): in orientation, foundational first; with a target level, 1 at
+ * the target and less per step away; "auto" keeps the earlier table (core best, then advanced and frontier).
+ */
+export function levelFit(level: Level, orientation: boolean, target: TargetLevel = "auto"): number {
+  if (!orientation && target !== "auto")
+    return [1, 0.75, 0.5, 0.3][Math.abs(LEVELS.indexOf(level) - LEVELS.indexOf(target))];
   const fit = orientation
     ? { foundational: 1, core: 0.8, advanced: 0.4, frontier: 0.2 }
     : { foundational: 0.6, core: 1, advanced: 0.9, frontier: 0.8 };
@@ -619,6 +628,7 @@ export class SweepRunner {
     }[];
     const now = this.now();
     const weights = this.deps.knobs?.().rankWeights ?? DEFAULT_RANK_WEIGHTS;
+    const target = this.deps.knobs?.().level ?? "auto";
     const scored: { id: number; score: number }[] = [];
     let blocked = 0;
     const set = this.deps.db.prepare(
@@ -632,7 +642,7 @@ export class SweepRunner {
             importance: r.importance ?? 0,
             relevance: r.relevance ?? 0,
             questionWeight: questionWeight(charter, r.matched_question ?? undefined),
-            levelFit: levelFit(r.level ?? "core", sweep.orientation),
+            levelFit: levelFit(r.level ?? "core", sweep.orientation, target),
             freshness: sweep.orientation ? 0.5 : freshness(paper.publishedAt, now),
           },
           weights,

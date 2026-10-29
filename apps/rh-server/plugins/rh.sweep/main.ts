@@ -5,7 +5,7 @@ import type { PluginContext } from "../../src/kernel/lifecycle.ts";
 import { CardWriter } from "../../src/sweep/card-writer.ts";
 import { CardStore } from "../../src/sweep/cards.ts";
 import { PaperDecisions } from "../../src/sweep/decisions.ts";
-import { DEFAULT_RANK_WEIGHTS, SweepRunner, type RankWeights } from "../../src/sweep/sweep.ts";
+import { DEFAULT_RANK_WEIGHTS, SweepRunner, type RankWeights, type TargetLevel } from "../../src/sweep/sweep.ts";
 import { DEFAULT_SETTINGS, type SweepSettings, type Variant } from "../../src/harness/replay.ts";
 import { SettingsInvalid, validateSettings } from "../../src/kernel/settings.ts";
 import type { CharterExports } from "../rh.charter/main.ts";
@@ -45,6 +45,7 @@ export function activate(context: PluginContext): SweepExports {
       feedback
         .recent(8)
         .map((j) => ({ title: j.title, verdict: j.verdict, ...(j.reason ? { reason: j.reason.slice(0, 200) } : {}) })),
+    rules: () => (context.settings.tasteRules as string[] | undefined) ?? [],
   });
   const sweeps = new SweepRunner({
     db: host.db,
@@ -70,6 +71,7 @@ export function activate(context: PluginContext): SweepExports {
       relevanceMin: context.settings.relevanceMin as number | undefined,
       worthMin: context.settings.worthMin as number | undefined,
       rankWeights: context.settings.rankWeights as RankWeights | undefined,
+      level: (context.settings.level as TargetLevel | undefined) ?? "auto",
     }),
     cardsPerSweep: () =>
       (context.savedSettings.cardsPerSweep as number | undefined) ??
@@ -107,6 +109,7 @@ export function activate(context: PluginContext): SweepExports {
     rankWeights: (context.settings.rankWeights as RankWeights | undefined) ?? DEFAULT_RANK_WEIGHTS,
     cardsPerSweep: sweeps.cardsPerSweep(),
     explorationPicks: context.settings.explorationPicks as number,
+    level: (context.settings.level as TargetLevel | undefined) ?? "auto",
   });
   return {
     currentSettings,

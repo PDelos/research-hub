@@ -7,6 +7,7 @@ import {
   DEFAULT_RANK_WEIGHTS,
   freshness,
   levelFit,
+  type TargetLevel,
   questionWeight,
   rankScore,
   type RankWeights,
@@ -42,6 +43,8 @@ export interface SweepSettings {
   rankWeights: RankWeights;
   cardsPerSweep: number;
   explorationPicks: number;
+  /** The user's level (v1-7): auto keeps the earlier level fit. */
+  level: TargetLevel;
 }
 export type Variant = Partial<SweepSettings>;
 
@@ -51,6 +54,7 @@ export const DEFAULT_SETTINGS: SweepSettings = {
   rankWeights: DEFAULT_RANK_WEIGHTS,
   cardsPerSweep: CARDS_PER_SWEEP.default,
   explorationPicks: 1,
+  level: "auto",
 };
 
 /** Gain per paper: ⭐ 2, 👍 1, 👎 0 from the user; the trusted judge's probability × 1.5 otherwise. */
@@ -100,7 +104,7 @@ export function replayCards(h: SweepHistory, settings: SweepSettings): { cards: 
             importance: p.importance ?? fallback,
             relevance: p.relevance,
             questionWeight: h.charter ? questionWeight(h.charter, p.matchedQuestion) : 0.5,
-            levelFit: levelFit(p.level ?? "core", h.orientation),
+            levelFit: levelFit(p.level ?? "core", h.orientation, settings.level ?? "auto"),
             freshness: h.orientation ? 0.5 : freshness(p.publishedAt, h.startedAt),
           },
           settings.rankWeights,
