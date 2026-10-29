@@ -187,6 +187,16 @@ export async function openProject(options: OpenProjectOptions): Promise<ProjectR
       configure: (pluginId, changes, actor) => kernel().configure(pluginId, changes, actor),
       undo: async (commit, actor) => void (await kernel().undo(commit, actor)),
       settingsOf: (pluginId) => kernel().settings(pluginId),
+      // Called after start-up (the engineer builds later), when `plugins` is set.
+      manage: {
+        install: async (folder, actor) => {
+          const plan = await plugins.installer.prepare({ folder });
+          await plugins.installer.confirm(plan.planId, actor);
+          return plan.id;
+        },
+        setEnabled: (pluginId, enabled, actor) => kernel().setEnabled(pluginId, enabled, { actor }),
+        uninstall: (pluginId, actor) => plugins.installer.uninstall(pluginId, { actor, deleteData: true }),
+      },
     }),
   });
   const { catalog } = await plugins.exportsOf<ProviderExports>("rh.provider-openrouter");

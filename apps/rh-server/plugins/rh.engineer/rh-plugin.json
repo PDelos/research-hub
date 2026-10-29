@@ -1,0 +1,35 @@
+{
+  "id": "rh.engineer",
+  "version": "1.0.0",
+  "displayName": "Engineer",
+  "kind": "core",
+  "topic": "agents",
+  "description": "Turns ideas (scout suggestions, your proposals) into plugins: researches whether each is worth it, builds and tests it once you press Build, and proposes it with its numbers. Paper sources and fine-tuned embedders (trained free on Kaggle).",
+  "engines": { "research-hub": "^1.0.0" },
+  "main": "main.ts",
+  "required": true,
+  "activationEvents": ["onStartup"],
+  "dependencies": {
+    "rh.provider-openrouter": "^1.0.0",
+    "rh.charter": "^1.0.0",
+    "rh.harness": "^1.0.0"
+  },
+  "contributes": {
+    "settings": {
+      "properties": {
+        "maxAttempts": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5,
+          "default": 3,
+          "description": "Times the engineer may fix a plugin that fails its test."
+        }
+      }
+    }
+  },
+  "permissions": {
+    "network": ["api.kaggle.com", "www.kaggle.com", "storage.googleapis.com"],
+    "secrets": ["KAGGLE_API_TOKEN", "KAGGLE_USERNAME", "KAGGLE_KEY"],
+    "budgetUsdPerDay": 1
+  }
+}

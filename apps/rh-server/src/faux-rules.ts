@@ -252,7 +252,52 @@ export const knowledgeReviewRule: FauxRule = (turn) => {
   return say(JSON.stringify({ directions, outOfScope, tasteRules }));
 };
 
+/**
+ * The offline engineer: an idea naming a URL is a paper source at that URL; one about fine-tuning is an embedder
+ * fine-tune; anything else is "other". The build writes a plugin for an API answering `{ items: [{ id, doi, title,
+ * authors, year }] }` at `<base>/search?q=…&rows=…`, with a wrong source field on the first attempt (to exercise the
+ * retry with the test's error).
+ */
+export const engineerRule: FauxRule = (turn) => {
+  if (turn.system.includes("engineer-assess")) {
+    const idea = section(turn.lastUser, "Idea");
+    const url = idea.match(/https?:\/\/[^\s"')]+/)?.[0];
+    const kind = /fine-?tun/i.test(idea) ? "embedder-finetune" : url ? "paper-source" : "other";
+    const origin = url ? new URL(url).origin : undefined;
+    return say(
+      JSON.stringify({
+        worth: kind !== "other",
+        kind,
+        gain: "More papers on your questions.",
+        cost: "Free.",
+        risk: "The API may change.",
+        plan: "Search endpoint, map the fields.",
+        ...(origin
+          ? { api: { name: new URL(origin).hostname.split(".")[1] ?? "source", baseUrl: origin, docsUrl: url } }
+          : {}),
+      }),
+    );
+  }
+  if (turn.system.includes("engineer-build")) {
+    const id = turn.system.match(/sources: \{ "([a-z0-9-]+)"/)?.[1] ?? "source";
+    const base = turn.lastUser.match(/Base URL: (\S+)/)?.[1] ?? "https://example.org";
+    const retry = turn.lastUser.includes("The last attempt failed");
+    const main = `export async function activate({ rh }) {
+  return { sources: { "${id}": { name: "${id}", search: async (q) => {
+    const body = await rh.http.json(\`${base}/search?q=\${encodeURIComponent(q.query)}&rows=\${q.limit}\`);
+    return (body.items || []).filter((x) => x.title).slice(0, q.limit).map((x) => ({
+      source: "${retry ? id : "wrong"}", externalId: String(x.id), ids: x.doi ? { doi: x.doi } : {}, title: x.title,
+      authors: x.authors || [], year: x.year }));
+  } } } };
+}
+`;
+    return say(JSON.stringify({ main, notes: retry ? "fixed the source field" : "first version" }));
+  }
+  return undefined;
+};
+
 export const offlineRules: FauxRule[] = [
+  engineerRule,
   knowledgeReviewRule,
   charterWriterRule,
   cardWriterRule,

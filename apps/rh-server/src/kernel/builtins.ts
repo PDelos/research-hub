@@ -10,6 +10,7 @@ export const BUILTIN_MODULES: Record<string, () => Promise<PluginModule>> = {
   "rh.digest": () => import("../../plugins/rh.digest/main.ts") as Promise<PluginModule>,
   "rh.desk": () => import("../../plugins/rh.desk/main.ts") as Promise<PluginModule>,
   "rh.embedder-openrouter": () => import("../../plugins/rh.embedder-openrouter/main.ts") as Promise<PluginModule>,
+  "rh.engineer": () => import("../../plugins/rh.engineer/main.ts") as Promise<PluginModule>,
   "rh.feedback": () => import("../../plugins/rh.feedback/main.ts") as Promise<PluginModule>,
   "rh.fulltext": () => import("../../plugins/rh.fulltext/main.ts") as Promise<PluginModule>,
   "rh.finder-method-transfer": () => import("../../plugins/rh.finder-method-transfer/main.ts") as Promise<PluginModule>,
