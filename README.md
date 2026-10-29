@@ -1,40 +1,44 @@
 # Research Hub
 
-A self-hosted research assistant. **One container = one research project (one theme).** Each project gets a
-durable agent (built on [pi-durable](https://github.com/earendil-works/pi)) that will sweep for papers, let
-[Jev](https://openrouter.ai/docs/guides/community/jev) make the bulk decisions, present a few paper cards a day,
-learn from your 👎/👍/⭐ and grow an Obsidian-compatible knowledge base. A new theme is a new container.
+A self-hosted research assistant. **One container = one research project (one theme).** Each project runs a
+durable agent (built on [pi-durable](https://github.com/earendil-works/pi)) that sweeps the literature every day, lets
+[Jev](https://openrouter.ai/docs/guides/community/jev) make the bulk decisions, presents a few paper cards, learns
+from your 👎/👍/⭐ and grows an Obsidian-compatible knowledge base. **You only read, judge and comment; the hub keeps
+improving itself** and asks you before anything that matters changes. A new theme is a new container.
 
-**Status: v1.9 (step 7 complete: full text, question finders, the engineer, MCP).** v0 built the durable agent, Jev client, live stream, browser UI and containers (v0.0),
-the brief, charter and schedule (v0.1), paper search with representations (v0.2), the daily sweep with paper cards
-(v0.3), learning from your judgments (v0.4) and the knowledge base with the real Obsidian interface (v0.5). v1.0 turns
-all of it into **plugins, like VS Code**: a small kernel and a plugin for every feature, which you can enable,
-disable, configure, swap, install and roll back per project (see [Plugins](#plugins)). v1.1 makes the hub light
-(232 MB, Obsidian as an add-on image) and runs **one daily cycle** you only read and judge (see
-[The daily cycle](#the-daily-cycle)). v1.2 measures the hub on your judgments ([Quality](#quality-the-harness)), v1.3 sorts every plugin into core, slots,
-add-ons and preferences with a fixed benchmark per slot ([What can change](#what-can-change-and-how-it-is-judged)),
-and v1.4 adds [the weekly upgrade](#the-weekly-upgrade): once a week the hub improves one slot on its benchmark or
-looks for new sources to add. v1.5 closes the [knowledge loop](#the-knowledge-loop): before each digest the hub
-proposes charter changes and new research questions from what you liked, disliked and wrote, for you to approve. v1.6
-adds full text (arXiv HTML, Europe PMC and bioRxiv XML, PDFs through a converter slot), v1.7 pluggable question finders
-with attribution, and v1.8 [the engineer](#the-engineer), which researches ideas and builds plugins: paper sources,
-and fine-tuned embedders trained free on Kaggle. v1.9 makes every project an
-[MCP server](#connecting-an-agent-mcp) for outside agents.
+**Status: v1.9 (2026-10-29), feature-complete; not yet reviewed or used for long in real conditions.** What it does:
 
-## Architecture and what comes next
+| Area | What you get | Section |
+|---|---|---|
+| Finding papers | Daily sweeps over arXiv, OpenAlex, Europe PMC and Semantic Scholar (more as add-ons), Jev gates and ranking, ~7 cards a day with an exploration pick | [Finding papers](#finding-papers), [The daily sweep](#the-daily-sweep-and-paper-cards) |
+| Learning from you | 👎/👍/⭐ with reasons move weights, taste examples and rules; a judge calibrated on your verdicts | [Judging cards](#judging-cards) |
+| The daily cycle | Sweep in the morning, nightly work, a weekly digest you read and comment on, every change listed with Undo | [The daily cycle](#the-daily-cycle) |
+| Measuring itself | Replays of past sweeps on your judgments, fixed public benchmarks per replaceable part ("slot") | [Quality](#quality-the-harness), [What can change](#what-can-change-and-how-it-is-judged) |
+| Improving itself | A weekly upgrade of one slot (applied with Undo or proposed), source scouting, an engineer that researches ideas and builds plugins (paper sources, fine-tuned embedders trained free on Kaggle) | [The weekly upgrade](#the-weekly-upgrade), [The engineer](#the-engineer) |
+| The charter evolves | Before each digest: charter changes, new research questions from pluggable question finders, level-up and taste rules, all as proposals with evidence | [The knowledge loop](#the-knowledge-loop) |
+| Full text and knowledge | Full text of ⭐ papers (arXiv HTML, Europe PMC and bioRxiv XML, PDFs through a converter), evidence notes, the Library or Obsidian | [Full text](#full-text), [The knowledge base](#the-knowledge-base) |
+| Outside agents | Every project is a read-only MCP server | [Connecting an agent](#connecting-an-agent-mcp) |
+| Everything is a plugin | A small kernel and plugins you can enable, swap, install and roll back per project | [Plugins](#plugins) |
 
-A small **kernel** (plugin discovery, the per-project plugin state, the durable agent runtime, the database, HTTP,
-permissions and budgets) runs **plugins**: paper sources, the embedder, the decision engine, the charter, sweep,
-feedback, the research desk, the knowledge base and its viewers, and the UI tabs. Each has an `rh-plugin.json`
-manifest, activates only when needed and declares what it may reach. Next (planned in
-[EVOLUTION.md](EVOLUTION.md) §0 and §6): the goal is a **daily cycle that runs itself**: agents sweep, rank and
-explain papers, analyze what you disliked or missed every night, replay candidate fixes on your past judgments and
-apply the ones that clearly win (each with undo), and send a weekly digest you read and comment on. You only read,
-judge and give opinions. Steps: a lighter image with the orchestrated cycle (v1-1), the replay harness on your
-judgments (v1-2), plugins grouped as core, slots with fixed benchmark presets, add-ons and preferences (v1-3), the
-weekly upgrade of one slot or a scout for add-ons (v1-4), and charter and new-question proposals (v1-5), all done;
-later: full text, the engineer agent, fine-tuning and MCP (EVOLUTION.md §6). Not
-everything can change: the core (including the harness that measures everything) never does; see EVOLUTION.md §0.1.
+**Not done yet** (see [EVOLUTION.md](EVOLUTION.md) §6, "then"): a code and security review (above all of the
+engineer, which runs model-written code in a sandbox, and of MCP), weeks of real use so the self-improving loops get
+real data, a live Kaggle fine-tuning run, a newcomer's install guide and published images. The history of how it was
+built, version by version, is in [PLAN.md](PLAN.md) §17 and EVOLUTION.md §6.
+
+## Architecture
+
+A small **kernel** (plugin discovery, the per-project plugin state with history and undo, the durable agent runtime,
+the database, HTTP, permissions and budgets) runs **plugins** for everything else: paper sources, the embedder, the
+converter, the decision engine, the charter, sweep, feedback, the research desk, the knowledge base and its viewers,
+the harness, the weekly upgrade, the knowledge review, the engineer, MCP, and the UI tabs. Each plugin has an
+`rh-plugin.json` manifest, activates only when needed and declares what it may reach; external plugins run in Node
+permission processes. Every plugin is one of four kinds: **core** (never changes, including the harness that measures
+everything), **slots** (one active, replaced only when a fixed benchmark says so), **add-ons** (on or off, judged by
+what they bring) and **preferences** (EVOLUTION.md §0.1).
+
+Three images, each the previous plus an add-on: `research-hub:latest` (the core, no Python), `research-hub:obsidian`
+(plus the Obsidian viewer) and `research-hub:full` (plus Docling and the local embedder); see
+[Projects with Docker](#projects-with-docker).
 
 ## Quick start (offline, no keys)
 
@@ -337,15 +341,14 @@ Every feature is a plugin; the **Plugins** tab lists them with their state (acti
 blocked, incompatible), what each adds (tabs, chat tools, commands, Jev commands, agents, processes, extension
 points), what it may reach (hosts, files, secrets, a daily budget), its settings and its history.
 
-| Plugin | What it does | Can you turn it off? |
+32 built-in plugins, grouped the way the Plugins tab groups them:
+
+| Kind | Plugins | Can you change it? |
 |---|---|---|
-| `rh.provider-openrouter`, `rh.decision-jev` | Models for every agent; Jev decisions | no (the hub needs them) |
-| `rh.papers`, `rh.embedder-openrouter` | Search, storage, enrichment, representations; the embedder | no |
-| `rh.source-arxiv`, `-openalex`, `-europepmc`, `-semanticscholar` | Paper sources (OpenAlex also enriches) | yes: the next search skips it |
-| `rh.charter`, `rh.schedule`, `rh.sweep`, `rh.feedback`, `rh.desk` | Charter, schedule, sweep and cards, judgments, the research desk | no |
-| `rh.kb` | The vault, its index, the librarian, the Library and Knowledge base tabs | no |
-| `rh.viewer-obsidian`, `rh.viewer-library` | What the Knowledge base tab shows (Obsidian, or the Library view) | yes |
-| `rh.runs-ui`, `rh.settings-ui`, `rh.plugins-ui` | The Runs, Settings and Plugins tabs | Runs only |
+| **Core** | `rh.papers` (search, storage, representations), `rh.charter`, `rh.schedule`, `rh.sweep` (sweeps and cards), `rh.feedback`, `rh.decision-jev`, `rh.desk` (the research desk), `rh.kb` (vault, index, librarian, Library and Knowledge base tabs), `rh.fulltext`, `rh.digest` (daily cycle and digest), `rh.harness`, `rh.upgrades` (weekly upgrade), `rh.knowledge` (knowledge review), `rh.engineer`, `rh.settings-ui`, `rh.plugins-ui` | no |
+| **Slots** (one active) | Models: `rh.provider-openrouter` · Embedder: `rh.embedder-openrouter`, `rh.embedder-local` (fine-tuned models; full image) · Converter: `rh.converter-pdf`, `rh.converter-docling` (full image) | swap when the slot's benchmark says so (the weekly upgrade proposes it) |
+| **Add-ons** | Sources: `rh.source-arxiv`, `-openalex`, `-europepmc`, `-semanticscholar` (and sources the engineer builds, `eng.*`) · Question finders: `rh.finder-method-transfer`, `-missing-links`, `-rising-topics` · `rh.mcp` · `rh.runs-ui` | on or off |
+| **Preferences** | `rh.viewer-obsidian`, `rh.viewer-library` (what the Knowledge base tab shows) | pick one |
 
 - **Enable, disable, configure:** changes apply at once, without a restart; disabling a plugin others need first
   lists them and asks. Plugin settings appear under Settings (defaults come from the environment, so `.env` keeps
@@ -365,13 +368,16 @@ points), what it may reach (hosts, files, secrets, a daily budget), its settings
 Every plugin is one of four kinds, and the Plugins tab groups them that way, by topic:
 
 - **Core** (collapsed, cannot be changed): the kernel, the agent runtime, the database, the daily cycle, your
-  judgments, the charter, the vault, and the harness that measures everything.
+  judgments, the charter, the vault, full text, the weekly upgrade, the knowledge review, the engineer, and the harness
+  that measures everything.
 - **Slots** (one active each, replaced only when a benchmark says so): Ranking and gating (preset: replays on your
   judgments), Embedder (SCIDOCS, LitSearch and "your stars"; nDCG@10), Facet labeler (PubMed 20k RCT; macro-F1),
-  Judge (agreement with you); Knowledge-base search and Models per job get presets later. Each slot card shows the
-  active implementation, its alternatives and the last result; "Run benchmark" runs the preset.
-- **Add-ons** (turn on or off): paper sources, enrichers, integrations, extra tabs. They are judged by what they
-  bring: each source shows the cards it found in the last 30 days and how many you liked (also in the digest).
+  Converter (10 arXiv papers, the PDF against its HTML; word F1 and heading recall), Judge (agreement with you);
+  Knowledge-base search and Models per job have no preset yet. Each slot card shows the active implementation, its
+  alternatives and the last result; "Run benchmark" runs the preset.
+- **Add-ons** (turn on or off): paper sources, question finders, integrations (MCP), extra tabs. They are judged by
+  what they bring: each source shows the cards it found in the last 30 days and how many you liked (also in the
+  digest); each question finder, the proposals it led to and how its approved questions did.
 - **Preferences**: the knowledge-base viewer.
 
 Public benchmarks run on small fixed samples (100 queries or abstracts, seed 7), downloaded once per project from
@@ -442,8 +448,9 @@ Every research theme is its own container with its own data folder, port and nam
 ./new-project.sh proteins          # creates projects/proteins/ (compose file + .env), port 4850, sweep 06:00
 ./new-project.sh genomics          # projects/genomics/, port 4860, sweep 06:20
 ./new-project.sh notes --obsidian  # with the Obsidian viewer (the add-on image)
+./new-project.sh pdfs --full       # Obsidian, Docling for PDFs and the local embedder (several GB)
 cd projects/proteins
-#   put this project's OpenRouter key in .env
+#   put this project's OpenRouter key in .env (Kaggle keys are optional: the engineer's fine-tuning)
 docker compose up -d               # open http://proteins.localhost:4850
 ```
 
@@ -542,17 +549,20 @@ npm run test:ui        # Playwright UI tests and light/dark screenshots, offline
 scripts/e2e-offline.sh # the whole flow through the UI proxy (plugins and the cycle included), about a minute
                        #   E2E_BUNDLE=1: on the bundled server · E2E_IMAGE=research-hub:latest: inside a container
 npm run pack -w rh-server  # bundle the server into apps/rh-server/dist (what the image runs)
+docker build -t research-hub .                    # the light image (also: --target obsidian, --target full)
 npm run lint           # vp lint;  npm run fmt: vp fmt
 ```
 
 The toolchain is **Vite+** (`vp`: Vite, Vitest, Oxlint, Oxfmt) with one root `vite.config.ts`, on Node 26 LTS and
 TypeScript 6.0; the UI is Vue 3.5 with Vue Router 5 and Pinia 4; the agent runtime is pi-durable 1.4.0.
 
-Changing a Jev command's questions or policy requires bumping its `version` and running `npm run lock:jev`.
+Changing a Jev command's questions or policy requires bumping its `version` and running `npm run lock:jev` (for the
+hub's commands in `prompt_engineering/jev`); a plugin's own commands (`plugins/<id>/jev`) are locked with `writeLock`
+from `packages/jev` and checked by `npm run check:jev`.
 
 Layout: `packages/durable-agent` and `packages/jev` are vendored from
 [pi-durable-news-agent](https://github.com/disler/pi-durable-news-agent) (see `NOTICE.md`); `packages/rh-sdk` holds
 wire types, the stream reducer and a client; `apps/rh-server` is the server (the kernel in `src/kernel/`, the built-in plugins in `plugins/`);
 `apps/rh-client-browser` the UI;
-`new-project.sh` and `deploy/` set up project containers. Specs and planned changes live in `openspec/`
-(OpenSpec), the overall plan in `PLAN.md`.
+`new-project.sh` and `deploy/` set up project containers. The specs and every archived change (v0-0 to v1-9) live in
+`openspec/` (OpenSpec); the original plan is `PLAN.md`, the direction since v1 and the decisions are in `EVOLUTION.md`.

@@ -14,8 +14,9 @@
 > Field focus: **AI + bioinformatics (neural networks)**. Runs on your own machine or server, **one Docker
 > container per project**, everything (including the Obsidian knowledge-base viewer) inside it.
 
-Last updated: 2026-10-25 (v0 complete; v1 = plugins like VS Code, the knowledge loop and the Upgrades tab, see
-EVOLUTION.md; trust, relations and curriculum move to v2)
+Last updated: 2026-10-29 (v0 and v1 complete, v1-0 to v1-9; next: review, real use, shipping). This is the original
+design document; where the built system differs, *As built* notes say so, and README.md describes the hub as it is.
+The direction since v1 and every decision are in EVOLUTION.md; trust, relations and curriculum are v2.
 
 ---
 
@@ -512,7 +513,7 @@ bundled Obsidian viewer). Built in v1: `/v1/plugins…` (v1-0), `/v1/cycle`, `/v
 | Screen | Content | Status |
 |---|---|---|
 | **Top bar / overview** | Project name, status, charter version, next sweep, monthly cost, pause; later level, pending proposals and upgrades | v0 |
-| **Brief / Charter** | Brief (paste or upload), charter draft with scoping questions, versions, approve; later the review's charter proposals and research directions | v0; review v1-3 |
+| **Brief / Charter** | Brief (paste or upload), charter draft with scoping questions, versions, approve; the knowledge review's charter proposals and new questions | v0; proposals v1-5 |
 | **Feed** (left) + **Agent** (right) | Cards with scores and reasons, 👎/👍/⭐ + reason box, precision trend; agent chat with live tool calls | v0 |
 | **Library** | Knowledge-base papers, keyword search, rendered notes, "Open in knowledge base" | v0 |
 | **Knowledge base** | The real Obsidian interface (Ignis), hub-themed, opening on the **graph view** (papers, concepts, questions in three colors), Graph/Index buttons | v0 (graph 2026-10-25) |
@@ -621,8 +622,8 @@ bioRxiv XML or PDFs through the Converter slot: pdf.js in the light image, Docli
 it is judged: EVOLUTION.md §0.1.
 
 v0 was built bottom-up; each layer is one OpenSpec change that depends only on the layers below it and
-is applied, tested and archived before the next starts. All six v0 changes exist in `openspec/changes/`
-with proposals and behavior specs; design and tasks are written for each layer when it is next.
+is applied, tested and archived before the next starts. Every change, v0-0 to v1-9, is archived in
+`openspec/changes/archive/` with its proposal, design, specs and tasks; the merged specs are in `openspec/specs/`.
 
 ```
                          ┌──────────────────────────┐
@@ -689,6 +690,8 @@ replaces the phase list below):
 - [x] One project per container, owner lock, `new-project.sh`
 - [x] Ignis trial (2026-10-23, from source): passed with a same-origin `/kb/` proxy and a loopback preload (see v0.5 proposal)
 - [ ] Contact email for OpenAlex and Europe PMC polite pools (`CONTACT_EMAIL`); optional Semantic Scholar API key
+- [ ] Optional: a Kaggle account and `KAGGLE_API_TOKEN` for the engineer's free fine-tuning (only tested against a fake
+  Kaggle API so far); `RH_MCP_TOKEN` in existing projects' `.env` to turn MCP on
 - [x] Python (decided 2026-10-28): not in the core image; Docling in the add-on image `research-hub:full` as the Converter slot's alternative
 - [x] Where fine-tuning runs (decided 2026-10-28): Kaggle Notebooks, free, through Kaggle's API (needs a free Kaggle account and API key)
 - [x] Autonomy policy (decided 2026-10-26, built in v1-4): setting winners on the finding loop apply with undo; new plugins (another embedder), charter changes and cost increases wait for approval

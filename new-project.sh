@@ -1,28 +1,31 @@
 #!/usr/bin/env bash
 # Create a new Research Hub project: one research theme = one container, set up so it never interferes with the
 # others on this machine. Usage:
-#   ./new-project.sh <name> [--base DIR] [--obsidian]
+#   ./new-project.sh <name> [--base DIR] [--obsidian | --full]
 # Creates DIR/<name>/ (default DIR: ./projects) with docker-compose.yml and .env: compose name rh-<name>, the next
 # free port from 4850 in steps of 10, a sweep time 20 minutes after the latest existing project, fresh tokens.
 # The project uses the light image (the Library shows the knowledge base); --obsidian uses the add-on image with
-# the Obsidian viewer.
+# the Obsidian viewer; --full the image with Obsidian, Docling (PDF conversion) and the local embedder (several GB,
+# 6 GB of memory).
 set -euo pipefail
 
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 base="$repo/projects"
 name=""
 obsidian=0
+full=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --base) base="$2"; shift 2 ;;
     --obsidian) obsidian=1; shift ;;
-    -h|--help) sed -n '2,8p' "$0"; exit 0 ;;
+    --full) full=1; obsidian=1; shift ;;
+    -h|--help) sed -n '2,9p' "$0"; exit 0 ;;
     *) if [[ -z "$name" ]]; then name="$1"; shift; else echo "unexpected argument: $1" >&2; exit 2; fi ;;
   esac
 done
 
 if [[ ! "$name" =~ ^[a-z0-9]([a-z0-9-]{0,38}[a-z0-9])?$ ]]; then
-  echo "usage: $0 <name> [--base DIR] [--obsidian]   (name: 1-40 lowercase letters, digits or dashes)" >&2
+  echo "usage: $0 <name> [--base DIR] [--obsidian | --full]   (name: 1-40 lowercase letters, digits or dashes)" >&2
   exit 2
 fi
 dir="$base/$name"
@@ -66,7 +69,9 @@ fi
 token() { head -c 24 /dev/urandom | od -An -tx1 | tr -d ' \n'; }
 
 mkdir -p "$dir/data"
-if (( obsidian )); then image=obsidian target=obsidian viewer=on; else image=latest target=lite viewer=off; fi
+if (( full )); then image=full target=full viewer=on
+elif (( obsidian )); then image=obsidian target=obsidian viewer=on
+else image=latest target=lite viewer=off; fi
 sed -e "s|__NAME__|$name|g" -e "s|__REPO__|$repo|g" -e "s|__IMAGE__|$image|g" -e "s|__TARGET__|$target|g" \
   "$repo/deploy/project-compose.yml" > "$dir/docker-compose.yml"
 set_var() {  # set_var KEY VALUE FILE: replace the KEY= line, or append it
@@ -81,18 +86,21 @@ set_var RH_API_TOKEN "$(token)" "$dir/.env"
 set_var RH_CLIENT_TOKEN "$(token)" "$dir/.env"
 set_var RH_MCP_TOKEN "$(token)" "$dir/.env"
 set_var RH_KB_VIEWER "$viewer" "$dir/.env"
+(( full )) && set_var RH_MEM_LIMIT 6g "$dir/.env"
 
 cat <<MSG
 Created project "$name" in $dir
   compose project  rh-$name
   port             $port
   daily sweep      $sweep
-  image            research-hub:$image$( (( obsidian )) && echo " (with the Obsidian viewer)" || echo " (light; the Library shows the knowledge base)")
+  image            research-hub:$image$( (( full )) && echo " (Obsidian, Docling and the local embedder)" || { (( obsidian )) && echo " (with the Obsidian viewer)" || echo " (light; the Library shows the knowledge base)"; })
   data             $dir/data
 
 Next:
   1. Put this project's OpenRouter key in $dir/.env (OPENROUTER_API_KEY=...);
      one key per project with a credit limit keeps budgets apart.
-  2. cd $dir && docker compose up -d
-  3. Open http://$name.localhost:$port
+  2. Optional: KAGGLE_USERNAME and KAGGLE_API_TOKEN for the engineer's free fine-tuning; RH_MCP_TOKEN (set) lets
+     outside agents connect over MCP.
+  3. cd $dir && docker compose up -d
+  4. Open http://$name.localhost:$port
 MSG

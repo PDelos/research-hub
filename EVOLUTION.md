@@ -5,6 +5,11 @@
 > (embedders, extractors, prompts, rankers) through replays on the user's own judgments. Agents do the work; the
 > human reads, judges and gives opinions. Companion to `PLAN.md` (the v0 system as built) — this file plans everything after v0.
 
+**Status (2026-10-29): every step of §6 is built (v1-0 to v1-9); next are review, real use and shipping.** Sections
+marked *as built* describe what exists; §1 and §3 keep the earlier design for the record, with notes where the built
+system differs (fixed slots and presets, the weekly upgrade and the engineer replaced the four-gate Upgrades
+workflow).
+
 Written 2026-10-25, after v0 was completed. Revised the same day: product upgrades run through an **Upgrades tab** where the human decides at every
 gate (idea → test → proof → implement), and **the whole hub is plug-and-play**, not only the pipeline. **Revised
 2026-10-26 after v1-0 (§0):** the goal is a self-running daily cycle with the human *on* the loop; winning fixes to
@@ -113,6 +118,12 @@ its numbers; the Upgrades tab and the digest's Upgrade section show it.
 The knowledge loop ends in **proposals with evidence** that you approve in one click. The product loop is the
 **Upgrades tab**: a staged workflow where the agent does the work and **you decide at every gate** (which ideas to
 test, and whether the proof justifies the upgrade). Everything is reversible with one click.
+
+**As built (2026-10-29):** the knowledge loop is the knowledge review (§4) with pluggable question finders. The product
+loop became three simpler parts: winning fixes on the finding loop applied with undo (§0), the **weekly upgrade**
+(§0.2: one slot on its fixed preset, or scouting), and the **engineer** (§3.4c: ideas researched, built and tested on
+your Build, enabled on your Enable). The Upgrades tab shows all three; the "verify after 7 days" stage was not built
+(the harness and the digest show quality over time instead).
 
 ---
 
@@ -270,6 +281,10 @@ behind an MCP server).
 
 ## 3. The product loop: the Upgrades tab
 
+> **Superseded in part (2026-10-26 to 10-29):** what may change is fixed by §0.1, the weekly upgrade (§0.2) replaced
+> the scout-and-test workflow of 3.1–3.3, and the engineer (3.4c) builds new plugins. 3.1–3.3, 3.6 and 3.7 are the
+> earlier design; 3.4b, 3.4c and 3.5 describe what was built.
+
 > **Later (2026-10-26):** the Upgrades tab is for changes found *outside* the project (new models, methods, tools on
 > the internet) and keeps its gates. Fixes the system finds in its own daily cycle (§0) do not wait for it: they are
 > replayed on your judgments and applied with undo. The harness of 3.5 is built first, in `v1-2-harness`.
@@ -339,6 +354,15 @@ Like the research charter, a page you own, describing what "better" means for th
 and per test, allowed providers and licenses, what may leave the machine, RAM and GPU), and topics the scout should
 watch or ignore. The scout and the test agent read it; you edit it.
 
+### 3.4b Full text (as built in v1-6, 2026-10-28)
+
+The core plugin `rh.fulltext` gets a paper's full text from arXiv HTML, Europe PMC JATS, bioRxiv/medRxiv JATS, or the
+PDF through the Converter slot (extension point `fulltext.converter`). The light image's converter is pdf.js text
+with heading detection (live: 0.779 on the preset); Docling Serve is the alternative in `research-hub:full` (or at
+`RH_DOCLING_URL`; live: 0.817, through its async API since long papers take minutes on CPU). The full image is 2.3 GB
+to download (7.3 GB unpacked), which is why Docling is not in the core image. The preset `converter-arxiv` scores word F1 and heading recall against the HTML of 10 fixed arXiv
+papers. Notes and facet vectors use the sections; the weekly upgrade has a converter focus.
+
 ### 3.4c The engineer (as built in v1-8, 2026-10-29)
 
 The core plugin `rh.engineer` turns ideas (scout suggestions via "Ask the engineer", the user's text) into plugins in
@@ -350,15 +374,6 @@ ListKernelSessionOutput with `KAGGLE_API_TOKEN`; the model runs in the new Embed
 a sentence-transformers server in `research-hub:full`; proposed only if it wins the embedder preset by 0.02).
 `rh.papers` follows a change of embedder plugin live. Live: a free model wrote a Crossref source that passed its test
 against the real API on the first attempt.
-
-### 3.4b Full text (as built in v1-6, 2026-10-28)
-
-The core plugin `rh.fulltext` gets a paper's full text from arXiv HTML, Europe PMC JATS, bioRxiv/medRxiv JATS, or the
-PDF through the Converter slot (extension point `fulltext.converter`). The light image's converter is pdf.js text
-with heading detection (live: 0.779 on the preset); Docling Serve is the alternative in `research-hub:full` (or at
-`RH_DOCLING_URL`; live: 0.817, through its async API since long papers take minutes on CPU). The full image is 2.3 GB
-to download (7.3 GB unpacked), which is why Docling is not in the core image. The preset `converter-arxiv` scores word F1 and heading recall against the HTML of 10 fixed arXiv
-papers. Notes and facet vectors use the sections; the weekly upgrade has a converter focus.
 
 ### 3.5 Benchmarks (the harness)
 
@@ -415,6 +430,9 @@ changes.
 ---
 
 ## 5. The research project as the first real test
+
+> **Status (2026-10-29):** the hub has the pieces (the Converter slot with Docling, full text, MCP); the research
+> benchmarks (OfficeQA, UNIDOC-BENCH, SpanishGovernmentMultimodalQA) are not harness datasets yet.
 
 The current project (agents searching multimodal document collections) is the same problem the hub faces when it
 reads ⭐ papers: charts, tables and scanned pages lost in text conversion. So the hub doubles as a testbed:

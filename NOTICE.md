@@ -11,6 +11,19 @@ Research Hub vendors code from **pi-durable-news-agent** by IndyDevDan:
 
 Local changes are tracked in this repository's history. The original license follows.
 
+## Other software in the images (not vendored)
+
+The add-on images include programs that run unmodified as separate processes:
+
+- `research-hub:obsidian` and `research-hub:full`: **Ignis** 0.8.18 (AGPL-3.0), https://github.com/Nystik-gh/ignis.
+  On first start the hub downloads the pinned **Obsidian** package from Obsidian's official release; it is not
+  redistributed here.
+- `research-hub:full`: **Docling** and **Docling Serve** (MIT), **sentence-transformers** (Apache-2.0) and **PyTorch**
+  (BSD-3-Clause), installed from PyPI, with Docling's models downloaded at build time.
+
+Fine-tuning runs on the user's own Kaggle account; the base model (`BAAI/bge-small-en-v1.5`, MIT) is downloaded
+there, not distributed with the hub. Benchmark samples keep their datasets' licenses (README, "What can change").
+
 ---
 
 MIT License
