@@ -215,21 +215,17 @@ export async function activate(context: PluginContext): Promise<HarnessExports> 
       relevant,
     };
   };
-  const record = (
-    slot: string,
-    preset: string,
-    candidate: Record<string, unknown>,
-    result: BenchmarkResult,
-    costUsd: number,
-  ): BenchmarkRecord => {
+  /** Store a benchmark run (the slot's preset is the slot's id). */
+  const record = (run: Omit<BenchmarkRecord, "id" | "createdAt" | "preset">): BenchmarkRecord => {
     const createdAt = new Date().toISOString();
-    const r = db
+    const { slot, candidate, result, costUsd } = run;
+    const inserted = db
       .prepare(
         `INSERT INTO ${benchmarksTable} (slot, preset, candidate_json, result_json, cost_usd, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
       )
-      .run(slot, preset, JSON.stringify(candidate), JSON.stringify(result), costUsd, createdAt);
+      .run(slot, slot, JSON.stringify(candidate), JSON.stringify(result), costUsd, createdAt);
     context.log.info("harness.benchmark", { slot, candidate, value: result.value, costUsd });
-    return { id: Number(r.lastInsertRowid), slot, preset, candidate, result, costUsd, createdAt };
+    return { id: Number(inserted.lastInsertRowid), slot, preset: slot, candidate, result, costUsd, createdAt };
   };
   const mean = (tasks: TaskResult[]) => {
     const v = tasks.map((t) => t.value).filter((x): x is number => x !== null);
@@ -252,6 +248,132 @@ export async function activate(context: PluginContext): Promise<HarnessExports> 
       if (c.id === source) return c.pluginId;
     return null;
   };
+  const benchmarkRanking = async (candidate: Record<string, unknown>) => {
+    const { report } = await exports.replay(candidate as Variant, "benchmark");
+    const task = {
+      task: "replay",
+      metric: "held-out nDCG difference",
+      value: report.heldOut.diff,
+      items: report.sweeps.labelled,
+    };
+    return record({
+      slot: "ranking",
+      candidate,
+      result: { tasks: [task], value: report.heldOut.diff, label: report.verdict },
+      costUsd: 0,
+    });
+  };
+
+  const benchmarkJudge = async () => {
+    const started = new Date().toISOString();
+    const calibration = await judge.calibrate();
+    const task = {
+      task: "your judged cards",
+      metric: "agreement",
+      value: calibration.agreement,
+      items: calibration.cases,
+    };
+    return record({
+      slot: "judge",
+      candidate: {},
+      result: { tasks: [task], value: calibration.agreement, label: calibration.trusted ? "trusted" : "not trusted" },
+      costUsd: costSince(started),
+    });
+  };
+
+  const benchmarkEmbedder = async (candidate: Record<string, unknown>) => {
+    const started = new Date().toISOString();
+    const { model, dims, local } = embedderCandidate(candidate);
+    const choice = host.services.contributions.activeContribution("papers.embedder", host.settingsOf("rh.papers"));
+    const provider = await host.exportsOf<EmbedderExports>(
+      local ? "rh.embedder-local" : (choice?.pluginId ?? "rh.embedder-openrouter"),
+    );
+    const embedder = provider.createEmbedder({
+      ledger: papers.embeddingLedger,
+      ...(model ? { model } : {}),
+      ...(dims ? { dims } : {}),
+    });
+    const embed = (texts: string[]) => embedder.embed(texts);
+    const tasks = [
+      await sampleTask("scidocs", embed),
+      await sampleTask("litsearch", embed),
+      await retrievalTask("your-stars", yourStars(), embed),
+    ];
+    const value = mean(tasks);
+    return record({
+      slot: "embedder",
+      // The model asked for (offline, the fake embedder stands in for it).
+      candidate: {
+        model: candidateModel(model, local) ?? embedder.model,
+        dims: embedder.dims,
+        ...(model ? { candidate: true } : {}),
+        ...(local ? { provider: "local" } : {}),
+      },
+      result: { tasks, value, label: value === null ? "no result" : `nDCG@10 ${value.toFixed(3)}` },
+      costUsd: costSince(started),
+    });
+  };
+
+  const benchmarkConverter = async (candidate: Record<string, unknown>) => {
+    const converter = candidate.converter;
+    if (converter !== undefined && (typeof converter !== "string" || !/^[a-z0-9-]+$/.test(converter)))
+      throw new BenchmarkInvalid("converter must be a converter id like pdf-text or docling");
+    const fulltext = await host.exportsOf<FullTextExports>("rh.fulltext");
+    const views = await fulltext.converters();
+    const chosen = typeof converter === "string" ? views.find((v) => v.id === converter) : views.find((v) => v.active);
+    if (!chosen) throw new BenchmarkInvalid(`no converter ${String(converter)}`);
+    if (!chosen.available) throw new BenchmarkInvalid(`${chosen.title} is not available here: ${chosen.reason ?? ""}`);
+    const { perPaper, ...task } = await converterTask(await loadConverterSample(datasetIo), (pdf) =>
+      fulltext.convert(pdf, chosen.id),
+    );
+    const scores = perPaper.map(
+      (paper) => `${paper.id} F1 ${paper.f1.toFixed(2)} headings ${paper.headings.toFixed(2)}`,
+    );
+    const note = [task.note, scores.join("; ")].filter(Boolean).join(" | ").slice(0, 2_000);
+    return record({
+      slot: "converter",
+      candidate: { converter: chosen.id, ...(converter ? { candidate: !chosen.active } : {}) },
+      result: {
+        tasks: [{ ...task, note }],
+        value: task.value,
+        label: task.value === null ? "no result" : `score ${task.value.toFixed(3)}`,
+      },
+      costUsd: 0,
+    });
+  };
+
+  const benchmarkFacets = async () => {
+    const started = new Date().toISOString();
+    let task: TaskResult;
+    try {
+      task = await facetsTask((await loadSample("pubmed-rct", datasetIo)).sample, (title, sentences) =>
+        papers.facets.labelSentences(title, sentences),
+      );
+    } catch (error) {
+      const note = error instanceof Error ? error.message : String(error);
+      task = { task: "pubmed-rct", metric: "macro-F1", value: null, items: 0, note };
+    }
+    return record({
+      slot: "facets",
+      candidate: { labeler: "Jev abstract-facets" },
+      result: {
+        tasks: [task],
+        value: task.value,
+        label: task.value === null ? "no result" : `macro-F1 ${task.value.toFixed(3)}`,
+      },
+      costUsd: costSince(started),
+    });
+  };
+
+  /** Each slot's preset (slots without one are not listed). */
+  const benchmarkOf: Record<string, (candidate: Record<string, unknown>) => Promise<BenchmarkRecord>> = {
+    ranking: benchmarkRanking,
+    judge: benchmarkJudge,
+    embedder: benchmarkEmbedder,
+    converter: benchmarkConverter,
+    facets: benchmarkFacets,
+  };
+
   const exports: HarnessExports = {
     attribution(
       from = new Date(Date.now() - 30 * 86_400_000).toISOString(),
@@ -263,147 +385,9 @@ export async function activate(context: PluginContext): Promise<HarnessExports> 
     async runBenchmark(slotId, candidate = {}) {
       const slot = SLOTS.find((s) => s.id === slotId);
       if (!slot) throw new BenchmarkInvalid(`No slot ${slotId}`);
-      if (!slot.preset) throw new BenchmarkInvalid(`The ${slot.title} slot has no benchmark preset yet`);
-      const started = new Date().toISOString();
-      if (slotId === "ranking") {
-        const r = await exports.replay(candidate as Variant, "benchmark");
-        return record(
-          "ranking",
-          "ranking",
-          candidate,
-          {
-            tasks: [
-              {
-                task: "replay",
-                metric: "held-out nDCG difference",
-                value: r.report.heldOut.diff,
-                items: r.report.sweeps.labelled,
-              },
-            ],
-            value: r.report.heldOut.diff,
-            label: r.report.verdict,
-          },
-          0,
-        );
-      }
-      if (slotId === "judge") {
-        const c = await judge.calibrate();
-        return record(
-          "judge",
-          "judge",
-          {},
-          {
-            tasks: [{ task: "your judged cards", metric: "agreement", value: c.agreement, items: c.cases }],
-            value: c.agreement,
-            label: c.trusted ? "trusted" : "not trusted",
-          },
-          costSince(started),
-        );
-      }
-      if (slotId === "embedder") {
-        const model = candidate.model;
-        const dims = candidate.dims;
-        const local = candidate.provider === "local";
-        if (local && (typeof model !== "string" || !model))
-          throw new BenchmarkInvalid("a local candidate needs model (a folder inside the data folder)");
-        if (!local && model !== undefined && (typeof model !== "string" || !/^[a-z0-9-]+\/[\w.:-]+$/i.test(model)))
-          throw new BenchmarkInvalid("model must be an OpenRouter model id like google/gemini-embedding-2");
-        if (dims !== undefined && (!Number.isInteger(dims) || (dims as number) < 32 || (dims as number) > 4096))
-          throw new BenchmarkInvalid("dims must be a whole number from 32 to 4096");
-        const choice = host.services.contributions.activeContribution("papers.embedder", host.settingsOf("rh.papers"));
-        const provider = await host.exportsOf<EmbedderExports>(
-          local ? "rh.embedder-local" : (choice?.pluginId ?? "rh.embedder-openrouter"),
-        );
-        const embedder = provider.createEmbedder({
-          ledger: papers.embeddingLedger,
-          ...(typeof model === "string" ? { model } : {}),
-          ...(typeof dims === "number" ? { dims } : {}),
-        });
-        const embed = (t: string[]) => embedder.embed(t);
-        const tasks = [
-          await sampleTask("scidocs", embed),
-          await sampleTask("litsearch", embed),
-          await retrievalTask("your-stars", yourStars(), embed),
-        ];
-        const value = mean(tasks);
-        return record(
-          "embedder",
-          "embedder",
-          // The model asked for (offline, the fake embedder stands in for it).
-          {
-            model: candidateModel(model, local) ?? embedder.model,
-            dims: embedder.dims,
-            ...(model ? { candidate: true } : {}),
-            ...(local ? { provider: "local" } : {}),
-          },
-          { tasks, value, label: value === null ? "no result" : `nDCG@10 ${value.toFixed(3)}` },
-          costSince(started),
-        );
-      }
-      if (slotId === "converter") {
-        const converter = candidate.converter;
-        if (converter !== undefined && (typeof converter !== "string" || !/^[a-z0-9-]+$/.test(converter)))
-          throw new BenchmarkInvalid("converter must be a converter id like pdf-text or docling");
-        const fulltext = await host.exportsOf<FullTextExports>("rh.fulltext");
-        const views = await fulltext.converters();
-        const chosen =
-          typeof converter === "string" ? views.find((v) => v.id === converter) : views.find((v) => v.active);
-        if (!chosen) throw new BenchmarkInvalid(`no converter ${String(converter)}`);
-        if (!chosen.available)
-          throw new BenchmarkInvalid(`${chosen.title} is not available here: ${chosen.reason ?? ""}`);
-        const task = await converterTask(await loadConverterSample(datasetIo), (pdf) =>
-          fulltext.convert(pdf, chosen.id),
-        );
-        const { perPaper, ...result } = task;
-        return record(
-          "converter",
-          "converter",
-          { converter: chosen.id, ...(converter ? { candidate: !chosen.active } : {}) },
-          {
-            tasks: [
-              {
-                ...result,
-                note: [
-                  result.note,
-                  perPaper.map((p) => `${p.id} F1 ${p.f1.toFixed(2)} headings ${p.headings.toFixed(2)}`).join("; "),
-                ]
-                  .filter(Boolean)
-                  .join(" | ")
-                  .slice(0, 2_000),
-              },
-            ],
-            value: task.value,
-            label: task.value === null ? "no result" : `score ${task.value.toFixed(3)}`,
-          },
-          0,
-        );
-      }
-      // facets
-      let task: TaskResult;
-      try {
-        task = await facetsTask((await loadSample("pubmed-rct", datasetIo)).sample, (title, sentences) =>
-          papers.facets.labelSentences(title, sentences),
-        );
-      } catch (error) {
-        task = {
-          task: "pubmed-rct",
-          metric: "macro-F1",
-          value: null,
-          items: 0,
-          note: error instanceof Error ? error.message : String(error),
-        };
-      }
-      return record(
-        "facets",
-        "facets",
-        { labeler: "Jev abstract-facets" },
-        {
-          tasks: [task],
-          value: task.value,
-          label: task.value === null ? "no result" : `macro-F1 ${task.value.toFixed(3)}`,
-        },
-        costSince(started),
-      );
+      const benchmark = benchmarkOf[slotId];
+      if (!slot.preset || !benchmark) throw new BenchmarkInvalid(`The ${slot.title} slot has no benchmark preset yet`);
+      return benchmark(candidate);
     },
     slots() {
       const { options } = host;
@@ -567,6 +551,19 @@ export async function activate(context: PluginContext): Promise<HarnessExports> 
     },
   });
   return { ...exports, agentExtensions: [defineExtension({ name: "harness-tools", tools: [tool] })] };
+}
+
+/** An embedder candidate checked: an OpenRouter model id, or a local model folder, and a vector size. */
+function embedderCandidate(candidate: Record<string, unknown>): { model?: string; dims?: number; local: boolean } {
+  const { model, dims } = candidate;
+  const local = candidate.provider === "local";
+  if (local && (typeof model !== "string" || !model))
+    throw new BenchmarkInvalid("a local candidate needs model (a folder inside the data folder)");
+  if (!local && model !== undefined && (typeof model !== "string" || !/^[a-z0-9-]+\/[\w.:-]+$/i.test(model)))
+    throw new BenchmarkInvalid("model must be an OpenRouter model id like google/gemini-embedding-2");
+  if (dims !== undefined && (!Number.isInteger(dims) || (dims as number) < 32 || (dims as number) > 4096))
+    throw new BenchmarkInvalid("dims must be a whole number from 32 to 4096");
+  return { ...(typeof model === "string" ? { model } : {}), ...(typeof dims === "number" ? { dims } : {}), local };
 }
 
 /** The model a benchmark record names: the candidate asked for (local models prefixed), else the active one. */
