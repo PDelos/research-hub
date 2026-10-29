@@ -2,7 +2,7 @@
 // per work, then enriched from OpenAlex (cached 7 days; works not yet in OpenAlex stay pending and are retried on a
 // later search). Spec paper-sources.
 import type { Logger } from "../logger.ts";
-import { PoliteHttp, SourceError } from "./http.ts";
+import { PoliteHttp } from "./http.ts";
 import { ArxivSource } from "./sources/arxiv.ts";
 import { EuropePmcSource } from "./sources/europepmc.ts";
 import { OpenAlexSource } from "./sources/openalex.ts";
