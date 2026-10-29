@@ -56,3 +56,11 @@ is available, proposing a switch that beats the active converter by 0.02.
 #### Scenario: Docling available
 - **WHEN** the weekly upgrade focuses on the converter in the full image and Docling scores 0.81 against 0.62
 - **THEN** switching to Docling is proposed with both numbers
+
+### Requirement: Local embedder alternative
+The Embedder slot SHALL have a local alternative that runs a model from the data folder (in the full image or at a
+configured URL), and switching the active embedder plugin SHALL apply without a restart.
+
+#### Scenario: Switch to the local embedder
+- **WHEN** a proposal to use the fine-tuned local model is approved
+- **THEN** the papers are re-embedded with it in the background and similarity search keeps working
