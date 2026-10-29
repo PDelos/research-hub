@@ -1,0 +1,18 @@
+{
+  "id": "rh.mcp",
+  "version": "1.0.0",
+  "displayName": "MCP server",
+  "kind": "addon",
+  "topic": "integrations",
+  "description": "Lets outside agents (Claude, IDEs) search this project's knowledge base and papers, read notes, full texts, cards and the charter over MCP at /mcp, read-only, with RH_MCP_TOKEN.",
+  "engines": { "research-hub": "^1.0.0" },
+  "main": "main.ts",
+  "activationEvents": ["onStartup"],
+  "dependencies": {
+    "rh.kb": "^1.0.0",
+    "rh.papers": "^1.0.0",
+    "rh.charter": "^1.0.0",
+    "rh.fulltext": "^1.0.0"
+  },
+  "permissions": {}
+}

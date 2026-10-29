@@ -17,6 +17,7 @@ import { upgradeRoutes } from "./routes-upgrades.ts";
 import { knowledgeRoutes } from "./routes-knowledge.ts";
 import { fullTextRoutes } from "./routes-fulltext.ts";
 import { engineerRoutes } from "./routes-engineer.ts";
+import { mcpRoutes } from "./routes-mcp.ts";
 import { StreamHub } from "./sse.ts";
 
 export function createHttpApp(hub: Hub) {
@@ -41,6 +42,7 @@ export function createHttpApp(hub: Hub) {
   http.use(knowledgeRoutes(hub));
   http.use(fullTextRoutes(hub));
   http.use(engineerRoutes(hub));
+  http.use(mcpRoutes(hub));
   const indexFile = join(config.uiDir, "index.html");
   if (existsSync(indexFile)) {
     // The page title names the project, so several project tabs are easy to tell apart.

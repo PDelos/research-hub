@@ -21,7 +21,8 @@ context: |
     v1-0-plugin-core -> v1-1-lite-daily-cycle -> v1-2-harness -> v1-3-slots-and-benchmarks ->
     v1-4-weekly-upgrade -> v1-5-knowledge-loop (all done 2026-10-28) -> step 7, built completely before review,
     testing and shipping: v1-6-full-text -> v1-7-question-finders -> v1-8-engineer (researches, builds and tests plugins from
-    suggestions or the user's proposals; fine-tuning on free Kaggle GPUs is one of its tools) -> v1-9-mcp.
+    suggestions or the user's proposals; fine-tuning on free Kaggle GPUs is one of its tools) -> v1-9-mcp (all done
+    2026-10-29). Next: review cycles, testing, shipping to users.
     The core image holds only what the core needs (no Python); slot alternatives and preferences live in add-on
     images (research-hub:obsidian, research-hub:full with Docling). Apply and
     archive each before the next. A change must not add requirements to a capability owned by an earlier change except as

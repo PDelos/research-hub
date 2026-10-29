@@ -31,6 +31,8 @@ export interface Config {
   logLevel: LogLevel;
   /** Guards /v1 for external callers (curl, scripts). */
   apiToken: string;
+  /** The read-only MCP token (v1-9); without it /mcp is off. */
+  mcpToken?: string;
   /** Held server-side by the UI proxy; never sent to the browser. */
   clientToken: string;
   /** True when a token was generated for this process because none was configured. */
@@ -175,6 +177,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     dataDir: resolve(REPO_ROOT, env.RH_DATA_DIR?.trim() || "./data"),
     logLevel: level,
     apiToken: token("RH_API_TOKEN"),
+    ...(env.RH_MCP_TOKEN?.trim() ? { mcpToken: env.RH_MCP_TOKEN.trim() } : {}),
     clientToken: token("RH_CLIENT_TOKEN"),
     generatedTokens,
     models: jobModelsFromEnv(env),
@@ -191,7 +194,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
 
 /** Values that must never appear in logs or responses. */
 export function secretsOf(config: Config): string[] {
-  return [config.openrouterKey, config.apiToken, config.clientToken, config.papers.s2ApiKey].filter(
+  return [config.openrouterKey, config.apiToken, config.clientToken, config.mcpToken, config.papers.s2ApiKey].filter(
     (s): s is string => !!s && s.length >= 8,
   );
 }

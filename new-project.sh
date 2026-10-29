@@ -79,6 +79,7 @@ set_var RH_PUBLISH_PORT "$port" "$dir/.env"
 set_var RH_SWEEP_TIME "$sweep" "$dir/.env"
 set_var RH_API_TOKEN "$(token)" "$dir/.env"
 set_var RH_CLIENT_TOKEN "$(token)" "$dir/.env"
+set_var RH_MCP_TOKEN "$(token)" "$dir/.env"
 set_var RH_KB_VIEWER "$viewer" "$dir/.env"
 
 cat <<MSG

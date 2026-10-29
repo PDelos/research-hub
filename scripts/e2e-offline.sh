@@ -14,15 +14,16 @@ LOG="$DATA/server.log"
 if [ -n "${E2E_BUNDLE:-}" ]; then ENTRY=(apps/rh-server/dist/server.mjs); else ENTRY=(--import tsx apps/rh-server/src/main.ts); fi
 FIXTURES="$ROOT/apps/rh-server/tests/fixtures/plugins"
 CONTAINER="rh-e2e-$PORT"
+MCP="e2e-mcp-token-0123456789"
 start() {
   if [ -n "${E2E_IMAGE:-}" ]; then
     mkdir -p "$DATA/data" && chmod 777 "$DATA/data"
-    docker run -d --name "$CONTAINER" -e RH_MODE=offline -e RH_KB_VIEWER=off -e RH_ALLOWED_HOSTS="localhost:$PORT" \
+    docker run -d --name "$CONTAINER" -e RH_MODE=offline -e RH_KB_VIEWER=off -e RH_ALLOWED_HOSTS="localhost:$PORT" -e RH_MCP_TOKEN="$MCP" \
       -v "$DATA/data:/data" -v "$ROOT/apps/rh-server/tests/fixtures/plugins:/fixtures:ro" \
       -p "127.0.0.1:$PORT:4850" "$E2E_IMAGE" > /dev/null
     FIXTURES=/fixtures
   else
-    (cd "$ROOT" && RH_ENV_FILE=none RH_MODE=offline RH_DATA_DIR="$DATA/data" RH_PORT="$PORT" RH_KB_VIEWER=off \
+    (cd "$ROOT" && RH_ENV_FILE=none RH_MODE=offline RH_DATA_DIR="$DATA/data" RH_PORT="$PORT" RH_KB_VIEWER=off RH_MCP_TOKEN="$MCP" \
       exec node "${ENTRY[@]}" >> "$LOG" 2>&1) &
     PID=$!
   fi
@@ -113,6 +114,10 @@ curl -s -X POST "$U/upgrades/run" "${H[@]}" -d '{"focus":"ranking"}' > /dev/null
 for _ in $(seq 1 40); do r=$(curl -s "$U/upgrades" "${H[@]}" | j "d['runs'][0]['status'] if d['runs'] else 'none'"); [ "$r" = done ] || [ "$r" = failed ] && break; sleep 0.25; done
 expect "upgrade run (ranking)" "$(curl -s "$U/upgrades" "${H[@]}" | j "d['runs'][0]['report']['result'][:30]")" "Nothing changed: not enough da"
 expect "nothing applied" "$(curl -s "$U/upgrades" "${H[@]}" | j "len(d['proposals'])")" 0
+# MCP (v1-9): an outside agent lists the tools and searches the knowledge base with the MCP token.
+mcp() { curl -s "http://127.0.0.1:$PORT/mcp" -H "Authorization: Bearer $MCP" -H "content-type: application/json" -H "accept: application/json, text/event-stream" -d "$1" | sed -n 's/^data: //p'; }
+expect "MCP tools" "$(mcp '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' | j "len(d['result']['tools'])")" 6
+expect "MCP knowledge search" "$(mcp '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"search_knowledge","arguments":{"query":"protein"}}}' | j "len(json.loads(d['result']['content'][0]['text'])) > 0")" True
 expect "rolled back" "$(curl -s -X POST "$U/plugins/rollback" "${H[@]}" -d "{\"commit\":\"$INIT\"}" | j "[p['state'] for p in d['plugins'] if p['id'] == 'acme.sample'][0]")" disabled
 expect "viewer after rollback" "$(viewer)" library
 [ -n "${E2E_IMAGE:-}" ] && docker logs "$CONTAINER" >> "$LOG" 2>&1

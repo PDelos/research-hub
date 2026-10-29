@@ -5,7 +5,7 @@ durable agent (built on [pi-durable](https://github.com/earendil-works/pi)) that
 [Jev](https://openrouter.ai/docs/guides/community/jev) make the bulk decisions, present a few paper cards a day,
 learn from your 👎/👍/⭐ and grow an Obsidian-compatible knowledge base. A new theme is a new container.
 
-**Status: v1.8 (the engineer).** v0 built the durable agent, Jev client, live stream, browser UI and containers (v0.0),
+**Status: v1.9 (step 7 complete: full text, question finders, the engineer, MCP).** v0 built the durable agent, Jev client, live stream, browser UI and containers (v0.0),
 the brief, charter and schedule (v0.1), paper search with representations (v0.2), the daily sweep with paper cards
 (v0.3), learning from your judgments (v0.4) and the knowledge base with the real Obsidian interface (v0.5). v1.0 turns
 all of it into **plugins, like VS Code**: a small kernel and a plugin for every feature, which you can enable,
@@ -18,7 +18,8 @@ looks for new sources to add. v1.5 closes the [knowledge loop](#the-knowledge-lo
 proposes charter changes and new research questions from what you liked, disliked and wrote, for you to approve. v1.6
 adds full text (arXiv HTML, Europe PMC and bioRxiv XML, PDFs through a converter slot), v1.7 pluggable question finders
 with attribution, and v1.8 [the engineer](#the-engineer), which researches ideas and builds plugins: paper sources,
-and fine-tuned embedders trained free on Kaggle.
+and fine-tuned embedders trained free on Kaggle. v1.9 makes every project an
+[MCP server](#connecting-an-agent-mcp) for outside agents.
 
 ## Architecture and what comes next
 
@@ -283,6 +284,31 @@ least 0.02 higher. A first live run (2026-10-29): pdf.js scored 0.779 (6 s for a
 worked on real papers: arXiv HTML (9 sections in 1 s), Europe PMC for the AlphaFold paper (13 sections), bioRxiv
 XML (5 sections), and a PDF-only arXiv paper through pdf.js. No paid calls.
 
+## Connecting an agent (MCP)
+
+Each project is also an **MCP server**, so an outside agent (Claude Code, Claude Desktop, an IDE, another agent) can
+use what the project knows. It is read-only and has its own token, `RH_MCP_TOKEN` (`new-project.sh` writes one; without
+it `/mcp` is off; the add-on "MCP server" can be turned off under Plugins).
+
+| Tool | What it gives |
+|---|---|
+| `search_knowledge` | Full-text search over the knowledge base (notes on starred papers, concepts, questions, the charter) |
+| `read_note` | One note by its stem |
+| `search_papers` | Semantic search over every paper the project gathered, with your judgment where there is one (one embedding of the query) |
+| `get_paper` | A paper's metadata, abstract, card (scores, summary, matched question), your judgment and reason, and its full text if the hub has it |
+| `recent_cards` | The newest cards with scores and judgments |
+| `get_charter` | The charter in force |
+
+Connect Claude Code to a project (the port is the project's `RH_PUBLISH_PORT`, published on 127.0.0.1 only):
+
+```bash
+claude mcp add --transport http research-hub-proteins http://127.0.0.1:4850/mcp \
+  --header "Authorization: Bearer <RH_MCP_TOKEN from projects/proteins/.env>"
+```
+
+Any client that speaks Streamable HTTP works the same way: `POST /mcp` with the bearer token (no sessions). Every
+call is logged (`mcp.call`, without the token).
+
 ## The knowledge base
 
 Every ⭐ becomes an evidence note in the project's Obsidian vault (`$RH_DATA_DIR/vault/`): the librarian (the
@@ -487,6 +513,7 @@ curl -s -X POST -H "authorization: Bearer $RH_API_TOKEN" -H 'content-type: appli
 | `GET /v1/attribution?days=30` | Cards each paper source brought, and how many you liked |
 | `GET /v1/upgrades` · `POST /v1/upgrades/run` | Runs with their reports, proposals and suggestions · start a run now (`focus`: `ranking`, `embedder` or `scout-addons`; without it Jev chooses), in the background |
 | `POST /v1/proposals/:id/approve` · `POST /v1/proposals/:id/reject` · `POST /v1/suggestions/:id/dismiss` | Decide on a proposed upgrade · dismiss a suggested add-on |
+| `POST /mcp` (Bearer `RH_MCP_TOKEN`) | The project's MCP server (Streamable HTTP, read-only tools) |
 | `GET /v1/engineer/ideas` · `POST /v1/engineer/ideas` (`text`) · `POST /v1/engineer/ideas/:id/{build,reject,enable}` | The engineer's ideas with stages, assessments and logs · give it an idea · build, reject, or enable what it built |
 | `GET /v1/papers/:id/fulltext` · `POST /v1/papers/:id/fulltext` · `GET /v1/fulltext/converters` | A paper's full text (or why it is missing) · get it now · the converters and which is active |
 | `GET /v1/knowledge` · `POST /v1/knowledge/review` | Knowledge reviews and charter proposals · start a review now (in the background) |
