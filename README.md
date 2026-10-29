@@ -236,7 +236,10 @@ no Python). The `research-hub:full` image adds **Docling** (layout, reading orde
 the first PDF; `RH_DOCLING_URL` can point at a Docling Serve you run elsewhere instead. Both are judged on the same
 preset: 10 fixed arXiv papers that have a PDF and an HTML version, the HTML as the truth, scored by word F1 and
 section-heading recall. The weekly upgrade's converter focus proposes switching when another converter scores at
-least 0.02 higher.
+least 0.02 higher. A first live run (2026-10-29): pdf.js scored 0.779 (6 s for all 10 papers), Docling 0.817
+(about 80 s per paper on CPU), so in the full image the weekly upgrade would propose Docling. The four sources
+worked on real papers: arXiv HTML (9 sections in 1 s), Europe PMC for the AlphaFold paper (13 sections), bioRxiv
+XML (5 sections), and a PDF-only arXiv paper through pdf.js. No paid calls.
 
 ## The knowledge base
 

@@ -344,7 +344,8 @@ watch or ignore. The scout and the test agent read it; you edit it.
 The core plugin `rh.fulltext` gets a paper's full text from arXiv HTML, Europe PMC JATS, bioRxiv/medRxiv JATS, or the
 PDF through the Converter slot (extension point `fulltext.converter`). The light image's converter is pdf.js text
 with heading detection (live: 0.779 on the preset); Docling Serve is the alternative in `research-hub:full` (or at
-`RH_DOCLING_URL`). The preset `converter-arxiv` scores word F1 and heading recall against the HTML of 10 fixed arXiv
+`RH_DOCLING_URL`; live: 0.817, through its async API since long papers take minutes on CPU). The full image is 2.3 GB
+to download (7.3 GB unpacked), which is why Docling is not in the core image. The preset `converter-arxiv` scores word F1 and heading recall against the HTML of 10 fixed arXiv
 papers. Notes and facet vectors use the sections; the weekly upgrade has a converter focus.
 
 ### 3.5 Benchmarks (the harness)
