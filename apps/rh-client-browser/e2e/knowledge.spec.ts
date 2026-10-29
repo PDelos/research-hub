@@ -22,6 +22,7 @@ test("a proposal is approved from the digest into a new charter version, undone 
   const section = page.locator('[data-section="charter"]');
   const add = section.locator('[data-proposal="add-question"]');
   await expect(add).toContainText("promise 80%");
+  await expect(add).toContainText("same method, different problem");
   await add.getByRole("button", { name: "Approve" }).click();
   await expect(add).toContainText("approved");
   await expect(add).toContainText("charter v2");
@@ -38,4 +39,7 @@ test("a proposal is approved from the digest into a new charter version, undone 
   await proposals.locator('[data-proposal="add-question"]').getByRole("button", { name: "Undo" }).click();
   await expect(proposals.locator('[data-proposal="add-question"]')).toContainText("undone");
   await expect(page.locator(".questions-list")).not.toContainText("transfer to RNA");
+  const finders = page.locator('[data-test="finders"]');
+  await expect(finders).toContainText("Same method, different problem");
+  await expect(finders.locator("tr", { hasText: "Same method, different problem" })).toContainText("1");
 });

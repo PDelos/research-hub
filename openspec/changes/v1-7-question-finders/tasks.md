@@ -13,5 +13,5 @@
 
 ## 4. UI and integration
 
-- [ ] 4.1 Finder stats in the Charter tab and digest; finder badge; SDK; Playwright
+- [x] 4.1 Finder stats in the Charter tab and digest; finder badge; SDK; Playwright
 - [ ] 4.2 All tests, checks, e2e, bundle, light image; one live review with finders on a throwaway project (cost recorded); docs; archive

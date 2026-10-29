@@ -225,6 +225,32 @@ async function reviewNow() {
           charter with the evidence. Nothing changes until you approve; an approved change becomes the next version.
         </p>
         <KnowledgeProposals :proposals="proposals" @changed="loadKnowledge" />
+        <template v-if="knowledge.finders.some((f) => f.proposed)">
+          <h3>Question finders</h3>
+          <p class="muted small">
+            What each way of finding new questions brought: its proposals and how the questions you approved did.
+          </p>
+          <table class="small" data-test="finders">
+            <thead>
+              <tr>
+                <th>Finder</th>
+                <th>Proposed</th>
+                <th>Approved</th>
+                <th>Rejected</th>
+                <th>👍/⭐ since</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="f in knowledge.finders" :key="f.finder" class="static">
+                <td>{{ f.title }}</td>
+                <td>{{ f.proposed }}</td>
+                <td>{{ f.approved }}</td>
+                <td>{{ f.rejected }}</td>
+                <td>{{ f.liked }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </template>
       </section>
     </template>
   </div>

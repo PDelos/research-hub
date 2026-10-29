@@ -257,6 +257,7 @@ export function activate(context: PluginContext): DigestExports {
               (p) => p.status === "proposed" || (p.decidedAt !== null && p.decidedAt >= from && p.decidedAt < to),
             ),
           reviewNotes,
+          finders: await knowledge.finders(),
         };
       const r = db
         .prepare(

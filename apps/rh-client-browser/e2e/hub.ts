@@ -39,7 +39,7 @@ await installer.confirm((await installer.prepare({ folder: join(FIXTURE_PLUGINS,
 await p.plugins.exportsOf("rh.knowledge");
 const seededAt = new Date().toISOString();
 const propose = p.db.prepare(
-  "INSERT INTO p_rh_knowledge__proposals (review_id, kind, change_key, change_json, evidence_json, status, base_version, created_at) VALUES (0, ?, ?, ?, ?, 'proposed', 1, ?)",
+  "INSERT INTO p_rh_knowledge__proposals (review_id, kind, change_key, change_json, evidence_json, status, base_version, created_at, finder) VALUES (0, ?, ?, ?, ?, 'proposed', 1, ?, ?)",
 );
 propose.run(
   "add-question",
@@ -55,6 +55,7 @@ propose.run(
     score: 0.8,
   }),
   seededAt,
+  "method-transfer",
 );
 propose.run(
   "add-out-of-scope",
@@ -62,6 +63,7 @@ propose.run(
   JSON.stringify({ kind: "add-out-of-scope", topic: "clinical trials" }),
   JSON.stringify({ summary: "You marked 3 clinical papers off topic.", papers: [] }),
   seededAt,
+  null,
 );
 // A knowledge-base paper with its full text, so the Library shows both.
 {

@@ -21,6 +21,12 @@ const STATUS: Record<KnowledgeProposal["status"], string> = {
   stale: "stale",
   undone: "undone",
 };
+const FINDER: Record<string, string> = {
+  interests: "from your interests",
+  "method-transfer": "same method, different problem",
+  "missing-links": "missing link",
+  "rising-topics": "rising topic",
+};
 const verdict = (v: string | null) => (v === "star" ? "⭐" : v === "up" ? "👍" : v === "down" ? "👎" : "");
 
 async function act(fn: () => Promise<unknown>) {
@@ -53,6 +59,7 @@ const undo = (id: number) => act(() => client.undoKnowledge(id));
           <strong>{{ p.title }}</strong>
           <span class="badge" :class="{ 'verdict-better': p.status === 'approved' }">{{ STATUS[p.status] }}</span>
           <span v-if="p.appliedVersion" class="muted small"> · charter v{{ p.appliedVersion }}</span>
+          <span v-if="p.finder" class="badge" :title="`Found by ${p.finder}`">{{ FINDER[p.finder] ?? p.finder }}</span>
         </div>
         <div class="small">
           {{ p.evidence.summary

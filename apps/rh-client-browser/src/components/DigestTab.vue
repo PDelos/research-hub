@@ -217,6 +217,13 @@ async function undo(commit: string, message: string) {
         <template v-else-if="sec.id === 'charter'">
           <p v-for="n in digest.charter?.reviewNotes ?? []" :key="n" class="muted small">{{ n }}</p>
           <KnowledgeProposals :proposals="charterProposals" @changed="loadLive" />
+          <p v-if="digest.charter?.finders?.some((f) => f.proposed)" class="muted small" data-test="finder-stats">
+            Question finders:
+            <template v-for="(f, i) in digest.charter.finders.filter((x) => x.proposed)" :key="f.finder"
+              >{{ i ? "; " : "" }}{{ f.title }} {{ f.approved }}/{{ f.proposed }} approved,
+              {{ f.liked }} liked</template
+            >
+          </p>
         </template>
         <template v-else-if="sec.id === 'cost'">
           <p>
