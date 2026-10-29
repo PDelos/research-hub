@@ -11,9 +11,9 @@
 ## 3. API, UI, image
 
 - [x] 3.1 Routes, SDK, the Engineer section and "Ask the engineer"; Playwright
-- [ ] 3.2 Dockerfile `full`: sentence-transformers and the embedding server; verify a real embedding in the full image
+- [x] 3.2 Dockerfile `full`: sentence-transformers and the embedding server; verify a real embedding in the full image
 
 ## 4. Integration
 
-- [ ] 4.1 All tests, checks, e2e, bundle, light image; live: an assessment and a paper-source build from a real suggestion (cost recorded)
-- [ ] 4.2 Docs; archive
+- [x] 4.1 All tests, checks, e2e, bundle, light image; live: an assessment and a paper-source build from a real suggestion (cost recorded)
+- [x] 4.2 Docs; archive

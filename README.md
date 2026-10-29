@@ -5,7 +5,7 @@ durable agent (built on [pi-durable](https://github.com/earendil-works/pi)) that
 [Jev](https://openrouter.ai/docs/guides/community/jev) make the bulk decisions, present a few paper cards a day,
 learn from your 👎/👍/⭐ and grow an Obsidian-compatible knowledge base. A new theme is a new container.
 
-**Status: v1.5 (the knowledge loop).** v0 built the durable agent, Jev client, live stream, browser UI and containers (v0.0),
+**Status: v1.8 (the engineer).** v0 built the durable agent, Jev client, live stream, browser UI and containers (v0.0),
 the brief, charter and schedule (v0.1), paper search with representations (v0.2), the daily sweep with paper cards
 (v0.3), learning from your judgments (v0.4) and the knowledge base with the real Obsidian interface (v0.5). v1.0 turns
 all of it into **plugins, like VS Code**: a small kernel and a plugin for every feature, which you can enable,
@@ -15,7 +15,10 @@ disable, configure, swap, install and roll back per project (see [Plugins](#plug
 add-ons and preferences with a fixed benchmark per slot ([What can change](#what-can-change-and-how-it-is-judged)),
 and v1.4 adds [the weekly upgrade](#the-weekly-upgrade): once a week the hub improves one slot on its benchmark or
 looks for new sources to add. v1.5 closes the [knowledge loop](#the-knowledge-loop): before each digest the hub
-proposes charter changes and new research questions from what you liked, disliked and wrote, for you to approve.
+proposes charter changes and new research questions from what you liked, disliked and wrote, for you to approve. v1.6
+adds full text (arXiv HTML, Europe PMC and bioRxiv XML, PDFs through a converter slot), v1.7 pluggable question finders
+with attribution, and v1.8 [the engineer](#the-engineer), which researches ideas and builds plugins: paper sources,
+and fine-tuned embedders trained free on Kaggle.
 
 ## Architecture and what comes next
 
@@ -232,6 +235,28 @@ kept (Jev 0.73), for $0.00007 (the sweep before it $0.030).
 A first live review (2026-10-28, throwaway project, free review model, one real sweep with test judgments): two weight
 proposals and three drafted questions, of which Jev kept one (0.61) and dropped two (0.49); approving it created
 charter version 3 with Q5 and its two queries. The review cost $0.00007 (Jev only; the sweep before it $0.021).
+
+## The engineer
+
+The engineer turns ideas into plugins. Give it one in the Upgrades tab ("add the Crossref API as a source", "try
+fine-tuning the embedder on my stars"), or press **Ask the engineer** on a source the weekly scout suggested.
+
+1. **Research and assessment.** It searches the web and writes an assessment: worth it or not, the expected gain,
+   the cost, the risks, a plan, and what kind of plugin it is. Nothing is built yet.
+2. **Build** (only when you press it). It writes and tests the plugin and leaves a proposal with its numbers.
+3. **Enable or Remove** (your decision). Every step is in the idea's log, with its cost.
+
+What it can build:
+
+| Kind | How it is built and tested | What you approve |
+|---|---|---|
+| **Paper source** | The review model writes an external plugin (`main.mjs`); the hub writes its manifest with the API's host as the only network permission. The plugin is installed in its sandbox (a Node permission process) and must return papers with titles and identifiers for one of your queries; a failure goes back to the model with the error (3 attempts), then the plugin is removed. A passing plugin stays installed **disabled** | Enable it (or Remove); its cards and likes then show in the attribution |
+| **Fine-tuned embedder** | Trains for free on **Kaggle's GPUs** (`KAGGLE_USERNAME` and `KAGGLE_API_TOKEN` in `.env`): pairs of your research questions and the papers you liked under them, disliked papers as hard negatives, fine-tuning `BAAI/bge-small-en-v1.5`. The model is downloaded into the project, run by the **local embedder** (the `research-hub:full` image) and benchmarked on the embedder preset; it is proposed only if it beats the active embedder by 0.02 | Enable switches the Embedder slot (two undoable settings); papers are re-embedded in the background |
+
+Other kinds are assessed but not built ("cannot build this yet"). A first live run (2026-10-29, free models):
+asked to add Crossref, the engineer assessed it as worth building ($0.007 web search), wrote a plugin on the first
+attempt that passed its test against the real API (5 papers for "protein language model"), and left it disabled until
+enabled. The fine-tune path is tested against a fake Kaggle API and a fake embedding server (no Kaggle token here).
 
 ## Full text
 
@@ -462,6 +487,7 @@ curl -s -X POST -H "authorization: Bearer $RH_API_TOKEN" -H 'content-type: appli
 | `GET /v1/attribution?days=30` | Cards each paper source brought, and how many you liked |
 | `GET /v1/upgrades` · `POST /v1/upgrades/run` | Runs with their reports, proposals and suggestions · start a run now (`focus`: `ranking`, `embedder` or `scout-addons`; without it Jev chooses), in the background |
 | `POST /v1/proposals/:id/approve` · `POST /v1/proposals/:id/reject` · `POST /v1/suggestions/:id/dismiss` | Decide on a proposed upgrade · dismiss a suggested add-on |
+| `GET /v1/engineer/ideas` · `POST /v1/engineer/ideas` (`text`) · `POST /v1/engineer/ideas/:id/{build,reject,enable}` | The engineer's ideas with stages, assessments and logs · give it an idea · build, reject, or enable what it built |
 | `GET /v1/papers/:id/fulltext` · `POST /v1/papers/:id/fulltext` · `GET /v1/fulltext/converters` | A paper's full text (or why it is missing) · get it now · the converters and which is active |
 | `GET /v1/knowledge` · `POST /v1/knowledge/review` | Knowledge reviews and charter proposals · start a review now (in the background) |
 | `POST /v1/knowledge/proposals/:id/approve` · `…/reject` (`reason`) · `…/undo` | Make a proposal the next charter version · reject it · restore the charter before it |
