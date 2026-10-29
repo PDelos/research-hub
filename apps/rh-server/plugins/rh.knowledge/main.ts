@@ -21,6 +21,19 @@ import {
   type Evidence,
   type Proposed,
 } from "./evidence.ts";
+import { evidencePack } from "./evidence-pack.ts";
+import type { Vault } from "../../src/kb/vault.ts";
+import {
+  AnswerReader,
+  leadsAndCandidates,
+  listOf,
+  readDirection,
+  readOutOfScope,
+  readTasteRules,
+  type Direction,
+  type EvidencePaper,
+  type RuleCandidate,
+} from "./answer.ts";
 
 export const REVIEW_MARKER = "knowledge-review";
 const REJECTED_MEMORY_DAYS = 90;
@@ -192,80 +205,6 @@ export function activate(context: PluginContext): KnowledgeExports {
     createdAt: r.created_at,
   });
 
-  // --- The evidence pack for the review model ------------------------------------------------------------------
-  const evidencePack = (charter: Charter, since: string) => {
-    const judged = db
-      .prepare(
-        `SELECT p.id, p.title, j.verdict, j.reason, j.reason_kind, c.matched_question q, c.level FROM judgments j
-           JOIN papers p ON p.id = j.paper_id JOIN cards c ON c.id = j.card_id
-          WHERE j.updated_at >= ? ORDER BY j.updated_at DESC`,
-      )
-      .all(since) as {
-      id: number;
-      title: string;
-      verdict: string;
-      reason: string | null;
-      reason_kind: string | null;
-      q: string | null;
-      level: string;
-    }[];
-    const likedRows = judged.filter((j) => j.verdict !== "down");
-    const dislikedRows = judged.filter((j) => j.verdict === "down");
-    let comments: string[] = [];
-    try {
-      comments = (
-        db
-          .prepare("SELECT section, text FROM p_rh_digest__comments WHERE created_at >= ? ORDER BY id DESC LIMIT 20")
-          .all(since) as { section: string; text: string }[]
-      ).map((c) => `${c.section}: ${c.text}`);
-    } catch {
-      // No digest yet.
-    }
-    const desk = (
-      db
-        .prepare(
-          `SELECT r.text FROM agent_runs r JOIN agent_conversations c ON c.conversation_id = r.conversation_id
-            WHERE c.parent_conversation_id IS NULL AND c.owner_task_id IS NULL AND r.text IS NOT NULL AND r.started_at >= ?
-            ORDER BY r.run_entry_id DESC LIMIT 20`,
-        )
-        .all(Date.parse(since)) as { text: string }[]
-    ).map((r) => r.text.replace(/\s+/g, " ").slice(0, 300));
-    const openQuestions: string[] = [];
-    try {
-      const kb = context.exports["rh.kb"] as KbExports | undefined;
-      const stems = db.prepare("SELECT stem FROM kb_notes ORDER BY created_at DESC LIMIT 30").all() as {
-        stem: string;
-      }[];
-      for (const { stem } of stems) {
-        const text = kb?.vault.read(`sources/${stem}.md`) ?? "";
-        const section = text
-          .split(/^## Open questions\s*$/m)[1]
-          ?.split(/^## /m)[0]
-          ?.trim();
-        if (section && !/^not stated/i.test(section))
-          openQuestions.push(`${stem}: ${section.replace(/\s+/g, " ").slice(0, 300)}`);
-        if (openQuestions.length >= 10) break;
-      }
-    } catch {
-      // No knowledge base yet.
-    }
-    const line = (j: (typeof judged)[number]) =>
-      `- #${j.id} ${j.title}${j.q ? ` [${j.q}]` : " [no question]"}${j.reason_kind ? ` (${j.reason_kind})` : ""}${j.reason ? `: “${j.reason.slice(0, 200)}”` : ""}`;
-    const prompt = [
-      `## Charter\n${JSON.stringify(charter)}`,
-      `## Liked papers (👍/⭐)\n${likedRows.slice(0, 20).map(line).join("\n") || "none"}`,
-      `## Disliked papers (👎)\n${dislikedRows.slice(0, 20).map(line).join("\n") || "none"}`,
-      `## Digest comments\n${comments.map((c) => `- ${c}`).join("\n") || "none"}`,
-      `## Questions asked at the desk\n${desk.map((d) => `- ${d}`).join("\n") || "none"}`,
-      `## Open questions in the knowledge base\n${openQuestions.map((o) => `- ${o}`).join("\n") || "none"}`,
-    ].join("\n\n");
-    const levels = likedRows.map((j) => j.level);
-    const level =
-      levels.toSorted((a, b) => levels.filter((x) => x === b).length - levels.filter((x) => x === a).length)[0] ??
-      "not known yet";
-    return { prompt, judged, level, comments };
-  };
-
   // --- Proposals --------------------------------------------------------------------------------------------------
   const store = (reviewId: number, baseVersion: number, p: Proposed): number | undefined => {
     const key = changeKey(p.change);
@@ -311,213 +250,253 @@ export function activate(context: PluginContext): KnowledgeExports {
     rh.events.emit("charter.changed", { version });
   };
 
-  let running: Promise<KnowledgeReview> | undefined;
-  const runReview = async (requestedBy: string): Promise<KnowledgeReview> => {
-    const approved = charters.approved();
-    const notes: string[] = [];
-    const report: KnowledgeReview["report"] = {
-      charterVersion: approved?.version ?? null,
-      rules: 0,
-      directions: [],
-      outOfScope: [],
-      proposals: [],
-      notes,
-    };
-    const reviewId = Number(
+  /** One review in progress: its row, report, cost and where its proposals go. */
+  interface Review {
+    id: number;
+    report: KnowledgeReview["report"];
+    costUsd: number;
+    keep(proposal: Proposed): void;
+  }
+
+  const startReview = (requestedBy: string, charterVersion: number | null): Review => {
+    const id = Number(
       db
         .prepare(`INSERT INTO ${T.reviews} (requested_by, report_json, cost_usd, created_at) VALUES (?, '{}', 0, ?)`)
         .run(requestedBy, now()).lastInsertRowid,
     );
-    let cost = 0;
-    if (!approved) notes.push("No approved charter yet.");
-    else if (!setting<boolean>("enabled")) notes.push("The knowledge review is off.");
-    else {
-      const charter = approved.charter;
-      const version = approved.version!;
-      const since = new Date(Date.now() - setting<number>("windowDays") * 86_400_000).toISOString();
-      const keep = (p: Proposed) => {
-        const id = store(reviewId, version, p);
-        if (id !== undefined) report.proposals.push(id);
-      };
-      const rules = evidenceRules(db, charter, since);
-      report.rules = rules.length;
-      rules.forEach(keep);
+    const report: KnowledgeReview["report"] = {
+      charterVersion,
+      rules: 0,
+      directions: [],
+      outOfScope: [],
+      proposals: [],
+      notes: [],
+    };
+    return {
+      id,
+      report,
+      costUsd: 0,
+      keep(proposal) {
+        const stored = store(id, charterVersion ?? 0, proposal);
+        if (stored !== undefined) report.proposals.push(stored);
+      },
+    };
+  };
 
-      // Level up (v1-7): from the cards liked in the window and the "too basic" reasons.
-      const level = levelRule(db, String(host.settingsOf("rh.sweep").level ?? "auto"), since);
-      if (level) keep(level);
-
-      // Leads from the question finders (v1-7): each enabled finder, at most 5 leads.
-      const leads: (Lead & { finder: string })[] = [];
-      for (const c of await host.services.contributions.contributionsTo("knowledge.finder", { activate: true })) {
-        try {
-          const finder = await host.exportsOf<FinderExports>(c.pluginId);
-          for (const lead of (await finder.leads({ finder: c.id, charter, since, limit: 5 })).slice(0, 5))
-            leads.push({ ...lead, finder: c.id });
-        } catch (error) {
-          notes.push(`The finder ${c.id} failed: ${error instanceof Error ? error.message : String(error)}`);
-        }
-      }
-      report.leads = leads.map((l) => ({ finder: l.finder, summary: l.summary }));
-      const candidates = (
-        db
-          .prepare(
-            "SELECT r.card_id, r.reason, r.reason_kind FROM rule_candidates r WHERE r.status = 'open' AND r.probability >= 0.5 ORDER BY r.created_at DESC LIMIT 10",
-          )
-          .all() as { card_id: number; reason: string; reason_kind: string | null }[]
-      ).map((r) => ({ cardId: Number(r.card_id), reason: r.reason, kind: r.reason_kind }));
-
-      const pack = evidencePack(charter, since);
-      pack.prompt += `\n\n## Leads from the question finders\n${
-        leads.map((l) => `- [${l.finder}] ${l.summary} (${l.paperIds.map((id) => `#${id}`).join(", ")})`).join("\n") ||
-        "none"
-      }\n\n## Rule candidates (reasons that may generalize)\n${
-        candidates
-          .map((c) => `- candidate ${c.cardId}${c.kind ? ` (${c.kind})` : ""}: “${c.reason.slice(0, 200)}”`)
-          .join("\n") || "none"
-      }`;
-      // Papers a lead names count as evidence too.
-      for (const id of new Set(leads.flatMap((l) => l.paperIds)))
-        if (!pack.judged.some((j) => Number(j.id) === id)) {
-          const paper = db.prepare("SELECT title FROM papers WHERE id = ?").get(id) as { title: string } | undefined;
-          if (paper)
-            pack.judged.push({
-              id,
-              title: paper.title,
-              verdict: null as never,
-              reason: null,
-              reason_kind: null,
-              q: null,
-              level: "",
-            });
-        }
-      if (!pack.judged.length && !pack.comments.length && !leads.length)
-        notes.push("No judgments or comments in the window: no new directions asked for.");
-      else {
-        const max = setting<number>("maxDirections");
-        try {
-          const answer = await rh.models.complete({
-            job: "review",
-            system: SYSTEM.replace("{{max}}", String(max)),
-            prompt: pack.prompt,
-            maxTokens: 2_000,
-          });
-          cost += answer.costUsd;
-          const body = jsonObject(answer.text) ?? {};
-          const titles = new Map(pack.judged.map((j) => [Number(j.id), j]));
-          const paperList = (ids: unknown) =>
-            (Array.isArray(ids) ? ids : [])
-              .map(Number)
-              .filter((id) => titles.has(id))
-              .slice(0, 6)
-              .map((id) => {
-                const j = titles.get(id)!;
-                return { id, title: j.title, verdict: j.verdict, reason: j.reason };
-              });
-          const str = (v: unknown, max: number) =>
-            typeof v === "string" ? v.trim().replace(/\s+/g, " ").slice(0, max) : "";
-          // The user reads the reasons: paper ids become short titles.
-          const why = (v: unknown) =>
-            str(v, 600)
-              .replace(/(?:[Pp]apers? )?#(\d+)/g, (m, id) => {
-                const t = titles.get(Number(id))?.title;
-                return t ? `“${t.length > 60 ? `${t.slice(0, 57)}…` : t}”` : m;
-              })
-              .slice(0, 500);
-          const directions = (Array.isArray(body.directions) ? body.directions : []).slice(0, max);
-          for (const d of directions as Record<string, unknown>[]) {
-            const question = str(d.question, 300);
-            const queries = (Array.isArray(d.queries) ? d.queries : [])
-              .map((q) => str(q, 120))
-              .filter(Boolean)
-              .slice(0, 3);
-            const papers = paperList(d.paperIds);
-            if (!question || !queries.length || !papers.length) {
-              report.directions.push({
-                question: question || "(empty)",
-                score: null,
-                kept: false,
-                note: "incomplete: needs a question, queries and papers from the evidence",
-              });
-              continue;
-            }
-            let score: number | null = null;
-            try {
-              const r = await rh.decisions.decide("question-promise", {
-                questions: charter.questions.map((q) => `${q.id}: ${q.text}`).join("\n"),
-                direction: `${question} (why: ${why(d.why)})`,
-                papers: papers.map((p) => p.title).join("\n"),
-                level: pack.level,
-              });
-              cost += r.costUsd;
-              score = Number((r.answers.promise as { noul?: number } | undefined)?.noul ?? 0);
-            } catch (error) {
-              report.directions.push({ question, score: null, kept: false, note: `not scored: ${String(error)}` });
-              continue;
-            }
-            const kept = score >= setting<number>("minPromise");
-            const finders = new Set(leads.map((l) => l.finder));
-            const finder = typeof d.finder === "string" && finders.has(d.finder) ? d.finder : INTERESTS;
-            report.directions.push({ question, score, kept, finder });
-            if (kept)
-              keep({
-                change: { kind: "add-question", text: question, queries },
-                evidence: { summary: why(d.why) || "Motivated by the papers below.", papers, score },
-                finder,
-              });
-          }
-          for (const o of ((Array.isArray(body.outOfScope) ? body.outOfScope : []) as Record<string, unknown>[]).slice(
-            0,
-            2,
-          )) {
-            const topic = str(o.topic, 120);
-            const papers = paperList(o.paperIds).filter(
-              (p) => p.verdict === "down" && titles.get(p.id)?.reason_kind === "off-topic",
-            );
-            const kept = !!topic && papers.length >= 2;
-            report.outOfScope.push({
-              topic: topic || "(empty)",
-              kept,
-              ...(kept ? {} : { note: "needs 2 off-topic 👎 papers" }),
-            });
-            if (kept)
-              keep({
-                change: { kind: "add-out-of-scope", topic },
-                evidence: { summary: why(o.why) || "You marked these papers off topic.", papers },
-              });
-          }
-          const known = new Set(candidates.map((c) => c.cardId));
-          for (const r of ((Array.isArray(body.tasteRules) ? body.tasteRules : []) as Record<string, unknown>[]).slice(
-            0,
-            2,
-          )) {
-            const rule = str(r.rule, 160);
-            const ids = (Array.isArray(r.candidateIds) ? r.candidateIds : []).map(Number).filter((id) => known.has(id));
-            if (rule.length < 3 || !ids.length) continue;
-            keep({
-              change: { kind: "taste-rule", rule, candidateIds: ids },
-              evidence: {
-                summary: `From your reasons: ${candidates
-                  .filter((c) => ids.includes(c.cardId))
-                  .map((c) => `“${c.reason.slice(0, 120)}”`)
-                  .join("; ")}`,
-                papers: [],
-              },
-            });
-          }
-        } catch (error) {
-          notes.push(`The review model failed: ${error instanceof Error ? error.message : String(error)}`);
-          context.log.warn("knowledge.model_failed", { error: String(error) });
-        }
+  /** The leads of every enabled question finder (a failing finder is noted and skipped). */
+  const collectLeads = async (review: Review, charter: Charter, since: string) => {
+    const leads: (Lead & { finder: string })[] = [];
+    for (const finder of await host.services.contributions.contributionsTo("knowledge.finder", { activate: true })) {
+      try {
+        const plugin = await host.exportsOf<FinderExports>(finder.pluginId);
+        const found = await plugin.leads({ finder: finder.id, charter, since, limit: 5 });
+        leads.push(...found.slice(0, 5).map((lead) => ({ ...lead, finder: finder.id })));
+      } catch (error) {
+        review.report.notes.push(
+          `The finder ${finder.id} failed: ${error instanceof Error ? error.message : String(error)}`,
+        );
       }
     }
+    return leads;
+  };
+
+  const ruleCandidates = (): RuleCandidate[] =>
+    (
+      db
+        .prepare(
+          "SELECT card_id, reason, reason_kind FROM rule_candidates WHERE status = 'open' AND probability >= 0.5 ORDER BY created_at DESC LIMIT 10",
+        )
+        .all() as { card_id: number; reason: string; reason_kind: string | null }[]
+    ).map((row) => ({ cardId: Number(row.card_id), reason: row.reason, kind: row.reason_kind }));
+
+  /** Papers a lead names count as evidence too, so the model can cite them. */
+  const leadPapers = (leads: Lead[], known: EvidencePaper[]): EvidencePaper[] =>
+    [...new Set(leads.flatMap((lead) => lead.paperIds))]
+      .filter((id) => !known.some((paper) => Number(paper.id) === id))
+      .flatMap((id) => {
+        const paper = db.prepare("SELECT title FROM papers WHERE id = ?").get(id) as { title: string } | undefined;
+        return paper ? [{ id, title: paper.title, verdict: null, reason: null, reason_kind: null }] : [];
+      });
+
+  /** Score a direction with Jev and propose it when promising. */
+  const proposeDirection = async (review: Review, direction: Direction, charter: Charter, level: string) => {
+    const scored = await rh.decisions.decide("question-promise", {
+      questions: charter.questions.map((question) => `${question.id}: ${question.text}`).join("\n"),
+      direction: `${direction.question} (why: ${direction.why})`,
+      papers: direction.papers.map((paper) => paper.title).join("\n"),
+      level,
+    });
+    review.costUsd += scored.costUsd;
+    const score = Number((scored.answers.promise as { noul?: number } | undefined)?.noul ?? 0);
+    const kept = score >= setting<number>("minPromise");
+    review.report.directions.push({ question: direction.question, score, kept, finder: direction.finder });
+    if (!kept) return;
+    review.keep({
+      change: { kind: "add-question", text: direction.question, queries: direction.queries },
+      evidence: { summary: direction.why || "Motivated by the papers below.", papers: direction.papers, score },
+      finder: direction.finder,
+    });
+  };
+
+  /** One review-model call: directions, out-of-scope topics and taste rules from the evidence pack. */
+  const askReviewModel = async (
+    review: Review,
+    input: {
+      charter: Charter;
+      prompt: string;
+      evidence: EvidencePaper[];
+      level: string;
+      finders: Set<string>;
+      candidates: RuleCandidate[];
+    },
+  ) => {
+    const max = setting<number>("maxDirections");
+    const answer = await rh.models.complete({
+      job: "review",
+      system: SYSTEM.replace("{{max}}", String(max)),
+      prompt: input.prompt,
+      maxTokens: 2_000,
+    });
+    review.costUsd += answer.costUsd;
+    const body = jsonObject(answer.text) ?? {};
+    const reader = new AnswerReader(input.evidence);
+    for (const fields of listOf(body.directions, max)) {
+      const direction = readDirection(fields, reader, input.finders);
+      if ("incomplete" in direction) {
+        review.report.directions.push({
+          question: direction.question,
+          score: null,
+          kept: false,
+          note: `incomplete: ${direction.incomplete}`,
+        });
+        continue;
+      }
+      try {
+        await proposeDirection(review, direction, input.charter, input.level);
+      } catch (error) {
+        review.report.directions.push({
+          question: direction.question,
+          score: null,
+          kept: false,
+          note: `not scored: ${String(error)}`,
+        });
+      }
+    }
+    for (const fields of listOf(body.outOfScope, 2)) {
+      const { topic, proposal } = readOutOfScope(fields, reader);
+      review.report.outOfScope.push({
+        topic,
+        kept: !!proposal,
+        ...(proposal ? {} : { note: "needs 2 off-topic 👎 papers" }),
+      });
+      if (proposal) review.keep(proposal);
+    }
+    readTasteRules(body.tasteRules, input.candidates).forEach(review.keep);
+  };
+
+  const reviewCharter = async (review: Review, charter: Charter) => {
+    const since = new Date(Date.now() - setting<number>("windowDays") * 86_400_000).toISOString();
+    const rules = evidenceRules(db, charter, since);
+    review.report.rules = rules.length;
+    rules.forEach(review.keep);
+    // Level up (v1-7): from the cards liked in the window and the "too basic" reasons.
+    const level = levelRule(db, String(host.settingsOf("rh.sweep").level ?? "auto"), since);
+    if (level) review.keep(level);
+
+    const leads = await collectLeads(review, charter, since);
+    review.report.leads = leads.map((lead) => ({ finder: lead.finder, summary: lead.summary }));
+    const candidates = ruleCandidates();
+    let vault: Vault | undefined;
+    try {
+      vault = (context.exports["rh.kb"] as KbExports | undefined)?.vault;
+    } catch {
+      // No knowledge base yet.
+    }
+    const pack = evidencePack(db, vault, charter, since);
+    const evidence: EvidencePaper[] = [...pack.judged, ...leadPapers(leads, pack.judged)];
+    if (!evidence.length && !pack.comments.length && !leads.length) {
+      review.report.notes.push("No judgments or comments in the window: no new directions asked for.");
+      return;
+    }
+    try {
+      await askReviewModel(review, {
+        charter,
+        prompt: pack.prompt + leadsAndCandidates(leads, candidates),
+        evidence,
+        level: pack.level,
+        finders: new Set(leads.map((lead) => lead.finder)),
+        candidates,
+      });
+    } catch (error) {
+      review.report.notes.push(`The review model failed: ${error instanceof Error ? error.message : String(error)}`);
+      context.log.warn("knowledge.model_failed", { error: String(error) });
+    }
+  };
+
+  let running: Promise<KnowledgeReview> | undefined;
+  const runReview = async (requestedBy: string): Promise<KnowledgeReview> => {
+    const approved = charters.approved();
+    const review = startReview(requestedBy, approved?.version ?? null);
+    if (!approved) review.report.notes.push("No approved charter yet.");
+    else if (!setting<boolean>("enabled")) review.report.notes.push("The knowledge review is off.");
+    else await reviewCharter(review, approved.charter);
     db.prepare(`UPDATE ${T.reviews} SET report_json = ?, cost_usd = ? WHERE id = ?`).run(
-      JSON.stringify(report),
-      cost,
-      reviewId,
+      JSON.stringify(review.report),
+      review.costUsd,
+      review.id,
     );
-    context.log.info("knowledge.reviewed", { id: reviewId, proposals: report.proposals.length, cost });
-    return toReview(db.prepare(`SELECT * FROM ${T.reviews} WHERE id = ?`).get(reviewId) as ReviewRow);
+    context.log.info("knowledge.reviewed", {
+      id: review.id,
+      proposals: review.report.proposals.length,
+      cost: review.costUsd,
+    });
+    return toReview(db.prepare(`SELECT * FROM ${T.reviews} WHERE id = ?`).get(review.id) as ReviewRow);
+  };
+
+  const approveSetting = async (id: number, change: Change) => {
+    const sweep = host.settingsOf("rh.sweep");
+    const tasteRules = (sweep.tasteRules as string[] | undefined) ?? [];
+    const update =
+      change.kind === "level" ? { level: change.level!.to } : { tasteRules: [...tasteRules, change.rule!].slice(-10) };
+    await host.configure("rh.sweep", update, `proposal:knowledge-${id}`);
+    const commit = (await host.pluginHistory(1))[0]?.id ?? null;
+    db.prepare(`UPDATE ${T.proposals} SET status = 'approved', commit_id = ?, decided_at = ? WHERE id = ?`).run(
+      commit,
+      now(),
+      id,
+    );
+    for (const cardId of change.kind === "taste-rule" ? (change.candidateIds ?? []) : [])
+      db.prepare("UPDATE rule_candidates SET status = 'accepted' WHERE card_id = ?").run(cardId);
+    context.log.info("knowledge.approved", { id, kind: change.kind });
+  };
+
+  /** The charter with the change, or a KnowledgeInvalid (a stale proposal is marked stale). */
+  const changedCharter = (id: number, charter: Charter, change: Change): Charter => {
+    try {
+      return applyChange(charter, change);
+    } catch (error) {
+      if (error instanceof ChangeRefused) throw new KnowledgeInvalid(error.message);
+      if (!(error instanceof ChangeStale)) throw error;
+      db.prepare(`UPDATE ${T.proposals} SET status = 'stale', reason = ?, decided_at = ? WHERE id = ?`).run(
+        error.message,
+        now(),
+        id,
+      );
+      throw new KnowledgeInvalid(`proposal ${id} is stale: ${error.message}`);
+    }
+  };
+
+  const approveCharterChange = (id: number, change: Change) => {
+    const current = charters.approved();
+    if (!current) throw new KnowledgeInvalid("there is no approved charter");
+    const applied = charters.approveVersion(changedCharter(id, current.charter, change), "user");
+    db.prepare(
+      `UPDATE ${T.proposals} SET status = 'approved', before_version = ?, applied_version = ?, decided_at = ? WHERE id = ?`,
+    ).run(current.version, applied.version, now(), id);
+    const added = change.kind === "add-question" && applied.charter.questions.find((q) => q.text === change.text);
+    if (added) db.prepare(`UPDATE ${T.proposals} SET question_id = ? WHERE id = ?`).run(added.id, id);
+    context.log.info("knowledge.approved", { id, version: applied.version });
+    afterCharterChange(applied.version!);
   };
 
   const exports: KnowledgeExports = {
@@ -548,52 +527,8 @@ export function activate(context: PluginContext): KnowledgeExports {
       if (r.status !== "proposed") throw new KnowledgeInvalid(`proposal ${id} is ${r.status}`);
       const change = JSON.parse(r.change_json) as Change;
       // Level and taste rules are sweep settings: one undoable plugin-state change.
-      if (SETTING_KINDS.includes(change.kind)) {
-        const sweep = host.settingsOf("rh.sweep");
-        const update =
-          change.kind === "level"
-            ? { level: change.level!.to }
-            : { tasteRules: [...((sweep.tasteRules as string[] | undefined) ?? []), change.rule!].slice(-10) };
-        await host.configure("rh.sweep", update, `proposal:knowledge-${id}`);
-        const commit = (await host.pluginHistory(1))[0]?.id ?? null;
-        db.prepare(`UPDATE ${T.proposals} SET status = 'approved', commit_id = ?, decided_at = ? WHERE id = ?`).run(
-          commit,
-          now(),
-          id,
-        );
-        if (change.kind === "taste-rule")
-          for (const cardId of change.candidateIds ?? [])
-            db.prepare("UPDATE rule_candidates SET status = 'accepted' WHERE card_id = ?").run(cardId);
-        context.log.info("knowledge.approved", { id, kind: change.kind });
-        return toProposal(row(id));
-      }
-      const current = charters.approved();
-      if (!current) throw new KnowledgeInvalid("there is no approved charter");
-      let next: Charter;
-      try {
-        next = applyChange(current.charter, JSON.parse(r.change_json));
-      } catch (error) {
-        if (error instanceof ChangeStale) {
-          db.prepare(`UPDATE ${T.proposals} SET status = 'stale', reason = ?, decided_at = ? WHERE id = ?`).run(
-            error.message,
-            now(),
-            id,
-          );
-          throw new KnowledgeInvalid(`proposal ${id} is stale: ${error.message}`);
-        }
-        if (error instanceof ChangeRefused) throw new KnowledgeInvalid(error.message);
-        throw error;
-      }
-      const applied = charters.approveVersion(next, "user");
-      db.prepare(
-        `UPDATE ${T.proposals} SET status = 'approved', before_version = ?, applied_version = ?, decided_at = ? WHERE id = ?`,
-      ).run(current.version, applied.version, now(), id);
-      if (change.kind === "add-question") {
-        const added = applied.charter.questions.find((q) => q.text === change.text);
-        if (added) db.prepare(`UPDATE ${T.proposals} SET question_id = ? WHERE id = ?`).run(added.id, id);
-      }
-      context.log.info("knowledge.approved", { id, version: applied.version });
-      afterCharterChange(applied.version!);
+      if (SETTING_KINDS.includes(change.kind)) await approveSetting(id, change);
+      else approveCharterChange(id, change);
       return toProposal(row(id));
     },
     reject(id, reason) {

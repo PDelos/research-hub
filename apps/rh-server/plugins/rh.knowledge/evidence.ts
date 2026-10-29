@@ -184,50 +184,60 @@ export function evidenceRules(db: Db, charter: Charter, sinceIso: string): Propo
 export class ChangeStale extends Error {}
 export class ChangeRefused extends Error {}
 
+const findQuestion = (charter: Charter, id?: string) => {
+  const question = charter.questions.find((q) => q.id === id);
+  if (!question) throw new ChangeStale(`question ${id} is no longer in the charter`);
+  return question;
+};
+
+const findQuery = (charter: Charter, text?: string) => {
+  const query = charter.queries.find((q) => q.text === text);
+  if (!query) throw new ChangeStale(`the query “${text}” is no longer in the charter`);
+  return query;
+};
+
+const refuseSettings = (change: Change): never => {
+  throw new ChangeRefused(`${change.kind} changes the sweep's settings, not the charter`);
+};
+
+/** How each kind of change edits a copy of the charter. */
+const APPLY: Record<ChangeKind, (charter: Charter, change: Change) => void> = {
+  weight(charter, change) {
+    const target =
+      change.targetKind === "question" ? findQuestion(charter, change.target) : findQuery(charter, change.target);
+    target.weight = change.to!;
+  },
+  "retire-question"(charter, change) {
+    findQuestion(charter, change.target);
+    if (charter.questions.length <= 3) throw new ChangeRefused("a charter keeps at least 3 questions");
+    charter.questions = charter.questions.filter((q) => q.id !== change.target);
+  },
+  "drop-query"(charter, change) {
+    findQuery(charter, change.target);
+    if (charter.queries.length <= 5) throw new ChangeRefused("a charter keeps at least 5 queries");
+    charter.queries = charter.queries.filter((q) => q.text !== change.target);
+  },
+  "add-question"(charter, change) {
+    if (charter.questions.length >= 7) throw new ChangeRefused("the charter has 7 questions: retire one first");
+    charter.questions.push({ text: change.text!, weight: 1 } as never);
+    const known = new Set(charter.queries.map((q) => q.text.toLowerCase()));
+    const fresh = (change.queries ?? []).filter((text) => !known.has(text.toLowerCase()));
+    for (const text of fresh) if (charter.queries.length < 20) charter.queries.push({ text, weight: 1 });
+  },
+  "add-out-of-scope"(charter, change) {
+    if (charter.outOfScope.length >= 20) throw new ChangeRefused("the charter has 20 out-of-scope topics");
+    const topic = change.topic!;
+    if (!charter.outOfScope.some((t) => t.toLowerCase() === topic.toLowerCase())) charter.outOfScope.push(topic);
+  },
+  level: (_charter, change) => refuseSettings(change),
+  "taste-rule": (_charter, change) => refuseSettings(change),
+};
+
 /** The charter with one change applied (question ids kept); throws ChangeStale when its target is gone. */
 export function applyChange(charter: Charter, change: Change): Charter {
-  const c: Charter = structuredClone(charter);
-  const question = (id?: string) => {
-    const q = c.questions.find((x) => x.id === id);
-    if (!q) throw new ChangeStale(`question ${id} is no longer in the charter`);
-    return q;
-  };
-  const query = (text?: string) => {
-    const q = c.queries.find((x) => x.text === text);
-    if (!q) throw new ChangeStale(`the query “${text}” is no longer in the charter`);
-    return q;
-  };
-  switch (change.kind) {
-    case "weight":
-      (change.targetKind === "question" ? question(change.target) : query(change.target)).weight = change.to!;
-      break;
-    case "retire-question":
-      question(change.target);
-      if (c.questions.length <= 3) throw new ChangeRefused("a charter keeps at least 3 questions");
-      c.questions = c.questions.filter((q) => q.id !== change.target);
-      break;
-    case "drop-query":
-      query(change.target);
-      if (c.queries.length <= 5) throw new ChangeRefused("a charter keeps at least 5 queries");
-      c.queries = c.queries.filter((q) => q.text !== change.target);
-      break;
-    case "add-question": {
-      if (c.questions.length >= 7) throw new ChangeRefused("the charter has 7 questions: retire one first");
-      c.questions.push({ text: change.text!, weight: 1 } as never);
-      const have = new Set(c.queries.map((q) => q.text.toLowerCase()));
-      for (const text of change.queries ?? [])
-        if (c.queries.length < 20 && !have.has(text.toLowerCase())) c.queries.push({ text, weight: 1 });
-      break;
-    }
-    case "level":
-    case "taste-rule":
-      throw new ChangeRefused(`${change.kind} changes the sweep's settings, not the charter`);
-    case "add-out-of-scope":
-      if (c.outOfScope.length >= 20) throw new ChangeRefused("the charter has 20 out-of-scope topics");
-      if (!c.outOfScope.some((t) => t.toLowerCase() === change.topic!.toLowerCase())) c.outOfScope.push(change.topic!);
-      break;
-  }
-  return c;
+  const copy: Charter = structuredClone(charter);
+  APPLY[change.kind](copy, change);
+  return copy;
 }
 
 /** A short line for the change: "Retire Q3", "Add question: …". */
