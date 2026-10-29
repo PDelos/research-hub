@@ -10,14 +10,16 @@ import type { SweepExports } from "../rh.sweep/main.ts";
 import type { EmbedderExports, PapersExports } from "../rh.papers/main.ts";
 import type { ProviderExports } from "../rh.provider-openrouter/main.ts";
 import type { FullTextExports } from "../rh.fulltext/main.ts";
+import { embedderUpgrade } from "./embedder-upgrade.ts";
+import { jsonArray, plainReason } from "./model-answers.ts";
+
+export { jsonArray, plainReason };
 import { analyze, rankingGrid, type Analysis } from "./ranking.ts";
 import { summarize } from "../rh.harness/main.ts";
 
 export const FOCUSES = ["ranking", "embedder", "converter", "scout-addons"] as const;
 export type Focus = (typeof FOCUSES)[number];
 export const FOCUS_MIN_CONFIDENCE = 0.4;
-/** Tokens one embedder benchmark embeds (the two samples and "your stars"), for the cost estimate. */
-export const BENCHMARK_TOKENS_MILLIONS = 1.2;
 const EMBED_CATALOG = "https://openrouter.ai/api/v1/embeddings/models";
 
 export interface CatalogModel {
@@ -88,27 +90,6 @@ export interface UpgradesExports {
   dismiss(id: number): Suggestion;
   /** The focus Jev picks (or the rotation), with the reason. */
   chooseFocus(): Promise<{ focus: Focus; reason: string; costUsd: number }>;
-}
-
-/** A reason as plain text: web answers cite inline as markdown links, which the report lists separately. */
-export function plainReason(text: unknown, max = 300): string {
-  return String(text ?? "")
-    .replace(/\s*\(?\[[^\]]*\]\([^)]*\)\)?/g, "")
-    .trim()
-    .slice(0, max);
-}
-
-/** Parse the first JSON array in a model's answer (it may be wrapped in prose or a code fence). */
-export function jsonArray(text: string): unknown[] {
-  const start = text.indexOf("[");
-  const end = text.lastIndexOf("]");
-  if (start < 0 || end <= start) return [];
-  try {
-    const value = JSON.parse(text.slice(start, end + 1));
-    return Array.isArray(value) ? value : [];
-  } catch {
-    return [];
-  }
 }
 
 export function activate(context: PluginContext): UpgradesExports {
@@ -394,142 +375,17 @@ export function activate(context: PluginContext): UpgradesExports {
     const choice = host.services.contributions.activeContribution("papers.embedder", host.settingsOf("rh.papers"));
     return host.exportsOf<EmbedderExports>(choice?.pluginId ?? "rh.embedder-openrouter");
   };
-  const embedderRun = async (runId: number): Promise<Outcome> => {
-    const active = (await embedder()).config();
-    const maxPrice = setting<number>("maxEmbedPricePerMillion");
-    const maxRun = setting<number>("maxRunUsd");
-    const all = await catalog();
-    // A memory of what lost: candidates benchmarked in the last 90 days are not tried again (the active one won).
-    const since = new Date(Date.now() - 90 * 86_400_000).toISOString();
-    const triedBefore = new Set(
-      harness
-        .benchmarks("embedder", 200)
-        .filter((b) => b.candidate.candidate && b.createdAt >= since)
-        .map((b) => String(b.candidate.model)),
-    );
-    const eligible = all.filter(
-      (m) => m.id !== active.model && !triedBefore.has(m.id) && m.pricePerMillion <= maxPrice && m.contextLength >= 512,
-    );
-    const analysis = {
-      catalog: all.length,
-      eligible: eligible.length,
-      triedBefore: [...triedBefore],
-      maxPricePerMillion: maxPrice,
-      active,
-    };
-    if (!eligible.length)
-      return {
-        report: {
-          analysis,
-          tried: [],
-          result: "Nothing changed: no embedding model within the price limit that was not tried in the last 90 days.",
-        },
-      };
-    let shortlist: { id: string; reason: string }[] = [];
-    let researchNote = "";
-    try {
-      const answer = await research(
-        `Which of these OpenRouter embedding models is likely best for retrieving scientific papers (biology, bioinformatics, machine learning) by title and abstract? Search the web for recent benchmark results (e.g. MTEB, SciDocs). Answer only with a JSON array of at most 2 objects {"id": "<one of the ids>", "reason": "<one sentence>"}, best first.\n\nCurrent model: ${active.model}\nCandidates:\n${eligible
-          .map((m) => `- ${m.id} ($${m.pricePerMillion.toFixed(3)}/M tokens): ${m.description}`)
-          .join("\n")}`,
-        { maxResults: 5 },
-      );
-      const ids = new Set(eligible.map((m) => m.id));
-      shortlist = jsonArray(answer.text)
-        .filter((x): x is { id: string; reason?: string } => !!x && typeof (x as { id?: unknown }).id === "string")
-        .filter((x) => ids.has(x.id))
-        .slice(0, 2)
-        .map((x) => ({ id: x.id, reason: plainReason(x.reason) }));
-      researchNote = shortlist.length ? "shortlisted by web research" : "web research named no catalog model";
-    } catch (error) {
-      researchNote = `web research unavailable (${error instanceof Error ? error.message : String(error)})`;
-    }
-    if (!shortlist.length)
-      shortlist = eligible
-        .toSorted((x, y) => y.created - x.created)
-        .slice(0, 2)
-        .map((m) => ({ id: m.id, reason: "one of the newest models within the price limit" }));
-    const tried: UpgradeReport["tried"] = [];
-    // The active model's numbers: reuse a result younger than 30 days.
-    const lastActive = harness
-      .benchmarks("embedder", 20)
-      .find((b) => b.candidate.model === active.model && b.candidate.dims === active.dims);
-    const fresh = lastActive && Date.now() - Date.parse(lastActive.createdAt) < 30 * 86_400_000;
-    const base = fresh ? lastActive : await harness.runBenchmark("embedder");
-    const numbers = (r: typeof base) =>
-      Object.fromEntries([...r.result.tasks.map((t) => [t.task, t.value] as const), ["mean", r.result.value] as const]);
-    tried.push({
-      what: `${active.model} (active, ${active.dims} dimensions)`,
-      numbers: numbers(base),
-      note: fresh ? "earlier result" : undefined,
+  const embedderRun = async (runId: number): Promise<Outcome> =>
+    embedderUpgrade({
+      harness,
+      research,
+      active: (await embedder()).config(),
+      catalog: await catalog(),
+      maxPricePerMillion: setting<number>("maxEmbedPricePerMillion"),
+      maxRunUsd: setting<number>("maxRunUsd"),
+      researchUsd: () => researchUsd,
+      propose: (payload) => addProposal(runId, "embedder", payload, "proposed"),
     });
-    const stars = (r: typeof base) => r.result.tasks.find((t) => t.task === "your-stars")?.value ?? null;
-    let winner: { model: string; dims: number; record: typeof base; reason: string } | undefined;
-    let spent = base.costUsd + researchUsd;
-    for (const pick of shortlist) {
-      const m = eligible.find((e) => e.id === pick.id)!;
-      const estimate = BENCHMARK_TOKENS_MILLIONS * m.pricePerMillion;
-      if (spent + estimate > maxRun) {
-        tried.push({
-          what: m.id,
-          why: pick.reason,
-          note: `skipped: about $${estimate.toFixed(2)} would pass the run's $${maxRun} cap`,
-        });
-        continue;
-      }
-      const dims = m.dimensionsParam ? active.dims : 0;
-      try {
-        const r = await harness.runBenchmark("embedder", { model: m.id, ...(dims ? { dims } : {}) });
-        spent += r.costUsd;
-        const gain = (r.result.value ?? 0) - (base.result.value ?? 0);
-        const starsOk = stars(r) === null || stars(base) === null || stars(r)! >= stars(base)!;
-        const wins = r.result.value !== null && base.result.value !== null && gain >= 0.02 && starsOk;
-        tried.push({
-          what: `${m.id} (${r.candidate.dims} dimensions)`,
-          why: pick.reason,
-          verdict: wins ? "better" : "not better",
-          numbers: numbers(r),
-        });
-        if (wins && (!winner || (r.result.value ?? 0) > (winner.record.result.value ?? 0)))
-          winner = { model: m.id, dims, record: r, reason: pick.reason };
-      } catch (error) {
-        tried.push({
-          what: m.id,
-          why: pick.reason,
-          note: `failed: ${error instanceof Error ? error.message : String(error)}`,
-        });
-      }
-    }
-    if (!winner)
-      return {
-        report: {
-          analysis: { ...analysis, research: researchNote },
-          tried,
-          result: "Nothing changed: no candidate beat the active model by 0.02 nDCG@10 without losing on your stars.",
-        },
-      };
-    const p = addProposal(
-      runId,
-      "embedder",
-      {
-        model: winner.model,
-        dims: winner.dims,
-        reason: winner.reason,
-        mean: winner.record.result.value,
-        activeMean: base.result.value,
-        activeModel: active.model,
-        activeDims: active.dims,
-      },
-      "proposed",
-    );
-    return {
-      report: {
-        analysis: { ...analysis, research: researchNote },
-        tried,
-        result: `Proposed ${winner.model} (${winner.dims || "native"} dimensions): mean nDCG@10 ${(winner.record.result.value ?? 0).toFixed(3)} vs ${(base.result.value ?? 0).toFixed(3)}. Approve it in the Upgrades tab (proposal ${p.id}); the papers are then re-embedded in the background.`,
-      },
-    };
-  };
 
   // --- Converter ------------------------------------------------------------------------------------------------
   const converterRun = async (runId: number): Promise<Outcome> => {
