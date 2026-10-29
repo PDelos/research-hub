@@ -4,11 +4,11 @@ import type { Decide, SystemOneResult } from "@rh/jev";
 export type Rule = (sentence: string) => [facet: string, confidence: number];
 
 /** Keyword rule: "we propose/use/train..." → method, numbers/"improves" → result, else background. */
-export const keywordRule: Rule = (s) => {
-  if (/\b(code|available|funded)\b/i.test(s)) return ["other", 0.9];
-  if (/\b(we (propose|use|train|fine-tune|introduce|apply|develop|build)|our (model|method|approach))\b/i.test(s))
+export const keywordRule: Rule = (state) => {
+  if (/\b(code|available|funded)\b/i.test(state)) return ["other", 0.9];
+  if (/\b(we (propose|use|train|fine-tune|introduce|apply|develop|build)|our (model|method|approach))\b/i.test(state))
     return ["method", 0.9];
-  if (/\b(improv|outperform|achiev|show|reach|result|accuracy|\d+(\.\d+)?%)/i.test(s)) return ["result", 0.85];
+  if (/\b(improv|outperform|achiev|show|reach|result|accuracy|\d+(\.\d+)?%)/i.test(state)) return ["result", 0.85];
   return ["background", 0.8];
 };
 

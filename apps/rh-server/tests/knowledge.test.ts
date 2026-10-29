@@ -9,7 +9,7 @@ import { cardWriterRule, deskToolRule, knowledgeReviewRule } from "../src/faux-r
 import { sampleCharter } from "./fixtures/charter.ts";
 import { choice, noul, score, scripted } from "./fixtures/jev-answers.ts";
 import { arxivOnlyFetch, fakePapers } from "./fixtures/sweep-env.ts";
-import { startTestServer, until } from "./helpers.ts";
+import { startTestServer, until } from "./test-server.ts";
 
 const QUESTIONS = [
   "How is translation measured?",
@@ -19,22 +19,22 @@ const QUESTIONS = [
 ];
 
 /** Two sweeps of 12 papers: "Ribosome profiling" ones match Q1 and are liked; "Clinical trial" ones match Q4 and are disliked as off topic. */
-async function project(o: { promise?: number; sweeps?: number } = {}) {
+async function project(options: { promise?: number; sweeps?: number } = {}) {
   let batch = 0;
-  const batches = Array.from({ length: o.sweeps ?? 2 }, (_, b) =>
+  const batches = Array.from({ length: options.sweeps ?? 2 }, (_, b) =>
     fakePapers(12, "x").map((p, i) => ({
       ...p,
       id: `26${40 + b}.${60000 + i}`,
       title: i % 3 ? `Clinical trial report ${b}-${i}` : `Ribosome profiling study ${b}-${i}`,
     })),
   );
-  const jev = scripted((id, _c, q: any, state: any) => {
+  const jev = scripted((id, _c, question: any, state: any) => {
     const good = String(state.paper?.title ?? "").startsWith("Ribosome");
     if (id === "relevance") return score(0.75, 5);
-    if (id === "matched_question") return choice(good ? "Q1" : "Q4", Object.keys(q.criteria));
-    if (id === "kind") return choice("survey", Object.keys(q.criteria));
+    if (id === "matched_question") return choice(good ? "Q1" : "Q4", Object.keys(question.criteria));
+    if (id === "kind") return choice("survey", Object.keys(question.criteria));
     if (id === "worth") return noul(0.9);
-    if (id === "promise") return noul(o.promise ?? 0.8);
+    if (id === "promise") return noul(options.promise ?? 0.8);
     return undefined;
   });
   const server = await startTestServer({
@@ -54,9 +54,9 @@ async function project(o: { promise?: number; sweeps?: number } = {}) {
   projectRuntime.charters.approve();
   await projectRuntime.plugins.kernel.configure("rh.sweep", { cardsPerSweep: 12, explorationPicks: 0 });
   const sweep = async () => {
-    const n = projectRuntime.sweeps.list().length;
+    const sweepCount = projectRuntime.sweeps.list().length;
     projectRuntime.scheduler.trigger("sweep");
-    await until(() => projectRuntime.sweeps.list().length === n + 1, 10_000, "sweep");
+    await until(() => projectRuntime.sweeps.list().length === sweepCount + 1, 10_000, "sweep");
     await projectRuntime.sweeps.settled(projectRuntime.sweeps.list(1)[0].id, 30_000);
   };
   for (let b = 0; b < batches.length; b++) {
@@ -96,10 +96,10 @@ test("applyChange keeps ids, refuses to go under the minimums and reports a vani
 });
 
 test("a review proposes from evidence and from the review model; approving creates the version the next sweep uses", async () => {
-  const s = await project();
+  const env = await project();
   try {
-    const review = await s.knowledge.review();
-    const open = s.knowledge.proposals("proposed");
+    const review = await env.knowledge.review();
+    const open = env.knowledge.proposals("proposed");
     const kinds = open.map((p) => p.kind).toSorted();
     assert.ok(kinds.includes("retire-question"), JSON.stringify(review.report));
     assert.ok(kinds.includes("add-question"));
@@ -119,57 +119,57 @@ test("a review proposes from evidence and from the review model; approving creat
     assert.ok(review.report.directions[0].kept);
 
     // A second review refreshes the open proposals instead of adding copies.
-    await s.knowledge.review();
-    assert.equal(s.knowledge.proposals("proposed").length, open.length);
+    await env.knowledge.review();
+    assert.equal(env.knowledge.proposals("proposed").length, open.length);
 
     // Approve the new question: version 2 with Q5 and its queries; the next sweep searches them.
-    const approved = await s.knowledge.approve(add.id);
+    const approved = await env.knowledge.approve(add.id);
     assert.equal(approved.appliedVersion, 2);
-    const v2 = s.p.charters.approved()!;
+    const v2 = env.p.charters.approved()!;
     assert.equal(v2.version, 2);
     assert.deepEqual(v2.charter.questions.at(-1), { id: "Q5", text: add.change.text, weight: 1 });
-    s.setBatch(5);
-    await s.sweep();
-    const queries = JSON.stringify(s.p.db.prepare("SELECT queries_json FROM sweeps ORDER BY id DESC LIMIT 1").get());
+    env.setBatch(5);
+    await env.sweep();
+    const queries = JSON.stringify(env.p.db.prepare("SELECT queries_json FROM sweeps ORDER BY id DESC LIMIT 1").get());
     assert.match(queries, /profiling methods/);
 
     // Retire Q4 (ids stay), then the weight proposal for Q4 is stale.
-    await s.knowledge.approve(retire.id);
+    await env.knowledge.approve(retire.id);
     assert.deepEqual(
-      s.p.charters.approved()!.charter.questions.map((q) => q.id),
+      env.p.charters.approved()!.charter.questions.map((q) => q.id),
       ["Q1", "Q2", "Q3", "Q5"],
     );
-    const weight = s.knowledge.proposals("proposed").find((p) => p.kind === "weight" && p.change.target === "Q4");
+    const weight = env.knowledge.proposals("proposed").find((p) => p.kind === "weight" && p.change.target === "Q4");
     if (weight) {
-      await assert.rejects(s.knowledge.approve(weight.id), /stale/);
-      assert.equal(s.knowledge.proposals("stale").length, 1);
+      await assert.rejects(env.knowledge.approve(weight.id), /stale/);
+      assert.equal(env.knowledge.proposals("stale").length, 1);
     }
     // Undo works only on the latest change.
-    await assert.rejects(s.knowledge.undo(add.id), /a later charter version exists/);
-    const undone = await s.knowledge.undo(retire.id);
+    await assert.rejects(env.knowledge.undo(add.id), /a later charter version exists/);
+    const undone = await env.knowledge.undo(retire.id);
     assert.equal(undone.status, "undone");
-    assert.equal(s.p.charters.approved()!.version, 4);
-    assert.ok(s.p.charters.approved()!.charter.questions.some((q) => q.id === "Q4"));
+    assert.equal(env.p.charters.approved()!.version, 4);
+    assert.ok(env.p.charters.approved()!.charter.questions.some((q) => q.id === "Q4"));
   } finally {
-    await s.server.stop();
+    await env.server.stop();
   }
 });
 
 test("rejected proposals are not proposed again; low-promise directions are dropped; no evidence, no model call", async () => {
-  const s = await project({ promise: 0.2 });
+  const env = await project({ promise: 0.2 });
   try {
-    await s.knowledge.review();
-    assert.ok(!s.knowledge.proposals("proposed").some((p) => p.kind === "add-question"), "under 0.5");
-    const report = s.knowledge.reviews(1)[0].report;
+    await env.knowledge.review();
+    assert.ok(!env.knowledge.proposals("proposed").some((p) => p.kind === "add-question"), "under 0.5");
+    const report = env.knowledge.reviews(1)[0].report;
     assert.equal(report.directions[0].kept, false);
     assert.equal(report.directions[0].score, 0.2);
-    const retire = s.knowledge.proposals("proposed").find((p) => p.kind === "retire-question")!;
-    assert.equal(s.knowledge.reject(retire.id, "I still care about clinics").reason, "I still care about clinics");
-    await s.knowledge.review();
-    assert.ok(!s.knowledge.proposals("proposed").some((p) => p.kind === "retire-question"));
-    await assert.rejects(s.knowledge.approve(retire.id), /is rejected/);
+    const retire = env.knowledge.proposals("proposed").find((p) => p.kind === "retire-question")!;
+    assert.equal(env.knowledge.reject(retire.id, "I still care about clinics").reason, "I still care about clinics");
+    await env.knowledge.review();
+    assert.ok(!env.knowledge.proposals("proposed").some((p) => p.kind === "retire-question"));
+    await assert.rejects(env.knowledge.approve(retire.id), /is rejected/);
   } finally {
-    await s.server.stop();
+    await env.server.stop();
   }
   const empty = await project({ sweeps: 0 });
   try {
@@ -182,9 +182,9 @@ test("rejected proposals are not proposed again; low-promise directions are drop
 });
 
 test("the API runs a review in the background, decides proposals, and the digest runs the review and lists them", async () => {
-  const s = await project();
+  const env = await project();
   try {
-    const { client } = s.server;
+    const { client } = env.server;
     assert.deepEqual((await client.knowledge()).proposals, []);
     assert.deepEqual(await client.runKnowledgeReview(), { started: true });
     await until(
@@ -202,7 +202,7 @@ test("the API runs a review in the background, decides proposals, and the digest
     const charter = await client.charter();
     assert.equal(charter.approved?.version, 3);
 
-    const digest = await s.server.hub.project.plugins
+    const digest = await env.server.hub.project.plugins
       .exportsOf<import("../plugins/rh.digest/main.ts").DigestExports>("rh.digest")
       .then((d) => d.buildDigest(Date.now() + 1000));
     assert.equal((await client.knowledge()).reviews[0].requestedBy, "digest", "the digest ran a review first");
@@ -212,6 +212,6 @@ test("the API runs a review in the background, decides proposals, and the digest
     assert.ok(listed.some((p) => p.kind === "retire-question" && p.status === "proposed"));
     await client.commentDigest(digest.id, "charter", "Good ideas");
   } finally {
-    await s.server.stop();
+    await env.server.stop();
   }
 });

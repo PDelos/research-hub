@@ -12,12 +12,12 @@ import type { SweepPaper } from "../src/sweep/sweep.ts";
 import { sampleCharter } from "./fixtures/charter.ts";
 import { choice, noul, score, scripted } from "./fixtures/jev-answers.ts";
 import { arxivOnlyFetch, fakePapers, type FakePaper } from "./fixtures/sweep-env.ts";
-import { startTestServer } from "./helpers.ts";
+import { startTestServer } from "./test-server.ts";
 
-const passAll = (id: string, _cmd: string, q: any) => {
+const passAll = (id: string, _cmd: string, question: any) => {
   if (id === "relevance") return score(0.75, 5);
-  if (id === "matched_question") return choice("Q2", Object.keys(q.criteria));
-  if (id === "kind") return choice("method", Object.keys(q.criteria));
+  if (id === "matched_question") return choice("Q2", Object.keys(question.criteria));
+  if (id === "kind") return choice("method", Object.keys(question.criteria));
   if (id === "worth") return noul(0.8);
   if (id === "novelty") return score(2 / 3, 4);
   if (id === "level") return score(1 / 3, 4);
@@ -278,13 +278,13 @@ test("a card turn that ends without complete_sweep fails the sweep and keeps its
 });
 
 test("a restart during the card turn re-attaches and completes the sweep with one card per paper", async () => {
-  const { tempDir } = await import("./helpers.ts");
-  const t = tempDir();
+  const { tempDir } = await import("./test-server.ts");
+  const temp = tempDir();
   try {
     const papers = fakePapers(3);
     const jev = scripted(passAll);
     const options = {
-      dataDir: t.dir,
+      dataDir: temp.dir,
       hub: {
         ticker: false,
         fauxRules: [cardWriterRule],
@@ -319,6 +319,6 @@ test("a restart during the card turn re-attaches and completes the sweep with on
       await second.stop();
     }
   } finally {
-    t.cleanup();
+    temp.cleanup();
   }
 });

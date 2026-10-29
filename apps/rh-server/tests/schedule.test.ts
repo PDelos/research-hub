@@ -5,7 +5,7 @@ import { ConfigError, loadConfig } from "../src/config.ts";
 import { validateCharter } from "../src/charter.ts";
 import { dailySlot, localParts, MISSED, weeklySlot, zonedToUtc } from "../src/schedule.ts";
 import { sampleCharter } from "./fixtures/charter.ts";
-import { startTestServer, tempDir, TOKEN, type TestServer } from "./helpers.ts";
+import { startTestServer, tempDir, TOKEN, type TestServer } from "./test-server.ts";
 
 const at = (iso: string) => Date.parse(iso);
 
@@ -73,9 +73,9 @@ const rows = (s: TestServer) =>
   s.hub.project.db.prepare("SELECT kind, slot, trigger, status, reason FROM scheduled_runs ORDER BY id").all() as any[];
 
 test("5.2 defaults come from RH_SWEEP_TIME; saved changes override the environment and survive restarts", async () => {
-  const t = tempDir();
+  const temp = tempDir();
   try {
-    let server = await activeServer({ RH_SWEEP_TIME: "06:20" }, t.dir);
+    let server = await activeServer({ RH_SWEEP_TIME: "06:20" }, temp.dir);
     try {
       const http = (method: string, path: string, body?: unknown) =>
         fetch(`${server.url}${path}`, {
@@ -98,7 +98,7 @@ test("5.2 defaults come from RH_SWEEP_TIME; saved changes override the environme
     } finally {
       await server.stop();
     }
-    server = await activeServer({ RH_SWEEP_TIME: "09:00" }, t.dir);
+    server = await activeServer({ RH_SWEEP_TIME: "09:00" }, temp.dir);
     try {
       const after = server.hub.project.scheduler.schedule();
       assert.equal(after.sweep.enabled, false, "turning the sweep off survives a restart");
@@ -112,14 +112,14 @@ test("5.2 defaults come from RH_SWEEP_TIME; saved changes override the environme
       await server.stop();
     }
   } finally {
-    t.cleanup();
+    temp.cleanup();
   }
 });
 
 test("5.3 exactly once per slot: two ticks and a restart inside the slot record one run", async () => {
-  const t = tempDir();
+  const temp = tempDir();
   try {
-    let server = await activeServer({}, t.dir);
+    let server = await activeServer({}, temp.dir);
     try {
       server.hub.project.scheduler.setSchedule({ review: { enabled: false }, nightly: { enabled: false } });
       assert.equal(server.hub.project.scheduler.tick(at("2026-10-23T06:00:30Z")).length, 1);
@@ -127,7 +127,7 @@ test("5.3 exactly once per slot: two ticks and a restart inside the slot record 
     } finally {
       await server.stop();
     }
-    server = await activeServer({}, t.dir);
+    server = await activeServer({}, temp.dir);
     try {
       assert.equal(server.hub.project.scheduler.tick(at("2026-10-23T06:02:00Z")).length, 0, "restart inside the slot");
       assert.deepEqual(
@@ -138,18 +138,18 @@ test("5.3 exactly once per slot: two ticks and a restart inside the slot record 
       await server.stop();
     }
   } finally {
-    t.cleanup();
+    temp.cleanup();
   }
 });
 
 test("5.4 catch-up, charter not approved, and paused slots", async () => {
   const server = await activeServer();
   try {
-    const s = server.hub.project.scheduler;
-    s.setSchedule({ review: { enabled: false }, nightly: { enabled: false } });
+    const scheduler = server.hub.project.scheduler;
+    scheduler.setSchedule({ review: { enabled: false }, nightly: { enabled: false } });
     // Last sweep ran on the 21st; the hub was down on the 22nd and comes back on the 23rd at 10:00.
-    s.tick(at("2026-10-21T06:00:30Z"));
-    const down = s.tick(at("2026-10-23T10:00:00Z"));
+    scheduler.tick(at("2026-10-21T06:00:30Z"));
+    const down = scheduler.tick(at("2026-10-23T10:00:00Z"));
     assert.deepEqual(
       down.map((r) => [r.slot, r.status, r.reason]),
       [
@@ -161,13 +161,13 @@ test("5.4 catch-up, charter not approved, and paused slots", async () => {
     // Paused at the slot: skipped "project paused", and nothing is caught up after resuming.
     server.hub.project.state.pause();
     assert.deepEqual(
-      s.tick(at("2026-10-24T06:00:30Z")).map((r) => [r.slot, r.reason]),
+      scheduler.tick(at("2026-10-24T06:00:30Z")).map((r) => [r.slot, r.reason]),
       [["sweep:2026-10-24", "project paused"]],
     );
     server.hub.project.state.resume(at("2026-10-24T07:00:00Z"));
-    assert.equal(s.tick(at("2026-10-24T07:05:00Z")).length, 0);
+    assert.equal(scheduler.tick(at("2026-10-24T07:05:00Z")).length, 0);
     assert.deepEqual(
-      s.tick(at("2026-10-25T06:00:30Z")).map((r) => r.status),
+      scheduler.tick(at("2026-10-25T06:00:30Z")).map((r) => r.status),
       ["requested"],
     );
   } finally {
@@ -191,8 +191,8 @@ test("5.4 catch-up, charter not approved, and paused slots", async () => {
 test("5.5 + 5.6 manual runs never take the scheduled slot; one active run per kind; the run log lists reasons", async () => {
   const server = await activeServer();
   try {
-    const s = server.hub.project.scheduler;
-    s.setSchedule({ review: { enabled: false }, nightly: { enabled: false } });
+    const scheduler = server.hub.project.scheduler;
+    scheduler.setSchedule({ review: { enabled: false }, nightly: { enabled: false } });
     const response = await fetch(`${server.url}/v1/runs/sweep`, {
       method: "POST",
       headers: { authorization: `Bearer ${TOKEN}` },
@@ -200,11 +200,11 @@ test("5.5 + 5.6 manual runs never take the scheduled slot; one active run per ki
     assert.equal(response.status, 202);
     assert.equal(((await response.json()) as any).trigger, "manual");
     assert.deepEqual(
-      s.tick(at("2026-10-23T06:00:30Z")).map((r) => [r.slot, r.status]),
+      scheduler.tick(at("2026-10-23T06:00:30Z")).map((r) => [r.slot, r.status]),
       [["sweep:2026-10-23", "requested"]],
     );
     server.hub.project.db.prepare("UPDATE scheduled_runs SET status = 'running' WHERE slot = 'sweep:2026-10-23'").run();
-    const second = s.trigger("sweep");
+    const second = scheduler.trigger("sweep");
     assert.equal(second.status, "skipped");
     assert.equal(second.reason, "sweep already running");
     const log = (await (
@@ -253,25 +253,25 @@ test("4.2 the overview shows status, version, next runs for an active project on
 });
 
 test("the nightly run of the daily cycle is requested once per night at RH_NIGHTLY_TIME and caught up like the sweep", async () => {
-  const t = tempDir();
+  const temp = tempDir();
   try {
-    let server = await activeServer({ RH_NIGHTLY_TIME: "02:30" }, t.dir);
+    let server = await activeServer({ RH_NIGHTLY_TIME: "02:30" }, temp.dir);
     try {
-      const s = server.hub.project.scheduler;
-      s.setSchedule({ sweep: { enabled: false }, review: { enabled: false } });
-      assert.deepEqual(s.schedule().nightly, { enabled: true, time: "02:30" });
-      assert.equal(s.tick(at("2026-10-23T02:29:00Z")).length > 0, true, "the previous night's slot is due");
+      const scheduler = server.hub.project.scheduler;
+      scheduler.setSchedule({ sweep: { enabled: false }, review: { enabled: false } });
+      assert.deepEqual(scheduler.schedule().nightly, { enabled: true, time: "02:30" });
+      assert.equal(scheduler.tick(at("2026-10-23T02:29:00Z")).length > 0, true, "the previous night's slot is due");
       assert.deepEqual(
-        s.tick(at("2026-10-23T02:31:00Z")).map((r) => [r.kind, r.slot, r.status]),
+        scheduler.tick(at("2026-10-23T02:31:00Z")).map((r) => [r.kind, r.slot, r.status]),
         [["nightly", "nightly:2026-10-23", "requested"]],
       );
-      assert.equal(s.tick(at("2026-10-23T03:00:00Z")).length, 0);
-      assert.match(s.next(at("2026-10-23T03:00:00Z")).nightly!, /^2026-10-24T02:30:00/);
-      assert.throws(() => s.setSchedule({ nightly: { time: "2:30" } }), /nightly\.time must be HH:MM/);
+      assert.equal(scheduler.tick(at("2026-10-23T03:00:00Z")).length, 0);
+      assert.match(scheduler.next(at("2026-10-23T03:00:00Z")).nightly!, /^2026-10-24T02:30:00/);
+      assert.throws(() => scheduler.setSchedule({ nightly: { time: "2:30" } }), /nightly\.time must be HH:MM/);
     } finally {
       await server.stop();
     }
-    server = await activeServer({ RH_NIGHTLY_TIME: "02:30" }, t.dir);
+    server = await activeServer({ RH_NIGHTLY_TIME: "02:30" }, temp.dir);
     try {
       // Down for two nights: the missed one is noted as skipped, the latest requested.
       assert.deepEqual(
@@ -285,6 +285,6 @@ test("the nightly run of the daily cycle is requested once per night at RH_NIGHT
       await server.stop();
     }
   } finally {
-    t.cleanup();
+    temp.cleanup();
   }
 });

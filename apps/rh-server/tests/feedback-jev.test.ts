@@ -10,18 +10,21 @@ const ruleP: Record<string, number> = {
   "Maybe prefer shorter papers": 0.55,
   "Nice figure 3": 0.1,
 };
-const script = (id: string, _c: string, q: any, state: any) => {
+const script = (id: string, _c: string, question: any, state: any) => {
   if (id === "relevance") return score(0.75, 5);
-  if (id === "matched_question") return choice("Q1", Object.keys(q.criteria));
+  if (id === "matched_question") return choice("Q1", Object.keys(question.criteria));
   if (id === "worth") return noul(0.8);
   if (id === "reason_kind")
-    return choice(String(state.judgment?.reason).includes("code") ? "great-method" : "other", Object.keys(q.criteria));
+    return choice(
+      String(state.judgment?.reason).includes("code") ? "great-method" : "other",
+      Object.keys(question.criteria),
+    );
   if (id === "generalizable") return noul(ruleP[String(state.judgment?.reason)] ?? 0);
   return undefined;
 };
 
-async function withCards(n = 4) {
-  const env = sweepEnv({ fetch: arxivOnlyFetch(fakePapers(n)), script });
+async function withCards(count = 4) {
+  const env = sweepEnv({ fetch: arxivOnlyFetch(fakePapers(count)), script });
   const sweep = await env.runner.settled(env.runner.start("manual").id);
   return { env, cards: env.presentAll(sweep.id) };
 }

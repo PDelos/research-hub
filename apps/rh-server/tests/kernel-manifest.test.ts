@@ -7,7 +7,7 @@ import { test } from "node:test";
 import { dependents, resolve, type GraphNode } from "../src/kernel/graph.ts";
 import { engineProblem, ManifestInvalid, parseManifest, type PluginManifest } from "../src/kernel/manifest.ts";
 import { discover } from "../src/kernel/registry.ts";
-import { tempDir } from "./helpers.ts";
+import { tempDir } from "./test-server.ts";
 
 const base = {
   id: "rh.example",
@@ -71,10 +71,10 @@ function write(root: string, name: string, manifest: unknown) {
 }
 
 test("discovery loads built-in and installed plugins and reports invalid ones without stopping", () => {
-  const t = tempDir();
+  const temp = tempDir();
   try {
-    const builtin = join(t.dir, "builtin");
-    const installed = join(t.dir, "installed");
+    const builtin = join(temp.dir, "builtin");
+    const installed = join(temp.dir, "installed");
     write(builtin, "kb", { ...base, id: "rh.kb" });
     write(installed, "reader", { ...base, id: "acme.reader", engines: { "research-hub": "^2.0.0" } });
     write(installed, "broken", "{ not json");
@@ -89,7 +89,7 @@ test("discovery loads built-in and installed plugins and reports invalid ones wi
     assert.match(byDir.shadow, /^id: rh\.kb is already provided by/);
     assert.equal(byDir.empty, "rh-plugin.json: missing");
   } finally {
-    t.cleanup();
+    temp.cleanup();
   }
 });
 

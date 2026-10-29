@@ -21,19 +21,19 @@ function io(offline = false) {
 }
 
 test("a retrieval sample is built once from Parquet and TSV, with relevant documents and distractors, then reused", async () => {
-  const s = io();
-  const first = await loadSample("scidocs", s.io);
+  const env = io();
+  const first = await loadSample("scidocs", env.io);
   assert.equal(first.downloaded, true);
   const { sample } = first;
   assert.equal(sample.queries.length, 12, "every query with a relevant document (fewer than 100 here)");
   assert.ok(!sample.queries.some((q) => q.id === "q99"), "a score-0 qrel is not relevant");
   for (const q of sample.queries) for (const d of sample.relevant[q.id]) assert.ok(sample.docs.some((x) => x.id === d));
   assert.equal(sample.docs.length, 42);
-  assert.equal(s.requests.length, 3);
-  const again = await loadSample("scidocs", s.io);
+  assert.equal(env.requests.length, 3);
+  const again = await loadSample("scidocs", env.io);
   assert.equal(again.downloaded, false);
-  assert.equal(s.requests.length, 3, "cached: nothing downloaded the second time");
-  assert.ok(s.cache.has("benchmarks/scidocs-v2.json"));
+  assert.equal(env.requests.length, 3, "cached: nothing downloaded the second time");
+  assert.ok(env.cache.has("benchmarks/scidocs-v2.json"));
 
   // The same seed gives the same sample.
   const other = io();
@@ -51,7 +51,7 @@ test("the PubMed sample maps sentence roles to background, method and result", a
 });
 
 test("offline mode never downloads: a missing sample is reported", async () => {
-  const s = io(true);
-  await assert.rejects(loadSample("scidocs", s.io), SampleUnavailable);
-  assert.equal(s.requests.length, 0);
+  const env = io(true);
+  await assert.rejects(loadSample("scidocs", env.io), SampleUnavailable);
+  assert.equal(env.requests.length, 0);
 });

@@ -5,11 +5,11 @@ import { test } from "node:test";
 import { openProjectDb } from "../src/db.ts";
 import { PaperStore } from "../src/papers/store.ts";
 import { Citations } from "../src/representations/citations.ts";
-import { tempDir } from "./helpers.ts";
+import { tempDir } from "./test-server.ts";
 
 test("shared references, direct citation and co-citation", () => {
-  const t = tempDir();
-  const { db } = openProjectDb(join(t.dir, "project.sqlite"));
+  const temp = tempDir();
+  const { db } = openProjectDb(join(temp.dir, "project.sqlite"));
   try {
     const store = new PaperStore(db);
     const add = (w: string, references: string[] = []) =>
@@ -22,17 +22,27 @@ test("shared references, direct citation and co-citation", () => {
         references,
       }).id;
     // A cites B; both reference W10, W11, W12; C and D cite both A and B.
-    const a = add("W1", ["W2", "W10", "W11", "W12", "W13"]);
-    const b = add("W2", ["W10", "W11", "W12", "W14"]);
+    const first = add("W1", ["W2", "W10", "W11", "W12", "W13"]);
+    const second = add("W2", ["W10", "W11", "W12", "W14"]);
     add("W3", ["W1", "W2"]);
     add("W4", ["https://openalex.org/W1", "W2", "W99"]);
     const citations = new Citations(db);
-    assert.deepEqual(citations.report(a, b), { aCitesB: true, bCitesA: false, sharedReferences: 3, coCitedBy: 2 });
-    assert.deepEqual(citations.report(b, a), { aCitesB: false, bCitesA: true, sharedReferences: 3, coCitedBy: 2 });
-    assert.deepEqual(citations.references(a), [b]);
-    assert.equal(citations.citedBy(a).length, 2);
+    assert.deepEqual(citations.report(first, second), {
+      aCitesB: true,
+      bCitesA: false,
+      sharedReferences: 3,
+      coCitedBy: 2,
+    });
+    assert.deepEqual(citations.report(second, first), {
+      aCitesB: false,
+      bCitesA: true,
+      sharedReferences: 3,
+      coCitedBy: 2,
+    });
+    assert.deepEqual(citations.references(first), [second]);
+    assert.equal(citations.citedBy(first).length, 2);
   } finally {
     db.close();
-    t.cleanup();
+    temp.cleanup();
   }
 });

@@ -9,20 +9,20 @@ import { test } from "node:test";
 import { validateCharter } from "../src/charter.ts";
 import { loadConfig } from "../src/config.ts";
 import { sampleCharter } from "./fixtures/charter.ts";
-import { startTestServer, tempDir } from "./helpers.ts";
+import { startTestServer, tempDir } from "./test-server.ts";
 
 const FAKE = join(import.meta.dirname, "fixtures/fake-ignis");
 const DIST = join(import.meta.dirname, "../../rh-client-browser/dist");
 
 async function viewerServer(over: Record<string, unknown> = {}) {
-  const t = tempDir();
+  const temp = tempDir();
   // Offline tests never download Obsidian: put a package in place.
-  const app = join(t.dir, "kb-viewer", "obsidian-app");
+  const app = join(temp.dir, "kb-viewer", "obsidian-app");
   mkdirSync(app, { recursive: true });
   writeFileSync(join(app, "index.html"), "<html></html>");
   writeFileSync(join(app, ".obsidian-version"), "1.14.4");
   const server = await startTestServer({
-    dataDir: t.dir,
+    dataDir: temp.dir,
     env: { RH_UI_DIR: DIST },
     hub: { ticker: false, kbViewer: { enabled: true, dir: FAKE, restartDelays: [200], ...over } },
   });
@@ -36,7 +36,7 @@ async function viewerServer(over: Record<string, unknown> = {}) {
     if (Date.now() > end) throw new Error(JSON.stringify(projectRuntime.kbViewer.status()));
     await new Promise((r) => setTimeout(r, 50));
   }
-  return { server, p: projectRuntime, done: async () => (await server.stop(), t.cleanup()) };
+  return { server, p: projectRuntime, done: async () => (await server.stop(), temp.cleanup()) };
 }
 
 const host = (server: { port: number }) => `localhost:${server.port}`;
@@ -106,8 +106,8 @@ test("cross-site requests, foreign hosts and foreign WebSocket origins are refus
           ),
         );
         let data = "";
-        socket.on("data", (d) => {
-          data += d.toString("latin1");
+        socket.on("data", (chunk) => {
+          data += chunk.toString("latin1");
           if (data.includes("hello") || data.includes("403")) {
             socket.end();
             resolve(data);
@@ -172,10 +172,10 @@ test("disabled (RH_KB_VIEWER=off) and unavailable (no Ignis, or offline without 
   } finally {
     await off.done();
   }
-  const t = tempDir();
+  const temp = tempDir();
   const missing = await startTestServer({
-    dataDir: t.dir,
-    hub: { ticker: false, kbViewer: { enabled: true, dir: join(t.dir, "nowhere") } },
+    dataDir: temp.dir,
+    hub: { ticker: false, kbViewer: { enabled: true, dir: join(temp.dir, "nowhere") } },
   });
   try {
     const projectRuntime = missing.hub.project;
@@ -188,7 +188,7 @@ test("disabled (RH_KB_VIEWER=off) and unavailable (no Ignis, or offline without 
     assert.match(projectRuntime.kbViewer.status().reason!, /Ignis is not installed/);
   } finally {
     await missing.stop();
-    t.cleanup();
+    temp.cleanup();
   }
   const t2 = tempDir();
   const noObsidian = await startTestServer({
@@ -196,14 +196,14 @@ test("disabled (RH_KB_VIEWER=off) and unavailable (no Ignis, or offline without 
     hub: { ticker: false, kbViewer: { enabled: true, dir: FAKE } },
   });
   try {
-    const p = noObsidian.hub.project;
-    p.brief.write("# x");
-    p.charters.saveDraft(validateCharter(sampleCharter()), "agent");
-    p.charters.approve();
-    p.syncVault();
+    const projectName = noObsidian.hub.project;
+    projectName.brief.write("# x");
+    projectName.charters.saveDraft(validateCharter(sampleCharter()), "agent");
+    projectName.charters.approve();
+    projectName.syncVault();
     await new Promise((r) => setTimeout(r, 100));
-    assert.equal(p.kbViewer.status().state, "unavailable");
-    assert.match(p.kbViewer.status().reason!, /offline mode makes no downloads/);
+    assert.equal(projectName.kbViewer.status().state, "unavailable");
+    assert.match(projectName.kbViewer.status().reason!, /offline mode makes no downloads/);
   } finally {
     await noObsidian.stop();
     t2.cleanup();

@@ -28,17 +28,17 @@ const config = loadConfig({
   RH_PROJECT_NAME: "ui-tests",
 } as NodeJS.ProcessEnv);
 const running = await startServer(config, createLogger({ level: "warn" }));
-const p = running.hub.project;
-p.brief.write("# UI tests\n\nProtein language models.");
-p.charters.saveDraft(validateCharter(sampleCharter()), "agent");
-p.charters.approve();
-p.syncVault();
-const { installer } = p.plugins;
+const project = running.hub.project;
+project.brief.write("# UI tests\n\nProtein language models.");
+project.charters.saveDraft(validateCharter(sampleCharter()), "agent");
+project.charters.approve();
+project.syncVault();
+const { installer } = project.plugins;
 await installer.confirm((await installer.prepare({ folder: join(FIXTURE_PLUGINS, "acme.reading-list") })).planId);
 // Two charter proposals of the knowledge review, so the Digest and Charter tabs show them.
-await p.plugins.exportsOf("rh.knowledge");
+await project.plugins.exportsOf("rh.knowledge");
 const seededAt = new Date().toISOString();
-const propose = p.db.prepare(
+const propose = project.db.prepare(
   "INSERT INTO p_rh_knowledge__proposals (review_id, kind, change_key, change_json, evidence_json, status, base_version, created_at, finder) VALUES (0, ?, ?, ?, ?, 'proposed', 1, ?, ?)",
 );
 propose.run(
@@ -67,7 +67,7 @@ propose.run(
 );
 // A knowledge-base paper with its full text, so the Library shows both.
 {
-  const paperId = p.papers.store.upsert({
+  const paperId = project.papers.store.upsert({
     source: "arxiv",
     externalId: "2601.00001",
     ids: { arxiv: "2601.00001" },
@@ -77,17 +77,17 @@ propose.run(
     year: 2026,
   }).id;
   const now = new Date().toISOString();
-  p.db
+  project.db
     .prepare("INSERT INTO kb_requests (paper_id, card_id, status, created_at, updated_at) VALUES (?, 0, 'done', ?, ?)")
     .run(paperId, now, now);
-  p.db
+  project.db
     .prepare(
       "INSERT INTO kb_notes (paper_id, stem, summary, created_at) VALUES (?, 'rna-fm', 'An RNA language model.', ?)",
     )
     .run(paperId, now);
-  p.vault.create("sources/rna-fm.md", "---\ntitle: RNA-FM\n---\n\n## Summary\nAn RNA language model.\n");
-  await p.plugins.exportsOf("rh.fulltext");
-  p.db
+  project.vault.create("sources/rna-fm.md", "---\ntitle: RNA-FM\n---\n\n## Summary\nAn RNA language model.\n");
+  await project.plugins.exportsOf("rh.fulltext");
+  project.db
     .prepare(
       "INSERT INTO p_rh_fulltext__texts (paper_id, status, source, sections_json, chars, notes_json, fetched_at) VALUES (?, 'ok', 'arxiv-html', ?, 60, '[]', ?)",
     )
@@ -101,12 +101,12 @@ propose.run(
     );
 }
 // One change and a digest, so the Digest tab has something to show (and to undo).
-await p.plugins.kernel.configure("rh.sweep", { cardsPerSweep: 5 });
-await (await p.plugins.exportsOf<DigestExports>("rh.digest")).buildDigest();
+await project.plugins.kernel.configure("rh.sweep", { cardsPerSweep: 5 });
+await (await project.plugins.exportsOf<DigestExports>("rh.digest")).buildDigest();
 // A finished upgrade run with an embedder proposal and an add-on suggestion, so the Upgrades tab has them.
-await p.plugins.exportsOf("rh.upgrades");
+await project.plugins.exportsOf("rh.upgrades");
 const at = new Date().toISOString();
-p.db
+project.db
   .prepare(
     "INSERT INTO p_rh_upgrades__runs (focus, reason, status, report_json, cost_usd, requested_by, started_at, finished_at) VALUES ('embedder', 'Seeded for the UI tests.', 'done', ?, 0.01, 'test', ?, ?)",
   )
@@ -120,12 +120,12 @@ p.db
     at,
     at,
   );
-p.db
+project.db
   .prepare(
     "INSERT INTO p_rh_upgrades__proposals (run_id, kind, payload_json, status, created_at) VALUES (1, 'embedder', ?, 'proposed', ?)",
   )
   .run(JSON.stringify({ model: "acme/embed-native", dims: 0, mean: 0.7, activeMean: 0.6, activeModel: "offline" }), at);
-p.db
+project.db
   .prepare(
     "INSERT INTO p_rh_upgrades__suggestions (run_id, name, url, reason, created_at) VALUES (1, 'bioRxiv API', 'https://api.biorxiv.org', 'biology preprints', ?)",
   )

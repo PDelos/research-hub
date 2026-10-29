@@ -4,7 +4,7 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import { openProjectDb } from "../src/db.ts";
-import { startTestServer, tempDir } from "./helpers.ts";
+import { startTestServer, tempDir } from "./test-server.ts";
 
 test("an empty data dir gets agent.sqlite and project.sqlite directly in it", async () => {
   const server = await startTestServer();
@@ -18,21 +18,21 @@ test("an empty data dir gets agent.sqlite and project.sqlite directly in it", as
 });
 
 test("project.sqlite proves FTS5 and loads sqlite-vec with working nearest-neighbour search", () => {
-  const t = tempDir();
+  const temp = tempDir();
   try {
-    const { db, check } = openProjectDb(join(t.dir, "project.sqlite"));
+    const { db, check } = openProjectDb(join(temp.dir, "project.sqlite"));
     assert.equal(check.fts5, true);
     assert.match(check.vec ?? "", /^v\d+\.\d+\.\d+/);
     db.close();
   } finally {
-    t.cleanup();
+    temp.cleanup();
   }
 });
 
 test("migrations run once: reopening keeps data and the schema version", () => {
-  const t = tempDir();
+  const temp = tempDir();
   try {
-    const path = join(t.dir, "project.sqlite");
+    const path = join(temp.dir, "project.sqlite");
     const first = openProjectDb(path);
     first.db.prepare("INSERT INTO settings (key, value, updated_at) VALUES ('k', '1', 'now')").run();
     first.db.close();
@@ -41,15 +41,15 @@ test("migrations run once: reopening keeps data and the schema version", () => {
     assert.equal((second.db.prepare("PRAGMA user_version").get() as any).user_version, 7);
     second.db.close();
   } finally {
-    t.cleanup();
+    temp.cleanup();
   }
 });
 
 test("migration 2 upgrades a version-1 database and keeps its telemetry rows", async () => {
   const { DatabaseSync } = await import("node:sqlite");
-  const t = tempDir();
+  const temp = tempDir();
   try {
-    const path = join(t.dir, "project.sqlite");
+    const path = join(temp.dir, "project.sqlite");
     // A v0.0 database: migration 1 only, with one run recorded.
     const first = openProjectDb(path);
     first.db
@@ -75,14 +75,14 @@ test("migration 2 upgrades a version-1 database and keeps its telemetry rows", a
     assert.equal(Number(insert.run().changes), 0, "UNIQUE(kind, slot) keeps one record per slot");
     second.db.close();
   } finally {
-    t.cleanup();
+    temp.cleanup();
   }
 });
 
 test("migration 3 upgrades a version-2 database and keeps its settings", async () => {
-  const t = tempDir();
+  const temp = tempDir();
   try {
-    const path = join(t.dir, "project.sqlite");
+    const path = join(temp.dir, "project.sqlite");
     const first = openProjectDb(path);
     first.db.prepare("INSERT INTO settings (key, value, updated_at) VALUES ('kept', '\"yes\"', 'now')").run();
     first.db.exec(
@@ -95,14 +95,14 @@ test("migration 3 upgrades a version-2 database and keeps its settings", async (
     assert.equal((second.db.prepare("SELECT value FROM settings WHERE key = 'kept'").get() as any).value, '"yes"');
     second.db.close();
   } finally {
-    t.cleanup();
+    temp.cleanup();
   }
 });
 
 test("migration 6 upgrades a version-5 database: notes, search index, ingest attempts; pending requests kept", () => {
-  const t = tempDir();
+  const temp = tempDir();
   try {
-    const path = join(t.dir, "project.sqlite");
+    const path = join(temp.dir, "project.sqlite");
     const first = openProjectDb(path);
     first.db.exec(
       "DROP TABLE kb_notes; DROP TABLE kb_fts; DROP TABLE kb_files; DROP TABLE kb_requests; CREATE TABLE kb_requests (paper_id INTEGER NOT NULL UNIQUE, card_id INTEGER NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL); PRAGMA user_version = 5;",
@@ -125,14 +125,14 @@ test("migration 6 upgrades a version-5 database: notes, search index, ingest att
     second.db.prepare("UPDATE kb_requests SET status = 'failed' WHERE paper_id = 1").run();
     second.db.close();
   } finally {
-    t.cleanup();
+    temp.cleanup();
   }
 });
 
 test("migration 5 upgrades a version-4 database: judgments, weights, rule candidates, knowledge-base requests", () => {
-  const t = tempDir();
+  const temp = tempDir();
   try {
-    const path = join(t.dir, "project.sqlite");
+    const path = join(temp.dir, "project.sqlite");
     const first = openProjectDb(path);
     first.db.exec(
       "DROP TABLE kb_notes; DROP TABLE kb_fts; DROP TABLE kb_files; DROP TABLE kb_requests; CREATE TABLE kb_requests (paper_id INTEGER NOT NULL UNIQUE, card_id INTEGER NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL); DROP TABLE judgments; DROP TABLE weight_effects; DROP TABLE weights; DROP TABLE rule_candidates; DROP TABLE kb_requests; ALTER TABLE sweep_papers DROP COLUMN queries_json; ALTER TABLE jev_calls DROP COLUMN extra_json; PRAGMA user_version = 4;",
@@ -147,14 +147,14 @@ test("migration 5 upgrades a version-4 database: judgments, weights, rule candid
     );
     second.db.close();
   } finally {
-    t.cleanup();
+    temp.cleanup();
   }
 });
 
 test("migration 4 upgrades a version-3 database: sweep tables, categories and cost tags", () => {
-  const t = tempDir();
+  const temp = tempDir();
   try {
-    const path = join(t.dir, "project.sqlite");
+    const path = join(temp.dir, "project.sqlite");
     const first = openProjectDb(path);
     first.db
       .prepare("INSERT INTO papers (title, title_norm, created_at, updated_at) VALUES ('Kept', 'kept', 'now', 'now')")
@@ -175,15 +175,15 @@ test("migration 4 upgrades a version-3 database: sweep tables, categories and co
     assert.equal((second.db.prepare("SELECT title FROM papers").get() as any).title, "Kept");
     second.db.close();
   } finally {
-    t.cleanup();
+    temp.cleanup();
   }
 });
 
 test("migration 3 adds the paper tables; vector tables follow the configured dimension", async () => {
   const { ensureVectorTables, VECTOR_KINDS } = await import("../src/db.ts");
-  const t = tempDir();
+  const temp = tempDir();
   try {
-    const { db } = openProjectDb(join(t.dir, "project.sqlite"));
+    const { db } = openProjectDb(join(temp.dir, "project.sqlite"));
     for (const table of [
       "papers",
       "paper_ids",
@@ -206,12 +206,12 @@ test("migration 3 adds the paper tables; vector tables follow the configured dim
     assert.equal((db.prepare("SELECT COUNT(*) n FROM vec_whole").get() as any).n, 0);
     db.close();
   } finally {
-    t.cleanup();
+    temp.cleanup();
   }
 });
 
 test("startup creates the four vector tables for RH_EMBED_DIMS", async () => {
-  const { startTestServer } = await import("./helpers.ts");
+  const { startTestServer } = await import("./test-server.ts");
   const server = await startTestServer({ env: { RH_EMBED_DIMS: "256" } });
   try {
     const db = server.hub.project.db;

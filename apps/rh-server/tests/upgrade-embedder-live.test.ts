@@ -1,7 +1,7 @@
 // Spec weekly-upgrade: Embedder upgrade proposed (Approve a new embedder: live switch) (v1-4 task 1.1).
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { startTestServer, until } from "./helpers.ts";
+import { startTestServer, until } from "./test-server.ts";
 
 test("changing the embedder's model or size re-embeds every paper in the background, without a restart, and undoes", async () => {
   const server = await startTestServer();

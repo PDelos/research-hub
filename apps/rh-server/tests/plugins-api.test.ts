@@ -4,16 +4,16 @@ import assert from "node:assert/strict";
 import { join } from "node:path";
 import { test } from "node:test";
 import { RhError } from "@rh/sdk";
-import { startTestServer } from "./helpers.ts";
+import { startTestServer } from "./test-server.ts";
 
 const FIXTURES = join(import.meta.dirname, "fixtures/plugins");
 
 const rejects = async (p: Promise<unknown>, code: string, message: RegExp, details?: unknown) =>
-  assert.rejects(p, (e: unknown) => {
-    assert.ok(e instanceof RhError);
-    assert.equal(e.code, code);
-    assert.match(e.message, message);
-    if (details !== undefined) assert.deepEqual(e.details, details);
+  assert.rejects(p, (error: unknown) => {
+    assert.ok(error instanceof RhError);
+    assert.equal(error.code, code);
+    assert.match(error.message, message);
+    if (details !== undefined) assert.deepEqual(error.details, details);
     return true;
   });
 

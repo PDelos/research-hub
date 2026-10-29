@@ -6,7 +6,7 @@ import { cardWriterRule } from "../src/faux-rules.ts";
 import { sampleCharter } from "./fixtures/charter.ts";
 import { choice, noul, score, scripted } from "./fixtures/jev-answers.ts";
 import { arxivOnlyFetch, fakePapers } from "./fixtures/sweep-env.ts";
-import { startTestServer, until } from "./helpers.ts";
+import { startTestServer, until } from "./test-server.ts";
 
 const answers = (id: string, _c: string, q: any) =>
   id === "relevance"
@@ -34,10 +34,10 @@ test("gate thresholds and rank weights come from rh.sweep settings; unset means 
   projectRuntime.brief.write("# x");
   projectRuntime.charters.saveDraft(validateCharter(sampleCharter()), "agent");
   projectRuntime.charters.approve();
-  const sweep = async (b: number) => {
-    batch = b;
+  const sweep = async (budget: number) => {
+    batch = budget;
     projectRuntime.scheduler.trigger("sweep");
-    await until(() => projectRuntime.sweeps.list().length === b + 1, 10_000, "sweep");
+    await until(() => projectRuntime.sweeps.list().length === budget + 1, 10_000, "sweep");
     await projectRuntime.sweeps.settled(projectRuntime.sweeps.list(1)[0].id, 30_000);
     return server.client.sweep(projectRuntime.sweeps.list(1)[0].id);
   };

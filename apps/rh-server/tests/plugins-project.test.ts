@@ -10,7 +10,7 @@ import type { Frame, PluginSummary } from "@rh/sdk";
 import { createRhApi } from "../src/kernel/api.ts";
 import { PluginUnavailable } from "../src/kernel/lifecycle.ts";
 import { parseManifest } from "../src/kernel/manifest.ts";
-import { startTestServer, until } from "./helpers.ts";
+import { startTestServer, until } from "./test-server.ts";
 
 test("a project starts its plugins from a committed lockfile with the provider and Jev plugins active", async () => {
   const server = await startTestServer({ hub: { fauxRules: [(t) => say(`echo ${t.lastUser}`)] } });
@@ -24,9 +24,9 @@ test("a project starts its plugins from a committed lockfile with the provider a
     assert.equal(plugins.kernel.get("rh.decision-jev")?.state, "active");
     assert.equal((await plugins.state.history()).at(-1)?.message, "initialize plugins from the environment");
 
-    await assert.rejects(plugins.kernel.setEnabled("rh.decision-jev", false), (e: unknown) => {
-      assert.ok(e instanceof PluginUnavailable);
-      assert.match(e.message, /the hub needs it, so it cannot be disabled/);
+    await assert.rejects(plugins.kernel.setEnabled("rh.decision-jev", false), (error: unknown) => {
+      assert.ok(error instanceof PluginUnavailable);
+      assert.match(error.message, /the hub needs it, so it cannot be disabled/);
       return true;
     });
 

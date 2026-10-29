@@ -5,7 +5,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import http from "node:http";
 import { join } from "node:path";
 import { test } from "node:test";
-import { startTestServer, TOKEN } from "./helpers.ts";
+import { startTestServer, TOKEN } from "./test-server.ts";
 
 const DIST = join(import.meta.dirname, "../../rh-client-browser/dist");
 

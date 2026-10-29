@@ -46,9 +46,9 @@ export default defineConfig({
       "no-nested-ternary": "warn",
       "unicorn/no-nested-ternary": "off",
       "unicorn/no-lonely-if": "error",
-      "aesthetic/no-single-letter": "warn",
-      "aesthetic/no-abbreviations": "warn",
-      "aesthetic/no-utils-module": "warn",
+      "aesthetic/no-single-letter": "error",
+      "aesthetic/no-abbreviations": "error",
+      "aesthetic/no-utils-module": "error",
     },
     overrides: [
       {

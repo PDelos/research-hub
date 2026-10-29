@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import dc from "node:diagnostics_channel";
 import http from "node:http";
 import { test } from "node:test";
-import { startTestServer } from "./helpers.ts";
+import { startTestServer } from "./test-server.ts";
 
 const LOOPBACK = new Set(["127.0.0.1", "localhost", "::1", "[::1]"]);
 
@@ -31,7 +31,7 @@ function guard() {
 }
 
 test("the guard sees outbound fetch and http.request attempts", async () => {
-  const g = guard();
+  const networkGuard = guard();
   try {
     await fetch("https://example.invalid/", { signal: AbortSignal.timeout(2000) }).catch(() => undefined);
     await new Promise<void>((resolve) => {
@@ -39,13 +39,13 @@ test("the guard sees outbound fetch and http.request attempts", async () => {
       request.on("error", () => resolve());
     });
   } finally {
-    g.stop();
+    networkGuard.stop();
   }
-  assert.deepEqual(g.outbound.sort(), ["fetch example.invalid", "http example.invalid"]);
+  assert.deepEqual(networkGuard.outbound.sort(), ["fetch example.invalid", "http example.invalid"]);
 });
 
 test("offline mode with no keys makes zero outbound connections", async () => {
-  const g = guard();
+  const networkGuard = guard();
   const saved = process.env.OPENROUTER_API_KEY;
   delete process.env.OPENROUTER_API_KEY;
   try {
@@ -67,8 +67,8 @@ test("offline mode with no keys makes zero outbound connections", async () => {
       await server.stop();
     }
   } finally {
-    g.stop();
+    networkGuard.stop();
     if (saved !== undefined) process.env.OPENROUTER_API_KEY = saved;
   }
-  assert.deepEqual(g.outbound, [], `outbound connections: ${g.outbound.join(", ")}`);
+  assert.deepEqual(networkGuard.outbound, [], `outbound connections: ${networkGuard.outbound.join(", ")}`);
 });

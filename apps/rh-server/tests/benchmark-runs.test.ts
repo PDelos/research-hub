@@ -7,7 +7,7 @@ import type { HarnessExports } from "../plugins/rh.harness/main.ts";
 import { loadSample } from "../src/harness/benchmarks/datasets.ts";
 import { ndcgAt } from "../src/harness/benchmarks/runner.ts";
 import { benchmarkFetch } from "./fixtures/benchmarks/datasets.ts";
-import { startTestServer } from "./helpers.ts";
+import { startTestServer } from "./test-server.ts";
 
 async function seedSamples(storage: string, names: ("scidocs" | "litsearch" | "pubmed-rct")[]) {
   const { fetch } = benchmarkFetch();

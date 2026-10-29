@@ -10,7 +10,7 @@ import { EmbeddingLedger } from "../src/representations/embed.ts";
 import { GATE, PaperDecisions } from "../src/sweep/decisions.ts";
 import { Telemetry } from "../src/telemetry.ts";
 import { choice, noul, score, scripted } from "./fixtures/jev-answers.ts";
-import { tempDir } from "./helpers.ts";
+import { tempDir } from "./test-server.ts";
 
 const JEV_DIR = join(import.meta.dirname, "../prompt_engineering/jev");
 
@@ -24,8 +24,8 @@ const vars = {
 };
 
 function setup() {
-  const t = tempDir();
-  const { db } = openProjectDb(join(t.dir, "project.sqlite"));
+  const temp = tempDir();
+  const { db } = openProjectDb(join(temp.dir, "project.sqlite"));
   const telemetry = new Telemetry(db);
   const ledger = new JevLedger((r) => telemetry.jevCall(r));
   const jev = scripted((id, _cmd, q) =>
@@ -49,7 +49,7 @@ function setup() {
     abstract: vars.abstract,
     authors: [],
   }).id;
-  return { db, jev, decisions, paperId, done: () => (db.close(), t.cleanup()) };
+  return { db, jev, decisions, paperId, done: () => (db.close(), temp.cleanup()) };
 }
 
 test("every gate and rank command renders, carries the data-only instruction, and fits the Jev limits", () => {
@@ -85,11 +85,11 @@ test("every gate and rank command renders, carries the data-only instruction, an
 });
 
 test("the gate commands go out in one Jev call, answers are split per command, stored, and reused without a second call", async () => {
-  const s = setup();
+  const env = setup();
   try {
-    const first = await s.decisions.decide(s.paperId, GATE, vars);
-    assert.equal(s.jev.calls.length, 1);
-    assert.deepEqual(s.jev.calls[0].questions.sort(), [
+    const first = await env.decisions.decide(env.paperId, GATE, vars);
+    assert.equal(env.jev.calls.length, 1);
+    assert.deepEqual(env.jev.calls[0].questions.sort(), [
       "on-theme__matched_question",
       "on-theme__relevance",
       "paper-kind__kind",
@@ -99,65 +99,65 @@ test("the gate commands go out in one Jev call, answers are split per command, s
     assert.equal((first["on-theme"].matched_question as any).choice, "Q1");
     assert.equal((first["paper-kind"].kind as any).choice, "method");
     assert.equal((first["worth-reading"].worth as any).noul, 0.8);
-    const rows = s.db
+    const rows = env.db
       .prepare("SELECT command, version FROM paper_decisions WHERE paper_id = ? ORDER BY command")
-      .all(s.paperId) as any[];
+      .all(env.paperId) as any[];
     assert.deepEqual(
       rows.map((r) => `${r.command}@${r.version}`),
       ["on-theme@1", "paper-kind@1", "worth-reading@1"],
     );
-    const jevRow = s.db.prepare("SELECT command, questions FROM jev_calls").get() as any;
+    const jevRow = env.db.prepare("SELECT command, questions FROM jev_calls").get() as any;
     assert.deepEqual({ ...jevRow }, { command: "on-theme+paper-kind+worth-reading", questions: 5 });
 
-    const again = await s.decisions.decide(s.paperId, GATE, vars);
-    assert.equal(s.jev.calls.length, 1, "no second call");
+    const again = await env.decisions.decide(env.paperId, GATE, vars);
+    assert.equal(env.jev.calls.length, 1, "no second call");
     assert.deepEqual(again, first);
     // Asking for one stored and one new command only asks the new one.
-    await s.decisions.decide(s.paperId, ["on-theme", "level"], {
+    await env.decisions.decide(env.paperId, ["on-theme", "level"], {
       ...vars,
       kind: "method",
       year: 2026,
       venue: "arXiv",
       citations: 3,
     });
-    assert.deepEqual(s.jev.calls[1].questions.sort(), ["level__level", "level__prereq_heavy"]);
+    assert.deepEqual(env.jev.calls[1].questions.sort(), ["level__level", "level__prereq_heavy"]);
   } finally {
-    s.done();
+    env.done();
   }
 });
 
 test("a failed Jev call is recorded as a failure and stores nothing", async () => {
-  const s = setup();
+  const env = setup();
   try {
-    s.jev.fail(new Error("Jev unavailable"));
-    await assert.rejects(s.decisions.decide(s.paperId, GATE, vars), /Jev unavailable/);
-    assert.equal((s.db.prepare("SELECT COUNT(*) n FROM paper_decisions").get() as any).n, 0);
-    assert.match((s.db.prepare("SELECT error FROM jev_calls").get() as any).error, /Jev unavailable/);
+    env.jev.fail(new Error("Jev unavailable"));
+    await assert.rejects(env.decisions.decide(env.paperId, GATE, vars), /Jev unavailable/);
+    assert.equal((env.db.prepare("SELECT COUNT(*) n FROM paper_decisions").get() as any).n, 0);
+    assert.match((env.db.prepare("SELECT error FROM jev_calls").get() as any).error, /Jev unavailable/);
   } finally {
-    s.done();
+    env.done();
   }
 });
 
 test("Jev and embedding calls made inside a cost-tag scope carry the tag; others do not", async () => {
-  const s = setup();
+  const env = setup();
   try {
-    const embeddings = new EmbeddingLedger(s.db);
+    const embeddings = new EmbeddingLedger(env.db);
     await withCostTag("sweep:7", async () => {
-      await s.decisions.decide(s.paperId, ["paper-kind"], vars);
+      await env.decisions.decide(env.paperId, ["paper-kind"], vars);
       await new Promise((r) => setTimeout(r, 1));
       embeddings.record({ model: "m", inputs: 1, costSource: "offline", elapsedMs: 0 });
     });
-    await s.decisions.decide(s.paperId, ["worth-reading"], vars);
+    await env.decisions.decide(env.paperId, ["worth-reading"], vars);
     embeddings.record({ model: "m", inputs: 1, costSource: "offline", elapsedMs: 0 });
     assert.deepEqual(
-      (s.db.prepare("SELECT tag FROM jev_calls ORDER BY id").all() as any[]).map((r) => r.tag),
+      (env.db.prepare("SELECT tag FROM jev_calls ORDER BY id").all() as any[]).map((r) => r.tag),
       ["sweep:7", null],
     );
     assert.deepEqual(
-      (s.db.prepare("SELECT tag FROM embedding_calls ORDER BY id").all() as any[]).map((r) => r.tag),
+      (env.db.prepare("SELECT tag FROM embedding_calls ORDER BY id").all() as any[]).map((r) => r.tag),
       ["sweep:7", null],
     );
   } finally {
-    s.done();
+    env.done();
   }
 });

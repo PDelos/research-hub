@@ -4,7 +4,7 @@ import { spawnSync } from "node:child_process";
 import { join } from "node:path";
 import { test } from "node:test";
 import { ConfigError, loadConfig } from "../src/config.ts";
-import { startTestServer, tempDir } from "./helpers.ts";
+import { startTestServer, tempDir } from "./test-server.ts";
 
 const MAIN = join(import.meta.dirname, "../src/main.ts");
 
@@ -16,9 +16,9 @@ test("live mode without OPENROUTER_API_KEY fails with the variable named", () =>
 });
 
 test("the server process exits non-zero and logs OPENROUTER_API_KEY when it is missing in live mode", () => {
-  const t = tempDir();
+  const temp = tempDir();
   try {
-    const env = { ...process.env, RH_ENV_FILE: "none", RH_MODE: "live", RH_DATA_DIR: t.dir, NODE_NO_WARNINGS: "1" };
+    const env = { ...process.env, RH_ENV_FILE: "none", RH_MODE: "live", RH_DATA_DIR: temp.dir, NODE_NO_WARNINGS: "1" };
     delete (env as Record<string, unknown>).OPENROUTER_API_KEY;
     const run = spawnSync(process.execPath, ["--import", "tsx", MAIN], { env, encoding: "utf8", timeout: 30_000 });
     assert.notEqual(run.status, 0);
@@ -26,7 +26,7 @@ test("the server process exits non-zero and logs OPENROUTER_API_KEY when it is m
     assert.ok(line, `no config.invalid line in: ${run.stdout}${run.stderr}`);
     assert.equal(JSON.parse(line).variable, "OPENROUTER_API_KEY");
   } finally {
-    t.cleanup();
+    temp.cleanup();
   }
 });
 
@@ -100,14 +100,14 @@ test("without CONTACT_EMAIL the server warns once at startup and continues", asy
   const blocker = createServer();
   await new Promise<void>((r) => blocker.listen(0, "127.0.0.1", () => r()));
   const port = (blocker.address() as { port: number }).port;
-  const t = tempDir();
+  const temp = tempDir();
   try {
     // The port is taken, so the process gets past the warning and stops at the port check without serving.
     const env = {
       ...process.env,
       RH_ENV_FILE: "none",
       RH_MODE: "offline",
-      RH_DATA_DIR: t.dir,
+      RH_DATA_DIR: temp.dir,
       RH_PORT: String(port),
       NODE_NO_WARNINGS: "1",
     };
@@ -121,6 +121,6 @@ test("without CONTACT_EMAIL the server warns once at startup and continues", asy
     assert.ok(out.includes("startup.port_in_use") || out.includes("is in use"), out);
   } finally {
     blocker.close();
-    t.cleanup();
+    temp.cleanup();
   }
 });

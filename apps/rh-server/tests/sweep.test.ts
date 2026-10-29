@@ -7,19 +7,19 @@ import { drawQueries, planQueries } from "../src/sweep/sweep.ts";
 import { sampleCharter } from "./fixtures/charter.ts";
 import { choice, noul, score } from "./fixtures/jev-answers.ts";
 import { arxivOnlyFetch, fakePapers, seeded, sweepEnv } from "./fixtures/sweep-env.ts";
-import { tempDir } from "./helpers.ts";
+import { tempDir } from "./test-server.ts";
 
 /** Pass everything: relevance 0.75 → Q1, method, worth 0.8, novelty 0.67, level core, importance by title number. */
-const passAll = (id: string, _cmd: string, q: any, state: any) => {
+const passAll = (id: string, _cmd: string, question: any, state: any) => {
   if (id === "relevance") return score(0.75, 5);
-  if (id === "matched_question") return choice("Q1", Object.keys(q.criteria));
-  if (id === "kind") return choice("method", Object.keys(q.criteria));
+  if (id === "matched_question") return choice("Q1", Object.keys(question.criteria));
+  if (id === "kind") return choice("method", Object.keys(question.criteria));
   if (id === "worth") return noul(0.8);
   if (id === "novelty") return score(2 / 3, 4);
   if (id === "level") return score(1 / 3, 4);
   if (id === "importance") {
-    const n = Number(String(state.paper?.title ?? "").match(/Paper (\d+)/)?.[1] ?? 0);
-    return score(Math.min(1, n / 30), 4);
+    const paperNumber = Number(String(state.paper?.title ?? "").match(/Paper (\d+)/)?.[1] ?? 0);
+    return score(Math.min(1, paperNumber / 30), 4);
   }
   return undefined;
 };
@@ -241,24 +241,24 @@ test("rank: exactly 30 survivors and N = 7 → 7 candidates, 23 ranked out", asy
 });
 
 test("crash in the gate: after a restart the sweep resumes and each paper gets exactly one set of gate decisions", async () => {
-  const t = tempDir();
+  const temp = tempDir();
   try {
     let gateCalls = 0;
     const papers = fakePapers(10);
     // First process: the 6th gate call fails (other parallel lanes finish theirs), the retry is 10 minutes away,
     // and the process "dies".
     const first = sweepEnv({
-      dir: t.dir,
+      dir: temp.dir,
       fetch: arxivOnlyFetch(papers),
       script: (id, cmd, q, state) => passAll(id, cmd, q, state),
       runner: { retryDelaysMs: [600_000, 600_000, 600_000] },
     });
     const realDecide = first.jev.decide;
-    let n = 0;
-    (first.decisions as any).options.decide = async (s: any, qs: any) => {
-      if (Object.keys(qs).some((k) => k.startsWith("on-theme")) && ++n === 6) throw new Error("process killed");
+    let calls = 0;
+    (first.decisions as any).options.decide = async (state: any, qs: any) => {
+      if (Object.keys(qs).some((k) => k.startsWith("on-theme")) && ++calls === 6) throw new Error("process killed");
       if (Object.keys(qs).some((k) => k.startsWith("on-theme"))) gateCalls++;
-      return realDecide(s, qs);
+      return realDecide(state, qs);
     };
     const started = first.runner.start("manual");
     await waitFor(() => first.runner.get(started.id)!.attempts === 1);
@@ -269,7 +269,7 @@ test("crash in the gate: after a restart the sweep resumes and each paper gets e
 
     // Second process, 11 minutes later: picks the sweep up and finishes the gate with the 5 undecided papers.
     const second = sweepEnv({
-      dir: t.dir,
+      dir: temp.dir,
       fetch: arxivOnlyFetch(papers),
       script: passAll,
       runner: { now: () => Date.now() + 660_000 },
@@ -292,7 +292,7 @@ test("crash in the gate: after a restart the sweep resumes and each paper gets e
       await second.close();
     }
   } finally {
-    t.cleanup();
+    temp.cleanup();
   }
 });
 

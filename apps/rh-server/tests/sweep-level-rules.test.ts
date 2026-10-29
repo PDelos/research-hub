@@ -8,7 +8,7 @@ import { cardWriterRule } from "../src/faux-rules.ts";
 import { sampleCharter } from "./fixtures/charter.ts";
 import { choice, noul, score, scripted } from "./fixtures/jev-answers.ts";
 import { arxivOnlyFetch, fakePapers } from "./fixtures/sweep-env.ts";
-import { startTestServer, until } from "./helpers.ts";
+import { startTestServer, until } from "./test-server.ts";
 
 test("level fit: auto keeps the earlier table; a target level fits best and less per step away; orientation first", () => {
   assert.equal(levelFit("core", false), 1);
@@ -30,9 +30,9 @@ test("a replay with a level ranks papers at that level first", () => {
       { paperId: 2, relevance: 0.8, worth: 0.8, importance: 0.5, level: "frontier" },
     ],
   } as never;
-  const s = { ...DEFAULT_SETTINGS, cardsPerSweep: 1, explorationPicks: 0 };
-  assert.deepEqual(replayCards(sweepHistory, { ...s, level: "frontier" }).cards, [2]);
-  assert.deepEqual(replayCards(sweepHistory, { ...s, level: "foundational" }).cards, [1]);
+  const settings = { ...DEFAULT_SETTINGS, cardsPerSweep: 1, explorationPicks: 0 };
+  assert.deepEqual(replayCards(sweepHistory, { ...settings, level: "frontier" }).cards, [2]);
+  assert.deepEqual(replayCards(sweepHistory, { ...settings, level: "foundational" }).cards, [1]);
 });
 
 test("approved taste rules go with every paper decision; settings are validated", async () => {

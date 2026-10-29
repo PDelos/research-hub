@@ -8,7 +8,7 @@ import { cardWriterRule } from "../src/faux-rules.ts";
 import { sampleCharter } from "./fixtures/charter.ts";
 import { choice, noul, score, scripted } from "./fixtures/jev-answers.ts";
 import { arxivOnlyFetch, fakePapers } from "./fixtures/sweep-env.ts";
-import { startTestServer, until } from "./helpers.ts";
+import { startTestServer, until } from "./test-server.ts";
 
 const passAll = (id: string, _c: string, q: any) =>
   id === "relevance"
@@ -36,8 +36,8 @@ test("a simulated week runs 7 sweeps, 7 nightly runs and 1 digest, each once, wi
   projectRuntime.brief.write("# Protein LMs");
   projectRuntime.charters.saveDraft(validateCharter(sampleCharter()), "agent");
   projectRuntime.charters.approve();
-  const s = projectRuntime.scheduler;
-  const runs = () => s.runs(500);
+  const scheduler = projectRuntime.scheduler;
+  const runs = () => scheduler.runs(500);
   const settled = async (slot: string) => {
     await until(
       () => runs().some((r) => r.slot === slot && ["done", "failed", "skipped"].includes(r.status)),
@@ -49,7 +49,7 @@ test("a simulated week runs 7 sweeps, 7 nightly runs and 1 digest, each once, wi
   };
   try {
     // Day 0 (Sunday the 18th, evening): the cycle starts; its earlier slots are not part of the week.
-    s.tick(at("2026-10-18T07:00:30Z"));
+    scheduler.tick(at("2026-10-18T07:00:30Z"));
     for (const slot of ["sweep:2026-10-18", "nightly:2026-10-18", "review:2026-W42"]) await settled(slot);
 
     for (const d of days) {
@@ -57,12 +57,12 @@ test("a simulated week runs 7 sweeps, 7 nightly runs and 1 digest, each once, wi
         ["02:00:30", `nightly:2026-10-${d}`],
         ["06:00:30", `sweep:2026-10-${d}`],
       ] as const) {
-        s.tick(at(`2026-10-${d}T${time}Z`));
-        s.tick(at(`2026-10-${d}T${time.replace(":30", ":50")}Z`)); // a second tick inside the slot changes nothing
+        scheduler.tick(at(`2026-10-${d}T${time}Z`));
+        scheduler.tick(at(`2026-10-${d}T${time.replace(":30", ":50")}Z`)); // a second tick inside the slot changes nothing
         await settled(slot);
       }
       if (d === "25") {
-        s.tick(at("2026-10-25T07:00:30Z"));
+        scheduler.tick(at("2026-10-25T07:00:30Z"));
         await settled("review:2026-W43");
       }
     }

@@ -21,7 +21,7 @@ import { BudgetExceeded, Budgets, PermissionDenied } from "../src/kernel/permiss
 import { discover, initialPlugins } from "../src/kernel/registry.ts";
 import { PluginState } from "../src/kernel/state.ts";
 import { createLogger } from "../src/logger.ts";
-import { tempDir } from "./helpers.ts";
+import { tempDir } from "./test-server.ts";
 
 function plugin(root: string, folder: string, manifest: Record<string, unknown>) {
   mkdirSync(join(root, folder), { recursive: true });
@@ -84,14 +84,14 @@ function capture(into: { rh?: RhApi }): PluginModule {
 }
 
 test("the API reports its version and a plugin reaches only its declared hosts, logged when refused", async () => {
-  const t = tempDir();
+  const temp = tempDir();
   try {
-    plugin(join(t.dir, "plugins"), "x", {
+    plugin(join(temp.dir, "plugins"), "x", {
       id: "rh.source-x",
       permissions: { network: ["export.arxiv.org", "*.openalex.org"] },
     });
     const x: { rh?: RhApi } = {};
-    const { lines } = await boot(t.dir, { "rh.source-x": capture(x) });
+    const { lines } = await boot(temp.dir, { "rh.source-x": capture(x) });
     const rh = x.rh!;
     assert.equal(rh.version, RH_API_VERSION);
     assert.equal(RH_API_VERSION, "1.0.0");
@@ -99,9 +99,9 @@ test("the API reports its version and a plugin reaches only its declared hosts, 
       url: "https://export.arxiv.org/api/query",
     });
     assert.ok(await rh.http.json("https://api.openalex.org/works"));
-    await assert.rejects(rh.http.json("https://example.com/"), (e: unknown) => {
-      assert.ok(e instanceof PermissionDenied);
-      assert.equal(e.message, "rh.source-x may not reach example.com");
+    await assert.rejects(rh.http.json("https://example.com/"), (error: unknown) => {
+      assert.ok(error instanceof PermissionDenied);
+      assert.equal(error.message, "rh.source-x may not reach example.com");
       return true;
     });
     await assert.rejects(rh.http.json("https://openalex.org.evil.com/"), /may not reach openalex\.org\.evil\.com/);
@@ -109,23 +109,23 @@ test("the API reports its version and a plugin reaches only its declared hosts, 
     const denied = lines.filter((l) => l.event === "plugin.permission_denied");
     assert.deepEqual(denied[0], { ...denied[0], plugin: "rh.source-x", kind: "network", target: "example.com" });
   } finally {
-    t.cleanup();
+    temp.cleanup();
   }
 });
 
 test("files: own storage always, the vault only as declared, never outside a scope; secrets only as declared", async () => {
-  const t = tempDir();
+  const temp = tempDir();
   try {
-    mkdirSync(join(t.dir, "vault", "sources"), { recursive: true });
-    writeFileSync(join(t.dir, "vault", "sources", "a.md"), "# A");
-    plugin(join(t.dir, "plugins"), "reader", {
+    mkdirSync(join(temp.dir, "vault", "sources"), { recursive: true });
+    writeFileSync(join(temp.dir, "vault", "sources", "a.md"), "# A");
+    plugin(join(temp.dir, "plugins"), "reader", {
       id: "acme.reader",
       permissions: { files: ["vault:read"], secrets: ["OPENROUTER_API_KEY"] },
     });
-    plugin(join(t.dir, "plugins"), "writer", { id: "acme.writer", permissions: { files: ["vault:read-write"] } });
+    plugin(join(temp.dir, "plugins"), "writer", { id: "acme.writer", permissions: { files: ["vault:read-write"] } });
     const reader: { rh?: RhApi } = {};
     const writer: { rh?: RhApi } = {};
-    await boot(t.dir, { "acme.reader": capture(reader), "acme.writer": capture(writer) });
+    await boot(temp.dir, { "acme.reader": capture(reader), "acme.writer": capture(writer) });
     const api = reader.rh!;
     api.files.write("storage", "cache/state.json", "{}");
     assert.equal(api.files.read("storage", "cache/state.json"), "{}");
@@ -141,19 +141,19 @@ test("files: own storage always, the vault only as declared, never outside a sco
     assert.throws(() => api.secrets.get("OTHER_TOKEN"), /acme\.reader may not read the secret OTHER_TOKEN/);
 
     writer.rh!.files.write("vault", "concepts/new.md", "# New");
-    assert.equal(readFileSync(join(t.dir, "vault", "concepts", "new.md"), "utf8"), "# New");
+    assert.equal(readFileSync(join(temp.dir, "vault", "concepts", "new.md"), "utf8"), "# New");
     assert.throws(() => writer.rh!.secrets.get("OPENROUTER_API_KEY"), PermissionDenied);
   } finally {
-    t.cleanup();
+    temp.cleanup();
   }
 });
 
 test("a plugin's migrations run once and may only touch its own tables", async () => {
-  const t = tempDir();
+  const temp = tempDir();
   try {
-    plugin(join(t.dir, "plugins"), "notes", { id: "acme.notes" });
+    plugin(join(temp.dir, "plugins"), "notes", { id: "acme.notes" });
     const x: { rh?: RhApi } = {};
-    const { services } = await boot(t.dir, { "acme.notes": capture(x) });
+    const { services } = await boot(temp.dir, { "acme.notes": capture(x) });
     const rh = x.rh!;
     const notes = rh.db.table("notes");
     assert.equal(notes, `${tablePrefix("acme.notes")}notes`);
@@ -178,23 +178,23 @@ test("a plugin's migrations run once and may only touch its own tables", async (
       [1, 2],
     );
   } finally {
-    t.cleanup();
+    temp.cleanup();
   }
 });
 
 test("calls fail once the daily budget is reached, the user is notified once, and the next day resets it", async () => {
-  const t = tempDir();
+  const temp = tempDir();
   try {
-    plugin(join(t.dir, "plugins"), "scout", {
+    plugin(join(temp.dir, "plugins"), "scout", {
       id: "acme.scout",
       permissions: { budgetUsdPerDay: 0.1, network: ["openrouter.ai"] },
     });
-    plugin(join(t.dir, "plugins"), "free", { id: "acme.free" });
+    plugin(join(temp.dir, "plugins"), "free", { id: "acme.free" });
     const scout: { rh?: RhApi } = {};
     const free: { rh?: RhApi } = {};
     const models = { complete: async () => ({ text: "ok", model: "m", costUsd: 0.04 }) };
     const { services, setDay } = await boot(
-      t.dir,
+      temp.dir,
       { "acme.scout": capture(scout), "acme.free": capture(free) },
       { providers: { models } },
     );
@@ -219,14 +219,14 @@ test("calls fail once the daily budget is reached, the user is notified once, an
     await assert.rejects(rh.models.complete({ prompt: "hi" }), /no model provider plugin is active/);
     assert.throws(() => rh.proposals.submit({}), /proposals arrive with the Upgrades tab/);
   } finally {
-    t.cleanup();
+    temp.cleanup();
   }
 });
 
 test("event handlers, commands, schedules and processes registered by a plugin end when it is disabled", async () => {
-  const t = tempDir();
+  const temp = tempDir();
   try {
-    const root = join(t.dir, "plugins");
+    const root = join(temp.dir, "plugins");
     plugin(root, "watcher", {
       id: "acme.watcher",
       contributes: {
@@ -251,7 +251,7 @@ test("event handlers, commands, schedules and processes registered by a plugin e
       },
     };
     process.env.OPENROUTER_API_KEY ??= "sk-should-not-leak-1234";
-    const { kernel, services } = await boot(t.dir, modules);
+    const { kernel, services } = await boot(temp.dir, modules);
     assert.equal(await (await fetch(`http://127.0.0.1:${port}/`)).text(), "up no secrets");
     services.events.emit("card.created", { cardId: 1, sweepId: 1 });
     assert.equal(await services.contributions.executeCommand("watcher.count"), 1);
@@ -267,6 +267,6 @@ test("event handlers, commands, schedules and processes registered by a plugin e
     );
     await assert.rejects(fetch(`http://127.0.0.1:${port}/`));
   } finally {
-    t.cleanup();
+    temp.cleanup();
   }
 });

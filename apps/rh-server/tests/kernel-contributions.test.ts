@@ -11,7 +11,7 @@ import { PluginKernel, SettingsInvalid, type PluginContext, type PluginModule } 
 import { discover, initialPlugins } from "../src/kernel/registry.ts";
 import { PluginState } from "../src/kernel/state.ts";
 import { createLogger } from "../src/logger.ts";
-import { tempDir } from "./helpers.ts";
+import { tempDir } from "./test-server.ts";
 
 const log = createLogger({ write: () => {} });
 
@@ -54,9 +54,9 @@ async function boot(root: string, data: string, modules: Record<string, PluginMo
 }
 
 test("contribution shapes are validated with the field, and kernel points need their activation events", () => {
-  const t = tempDir();
+  const temp = tempDir();
   try {
-    plugin(t.dir, "bad", {
+    plugin(temp.dir, "bad", {
       id: "acme.bad",
       activationEvents: [],
       contributes: {
@@ -67,7 +67,7 @@ test("contribution shapes are validated with the field, and kernel points need t
         colours: ["red"],
       },
     });
-    const { invalid } = discover({ builtinDir: t.dir });
+    const { invalid } = discover({ builtinDir: temp.dir });
     const problems = invalid[0].problems;
     assert.ok(problems.includes("contributes.tabs.0.title: required"), problems.join("\n"));
     assert.ok(problems.some((p) => p.startsWith("contributes.tabs.0.id: ")));
@@ -82,14 +82,14 @@ test("contribution shapes are validated with the field, and kernel points need t
     );
     assert.ok(problems.includes("contributes.jevCommands: jev/missing has no command.json"));
   } finally {
-    t.cleanup();
+    temp.cleanup();
   }
 });
 
 test("tabs, commands, chat tools, Jev commands, prompts and processes follow the plugin's enablement", async () => {
-  const t = tempDir();
+  const temp = tempDir();
   try {
-    const root = join(t.dir, "plugins");
+    const root = join(temp.dir, "plugins");
     plugin(root, "desk", {
       id: "rh.desk",
       contributes: { tabs: [{ id: "chat", title: "Chat", view: "chat", order: 10 }] },
@@ -124,7 +124,7 @@ test("tabs, commands, chat tools, Jev commands, prompts and processes follow the
         },
       },
     };
-    const { kernel, registry, discovery } = await boot(root, join(t.dir, "data"), modules);
+    const { kernel, registry, discovery } = await boot(root, join(temp.dir, "data"), modules);
     // Nothing of rh.kb has run, yet everything it contributes is known.
     assert.deepEqual(activated, []);
     assert.deepEqual(
@@ -169,14 +169,14 @@ test("tabs, commands, chat tools, Jev commands, prompts and processes follow the
     );
     await kernel.stop();
   } finally {
-    t.cleanup();
+    temp.cleanup();
   }
 });
 
 test("a one-cardinality point has one active contribution (a setting); many collects all; unknown points are reported", async () => {
-  const t = tempDir();
+  const temp = tempDir();
   try {
-    const root = join(t.dir, "plugins");
+    const root = join(temp.dir, "plugins");
     plugin(root, "kb", {
       id: "rh.kb",
       contributes: {
@@ -205,7 +205,7 @@ test("a one-cardinality point has one active contribution (a setting); many coll
     });
     plugin(root, "openalex", { id: "rh.source-openalex", contributes: { "papers.source": [{ id: "openalex" }] } });
     plugin(root, "ranker", { id: "acme.ranker", contributes: { "papers.ranker": [{ id: "bm25" }] } });
-    const { kernel, registry } = await boot(root, join(t.dir, "data"), {});
+    const { kernel, registry } = await boot(root, join(temp.dir, "data"), {});
 
     assert.equal(registry.activeContribution("kb.viewer", kernel.settings("rh.kb"))?.id, "obsidian");
     await kernel.configure("rh.kb", { "kb.viewer": "library" });
@@ -238,14 +238,14 @@ test("a one-cardinality point has one active contribution (a setting); many coll
     ]);
     await kernel.stop();
   } finally {
-    t.cleanup();
+    temp.cleanup();
   }
 });
 
 test("settings: schema and environment defaults, saved values, validation with the allowed range", async () => {
-  const t = tempDir();
+  const temp = tempDir();
   try {
-    const root = join(t.dir, "plugins");
+    const root = join(temp.dir, "plugins");
     plugin(root, "sweep", {
       id: "rh.sweep",
       contributes: {
@@ -263,7 +263,7 @@ test("settings: schema and environment defaults, saved values, validation with t
     const env = { RH_MAX_CARDS: "9", RH_SOURCES: "arxiv, openalex", RH_KB_VIEWER: "off" };
     const { kernel, state } = await boot(
       root,
-      join(t.dir, "data"),
+      join(temp.dir, "data"),
       { "rh.sweep": { activate: (context) => void (seen = context.settings) } },
       env,
     );
@@ -271,9 +271,9 @@ test("settings: schema and environment defaults, saved values, validation with t
     assert.deepEqual(seen, { maxCards: 9, model: "free", sources: ["arxiv", "openalex"] });
     assert.equal(kernel.get("rh.viewer-obsidian")!.state, "disabled");
 
-    await assert.rejects(kernel.configure("rh.sweep", { maxCards: 40 }), (e: unknown) => {
-      assert.ok(e instanceof SettingsInvalid);
-      assert.deepEqual(e.problems, ["maxCards: must be an integer from 1 to 15"]);
+    await assert.rejects(kernel.configure("rh.sweep", { maxCards: 40 }), (error: unknown) => {
+      assert.ok(error instanceof SettingsInvalid);
+      assert.deepEqual(error.problems, ["maxCards: must be an integer from 1 to 15"]);
       return true;
     });
     await assert.rejects(kernel.configure("rh.sweep", { colour: "red" }), /colour: not a known setting/);
@@ -286,14 +286,14 @@ test("settings: schema and environment defaults, saved values, validation with t
     assert.equal(seen.maxCards, 9); // back to the environment default
     await kernel.stop();
   } finally {
-    t.cleanup();
+    temp.cleanup();
   }
 });
 
 test("the Jev lock check across plugins reports unlocked and duplicate commands", () => {
-  const t = tempDir();
+  const temp = tempDir();
   try {
-    const root = join(t.dir, "plugins");
+    const root = join(temp.dir, "plugins");
     for (const [folder, id] of [
       ["a", "acme.a"],
       ["b", "acme.b"],
@@ -306,6 +306,6 @@ test("the Jev lock check across plugins reports unlocked and duplicate commands"
     assert.ok(problems.some((p) => p.startsWith("tagger: contributed twice")));
     assert.ok(problems.includes(`${join(root, "b", "jev")}: tagger: new command not in the lock; run with --update`));
   } finally {
-    t.cleanup();
+    temp.cleanup();
   }
 });

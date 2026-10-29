@@ -4,17 +4,17 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { openProjectDb } from "../src/db.ts";
 import { MetadataCache, PaperStore, type SourcePaper } from "../src/papers/store.ts";
-import { tempDir } from "./helpers.ts";
+import { tempDir } from "./test-server.ts";
 
 function withStore(run: (store: PaperStore, db: ReturnType<typeof openProjectDb>["db"]) => void | Promise<void>) {
   return async () => {
-    const t = tempDir();
-    const { db } = openProjectDb(join(t.dir, "project.sqlite"));
+    const temp = tempDir();
+    const { db } = openProjectDb(join(temp.dir, "project.sqlite"));
     try {
       await run(new PaperStore(db), db);
     } finally {
       db.close();
-      t.cleanup();
+      temp.cleanup();
     }
   };
 }
@@ -70,7 +70,7 @@ test(
   "a result whose identifiers point at two records merges them into the older one",
   withStore((store) => {
     const upsertResult = store.upsert({ ...arxivPreprint, ids: { arxiv: "2401.01234" } });
-    const b = store.upsert({
+    const second = store.upsert({
       source: "europepmc",
       externalId: "PPR1",
       ids: { pmid: "38000001" },
@@ -86,13 +86,13 @@ test(
       title: "Contact prediction with protein language models",
       authors: [],
     });
-    assert.deepEqual(bridge, { id: upsertResult.id, created: false, merged: [b.id] });
+    assert.deepEqual(bridge, { id: upsertResult.id, created: false, merged: [second.id] });
     assert.equal(store.count(), 1);
     const paper = store.get(upsertResult.id)!;
     assert.deepEqual(paper.ids, { arxiv: "2401.01234", pmid: "38000001", openalex: "W9" });
     assert.deepEqual(paper.sources.sort(), ["arxiv", "europepmc", "openalex"]);
     assert.equal(paper.venue, "Bioinformatics");
-    assert.equal(store.get(b.id), undefined);
+    assert.equal(store.get(second.id), undefined);
   }),
 );
 
@@ -106,16 +106,16 @@ test(
       title: "Graph Neural Networks for Gene Regulation",
       authors: [],
     });
-    const b = store.upsert({
+    const second = store.upsert({
       source: "europepmc",
       externalId: "y",
       ids: { doi: "10.1101/2026.01.01.000001" },
       title: "Graph neural networks for gene regulation.",
       authors: [],
     });
-    assert.notEqual(upsertResult.id, b.id);
+    assert.notEqual(upsertResult.id, second.id);
     assert.equal(store.count(), 2);
-    assert.equal(store.get(b.id)!.possibleDuplicateOf, upsertResult.id);
+    assert.equal(store.get(second.id)!.possibleDuplicateOf, upsertResult.id);
     assert.equal(store.get(upsertResult.id)!.possibleDuplicateOf, undefined);
   }),
 );
@@ -169,7 +169,7 @@ test(
       authors: [],
       references: ["https://openalex.org/W2", "W3"],
     });
-    const b = store.upsert({
+    const second = store.upsert({
       source: "openalex",
       externalId: "W2",
       ids: { openalex: "W2" },
@@ -182,7 +182,7 @@ test(
     assert.deepEqual(
       links.map((l) => [l.cited_value, l.cited_paper_id === null ? null : Number(l.cited_paper_id)]),
       [
-        ["W2", b.id],
+        ["W2", second.id],
         ["W3", null],
       ],
     );

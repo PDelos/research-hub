@@ -9,7 +9,7 @@ import { cardWriterRule, librarianRule } from "../src/faux-rules.ts";
 import { sampleCharter } from "./fixtures/charter.ts";
 import { choice, noul, score, scripted } from "./fixtures/jev-answers.ts";
 import { arxivOnlyFetch, fakePapers, type FakePaper } from "./fixtures/sweep-env.ts";
-import { startTestServer, tempDir } from "./helpers.ts";
+import { startTestServer, tempDir } from "./test-server.ts";
 
 const passAll = (id: string, _c: string, q: any) =>
   id === "relevance"
@@ -51,10 +51,10 @@ async function project(
   return { server, p: projectRuntime };
 }
 
-const done = async (p: any, n: number, ms = 15_000) => {
+const done = async (project: any, expected: number, ms = 15_000) => {
   const end = Date.now() + ms;
-  while (p.ingest.requests().filter((r: any) => r.status === "done").length < n) {
-    if (Date.now() > end) throw new Error(`ingest: ${JSON.stringify(p.ingest.requests())}`);
+  while (project.ingest.requests().filter((r: any) => r.status === "done").length < expected) {
+    if (Date.now() > end) throw new Error(`ingest: ${JSON.stringify(project.ingest.requests())}`);
     await new Promise((r) => setTimeout(r, 20));
   }
 };
@@ -184,16 +184,16 @@ test("an invented number is refused; an edited note keeps the user's Summary whe
 });
 
 test("a crash during the librarian's turn: after restart the ingest completes with exactly one note", async () => {
-  const t = tempDir();
+  const temp = tempDir();
   try {
     const papers = fakePapers(2);
-    const first = await project(papers, [cardWriterRule, librarianRule], t.dir, { fauxTokensPerSecond: 30 });
+    const first = await project(papers, [cardWriterRule, librarianRule], temp.dir, { fauxTokensPerSecond: 30 });
     const card = first.p.cards.list()[0];
     first.p.feedback.judge(card.id, "star", "great");
     for (let i = 0; i < 500 && !first.p.ingest.note(card.paperId); i++) await new Promise((r) => setTimeout(r, 10));
     assert.ok(first.p.ingest.note(card.paperId), "the note was written before the crash");
     await first.server.stop();
-    const second = await project(papers, [cardWriterRule, librarianRule], t.dir);
+    const second = await project(papers, [cardWriterRule, librarianRule], temp.dir);
     try {
       await done(second.p, 1);
       assert.equal((second.p.db.prepare("SELECT COUNT(*) n FROM kb_notes").get() as any).n, 1);
@@ -203,6 +203,6 @@ test("a crash during the librarian's turn: after restart the ingest completes wi
       await second.server.stop();
     }
   } finally {
-    t.cleanup();
+    temp.cleanup();
   }
 });

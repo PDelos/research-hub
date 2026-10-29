@@ -7,13 +7,13 @@ import { test } from "node:test";
 import { Type } from "@earendil-works/pi-ai";
 import { defineExtension } from "@earendil-works/pi-durable";
 import { call, defineAppTool, say, toolText } from "@rh/durable-agent";
-import { startTestServer, tempDir } from "./helpers.ts";
+import { startTestServer, tempDir } from "./test-server.ts";
 
 test("a faux chat round trip answers and the root conversation is reused after restart", async () => {
-  const t = tempDir();
+  const temp = tempDir();
   try {
     const first = await startTestServer({
-      dataDir: t.dir,
+      dataDir: temp.dir,
       hub: { fauxRules: [(turn) => say(`hello ${turn.lastUser}`)] },
     });
     const sent = await first.client.send("world", { waitMs: 10_000 });
@@ -21,7 +21,7 @@ test("a faux chat round trip answers and the root conversation is reused after r
     assert.equal(sent.answer?.text, "hello world");
     const before = (await first.client.agent()).conversationId;
     await first.stop();
-    const second = await startTestServer({ dataDir: t.dir });
+    const second = await startTestServer({ dataDir: temp.dir });
     try {
       const after = await second.client.agent();
       assert.equal(after.conversationId, before);
@@ -33,13 +33,13 @@ test("a faux chat round trip answers and the root conversation is reused after r
       await second.stop();
     }
   } finally {
-    t.cleanup();
+    temp.cleanup();
   }
 });
 
 test("a tool outside the allow-list is rejected and never executed", async () => {
-  const t = tempDir();
-  const marker = join(t.dir, "executed.log");
+  const temp = tempDir();
+  const marker = join(temp.dir, "executed.log");
   const forbidden = defineAppTool({
     name: "forbidden_tool",
     description: "Must never run",
@@ -50,7 +50,7 @@ test("a tool outside the allow-list is rejected and never executed", async () =>
     },
   });
   const server = await startTestServer({
-    dataDir: t.dir,
+    dataDir: temp.dir,
     hub: {
       extensions: [defineExtension({ name: "test-tools", tools: [forbidden] })],
       fauxRules: [
@@ -67,18 +67,18 @@ test("a tool outside the allow-list is rejected and never executed", async () =>
     assert.equal(existsSync(marker), false, "the tool body never ran");
   } finally {
     await server.stop();
-    t.cleanup();
+    temp.cleanup();
   }
 });
 
 test("changing RH_MODEL_CHAT changes the model recorded on the next run", async () => {
-  const t = tempDir();
+  const temp = tempDir();
   try {
-    const first = await startTestServer({ dataDir: t.dir });
+    const first = await startTestServer({ dataDir: temp.dir });
     await first.client.send("one", { waitMs: 10_000 });
     assert.deepEqual((await first.client.runs())[0].models, ["anthropic/claude-haiku-5.5"]);
     await first.stop();
-    const second = await startTestServer({ dataDir: t.dir, env: { RH_MODEL_CHAT: "anthropic/claude-sonnet-5.5" } });
+    const second = await startTestServer({ dataDir: temp.dir, env: { RH_MODEL_CHAT: "anthropic/claude-sonnet-5.5" } });
     try {
       assert.equal((await second.client.agent()).model, "anthropic/claude-sonnet-5.5");
       await second.client.send("two", { waitMs: 10_000 });
@@ -89,7 +89,7 @@ test("changing RH_MODEL_CHAT changes the model recorded on the next run", async 
       await second.stop();
     }
   } finally {
-    t.cleanup();
+    temp.cleanup();
   }
 });
 
@@ -125,11 +125,11 @@ test("tool results are recorded on their tool call, including errors", async () 
     const [run] = await server.client.runs();
     const detail = await server.client.run(run.id);
     assert.equal(detail.toolCallList.length, 1);
-    const [c] = detail.toolCallList;
-    assert.equal(c.toolName, "missing_tool");
-    assert.equal(c.isError, true);
-    assert.equal(c.status, "error");
-    assert.match(c.result ?? "", /not available/);
+    const [toolCall] = detail.toolCallList;
+    assert.equal(toolCall.toolName, "missing_tool");
+    assert.equal(toolCall.isError, true);
+    assert.equal(toolCall.status, "error");
+    assert.match(toolCall.result ?? "", /not available/);
     assert.ok(!server.logs.some((l) => l.includes("telemetry.project_failed")), "no projection errors");
   } finally {
     await server.stop();

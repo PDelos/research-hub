@@ -9,7 +9,7 @@ import type { DigestExports } from "../plugins/rh.digest/main.ts";
 import { sampleCharter } from "./fixtures/charter.ts";
 import { choice, noul, score, scripted } from "./fixtures/jev-answers.ts";
 import { arxivOnlyFetch, fakePapers } from "./fixtures/sweep-env.ts";
-import { startTestServer, until } from "./helpers.ts";
+import { startTestServer, until } from "./test-server.ts";
 
 /** Three sweeps of 12 papers, half "Good" (the user likes them) and half "Bad". */
 async function project(judgeLikes: (title: string) => number) {
@@ -21,11 +21,11 @@ async function project(judgeLikes: (title: string) => number) {
       title: `${i % 2 ? "Bad" : "Good"} paper ${b}-${i} on protein language models`,
     })),
   );
-  const jev = scripted((id, _c, q: any, state: any) => {
+  const jev = scripted((id, _c, question: any, state: any) => {
     if (id === "like") return noul(judgeLikes(String(state.paper?.title ?? "")));
     if (id === "relevance") return score(0.6, 5);
-    if (id === "matched_question") return choice("Q1", Object.keys(q.criteria));
-    if (id === "kind") return choice("survey", Object.keys(q.criteria));
+    if (id === "matched_question") return choice("Q1", Object.keys(question.criteria));
+    if (id === "kind") return choice("survey", Object.keys(question.criteria));
     if (id === "worth") return noul(0.9);
     return undefined;
   });
@@ -57,59 +57,61 @@ async function project(judgeLikes: (title: string) => number) {
 }
 
 test("a judge that agrees with the user is trusted, its labels are cached, and the budget stops labelling", async () => {
-  const s = await project((title) => (title.startsWith("Good") ? 0.9 : 0.1));
+  const env = await project((title) => (title.startsWith("Good") ? 0.9 : 0.1));
   try {
-    const night = await s.harness.night();
+    const night = await env.harness.night();
     assert.equal(night.calibration.cases, 30);
     assert.equal(night.calibration.agreement, 1);
     assert.equal(night.calibration.trusted, true);
     assert.equal(night.labelled, 6, "the ranked-out papers the user never saw");
-    const calls = s.likeCalls();
-    const again = await s.harness.night();
+    const calls = env.likeCalls();
+    const again = await env.harness.night();
     assert.equal(again.labelled, 0);
-    assert.equal(s.likeCalls(), calls, "cached labels are reused");
-    assert.equal(s.harness.quality().labels.judge, 36);
+    assert.equal(env.likeCalls(), calls, "cached labels are reused");
+    assert.equal(env.harness.quality().labels.judge, 36);
 
     // Budget: with today's budget used up, labelling stops and nothing else is affected.
-    s.p.db.exec(`DELETE FROM ${s.harness.judge.tables.labels} WHERE paper_id NOT IN (SELECT paper_id FROM judgments)`);
-    s.p.plugins.services.budgets.charge("rh.harness", 1);
-    const stopped = await s.harness.judge.labelRecent();
+    env.p.db.exec(
+      `DELETE FROM ${env.harness.judge.tables.labels} WHERE paper_id NOT IN (SELECT paper_id FROM judgments)`,
+    );
+    env.p.plugins.services.budgets.charge("rh.harness", 1);
+    const stopped = await env.harness.judge.labelRecent();
     assert.deepEqual(stopped, { labelled: 0, stoppedByBudget: true });
 
     // A replay makes no Jev, model or embedding call.
-    const count = (t: string) => Number((s.p.db.prepare(`SELECT COUNT(*) n FROM ${t}`).get() as { n: number }).n);
+    const count = (t: string) => Number((env.p.db.prepare(`SELECT COUNT(*) n FROM ${t}`).get() as { n: number }).n);
     const before = [count("jev_calls"), count("generations"), count("embedding_calls")];
-    const storedReplay = await s.harness.replay({ cardsPerSweep: 5 });
+    const storedReplay = await env.harness.replay({ cardsPerSweep: 5 });
     assert.deepEqual([count("jev_calls"), count("generations"), count("embedding_calls")], before);
     assert.equal(storedReplay.report.sweeps.total, 3);
     assert.equal(storedReplay.report.sweeps.labelled, 3);
     assert.ok(["better", "worse", "inconclusive"].includes(storedReplay.report.verdict));
     assert.equal(storedReplay.report.judgeUsed, true);
   } finally {
-    await s.server.stop();
+    await env.server.stop();
   }
 });
 
 test("a judge that disagrees is not trusted: replays use only the user's verdicts", async () => {
-  const s = await project(() => 0.9);
+  const env = await project(() => 0.9);
   try {
-    const night = await s.harness.night();
+    const night = await env.harness.night();
     assert.equal(night.calibration.trusted, false);
     assert.ok(night.calibration.agreement! < 0.7);
-    assert.equal(s.harness.judge.labelsIfTrusted(), undefined);
-    const storedReplay = await s.harness.replay({ cardsPerSweep: 5 });
+    assert.equal(env.harness.judge.labelsIfTrusted(), undefined);
+    const storedReplay = await env.harness.replay({ cardsPerSweep: 5 });
     assert.equal(storedReplay.report.judgeUsed, false);
-    assert.equal(s.harness.quality().judge?.trusted, false);
+    assert.equal(env.harness.quality().judge?.trusted, false);
   } finally {
-    await s.server.stop();
+    await env.server.stop();
   }
 });
 
 test("the harness API, the digest's quality section and the desk's replay_variant tool", async () => {
-  const s = await project((title) => (title.startsWith("Good") ? 0.9 : 0.1));
+  const env = await project((title) => (title.startsWith("Good") ? 0.9 : 0.1));
   try {
-    const { client } = s.server;
-    await s.harness.night();
+    const { client } = env.server;
+    await env.harness.night();
     await assert.rejects(client.replay({ cardsPerSweep: 40 }), /cardsPerSweep: must be an integer from 1 to 15/);
     await assert.rejects(client.replay({ colour: 1 } as never), /colour: not a sweep setting a replay can change/);
     const stored = await client.replay({ relevanceMin: 0.5 });
@@ -122,7 +124,7 @@ test("the harness API, the digest's quality section and the desk's replay_varian
     assert.equal(quality.overTime.length, 3);
     assert.ok(quality.overTime.every((q) => q.ndcg !== undefined));
 
-    const digest = await (await s.p.plugins.exportsOf<DigestExports>("rh.digest")).buildDigest();
+    const digest = await (await env.p.plugins.exportsOf<DigestExports>("rh.digest")).buildDigest();
     assert.equal(digest.quality?.judge?.trusted, true);
     assert.ok(digest.quality?.replays.some((r) => r.id === stored.id));
 
@@ -131,6 +133,6 @@ test("the harness API, the digest's quality section and the desk's replay_varian
     assert.match(sent.answer!.text, /^(better|worse|inconclusive): nDCG/);
     assert.equal((await client.replays())[0].requestedBy, "desk");
   } finally {
-    await s.server.stop();
+    await env.server.stop();
   }
 });

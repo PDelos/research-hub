@@ -11,7 +11,7 @@ import { PaperSearch } from "../src/papers/search.ts";
 import type { PaperSource } from "../src/papers/sources/types.ts";
 import { MetadataCache, PaperStore } from "../src/papers/store.ts";
 import { fakeFetch, recorded, type Route } from "./fixtures/papers/fake-fetch.ts";
-import { startTestServer, tempDir } from "./helpers.ts";
+import { startTestServer, tempDir } from "./test-server.ts";
 
 const noPacing = { "export.arxiv.org": 0, "api.openalex.org": 0, "www.ebi.ac.uk": 0, "api.semanticscholar.org": 0 };
 const s2: Route = (url) => (url.host === "api.semanticscholar.org" ? Response.json({ data: [] }) : undefined);
@@ -39,8 +39,8 @@ const pubmed: PaperSource = {
 };
 
 test("a search queries only the selected sources and adds plugin sources; a disabled Semantic Scholar gets no request", async () => {
-  const t = tempDir();
-  const { db } = openProjectDb(join(t.dir, "project.sqlite"));
+  const temp = tempDir();
+  const { db } = openProjectDb(join(temp.dir, "project.sqlite"));
   const fake = fakeFetch(s2, openalexKnowsNothing, recorded);
   try {
     const search = new PaperSearch({
@@ -69,7 +69,7 @@ test("a search queries only the selected sources and adds plugin sources; a disa
     assert.deepEqual(result.enrichment, { done: 0, pending: 0 });
   } finally {
     db.close();
-    t.cleanup();
+    temp.cleanup();
   }
 });
 

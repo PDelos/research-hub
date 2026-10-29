@@ -5,13 +5,13 @@ import { test } from "node:test";
 import { openProjectDb } from "../src/db.ts";
 import { PoliteHttp } from "../src/papers/http.ts";
 import { EmbeddingLedger, FakeEmbedder, OpenRouterEmbedder } from "../src/representations/embed.ts";
-import { tempDir } from "./helpers.ts";
+import { tempDir } from "./test-server.ts";
 
 const cosine = (a: Float32Array, b: Float32Array) => a.reduce((s, x, i) => s + x * b[i], 0);
 
 test("OpenRouter embeddings: 70 texts go out in batches of 32, 32 and 6 with dimensions; tokens and reported cost are recorded", async () => {
-  const t = tempDir();
-  const { db } = openProjectDb(join(t.dir, "project.sqlite"));
+  const temp = tempDir();
+  const { db } = openProjectDb(join(temp.dir, "project.sqlite"));
   try {
     const bodies: any[] = [];
     let auth = "";
@@ -55,13 +55,13 @@ test("OpenRouter embeddings: 70 texts go out in batches of 32, 32 and 6 with dim
     assert.ok(rows.every((r) => r.cost_source === "reported"));
   } finally {
     db.close();
-    t.cleanup();
+    temp.cleanup();
   }
 });
 
 test("a wrong dimension or an error answer fails the call and is recorded as an error", async () => {
-  const t = tempDir();
-  const { db } = openProjectDb(join(t.dir, "project.sqlite"));
+  const temp = tempDir();
+  const { db } = openProjectDb(join(temp.dir, "project.sqlite"));
   try {
     const ledger = new EmbeddingLedger(db);
     const wrongDims = new OpenRouterEmbedder({
@@ -88,20 +88,23 @@ test("a wrong dimension or an error answer fails the call and is recorded as an 
     assert.equal(ledger.totals().calls, 0, "failed calls are not counted as spending");
   } finally {
     db.close();
-    t.cleanup();
+    temp.cleanup();
   }
 });
 
 test("the offline fake is deterministic, unit length, and closer for texts sharing words", async () => {
   const fake = new FakeEmbedder(256);
-  const [left, a2, b, c] = await fake.embed([
+  const [first, repeat, related, unrelated] = await fake.embed([
     "graph neural network for protein contact prediction",
     "graph neural network for protein contact prediction",
     "graph neural network for single-cell gene regulation",
     "a survey of hospital staffing policies",
   ]);
-  assert.deepEqual([...left], [...a2]);
-  assert.ok(Math.abs(cosine(left, left) - 1) < 1e-5);
-  assert.ok(cosine(left, b) > cosine(left, c), `${cosine(left, b)} > ${cosine(left, c)}`);
-  assert.ok(cosine(left, b) > 0.3);
+  assert.deepEqual([...first], [...repeat]);
+  assert.ok(Math.abs(cosine(first, first) - 1) < 1e-5);
+  assert.ok(
+    cosine(first, related) > cosine(first, unrelated),
+    `${cosine(first, related)} > ${cosine(first, unrelated)}`,
+  );
+  assert.ok(cosine(first, related) > 0.3);
 });

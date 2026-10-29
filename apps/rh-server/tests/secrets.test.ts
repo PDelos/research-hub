@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
-import { startTestServer, TOKEN } from "./helpers.ts";
+import { startTestServer, TOKEN } from "./test-server.ts";
 
 const DIST = join(import.meta.dirname, "../../rh-client-browser/dist");
 const KEY = "sk-or-v1-0000fake0000secret0000value0000";

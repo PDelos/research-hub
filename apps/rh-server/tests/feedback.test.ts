@@ -16,8 +16,8 @@ const passAll = (id: string, _c: string, q: any) =>
           ? noul(0.8)
           : undefined;
 
-async function withCards(n = 4, over: Record<string, unknown> = {}) {
-  const env = sweepEnv({ fetch: arxivOnlyFetch(fakePapers(n)), script: passAll, ...over });
+async function withCards(count = 4, over: Record<string, unknown> = {}) {
+  const env = sweepEnv({ fetch: arxivOnlyFetch(fakePapers(count)), script: passAll, ...over });
   const sweep = await env.runner.settled(env.runner.start("manual").id);
   const cards = env.presentAll(sweep.id);
   return { env, sweep, cards };
@@ -75,28 +75,34 @@ test("👍 then 👎 nets one 👎; weights clamp at 2; effects show before and 
       "PLM benchmark",
     ],
   });
-  const a = await withCards(3, { charter });
-  const b = await withCards(3, { charter });
+  const first = await withCards(3, { charter });
+  const second = await withCards(3, { charter });
   try {
-    a.env.feedback.judge(a.cards[0].id, "up");
-    a.env.feedback.judge(a.cards[0].id, "down");
-    b.env.feedback.judge(b.cards[0].id, "down");
+    first.env.feedback.judge(first.cards[0].id, "up");
+    first.env.feedback.judge(first.cards[0].id, "down");
+    second.env.feedback.judge(second.cards[0].id, "down");
     const strip = (ws: any[]) => ws.map((w) => `${w.kind}:${w.key}=${w.value}`).sort();
-    assert.deepEqual(strip(a.env.feedback.weights()), strip(b.env.feedback.weights()), "the net change equals one 👎");
-    const q1 = a.env.feedback.weights().find((w) => w.kind === "question" && w.key === "Q1")!;
+    assert.deepEqual(
+      strip(first.env.feedback.weights()),
+      strip(second.env.feedback.weights()),
+      "the net change equals one 👎",
+    );
+    const q1 = first.env.feedback.weights().find((w) => w.kind === "question" && w.key === "Q1")!;
     assert.equal(q1.base, 1);
     assert.equal(q1.value, 0.85);
 
     // A query already at 2.0 receives a ⭐ and stays 2.0 (the 👎 is cleared first, so the query is back at 2.0).
-    a.env.feedback.clear(a.cards[0].id);
-    const star = a.cards.slice(1).find((card) => {
-      const row = a.env.db.prepare("SELECT queries_json FROM sweep_papers WHERE paper_id = ?").get(card.paperId) as any;
+    first.env.feedback.clear(first.cards[0].id);
+    const star = first.cards.slice(1).find((card) => {
+      const row = first.env.db
+        .prepare("SELECT queries_json FROM sweep_papers WHERE paper_id = ?")
+        .get(card.paperId) as any;
       return (JSON.parse(row.queries_json) as string[]).includes("protein language model");
     })!;
     assert.ok(star, "a card found by the weight-2 query");
-    a.env.feedback.judge(star.id, "star");
-    assert.equal(a.env.feedback.weight("query", "protein language model", 0), 2);
-    const effects = a.env.feedback.effects(star.id);
+    first.env.feedback.judge(star.id, "star");
+    assert.equal(first.env.feedback.weight("query", "protein language model", 0), 2);
+    const effects = first.env.feedback.effects(star.id);
     assert.deepEqual(
       effects.find((e) => e.kind === "query" && e.key === "protein language model"),
       { kind: "query", key: "protein language model", before: 2, after: 2 },
@@ -104,21 +110,21 @@ test("👍 then 👎 nets one 👎; weights clamp at 2; effects show before and 
     assert.ok(effects.some((e) => e.kind === "question" && e.key === "Q1" && e.before === 1 && e.after === 1.15));
     assert.ok(effects.some((e) => e.kind === "source" && e.key === "arxiv" && e.before < e.after));
     // The runner's charter carries the effective weights.
-    const runnerQ1 = a.env.runner.charter().questions.find((q) => q.id === "Q1")!;
+    const runnerQ1 = first.env.runner.charter().questions.find((q) => q.id === "Q1")!;
     assert.equal(runnerQ1.weight, 1.15, "the charter's 1 plus 0.15 for the ⭐");
-    const down = a.cards.find((c) => c.id !== star.id && c.id !== a.cards[0].id)!;
-    a.env.feedback.judge(down.id, "down", "too basic");
+    const down = first.cards.find((c) => c.id !== star.id && c.id !== first.cards[0].id)!;
+    first.env.feedback.judge(down.id, "down", "too basic");
     const queriesOfDown = JSON.parse(
-      (a.env.db.prepare("SELECT queries_json FROM sweep_papers WHERE paper_id = ?").get(down.paperId) as any)
+      (first.env.db.prepare("SELECT queries_json FROM sweep_papers WHERE paper_id = ?").get(down.paperId) as any)
         .queries_json,
     ) as string[];
     for (const q of queriesOfDown) {
-      const charterWeight = a.env.charters.approved()!.charter.queries.find((x) => x.text === q)!.weight;
-      assert.ok(a.env.runner.charter().queries.find((x) => x.text === q)!.weight <= charterWeight, q);
+      const charterWeight = first.env.charters.approved()!.charter.queries.find((x) => x.text === q)!.weight;
+      assert.ok(first.env.runner.charter().queries.find((x) => x.text === q)!.weight <= charterWeight, q);
     }
   } finally {
-    await a.env.done();
-    await b.env.done();
+    await first.env.done();
+    await second.env.done();
   }
 });
 

@@ -7,7 +7,7 @@ import { call, say, type FauxRule } from "@rh/durable-agent";
 import { validateCharter } from "../src/charter.ts";
 import { ftsQuery, noteTitle } from "../src/kb/search.ts";
 import { sampleCharter } from "./fixtures/charter.ts";
-import { startTestServer } from "./helpers.ts";
+import { startTestServer } from "./test-server.ts";
 
 const note = (title: string, body: string) =>
   `---\ntitle: ${JSON.stringify(title)}\nlevel: "core"\n---\n\n## Summary\n\n${body}\n\n## Related papers\n`;

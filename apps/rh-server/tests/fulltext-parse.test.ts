@@ -54,10 +54,10 @@ test("PDF text: headings, running headers removed, hyphenation joined, reference
 });
 
 test("facets by heading, unnamed sections between background and results count as method; budget keeps every head", () => {
-  const f = facetTexts(arxivHtmlToSections(ARXIV_HTML));
-  assert.match(f.background!, /Translation/);
-  assert.match(f.method!, /12,000 transcripts/);
-  assert.match(f.result!, /0.87 AUROC/);
+  const facets = facetTexts(arxivHtmlToSections(ARXIV_HTML));
+  assert.match(facets.background!, /Translation/);
+  assert.match(facets.method!, /12,000 transcripts/);
+  assert.match(facets.result!, /0.87 AUROC/);
   const text = withinBudget(
     [
       { title: "A", text: "x".repeat(5000) },

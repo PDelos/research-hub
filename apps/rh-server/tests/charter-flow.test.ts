@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { call, say } from "@rh/durable-agent";
 import { charterWriterRule, fauxCharter } from "../src/faux-rules.ts";
-import { startTestServer, TOKEN, until, type TestServer } from "./helpers.ts";
+import { startTestServer, TOKEN, until, type TestServer } from "./test-server.ts";
 
 const BRIEF =
   "# Protein language models\nI want to understand how protein language models learn structure and where they fail.";
@@ -174,9 +174,9 @@ test("3.5 + 3.6 + 2.2 answers revise the draft; approval versions it; edits and 
   try {
     await http("PUT", "/v1/brief", { brief: BRIEF });
     const draft = await settled(http);
-    const q = draft.questions.find((x: any) => /clinical/i.test(x.text));
+    const clinical = draft.questions.find((x: any) => /clinical/i.test(x.text));
     const answered = await http("POST", "/v1/charter/answers", {
-      answers: [{ id: q.id, answer: "Clinical applications are out of scope" }],
+      answers: [{ id: clinical.id, answer: "Clinical applications are out of scope" }],
     });
     assert.equal(answered.status, 200);
     const revised = await settled(http);
@@ -186,7 +186,7 @@ test("3.5 + 3.6 + 2.2 answers revise the draft; approval versions it; edits and 
       JSON.stringify(revised.draft.charter.outOfScope),
     );
     assert.equal(
-      (await http("POST", "/v1/charter/answers", { answers: [{ id: q.id, answer: "again" }] })).status,
+      (await http("POST", "/v1/charter/answers", { answers: [{ id: clinical.id, answer: "again" }] })).status,
       400,
       "already answered",
     );

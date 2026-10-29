@@ -10,7 +10,7 @@ import type { UpgradesExports } from "../plugins/rh.upgrades/main.ts";
 import { CONVERTER_PAPERS, headingRecall, wordF1 } from "../src/harness/benchmarks/converter.ts";
 import { arxivHtmlToSections } from "../src/fulltext/parse.ts";
 import { ARXIV_HTML } from "./fixtures/fulltext/documents.ts";
-import { startTestServer } from "./helpers.ts";
+import { startTestServer } from "./test-server.ts";
 
 const PDF = readFileSync(join(import.meta.dirname, "fixtures/fulltext/paper.pdf"));
 const TRUTH = arxivHtmlToSections(ARXIV_HTML);

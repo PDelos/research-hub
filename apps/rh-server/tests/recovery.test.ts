@@ -5,7 +5,7 @@ import { spawn } from "node:child_process";
 import { join } from "node:path";
 import { test } from "node:test";
 import { HubClient } from "@rh/sdk";
-import { TOKEN, tempDir, until } from "./helpers.ts";
+import { TOKEN, tempDir, until } from "./test-server.ts";
 
 const HOST = join(import.meta.dirname, "fixtures/server-host.ts");
 
@@ -25,11 +25,11 @@ function host(dataDir: string, port: number, tps: number) {
 }
 
 test("SIGKILL mid-turn: after restart the turn completes once with no duplicates", { timeout: 120_000 }, async () => {
-  const t = tempDir();
+  const temp = tempDir();
   const port = 4900 + Math.floor(Math.random() * 500);
   try {
     // Slow faux model: the echo reply streams for several seconds, so the kill lands mid-generation.
-    const first = host(t.dir, port, 3);
+    const first = host(temp.dir, port, 3);
     const client = new HubClient({ base: `${await first.url}/v1`, token: TOKEN });
     const sent = await client.send("survive this crash please, it is a long message to echo back");
     assert.notEqual(sent.status, "done");
@@ -38,7 +38,7 @@ test("SIGKILL mid-turn: after restart the turn completes once with no duplicates
     first.child.kill("SIGKILL");
     await first.exited;
 
-    const second = host(t.dir, port, 2000);
+    const second = host(temp.dir, port, 2000);
     try {
       const client2 = new HubClient({ base: `${await second.url}/v1`, token: TOKEN });
       await until(async () => (await client2.runs())[0]?.status === "done", 60_000, "turn completed after restart");
@@ -66,6 +66,6 @@ test("SIGKILL mid-turn: after restart the turn completes once with no duplicates
       await second.exited;
     }
   } finally {
-    t.cleanup();
+    temp.cleanup();
   }
 });

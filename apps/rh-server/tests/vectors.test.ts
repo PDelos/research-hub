@@ -9,7 +9,7 @@ import { EmbeddingLedger, FakeEmbedder, type Embedder } from "../src/representat
 import { FacetLabeler } from "../src/representations/facets.ts";
 import { PaperVectors } from "../src/representations/vectors.ts";
 import { scriptedJev } from "./fixtures/scripted-jev.ts";
-import { tempDir } from "./helpers.ts";
+import { tempDir } from "./test-server.ts";
 
 const JEV_DIR = join(import.meta.dirname, "../prompt_engineering/jev");
 
@@ -31,8 +31,8 @@ function counting(inner: Embedder) {
 }
 
 function setup(dims = 256, embedder?: Embedder) {
-  const t = tempDir();
-  const { db } = openProjectDb(join(t.dir, "project.sqlite"));
+  const temp = tempDir();
+  const { db } = openProjectDb(join(temp.dir, "project.sqlite"));
   ensureVectorTables(db, dims);
   const settings = new Settings(db);
   const store = new PaperStore(db);
@@ -42,68 +42,68 @@ function setup(dims = 256, embedder?: Embedder) {
   const facets = new FacetLabeler({ db, jevDir: JEV_DIR, decide: jev.decide, ledger: new JevLedger() });
   const vectors = new PaperVectors({ db, settings, store, embedder: counted.embedder, facets });
   vectors.syncModel();
-  let n = 0;
+  let calls = 0;
   const add = (title: string, abstract?: string) =>
     store.upsert({
       source: "arxiv",
-      externalId: String(++n),
-      ids: { arxiv: `2601.${String(n).padStart(5, "0")}` },
+      externalId: String(++calls),
+      ids: { arxiv: `2601.${String(calls).padStart(5, "0")}` },
       title,
       abstract,
       authors: [],
     }).id;
-  return { db, settings, store, jev, counted, facets, vectors, add, ledger, done: () => (db.close(), t.cleanup()) };
+  return { db, settings, store, jev, counted, facets, vectors, add, ledger, done: () => (db.close(), temp.cleanup()) };
 }
 
 test("a paper with background, method and result sentences gets four vectors; a missing facet and a title-only paper get fewer", async () => {
-  const s = setup();
+  const env = setup();
   try {
-    const full = s.add(
+    const full = env.add(
       "Contacts for orphan proteins",
       "Orphan proteins lack homologs. We fine-tune ESM-2 with a contact head. Precision improves to 0.74.",
     );
-    const noResult = s.add(
+    const noResult = env.add(
       "Gene regulation",
       "Gene regulatory networks are hard to infer. We train a graph neural network on single-cell data.",
     );
-    const titleOnly = s.add("A fresh preprint without abstract");
-    const result = await s.vectors.represent([full, noResult, titleOnly]);
+    const titleOnly = env.add("A fresh preprint without abstract");
+    const result = await env.vectors.represent([full, noResult, titleOnly]);
     assert.deepEqual(result, { represented: 3, skipped: 0, facetFailures: 0 });
-    assert.deepEqual(s.vectors.kinds(full), ["background", "method", "result", "whole"]);
-    assert.deepEqual(s.vectors.kinds(noResult), ["background", "method", "whole"]);
-    assert.deepEqual(s.vectors.kinds(titleOnly), ["whole"]);
-    assert.equal(s.store.get(titleOnly)!.titleOnly, true);
-    const row = s.db
+    assert.deepEqual(env.vectors.kinds(full), ["background", "method", "result", "whole"]);
+    assert.deepEqual(env.vectors.kinds(noResult), ["background", "method", "whole"]);
+    assert.deepEqual(env.vectors.kinds(titleOnly), ["whole"]);
+    assert.equal(env.store.get(titleOnly)!.titleOnly, true);
+    const row = env.db
       .prepare("SELECT model, dims FROM representations WHERE paper_id = ? AND kind = 'whole'")
       .get(full) as any;
     assert.deepEqual({ ...row }, { model: "offline/fake-embedding", dims: 256 });
-    assert.equal(s.vectors.vector(full, "whole")!.length, 256);
-    assert.equal(s.jev.calls.length, 2, "one Jev call per paper with an abstract");
-    assert.equal(s.counted.sent.length, 1, "all texts in one batched embedding request");
-    assert.equal(s.counted.sent[0].length, 4 + 3 + 1);
+    assert.equal(env.vectors.vector(full, "whole")!.length, 256);
+    assert.equal(env.jev.calls.length, 2, "one Jev call per paper with an abstract");
+    assert.equal(env.counted.sent.length, 1, "all texts in one batched embedding request");
+    assert.equal(env.counted.sent[0].length, 4 + 3 + 1);
     assert.equal(
-      s.counted.sent[0][0],
+      env.counted.sent[0][0],
       "Contacts for orphan proteins\n\nOrphan proteins lack homologs. We fine-tune ESM-2 with a contact head. Precision improves to 0.74.",
     );
   } finally {
-    s.done();
+    env.done();
   }
 });
 
 test("a paper seen again with the current model and command version sends no embedding or Jev request", async () => {
-  const s = setup();
+  const env = setup();
   try {
-    const id = s.add("Contacts", "Orphan proteins lack homologs. We fine-tune ESM-2. Precision improves.");
-    await s.vectors.represent([id]);
-    const jevCalls = s.jev.calls.length;
-    const embedCalls = s.counted.sent.length;
-    assert.deepEqual(await s.vectors.represent([id, id]), { represented: 0, skipped: 1, facetFailures: 0 });
-    assert.equal(s.jev.calls.length, jevCalls);
-    assert.equal(s.counted.sent.length, embedCalls);
+    const id = env.add("Contacts", "Orphan proteins lack homologs. We fine-tune ESM-2. Precision improves.");
+    await env.vectors.represent([id]);
+    const jevCalls = env.jev.calls.length;
+    const embedCalls = env.counted.sent.length;
+    assert.deepEqual(await env.vectors.represent([id, id]), { represented: 0, skipped: 1, facetFailures: 0 });
+    assert.equal(env.jev.calls.length, jevCalls);
+    assert.equal(env.counted.sent.length, embedCalls);
     // Gaining an abstract later (title-only → full) represents the paper again.
-    const bare = s.add("Bare title paper");
-    await s.vectors.represent([bare]);
-    s.store.upsert({
+    const bare = env.add("Bare title paper");
+    await env.vectors.represent([bare]);
+    env.store.upsert({
       source: "openalex",
       externalId: "W1",
       ids: { arxiv: "2601.00002", openalex: "W1" },
@@ -111,16 +111,16 @@ test("a paper seen again with the current model and command version sends no emb
       abstract: "Now there is background. We propose a method.",
       authors: [],
     });
-    assert.equal(s.vectors.isCurrent(s.store.get(bare)!), false);
-    await s.vectors.represent([bare]);
-    assert.deepEqual(s.vectors.kinds(bare), ["background", "method", "whole"]);
+    assert.equal(env.vectors.isCurrent(env.store.get(bare)!), false);
+    await env.vectors.represent([bare]);
+    assert.deepEqual(env.vectors.kinds(bare), ["background", "method", "whole"]);
   } finally {
-    s.done();
+    env.done();
   }
 });
 
 test("nearest by topic: k = 8 of 50 papers, ordered by distance, excluding the paper itself", async () => {
-  const s = setup();
+  const env = setup();
   try {
     const topics = [
       "protein contact prediction",
@@ -133,48 +133,48 @@ test("nearest by topic: k = 8 of 50 papers, ordered by distance, excluding the p
     for (let i = 0; i < 50; i++) {
       const topic = topics[i % topics.length];
       ids.push(
-        s.add(
+        env.add(
           `${topic} study ${i}`,
           `We study ${topic} in setting ${i}. We propose model ${i}. Accuracy improves by ${i}%.`,
         ),
       );
     }
-    await s.vectors.represent(ids);
-    const hits = await s.vectors.similar({ paperId: ids[0] }, { k: 8 });
+    await env.vectors.represent(ids);
+    const hits = await env.vectors.similar({ paperId: ids[0] }, { k: 8 });
     assert.equal(hits.length, 8);
     assert.ok(!hits.some((h) => h.paperId === ids[0]));
     for (let i = 1; i < hits.length; i++) assert.ok(hits[i].distance >= hits[i - 1].distance);
     const sameTopic = hits.filter((h) => (h.paperId - ids[0]) % 5 === 0).length;
     assert.ok(sameTopic >= 8, `${sameTopic} of 8 share the topic`);
-    const byText = await s.vectors.similar({ text: "cryo-EM density maps" }, { k: 3 });
+    const byText = await env.vectors.similar({ text: "cryo-EM density maps" }, { k: 3 });
     assert.ok(byText.every((h) => (h.paperId - ids[3]) % 5 === 0));
-    await assert.rejects(s.vectors.similar({ paperId: ids[0] }, { k: 0 }), /k must be 1 to 100/);
+    await assert.rejects(env.vectors.similar({ paperId: ids[0] }, { k: 0 }), /k must be 1 to 100/);
   } finally {
-    s.done();
+    env.done();
   }
 });
 
 test("same method, different problem: a method search ranks by method and reports background distance", async () => {
-  const s = setup();
+  const env = setup();
   try {
-    const anchor = s.add(
+    const anchor = env.add(
       "Protein contacts with transformers",
       "Protein contact maps are needed for folding. We train a graph transformer with attention pooling on residue graphs.",
     );
-    const sameMethodOtherProblem = s.add(
+    const sameMethodOtherProblem = env.add(
       "Cell types with transformers",
       "Single-cell atlases contain unlabeled cell types. We train a graph transformer with attention pooling on cell graphs.",
     );
-    const sameProblemOtherMethod = s.add(
+    const sameProblemOtherMethod = env.add(
       "Protein contacts by coevolution",
       "Protein contact maps are needed for folding. We use a Potts model fitted to multiple sequence alignments by pseudolikelihood.",
     );
-    const unrelated = s.add(
+    const unrelated = env.add(
       "Hospital staffing",
       "Hospitals struggle with staffing. We use questionnaires to survey nurses.",
     );
-    await s.vectors.represent([anchor, sameMethodOtherProblem, sameProblemOtherMethod, unrelated]);
-    const hits = await s.vectors.similar({ paperId: anchor }, { by: "method", k: 3 });
+    await env.vectors.represent([anchor, sameMethodOtherProblem, sameProblemOtherMethod, unrelated]);
+    const hits = await env.vectors.similar({ paperId: anchor }, { by: "method", k: 3 });
     assert.equal(hits[0].paperId, sameMethodOtherProblem, "the same method ranks first");
     const other = hits.find((h) => h.paperId === sameProblemOtherMethod)!;
     assert.ok(
@@ -183,16 +183,16 @@ test("same method, different problem: a method search ranks by method and report
     );
     assert.ok(hits.every((h) => h.wholeDistance !== undefined));
     // By whole vector the same-problem paper is the nearest instead.
-    const byTopic = await s.vectors.similar({ paperId: anchor }, { k: 1 });
+    const byTopic = await env.vectors.similar({ paperId: anchor }, { k: 1 });
     assert.equal(byTopic[0].paperId, sameProblemOtherMethod);
   } finally {
-    s.done();
+    env.done();
   }
 });
 
 test("switching the embedding model clears old vectors, reports pending papers, and re-embeds without mixing models", async () => {
-  const t = tempDir();
-  const { db } = openProjectDb(join(t.dir, "project.sqlite"));
+  const temp = tempDir();
+  const { db } = openProjectDb(join(temp.dir, "project.sqlite"));
   try {
     ensureVectorTables(db, 64);
     const settings = new Settings(db);
@@ -234,6 +234,6 @@ test("switching the embedding model clears old vectors, reports pending papers, 
     assert.equal(newModel.syncModel(), false, "no change on the next start");
   } finally {
     db.close();
-    t.cleanup();
+    temp.cleanup();
   }
 });

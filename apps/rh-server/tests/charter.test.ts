@@ -13,7 +13,7 @@ import {
 } from "../src/charter.ts";
 import { openProjectDb, Settings } from "../src/db.ts";
 import { sampleCharter } from "./fixtures/charter.ts";
-import { tempDir } from "./helpers.ts";
+import { tempDir } from "./test-server.ts";
 
 const problems = (input: unknown): string[] => {
   try {
@@ -61,13 +61,13 @@ test("3.1 every bound is enforced with an exact message", () => {
 });
 
 function store() {
-  const t = tempDir();
-  const { db } = openProjectDb(join(t.dir, "project.sqlite"));
+  const temp = tempDir();
+  const { db } = openProjectDb(join(temp.dir, "project.sqlite"));
   const settings = new Settings(db);
-  const brief = new Brief(t.dir);
+  const brief = new Brief(temp.dir);
   const charters = new Charters(db);
   return {
-    t,
+    t: temp,
     db,
     settings,
     brief,
@@ -78,85 +78,85 @@ function store() {
 }
 
 test("1.2 status is derived: needs-brief → charter-review → active; paused remembers what to return to", () => {
-  const s = store();
+  const env = store();
   try {
-    assert.equal(s.state.status(), "needs-brief");
-    s.brief.write("# Protein LMs\nStudy them.");
-    assert.equal(s.state.status(), "charter-review");
-    s.charters.saveDraft(validateCharter(sampleCharter()), "agent");
-    assert.equal(s.state.status(), "charter-review");
-    s.charters.approve();
-    assert.equal(s.state.status(), "active");
-    s.state.pause();
-    assert.equal(s.state.status(), "paused");
-    assert.equal(s.state.underlying(), "active");
-    s.state.resume(Date.parse("2026-10-23T09:00:00Z"));
-    assert.equal(s.state.status(), "active");
-    assert.equal(s.state.resumedAt(), Date.parse("2026-10-23T09:00:00Z"));
+    assert.equal(env.state.status(), "needs-brief");
+    env.brief.write("# Protein LMs\nStudy them.");
+    assert.equal(env.state.status(), "charter-review");
+    env.charters.saveDraft(validateCharter(sampleCharter()), "agent");
+    assert.equal(env.state.status(), "charter-review");
+    env.charters.approve();
+    assert.equal(env.state.status(), "active");
+    env.state.pause();
+    assert.equal(env.state.status(), "paused");
+    assert.equal(env.state.underlying(), "active");
+    env.state.resume(Date.parse("2026-10-23T09:00:00Z"));
+    assert.equal(env.state.status(), "active");
+    assert.equal(env.state.resumedAt(), Date.parse("2026-10-23T09:00:00Z"));
   } finally {
-    s.db.close();
-    s.t.cleanup();
+    env.db.close();
+    env.t.cleanup();
   }
 });
 
 test("charter versions: approval numbers versions, a new draft supersedes the old draft, versions stay readable", () => {
-  const s = store();
+  const env = store();
   try {
-    s.charters.saveDraft(validateCharter(sampleCharter()), "agent");
-    s.charters.saveDraft(validateCharter(sampleCharter({ concepts: ["second draft"] })), "agent");
-    assert.deepEqual(s.charters.draft()!.charter.concepts, ["second draft"]);
-    assert.equal(s.charters.approve()!.version, 1);
-    assert.equal(s.charters.draft(), undefined);
-    s.charters.saveDraft(validateCharter(sampleCharter({ concepts: ["edited"] })), "user");
-    assert.equal(s.charters.approved()!.version, 1, "v1 stays in force until the next approval");
-    assert.equal(s.charters.approve()!.version, 2);
-    assert.deepEqual(s.charters.version(1)!.charter.concepts, ["second draft"]);
+    env.charters.saveDraft(validateCharter(sampleCharter()), "agent");
+    env.charters.saveDraft(validateCharter(sampleCharter({ concepts: ["second draft"] })), "agent");
+    assert.deepEqual(env.charters.draft()!.charter.concepts, ["second draft"]);
+    assert.equal(env.charters.approve()!.version, 1);
+    assert.equal(env.charters.draft(), undefined);
+    env.charters.saveDraft(validateCharter(sampleCharter({ concepts: ["edited"] })), "user");
+    assert.equal(env.charters.approved()!.version, 1, "v1 stays in force until the next approval");
+    assert.equal(env.charters.approve()!.version, 2);
+    assert.deepEqual(env.charters.version(1)!.charter.concepts, ["second draft"]);
     assert.deepEqual(
-      s.charters.versions().map((v) => v.version),
+      env.charters.versions().map((v) => v.version),
       [1, 2],
     );
     assert.throws(
-      () => s.charters.saveDraft({ ...validateCharter(sampleCharter()), questions: [] }, "user"),
+      () => env.charters.saveDraft({ ...validateCharter(sampleCharter()), questions: [] }, "user"),
       CharterInvalid,
     );
   } finally {
-    s.db.close();
-    s.t.cleanup();
+    env.db.close();
+    env.t.cleanup();
   }
 });
 
 test("scoping questions cap at 5 in total and record answers", () => {
-  const s = store();
+  const env = store();
   try {
-    s.questions.ask(1, ["Applied or theoretical?", "Clinical in scope?", "Which organisms?"]);
-    assert.throws(() => s.questions.ask(2, ["a", "b", "c"]), /only 2 more scoping questions allowed/);
-    s.questions.ask(2, ["a", "b"]);
-    assert.throws(() => s.questions.ask(3, ["sixth"]), /only 0 more/);
-    const [first] = s.questions.open();
-    s.questions.answer([{ id: first.id, answer: "Applied" }]);
-    assert.equal(s.questions.open().length, 4);
-    assert.equal(s.questions.all()[0].answer, "Applied");
+    env.questions.ask(1, ["Applied or theoretical?", "Clinical in scope?", "Which organisms?"]);
+    assert.throws(() => env.questions.ask(2, ["a", "b", "c"]), /only 2 more scoping questions allowed/);
+    env.questions.ask(2, ["a", "b"]);
+    assert.throws(() => env.questions.ask(3, ["sixth"]), /only 0 more/);
+    const [first] = env.questions.open();
+    env.questions.answer([{ id: first.id, answer: "Applied" }]);
+    assert.equal(env.questions.open().length, 4);
+    assert.equal(env.questions.all()[0].answer, "Applied");
   } finally {
-    s.db.close();
-    s.t.cleanup();
+    env.db.close();
+    env.t.cleanup();
   }
 });
 
 test("brief: ≤ 50,000 characters of nonblank text, nothing stored on failure", () => {
-  const s = store();
+  const env = store();
   try {
     assert.throws(
-      () => s.brief.write("x".repeat(60_000)),
+      () => env.brief.write("x".repeat(60_000)),
       (e: unknown) => e instanceof BriefInvalid && /the limit is 50,000/.test(e.message),
     );
-    assert.equal(s.brief.read(), undefined);
-    assert.throws(() => s.brief.write("   "), BriefInvalid);
-    assert.throws(() => s.brief.write(42), BriefInvalid);
-    s.brief.write("é".repeat(50_000));
-    assert.equal([...s.brief.read()!].length, 50_000);
+    assert.equal(env.brief.read(), undefined);
+    assert.throws(() => env.brief.write("   "), BriefInvalid);
+    assert.throws(() => env.brief.write(42), BriefInvalid);
+    env.brief.write("é".repeat(50_000));
+    assert.equal([...env.brief.read()!].length, 50_000);
   } finally {
-    s.db.close();
-    s.t.cleanup();
+    env.db.close();
+    env.t.cleanup();
   }
 });
 
@@ -174,22 +174,25 @@ test("lists sent as JSON-encoded strings are accepted; other non-lists name the 
 });
 
 test("an approved version keeps question ids: retiring one does not shift the others, a new one gets the next id", () => {
-  const s = store();
+  const env = store();
   try {
-    s.charters.saveDraft(
+    env.charters.saveDraft(
       validateCharter(sampleCharter({ questions: ["A?", "B?", "C?", "D?"].map((text) => ({ text })) })),
       "agent",
     );
-    s.charters.approve();
-    const open = s.charters.saveDraft(validateCharter(sampleCharter()), "user");
-    const v1 = s.charters.approved()!.charter;
-    const retired = s.charters.approveVersion({ ...v1, questions: v1.questions.filter((q) => q.id !== "Q2") }, "user");
+    env.charters.approve();
+    const open = env.charters.saveDraft(validateCharter(sampleCharter()), "user");
+    const v1 = env.charters.approved()!.charter;
+    const retired = env.charters.approveVersion(
+      { ...v1, questions: v1.questions.filter((q) => q.id !== "Q2") },
+      "user",
+    );
     assert.equal(retired.version, 2);
     assert.deepEqual(
       retired.charter.questions.map((q) => q.id),
       ["Q1", "Q3", "Q4"],
     );
-    const added = s.charters.approveVersion(
+    const added = env.charters.approveVersion(
       { ...retired.charter, questions: [...retired.charter.questions, { text: "E?" } as never] },
       "user",
     );
@@ -197,13 +200,13 @@ test("an approved version keeps question ids: retiring one does not shift the ot
       added.charter.questions.map((q) => `${q.id} ${q.text}`),
       ["Q1 A?", "Q3 C?", "Q4 D?", "Q5 E?"],
     );
-    assert.equal(s.charters.draft()?.id, open.id, "an open draft is untouched");
+    assert.equal(env.charters.draft()?.id, open.id, "an open draft is untouched");
     // Drafts are renumbered as before.
     assert.deepEqual(
-      s.charters.saveDraft(added.charter, "user").charter.questions.map((q) => q.id),
+      env.charters.saveDraft(added.charter, "user").charter.questions.map((q) => q.id),
       ["Q1", "Q2", "Q3", "Q4"],
     );
   } finally {
-    s.db.close();
+    env.db.close();
   }
 });

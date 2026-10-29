@@ -16,7 +16,7 @@ import { parseManifest } from "../src/kernel/manifest.ts";
 import { discover, type Discovery } from "../src/kernel/registry.ts";
 import { PluginState } from "../src/kernel/state.ts";
 import { createLogger } from "../src/logger.ts";
-import { tempDir } from "./helpers.ts";
+import { tempDir } from "./test-server.ts";
 
 const log = createLogger({ write: () => {} });
 
@@ -88,9 +88,9 @@ async function setup(dir: string, specs: Record<string, Spec>, options: { timeou
 }
 
 test("a plugin listening only for its view is activated once, when the view opens", async () => {
-  const t = tempDir();
+  const temp = tempDir();
   try {
-    const { kernel, calls, loaded, stateOf } = await setup(t.dir, {
+    const { kernel, calls, loaded, stateOf } = await setup(temp.dir, {
       "rh.desk": {},
       "acme.reading-list": { events: ["onView:reading-list"] },
     });
@@ -106,15 +106,15 @@ test("a plugin listening only for its view is activated once, when the view open
     );
     await kernel.stop();
   } finally {
-    t.cleanup();
+    temp.cleanup();
   }
 });
 
 test("dependencies activate first and their exports reach the dependent", async () => {
-  const t = tempDir();
+  const temp = tempDir();
   try {
     let seen: Readonly<Record<string, unknown>> = {};
-    const { kernel, calls } = await setup(t.dir, {
+    const { kernel, calls } = await setup(temp.dir, {
       "rh.sweep": {
         deps: { "rh.papers": "^1.0.0" },
         module: (c) => ({
@@ -137,14 +137,14 @@ test("dependencies activate first and their exports reach the dependent", async 
       "dispose rh.provider",
     ]);
   } finally {
-    t.cleanup();
+    temp.cleanup();
   }
 });
 
 test("a disabled plugin's code is never loaded and its dependents say why they are inactive", async () => {
-  const t = tempDir();
+  const temp = tempDir();
   try {
-    const { kernel, loaded, stateOf } = await setup(t.dir, {
+    const { kernel, loaded, stateOf } = await setup(temp.dir, {
       "rh.kb": { enabled: false },
       "acme.graph": { deps: { "rh.kb": "^1.0.0" } },
       "acme.future": { engines: "^2.0.0" },
@@ -157,20 +157,20 @@ test("a disabled plugin's code is never loaded and its dependents say why they a
     assert.equal(kernel.get("acme.future")!.reason, "needs kernel API ^2.0.0, this hub has 1.0.0");
     await assert.rejects(kernel.activate("acme.graph"), PluginUnavailable);
   } finally {
-    t.cleanup();
+    temp.cleanup();
   }
 });
 
 test("disabling at runtime deactivates, asks before taking dependents along, and enabling restores", async () => {
-  const t = tempDir();
+  const temp = tempDir();
   try {
-    const { kernel, state, calls, frames, stateOf } = await setup(t.dir, {
+    const { kernel, state, calls, frames, stateOf } = await setup(temp.dir, {
       "rh.kb": {},
       "rh.viewer-obsidian": { deps: { "rh.kb": "^1.0.0" } },
     });
-    await assert.rejects(kernel.setEnabled("rh.kb", false), (e: unknown) => {
-      assert.ok(e instanceof HasDependents);
-      assert.deepEqual(e.dependents, ["rh.viewer-obsidian"]);
+    await assert.rejects(kernel.setEnabled("rh.kb", false), (error: unknown) => {
+      assert.ok(error instanceof HasDependents);
+      assert.deepEqual(error.dependents, ["rh.viewer-obsidian"]);
       return true;
     });
     assert.equal(stateOf("rh.kb"), "active");
@@ -195,15 +195,15 @@ test("disabling at runtime deactivates, asks before taking dependents along, and
     assert.equal(stateOf("rh.viewer-obsidian"), "active");
     await kernel.stop();
   } finally {
-    t.cleanup();
+    temp.cleanup();
   }
 });
 
 test("a failing or hanging plugin fails alone; its dependents are blocked and the rest runs", async () => {
-  const t = tempDir();
+  const temp = tempDir();
   try {
     const { kernel, stateOf } = await setup(
-      t.dir,
+      temp.dir,
       {
         "acme.broken": {
           module: () => ({
@@ -227,14 +227,14 @@ test("a failing or hanging plugin fails alone; its dependents are blocked and th
     assert.equal(stateOf("rh.desk"), "active");
     await kernel.stop();
   } finally {
-    t.cleanup();
+    temp.cleanup();
   }
 });
 
 test("rollback re-applies an earlier state and built-ins new to the image are added", async () => {
-  const t = tempDir();
+  const temp = tempDir();
   try {
-    const first = await setup(t.dir, { "rh.kb": {}, "rh.viewer-obsidian": {} });
+    const first = await setup(temp.dir, { "rh.kb": {}, "rh.viewer-obsidian": {} });
     const initial = (await first.state.history())[0].id;
     await first.kernel.setEnabled("rh.viewer-obsidian", false);
     assert.equal(first.stateOf("rh.viewer-obsidian"), "disabled");
@@ -243,7 +243,7 @@ test("rollback re-applies an earlier state and built-ins new to the image are ad
     await first.kernel.stop();
 
     // A newer image ships rh.viewer-library: it is added to the existing project's lockfile, enabled.
-    const state = new PluginState(t.dir);
+    const state = new PluginState(temp.dir);
     await state.open(() => assert.fail("already initialized"));
     const second = new PluginKernel({
       discovery: {
@@ -258,7 +258,7 @@ test("rollback re-applies an earlier state and built-ins new to the image are ad
                 engines: { "research-hub": "^1.0.0" },
                 activationEvents: [],
               }),
-              dir: t.dir,
+              dir: temp.dir,
               builtin: true,
             },
           ]),
@@ -275,14 +275,14 @@ test("rollback re-applies an earlier state and built-ins new to the image are ad
     assert.equal(history[0].message, "add built-in rh.viewer-library");
     assert.equal(history[0].actor, "kernel");
   } finally {
-    t.cleanup();
+    temp.cleanup();
   }
 });
 
 test("the default loader imports the manifest's main module from the plugin folder", async () => {
-  const t = tempDir();
+  const temp = tempDir();
   try {
-    const root = join(t.dir, "builtin");
+    const root = join(temp.dir, "builtin");
     mkdirSync(join(root, "hello"), { recursive: true });
     writeFileSync(
       join(root, "hello", "rh-plugin.json"),
@@ -299,7 +299,7 @@ test("the default loader imports the manifest's main module from the plugin fold
       join(root, "hello", "main.mjs"),
       "export function activate(ctx) { return { greeting: `hello from ${ctx.id}` }; }",
     );
-    const state = new PluginState(join(t.dir, "data"));
+    const state = new PluginState(join(temp.dir, "data"));
     await state.open(() => ({
       "acme.hello": { version: "1.0.0", source: { kind: "builtin" }, enabled: true, settings: {} },
     }));
@@ -307,6 +307,6 @@ test("the default loader imports the manifest's main module from the plugin fold
     await kernel.start();
     assert.deepEqual(await kernel.activate("acme.hello"), { greeting: "hello from acme.hello" });
   } finally {
-    t.cleanup();
+    temp.cleanup();
   }
 });

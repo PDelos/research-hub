@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { say } from "@rh/durable-agent";
-import { startTestServer, TOKEN } from "./helpers.ts";
+import { startTestServer, TOKEN } from "./test-server.ts";
 
 test("/v1/health is open and carries version, mode and providers but no secrets", async () => {
   const server = await startTestServer();

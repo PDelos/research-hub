@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { ResearchUnavailable, type ProviderExports } from "../plugins/rh.provider-openrouter/main.ts";
 import { fakeOpenRouter } from "./fixtures/openrouter.ts";
-import { startTestServer } from "./helpers.ts";
+import { startTestServer } from "./test-server.ts";
 
 test("research asks OpenRouter with the web plugin and returns the answer, its sources and cost", async () => {
   const or = fakeOpenRouter([]);

@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { RhError } from "@rh/sdk";
 import { discover } from "../src/kernel/registry.ts";
-import { startTestServer } from "./helpers.ts";
+import { startTestServer } from "./test-server.ts";
 
 const FIXTURES = join(import.meta.dirname, "fixtures/plugins");
 
@@ -38,9 +38,9 @@ test("a plugin claiming to be core is refused; installed plugins default to add-
   const server = await startTestServer();
   try {
     const { client } = server;
-    await assert.rejects(client.prepareInstall({ folder: join(FIXTURES, "acme.core") }), (e: unknown) => {
-      assert.ok(e instanceof RhError);
-      assert.deepEqual(e.details, ["kind: only the hub's own plugins are core"]);
+    await assert.rejects(client.prepareInstall({ folder: join(FIXTURES, "acme.core") }), (error: unknown) => {
+      assert.ok(error instanceof RhError);
+      assert.deepEqual(error.details, ["kind: only the hub's own plugins are core"]);
       return true;
     });
     const installed = await client.approveInstall(
@@ -85,7 +85,7 @@ test("each source is credited with the cards it brought and the ones you liked, 
   const { sampleCharter } = await import("./fixtures/charter.ts");
   const { choice, noul, score, scripted } = await import("./fixtures/jev-answers.ts");
   const { arxivOnlyFetch, fakePapers } = await import("./fixtures/sweep-env.ts");
-  const { until } = await import("./helpers.ts");
+  const { until } = await import("./test-server.ts");
   const server = await startTestServer({
     hub: {
       ticker: false,

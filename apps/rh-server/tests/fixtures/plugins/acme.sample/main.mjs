@@ -35,7 +35,7 @@ export async function activate({ rh }) {
     },
     "sample.hang": () => new Promise(() => {}),
   };
-  for (const [id, fn] of Object.entries(commands)) await rh.commands.register(id, fn);
+  for (const [id, handler] of Object.entries(commands)) await rh.commands.register(id, handler);
   return {
     sources: {
       sample: {

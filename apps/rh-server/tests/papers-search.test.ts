@@ -7,14 +7,14 @@ import { PoliteHttp } from "../src/papers/http.ts";
 import { PaperSearch } from "../src/papers/search.ts";
 import { MetadataCache, PaperStore } from "../src/papers/store.ts";
 import { fakeFetch, fixture, recorded, type Route } from "./fixtures/papers/fake-fetch.ts";
-import { tempDir } from "./helpers.ts";
+import { tempDir } from "./test-server.ts";
 
 const noPacing = { "export.arxiv.org": 0, "api.openalex.org": 0, "www.ebi.ac.uk": 0, "api.semanticscholar.org": 0 };
 const instantSleep = async () => {};
 
 function setup(routes: Route[], options: { s2ApiKey?: string; now?: () => number } = {}) {
-  const t = tempDir();
-  const { db } = openProjectDb(join(t.dir, "project.sqlite"));
+  const temp = tempDir();
+  const { db } = openProjectDb(join(temp.dir, "project.sqlite"));
   const fake = fakeFetch(...routes);
   const store = new PaperStore(db);
   const search = new PaperSearch({
@@ -23,7 +23,7 @@ function setup(routes: Route[], options: { s2ApiKey?: string; now?: () => number
     http: new PoliteHttp({ fetch: fake.fetch, pacing: noPacing, sleep: instantSleep }),
     s2ApiKey: options.s2ApiKey,
   });
-  return { search, store, fake, db, done: () => (db.close(), t.cleanup()) };
+  return { search, store, fake, db, done: () => (db.close(), temp.cleanup()) };
 }
 
 /** OpenAlex DOI batch lookups answer nothing (works not in OpenAlex yet). */
@@ -33,9 +33,9 @@ const openalexKnowsNothing: Route = (url) =>
     : undefined;
 
 test("a query runs on arXiv, OpenAlex and Europe PMC; each paper lists its sources; no request goes to Semantic Scholar without a key", async () => {
-  const s = setup([openalexKnowsNothing, recorded]);
+  const env = setup([openalexKnowsNothing, recorded]);
   try {
-    const result = await s.search.search({ query: "protein language model", limit: 25 });
+    const result = await env.search.search({ query: "protein language model", limit: 25 });
     assert.deepEqual(
       result.sources.map((r) => [r.source, r.status, r.count]),
       [
@@ -55,36 +55,36 @@ test("a query runs on arXiv, OpenAlex and Europe PMC; each paper lists its sourc
     );
     const preprint = result.papers.find((p) => p.server === "bioRxiv" && p.sources.includes("europepmc"))!;
     assert.ok(preprint.ids.doi && preprint.abstract);
-    assert.ok(!s.fake.requests.some((r) => r.url.host === "api.semanticscholar.org"));
+    assert.ok(!env.fake.requests.some((r) => r.url.host === "api.semanticscholar.org"));
     // OpenAlex results count as enriched; the others were looked up in one batch and stay pending.
     assert.equal(result.enrichment.pending, 6);
-    assert.equal(s.fake.requests.filter((r) => r.url.searchParams.get("filter")?.startsWith("doi:")).length, 1);
+    assert.equal(env.fake.requests.filter((r) => r.url.searchParams.get("filter")?.startsWith("doi:")).length, 1);
   } finally {
-    s.done();
+    env.done();
   }
 });
 
 test("Semantic Scholar is queried with x-api-key only when S2_API_KEY is set", async () => {
   const s2: Route = (url) => (url.host === "api.semanticscholar.org" ? Response.json({ data: [] }) : undefined);
-  const s = setup([s2, openalexKnowsNothing, recorded], { s2ApiKey: "s2-key-abc" });
+  const env = setup([s2, openalexKnowsNothing, recorded], { s2ApiKey: "s2-key-abc" });
   try {
-    const result = await s.search.search({ query: "protein", limit: 5 });
+    const result = await env.search.search({ query: "protein", limit: 5 });
     assert.deepEqual(
       result.sources.find((r) => r.source === "semanticscholar"),
       { source: "semanticscholar", status: "ok", count: 0 },
     );
-    const request = s.fake.requests.find((r) => r.url.host === "api.semanticscholar.org")!;
+    const request = env.fake.requests.find((r) => r.url.host === "api.semanticscholar.org")!;
     assert.equal(request.headers.get("x-api-key"), "s2-key-abc");
   } finally {
-    s.done();
+    env.done();
   }
 });
 
 test("Europe PMC down (503): the other sources' results return and Europe PMC is listed as failed with the reason", async () => {
   const down: Route = (url) => (url.host === "www.ebi.ac.uk" ? new Response("", { status: 503 }) : undefined);
-  const s = setup([down, openalexKnowsNothing, recorded]);
+  const env = setup([down, openalexKnowsNothing, recorded]);
   try {
-    const result = await s.search.search({ query: "protein language model" });
+    const result = await env.search.search({ query: "protein language model" });
     assert.deepEqual(
       result.sources.find((r) => r.source === "europepmc"),
       {
@@ -95,9 +95,9 @@ test("Europe PMC down (503): the other sources' results return and Europe PMC is
       },
     );
     assert.equal(result.papers.length, 6);
-    assert.equal(s.fake.requests.filter((r) => r.url.host === "www.ebi.ac.uk").length, 3);
+    assert.equal(env.fake.requests.filter((r) => r.url.host === "www.ebi.ac.uk").length, 3);
   } finally {
-    s.done();
+    env.done();
   }
 });
 
@@ -131,32 +131,32 @@ test("a fresh preprint not yet in OpenAlex stays pending, is retried on a later 
       : url.searchParams.has("search")
         ? Response.json({ results: [] })
         : undefined;
-  const s = setup([lookup, onlyEpmc, recorded], { now: () => now });
+  const env = setup([lookup, onlyEpmc, recorded], { now: () => now });
   try {
-    const first = await s.search.search({ query: "protein language model" });
+    const first = await env.search.search({ query: "protein language model" });
     const paper = first.papers.find((p) => p.ids.doi === preprintDoi)!;
     assert.equal(paper.enrichment, "pending");
     assert.equal(first.enrichment.pending, 3);
     // Same day, OpenAlex has indexed it now, but the miss is cached for an hour.
     indexed = true;
-    await s.search.search({ query: "unrelated words", limit: 1 });
-    assert.equal(s.store.get(paper.id)!.enrichment, "pending");
+    await env.search.search({ query: "unrelated words", limit: 1 });
+    assert.equal(env.store.get(paper.id)!.enrichment, "pending");
     now += 2 * 60 * 60 * 1000;
-    const later = await s.search.search({ query: "unrelated words", limit: 1 });
+    const later = await env.search.search({ query: "unrelated words", limit: 1 });
     assert.ok(later.enrichment.done >= 1);
-    const enriched = s.store.get(paper.id)!;
+    const enriched = env.store.get(paper.id)!;
     assert.equal(enriched.enrichment, "done");
     assert.equal(enriched.retracted, true);
     assert.equal(enriched.citedByCount, 2);
     assert.equal(enriched.ids.openalex, "W1");
     assert.ok(enriched.sources.includes("openalex"));
   } finally {
-    s.done();
+    env.done();
   }
 });
 
 test("the same DOI found by two queries on the same day is looked up in OpenAlex once", async () => {
-  const s = setup([
+  const env = setup([
     openalexKnowsNothing,
     (url) =>
       url.host === "www.ebi.ac.uk"
@@ -169,30 +169,30 @@ test("the same DOI found by two queries on the same day is looked up in OpenAlex
     recorded,
   ]);
   try {
-    await s.search.search({ query: "protein language model" });
+    await env.search.search({ query: "protein language model" });
     // A second query finds the same works again; their DOIs were already asked for today.
-    for (const p of s.store.all()) s.store.setEnrichment(p.id, "pending");
-    const lookups = () => s.fake.requests.filter((r) => r.url.searchParams.get("filter")?.startsWith("doi:")).length;
+    for (const p of env.store.all()) env.store.setEnrichment(p.id, "pending");
+    const lookups = () => env.fake.requests.filter((r) => r.url.searchParams.get("filter")?.startsWith("doi:")).length;
     const before = lookups();
-    await s.search.search({ query: "protein language model again" });
+    await env.search.search({ query: "protein language model again" });
     assert.equal(lookups(), before, "answered from the cache");
   } finally {
-    s.done();
+    env.done();
   }
 });
 
 test("date window and limits", async () => {
-  const s = setup([openalexKnowsNothing, recorded]);
+  const env = setup([openalexKnowsNothing, recorded]);
   try {
-    const result = await s.search.search({ query: "protein language model", since: "2026-10-01" });
+    const result = await env.search.search({ query: "protein language model", since: "2026-10-01" });
     assert.ok(
       result.papers.every((p) => p.publishedAt! >= "2026-10-01"),
       result.papers.map((p) => p.publishedAt).join(","),
     );
-    assert.equal((await s.search.search({ query: "protein", limit: 2 })).papers.length, 2);
-    await assert.rejects(s.search.search({ query: "protein", limit: 101 }), /limit must be 1 to 100/);
-    await assert.rejects(s.search.search({ query: "  " }), /query must not be empty/);
+    assert.equal((await env.search.search({ query: "protein", limit: 2 })).papers.length, 2);
+    await assert.rejects(env.search.search({ query: "protein", limit: 101 }), /limit must be 1 to 100/);
+    await assert.rejects(env.search.search({ query: "  " }), /query must not be empty/);
   } finally {
-    s.done();
+    env.done();
   }
 });

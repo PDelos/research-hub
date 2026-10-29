@@ -12,7 +12,7 @@ import { CardStore } from "../../src/sweep/cards.ts";
 import { Feedback } from "../../src/feedback/feedback.ts";
 import { ReasonParser } from "../../src/feedback/reasons.ts";
 import { Telemetry } from "../../src/telemetry.ts";
-import { tempDir } from "../helpers.ts";
+import { tempDir } from "../test-server.ts";
 import { sampleCharter } from "./charter.ts";
 import { scripted, type Script } from "./jev-answers.ts";
 
@@ -29,8 +29,8 @@ export interface SweepEnvOptions {
 }
 
 export function sweepEnv(options: SweepEnvOptions = {}) {
-  const t = options.dir ? { dir: options.dir, cleanup: () => {} } : tempDir();
-  const { db } = openProjectDb(join(t.dir, "project.sqlite"));
+  const temp = options.dir ? { dir: options.dir, cleanup: () => {} } : tempDir();
+  const { db } = openProjectDb(join(temp.dir, "project.sqlite"));
   const settings = new Settings(db);
   const telemetry = new Telemetry(db);
   const logs: string[] = [];
@@ -101,7 +101,7 @@ export function sweepEnv(options: SweepEnvOptions = {}) {
     jev,
     logs,
     cardCalls,
-    dir: t.dir,
+    dir: temp.dir,
     feedback,
     cards,
     reasons,
@@ -135,7 +135,7 @@ export function sweepEnv(options: SweepEnvOptions = {}) {
       await runner.close();
       await papers.close();
       db.close();
-      t.cleanup();
+      temp.cleanup();
     },
     async close() {
       await runner.close();
@@ -147,13 +147,13 @@ export function sweepEnv(options: SweepEnvOptions = {}) {
 
 /** A small deterministic PRNG (mulberry32). */
 export function seeded(seed: number): () => number {
-  let a = seed >>> 0;
+  let state = seed >>> 0;
   return () => {
-    a = (a + 0x6d2b79f5) >>> 0;
-    let t = a;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    state = (state + 0x6d2b79f5) >>> 0;
+    let mixed = state;
+    mixed = Math.imul(mixed ^ (mixed >>> 15), mixed | 1);
+    mixed ^= mixed + Math.imul(mixed ^ (mixed >>> 7), mixed | 61);
+    return ((mixed ^ (mixed >>> 14)) >>> 0) / 4294967296;
   };
 }
 

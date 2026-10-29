@@ -8,7 +8,7 @@ import { test } from "node:test";
 import type { FullTextExports } from "../plugins/rh.fulltext/main.ts";
 import type { PapersExports } from "../plugins/rh.papers/main.ts";
 import { ARXIV_HTML, DOCLING_MD, JATS_XML } from "./fixtures/fulltext/documents.ts";
-import { startTestServer } from "./helpers.ts";
+import { startTestServer } from "./test-server.ts";
 
 const PDF = readFileSync(join(import.meta.dirname, "fixtures/fulltext/paper.pdf"));
 
@@ -53,42 +53,42 @@ async function setup() {
 }
 
 test("sources in order: arXiv HTML, Europe PMC, bioRxiv, the PDF through the converter; misses say why", async () => {
-  const s = await setup();
+  const env = await setup();
   try {
-    const html = await s.fulltext.ensure(s.add({ arxiv: "2601.00001" }));
+    const html = await env.fulltext.ensure(env.add({ arxiv: "2601.00001" }));
     assert.equal(html.source, "arxiv-html");
     assert.deepEqual(
       html.sections.map((x) => x.title),
       ["Abstract", "Introduction", "Our kernels", "Results"],
     );
 
-    const pdfOnly = await s.fulltext.ensure(s.add({ arxiv: "2601.00002" }));
+    const pdfOnly = await env.fulltext.ensure(env.add({ arxiv: "2601.00002" }));
     assert.equal(pdfOnly.source, "pdf:pdf-text");
     assert.ok(pdfOnly.sections.some((x) => x.title === "2 Methods"));
     assert.match(pdfOnly.notes[0], /arxiv-html: HTTP 404/);
 
-    assert.equal((await s.fulltext.ensure(s.add({ pmcid: "PMC123" }))).source, "europepmc-jats");
-    assert.equal((await s.fulltext.ensure(s.add({ doi: "10.1101/2026.01.01.000001" }))).source, "biorxiv-jats");
+    assert.equal((await env.fulltext.ensure(env.add({ pmcid: "PMC123" }))).source, "europepmc-jats");
+    assert.equal((await env.fulltext.ensure(env.add({ doi: "10.1101/2026.01.01.000001" }))).source, "biorxiv-jats");
 
-    const closed = await s.fulltext.ensure(
-      s.add({ doi: "10.1000/closed" }, { oaUrl: "https://publisher.example.com/x.pdf" }),
+    const closed = await env.fulltext.ensure(
+      env.add({ doi: "10.1000/closed" }, { oaUrl: "https://publisher.example.com/x.pdf" }),
     );
     assert.equal(closed.status, "missing");
     assert.match(closed.notes.join(), /publisher.example.com is not on the open-access host list/);
-    const nothing = await s.fulltext.ensure(s.add({ doi: "10.1000/none" }));
+    const nothing = await env.fulltext.ensure(env.add({ doi: "10.1000/none" }));
     assert.match(nothing.notes[0], /no arXiv id, PMCID, bioRxiv DOI or open-access link/);
 
     // Stored: a second ensure does not fetch again; refetch does.
     const id = html.paperId;
-    await s.fulltext.ensure(id);
-    assert.equal(s.web.hits.get("https://arxiv.org/html/2601.00001"), 1);
-    await s.fulltext.refetch(id);
-    assert.equal(s.web.hits.get("https://arxiv.org/html/2601.00001"), 2);
+    await env.fulltext.ensure(id);
+    assert.equal(env.web.hits.get("https://arxiv.org/html/2601.00001"), 1);
+    await env.fulltext.refetch(id);
+    assert.equal(env.web.hits.get("https://arxiv.org/html/2601.00001"), 2);
 
     // Facet vectors came from the sections.
-    assert.ok(s.papers.vectors.kinds(id).includes("method"), JSON.stringify(s.papers.vectors.kinds(id)));
+    assert.ok(env.papers.vectors.kinds(id).includes("method"), JSON.stringify(env.papers.vectors.kinds(id)));
   } finally {
-    await s.server.stop();
+    await env.server.stop();
   }
 });
 
@@ -129,10 +129,10 @@ test("the converter slot: pdf-text is active; Docling is unavailable without its
   }
 
   process.env.RH_DOCLING_URL = `http://127.0.0.1:${port}`;
-  const s = await setup();
+  const env = await setup();
   try {
-    assert.ok((await s.fulltext.converters()).find((v) => v.id === "docling")!.available);
-    const sections = await s.fulltext.convert(PDF, "docling");
+    assert.ok((await env.fulltext.converters()).find((v) => v.id === "docling")!.available);
+    const sections = await env.fulltext.convert(PDF, "docling");
     assert.deepEqual(
       sections.map((x) => x.title),
       ["Abstract", "1 Introduction", "2 Methods"],
@@ -140,12 +140,12 @@ test("the converter slot: pdf-text is active; Docling is unavailable without its
     assert.match(received[0], /^\/v1\/convert\/file\/async /, "the async API");
     assert.match(received[0], /name="files"; filename="paper.pdf"/);
     assert.match(received[0], /name="to_formats"\r\n\r\nmd/);
-    await s.p.plugins.kernel.configure("rh.fulltext", { "fulltext.converter": "docling" });
-    const fullText = await s.fulltext.ensure(s.add({ arxiv: "2601.00002" }));
+    await env.p.plugins.kernel.configure("rh.fulltext", { "fulltext.converter": "docling" });
+    const fullText = await env.fulltext.ensure(env.add({ arxiv: "2601.00002" }));
     assert.equal(fullText.source, "pdf:docling");
   } finally {
     delete process.env.RH_DOCLING_URL;
-    await s.server.stop();
+    await env.server.stop();
     docling.close();
   }
 });
@@ -208,19 +208,19 @@ test("a starred paper's note is written with its full text; facet vectors come f
 });
 
 test("the API returns a paper's full text or its absence, fetches it on request, and lists the converters", async () => {
-  const s = await setup();
+  const env = await setup();
   try {
-    const id = s.add({ arxiv: "2601.00001" });
-    const none = await s.server.client.fullText(id);
+    const id = env.add({ arxiv: "2601.00001" });
+    const none = await env.server.client.fullText(id);
     assert.equal(none.status, "none");
-    const got = await s.server.client.fetchFullText(id);
+    const got = await env.server.client.fetchFullText(id);
     assert.equal(got.source, "arxiv-html");
-    assert.equal((await s.server.client.fullText(id)).sections.length, 4);
-    await assert.rejects(s.server.client.fullText(999_999), /No paper 999999/);
-    const converters = await s.server.client.converters();
+    assert.equal((await env.server.client.fullText(id)).sections.length, 4);
+    await assert.rejects(env.server.client.fullText(999_999), /No paper 999999/);
+    const converters = await env.server.client.converters();
     assert.deepEqual(converters.find((c) => c.active)?.id, "pdf-text");
   } finally {
-    await s.server.stop();
+    await env.server.stop();
   }
 });
 
@@ -228,17 +228,17 @@ test("with RH_DOCLING=on the hub starts docling-serve itself on first use and st
   process.env.RH_DOCLING = "on";
   process.env.RH_DOCLING_CMD = join(import.meta.dirname, "fixtures/fulltext/fake-docling-serve.mjs");
   process.env.RH_DOCLING_PORT = String(15_000 + Math.floor(Math.random() * 1000));
-  const s = await setup();
+  const env = await setup();
   const health = `http://127.0.0.1:${process.env.RH_DOCLING_PORT}/health`;
   try {
     await assert.rejects(fetch(health), "not started before the first conversion");
-    const sections = await s.fulltext.convert(PDF, "docling");
+    const sections = await env.fulltext.convert(PDF, "docling");
     assert.deepEqual(
       sections.map((x) => x.text),
       ["Started by the hub.", "Supervised."],
     );
   } finally {
-    await s.server.stop();
+    await env.server.stop();
     for (const k of ["RH_DOCLING", "RH_DOCLING_CMD", "RH_DOCLING_PORT"]) delete process.env[k];
   }
   await new Promise((r) => setTimeout(r, 300));

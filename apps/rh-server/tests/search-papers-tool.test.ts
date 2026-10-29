@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { call, say } from "@rh/durable-agent";
 import { deskSearchRule } from "../src/faux-rules.ts";
-import { startTestServer } from "./helpers.ts";
+import { startTestServer } from "./test-server.ts";
 
 test("asking the desk for papers calls search_papers, stores and represents the records, and answers with metadata", async () => {
   const server = await startTestServer({ hub: { fauxRules: [deskSearchRule] } });

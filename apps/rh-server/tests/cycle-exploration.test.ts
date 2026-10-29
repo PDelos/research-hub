@@ -7,7 +7,7 @@ import { cardWriterRule } from "../src/faux-rules.ts";
 import { sampleCharter } from "./fixtures/charter.ts";
 import { choice, noul, score, scripted } from "./fixtures/jev-answers.ts";
 import { arxivOnlyFetch, fakePapers } from "./fixtures/sweep-env.ts";
-import { startTestServer } from "./helpers.ts";
+import { startTestServer } from "./test-server.ts";
 
 const passAll = (id: string, _c: string, q: any) =>
   id === "relevance"
@@ -33,10 +33,10 @@ test("exploration picks: none before likes, one marked last card after, none whe
   projectRuntime.brief.write("# Protein LMs");
   projectRuntime.charters.saveDraft(validateCharter(sampleCharter()), "agent");
   projectRuntime.charters.approve();
-  const sweep = async (b: number) => {
-    batch = b;
+  const sweep = async (budget: number) => {
+    batch = budget;
     projectRuntime.scheduler.trigger("sweep");
-    for (let i = 0; i < 500 && projectRuntime.sweeps.list().length < b + 1; i++)
+    for (let i = 0; i < 500 && projectRuntime.sweeps.list().length < budget + 1; i++)
       await new Promise((r) => setTimeout(r, 10));
     const id = projectRuntime.sweeps.list()[0].id;
     await projectRuntime.sweeps.settled(id, 30_000);

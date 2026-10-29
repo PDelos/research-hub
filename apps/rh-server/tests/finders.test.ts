@@ -8,9 +8,9 @@ import { cardWriterRule, knowledgeReviewRule } from "../src/faux-rules.ts";
 import { sampleCharter } from "./fixtures/charter.ts";
 import { choice, noul, score, scripted } from "./fixtures/jev-answers.ts";
 import { arxivOnlyFetch, fakePapers } from "./fixtures/sweep-env.ts";
-import { startTestServer, until } from "./helpers.ts";
+import { startTestServer, until } from "./test-server.ts";
 
-const v = (...xs: number[]) => new Float32Array(xs);
+const vector = (...xs: number[]) => new Float32Array(xs);
 const paper = (id: number, question: string | null = "Q1"): LikedPaper => ({
   id,
   title: `Paper ${id}`,
@@ -21,12 +21,12 @@ const paper = (id: number, question: string | null = "Q1"): LikedPaper => ({
 test("method transfer: close methods on far-apart problems are leads, the strongest first", () => {
   // Papers 1 and 2 share a method (x axis) but study different problems; 3–6 are ordinary.
   const vectors: Record<number, { method: Float32Array; background: Float32Array }> = {
-    1: { method: v(1, 0, 0), background: v(1, 0, 0) },
-    2: { method: v(0.99, 0.1, 0), background: v(0, 0, 1) },
-    3: { method: v(0, 1, 0), background: v(1, 0.1, 0) },
-    4: { method: v(0, 0, 1), background: v(0.9, 0.2, 0) },
-    5: { method: v(0.1, 0.9, 0.2), background: v(0.8, 0.3, 0) },
-    6: { method: v(0.2, 0.1, 0.9), background: v(0.9, 0, 0.1) },
+    1: { method: vector(1, 0, 0), background: vector(1, 0, 0) },
+    2: { method: vector(0.99, 0.1, 0), background: vector(0, 0, 1) },
+    3: { method: vector(0, 1, 0), background: vector(1, 0.1, 0) },
+    4: { method: vector(0, 0, 1), background: vector(0.9, 0.2, 0) },
+    5: { method: vector(0.1, 0.9, 0.2), background: vector(0.8, 0.3, 0) },
+    6: { method: vector(0.2, 0.1, 0.9), background: vector(0.9, 0, 0.1) },
   };
   const leads = methodTransferLeads(
     [1, 2, 3, 4, 5, 6].map((id) => paper(id)),
@@ -37,7 +37,12 @@ test("method transfer: close methods on far-apart problems are leads, the strong
 });
 
 test("missing links: close papers on different questions without a citation between them", () => {
-  const whole: Record<number, Float32Array> = { 1: v(1, 0), 2: v(0.98, 0.1), 3: v(0.97, 0.12), 4: v(0, 1) };
+  const whole: Record<number, Float32Array> = {
+    1: vector(1, 0),
+    2: vector(0.98, 0.1),
+    3: vector(0.97, 0.12),
+    4: vector(0, 1),
+  };
   const cited = new Set(["1-3"]);
   const db = {
     prepare: () => ({
@@ -82,10 +87,10 @@ test("a review credits its finder, proposes level up and a taste rule; approvals
     id: `2650.${70000 + i}`,
     title: i % 3 ? `Clinical trial report ${i}` : `Ribosome profiling study ${i}`,
   }));
-  const jev = scripted((id, _c, q: any, state: any) => {
+  const jev = scripted((id, _c, question: any, state: any) => {
     const good = String(state.paper?.title ?? "").startsWith("Ribosome");
     if (id === "relevance") return score(0.75, 5);
-    if (id === "matched_question") return choice(good ? "Q1" : "Q2", Object.keys(q.criteria));
+    if (id === "matched_question") return choice(good ? "Q1" : "Q2", Object.keys(question.criteria));
     if (id === "worth") return noul(0.9);
     if (id === "level") return score(good ? 2 / 3 : 0, 4);
     if (id === "promise") return noul(0.8);
@@ -115,9 +120,9 @@ test("a review credits its finder, proposes level up and a taste rule; approvals
     projectRuntime.charters.approve();
     await projectRuntime.plugins.kernel.configure("rh.sweep", { cardsPerSweep: 12, explorationPicks: 0 });
     const sweep = async () => {
-      const n = projectRuntime.sweeps.list().length;
+      const sweepCount = projectRuntime.sweeps.list().length;
       projectRuntime.scheduler.trigger("sweep");
-      await until(() => projectRuntime.sweeps.list().length === n + 1, 10_000, "sweep");
+      await until(() => projectRuntime.sweeps.list().length === sweepCount + 1, 10_000, "sweep");
       await projectRuntime.sweeps.settled(projectRuntime.sweeps.list(1)[0].id, 30_000);
     };
     await sweep();

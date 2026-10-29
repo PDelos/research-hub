@@ -12,7 +12,7 @@ import { sampleCharter } from "./fixtures/charter.ts";
 import { choice, noul, score, scripted } from "./fixtures/jev-answers.ts";
 import { fakeOpenRouter } from "./fixtures/openrouter.ts";
 import { arxivOnlyFetch, fakePapers } from "./fixtures/sweep-env.ts";
-import { startTestServer, until } from "./helpers.ts";
+import { startTestServer, until } from "./test-server.ts";
 
 const MODELS = [
   { id: "acme/embed-small", prompt: "0.00000002", created: 1_780_000_000, dimensions: true },
@@ -21,21 +21,22 @@ const MODELS = [
 ];
 
 /** A project with `sweeps` sweeps of 12 papers: the user likes the "Good" ones, which Jev scores as more relevant. */
-async function project(o: { sweeps?: number; focus?: [string, number] } = {}) {
+async function project(options: { sweeps?: number; focus?: [string, number] } = {}) {
   let batch = 0;
-  const batches = Array.from({ length: o.sweeps ?? 0 }, (_, b) =>
+  const batches = Array.from({ length: options.sweeps ?? 0 }, (_, b) =>
     fakePapers(12, "x").map((p, i) => ({
       ...p,
       id: `26${30 + b}.${50000 + i}`,
       title: `${i % 3 ? "Bad" : "Good"} paper ${b}-${i} on protein language models`,
     })),
   );
-  const jev = scripted((id, _c, q: any, state: any) => {
+  const jev = scripted((id, _c, question: any, state: any) => {
     const title = String(state.paper?.title ?? "");
-    if (id === "focus" && o.focus) return choice(o.focus[0], Object.keys(q.criteria), o.focus[1]);
+    if (id === "focus" && options.focus)
+      return choice(options.focus[0], Object.keys(question.criteria), options.focus[1]);
     if (id === "relevance") return score(title.startsWith("Good") ? 1 : 0.5, 5);
-    if (id === "matched_question") return choice("Q1", Object.keys(q.criteria));
-    if (id === "kind") return choice("survey", Object.keys(q.criteria));
+    if (id === "matched_question") return choice("Q1", Object.keys(question.criteria));
+    if (id === "kind") return choice("survey", Object.keys(question.criteria));
     if (id === "worth") return noul(0.9);
     if (id === "like") return noul(0.5);
     return undefined;
@@ -76,10 +77,10 @@ async function project(o: { sweeps?: number; focus?: [string, number] } = {}) {
 }
 
 test("the grid starts from what the analysis points at and keeps rank weights summing to the same total", () => {
-  const w = shiftWeights(DEFAULT_SETTINGS.rankWeights, "relevance");
+  const shifted = shiftWeights(DEFAULT_SETTINGS.rankWeights, "relevance");
   const sum = (x: object) => Object.values(x).reduce((a: number, b) => a + (b as number), 0);
-  assert.ok(Math.abs(sum(w) - sum(DEFAULT_SETTINGS.rankWeights)) < 0.02);
-  assert.ok(w.relevance > DEFAULT_SETTINGS.rankWeights.relevance);
+  assert.ok(Math.abs(sum(shifted) - sum(DEFAULT_SETTINGS.rankWeights)) < 0.02);
+  assert.ok(shifted.relevance > DEFAULT_SETTINGS.rankWeights.relevance);
   const grid = rankingGrid(DEFAULT_SETTINGS, {
     judged: 30,
     disliked: { "off-topic": 9 },
@@ -99,20 +100,20 @@ test("the grid starts from what the analysis points at and keeps rank weights su
 });
 
 test("due after everyDays; Jev picks the focus, and below 0.4 confidence the rotation does", async () => {
-  const s = await project({ focus: ["embedder", 0.8] });
+  const env = await project({ focus: ["embedder", 0.8] });
   try {
-    assert.equal(s.upgrades.due(), true, "never ran");
-    const chosen = await s.upgrades.chooseFocus();
+    assert.equal(env.upgrades.due(), true, "never ran");
+    const chosen = await env.upgrades.chooseFocus();
     assert.equal(chosen.focus, "embedder");
     assert.match(chosen.reason, /Jev \(confidence 0\.80\)/);
-    const run = await s.upgrades.run({ focus: "scout-addons" });
+    const run = await env.upgrades.run({ focus: "scout-addons" });
     assert.equal(run.focus, "scout-addons");
-    assert.equal(s.upgrades.due(), false);
-    assert.equal(s.upgrades.due(Date.now() + 7 * 86_400_000), true);
-    await s.p.plugins.kernel.configure("rh.upgrades", { enabled: false });
-    assert.equal(s.upgrades.due(Date.now() + 70 * 86_400_000), false);
+    assert.equal(env.upgrades.due(), false);
+    assert.equal(env.upgrades.due(Date.now() + 7 * 86_400_000), true);
+    await env.p.plugins.kernel.configure("rh.upgrades", { enabled: false });
+    assert.equal(env.upgrades.due(Date.now() + 70 * 86_400_000), false);
   } finally {
-    await s.server.stop();
+    await env.server.stop();
   }
   const unsure = await project({ focus: ["ranking", 0.2] });
   try {
@@ -126,11 +127,11 @@ test("due after everyDays; Jev picks the focus, and below 0.4 confidence the rot
 });
 
 test("a ranking run replays variants and applies the best better one with undo, or changes nothing", async () => {
-  const s = await project({ sweeps: 5 });
+  const env = await project({ sweeps: 5 });
   try {
     // The defaults already put the liked (more relevant) papers first: nothing is better, nothing changes.
-    const before = s.p.plugins.kernel.settings("rh.sweep");
-    const first = await s.upgrades.run({ focus: "ranking" });
+    const before = env.p.plugins.kernel.settings("rh.sweep");
+    const first = await env.upgrades.run({ focus: "ranking" });
     assert.equal(first.status, "done");
     assert.ok(first.report!.tried.length >= 1 && first.report!.tried.length <= 12);
     assert.ok(
@@ -138,28 +139,28 @@ test("a ranking run replays variants and applies the best better one with undo, 
       "every variant has a verdict",
     );
     assert.match(first.report!.result, /^Nothing changed: no variant replayed as better/);
-    assert.deepEqual(s.p.plugins.kernel.settings("rh.sweep"), before);
-    assert.equal(s.upgrades.proposals().length, 0);
+    assert.deepEqual(env.p.plugins.kernel.settings("rh.sweep"), before);
+    assert.equal(env.upgrades.proposals().length, 0);
 
     // Settings that ignore relevance: moving weight back to relevance replays as better and is applied, undoably.
-    await s.p.plugins.kernel.configure("rh.sweep", {
+    await env.p.plugins.kernel.configure("rh.sweep", {
       cardsPerSweep: 4,
       rankWeights: { importance: 0.5, relevance: 0, question: 0.25, level: 0.25, freshness: 0 },
     });
-    const poor = s.p.plugins.kernel.settings("rh.sweep");
-    const second = await s.upgrades.run({ focus: "ranking" });
-    const [applied] = s.upgrades.proposals("applied");
+    const poor = env.p.plugins.kernel.settings("rh.sweep");
+    const second = await env.upgrades.run({ focus: "ranking" });
+    const [applied] = env.upgrades.proposals("applied");
     assert.ok(applied, second.report!.result);
     assert.match(second.report!.result, /^Applied/);
     assert.equal(applied.runId, second.id);
-    assert.notDeepEqual(s.p.plugins.kernel.settings("rh.sweep"), poor);
-    const [change] = await s.server.client.pluginHistory();
+    assert.notDeepEqual(env.p.plugins.kernel.settings("rh.sweep"), poor);
+    const [change] = await env.server.client.pluginHistory();
     assert.equal(change.actor, `proposal:upgrade-${second.id}`);
-    await s.p.plugins.kernel.undo(applied.commit!, "user");
-    assert.deepEqual(s.p.plugins.kernel.settings("rh.sweep"), poor);
-    assert.equal(s.upgrades.runs()[0].id, second.id);
+    await env.p.plugins.kernel.undo(applied.commit!, "user");
+    assert.deepEqual(env.p.plugins.kernel.settings("rh.sweep"), poor);
+    assert.equal(env.upgrades.runs()[0].id, second.id);
   } finally {
-    await s.server.stop();
+    await env.server.stop();
   }
   const empty = await project();
   try {
@@ -172,13 +173,13 @@ test("a ranking run replays variants and applies the best better one with undo, 
 });
 
 test("an embedder run shortlists from the cheap catalog, benchmarks, and proposes a clear winner for approval", async () => {
-  const s = await project();
+  const env = await project();
   try {
-    s.or.answer =
+    env.or.answer =
       'I found: [{"id": "acme/embed-native", "reason": "tops SciDocs"}, {"id": "acme/embed-pricey", "reason": "x"}, {"id": "made/up"}]';
-    const real = s.harness.runBenchmark;
+    const real = env.harness.runBenchmark;
     const value = (c: Record<string, unknown>) => (c.model === "acme/embed-native" ? 0.7 : 0.6);
-    s.harness.runBenchmark = async (slot, candidate = {}) => {
+    env.harness.runBenchmark = async (slot, candidate = {}) => {
       const tasks = ["scidocs", "litsearch", "your-stars"].map((task) => ({
         task,
         metric: "nDCG@10",
@@ -195,75 +196,75 @@ test("an embedder run shortlists from the cheap catalog, benchmarks, and propose
         createdAt: new Date().toISOString(),
       };
     };
-    const run = await s.upgrades.run({ focus: "embedder" });
-    s.harness.runBenchmark = real;
+    const run = await env.upgrades.run({ focus: "embedder" });
+    env.harness.runBenchmark = real;
     const report = run.report!;
     assert.equal(report.tried.length, 2, "the active model and the one shortlisted model within the price limit");
     assert.match(report.tried[1].what, /acme\/embed-native/);
     assert.equal(report.tried[1].verdict, "better");
-    assert.equal(s.or.research.length, 1);
-    assert.doesNotMatch(JSON.stringify(s.or.research[0]), /embed-pricey/, "over the price limit, never offered");
-    const [proposal] = s.upgrades.proposals("proposed");
+    assert.equal(env.or.research.length, 1);
+    assert.doesNotMatch(JSON.stringify(env.or.research[0]), /embed-pricey/, "over the price limit, never offered");
+    const [proposal] = env.upgrades.proposals("proposed");
     assert.equal(proposal.payload.model, "acme/embed-native");
     assert.equal(proposal.payload.dims, 0, "no dimensions parameter: its native size");
 
-    const approved = await s.upgrades.approve(proposal.id);
+    const approved = await env.upgrades.approve(proposal.id);
     assert.equal(approved.status, "approved");
-    const settings = s.p.plugins.kernel.settings("rh.embedder-openrouter");
+    const settings = env.p.plugins.kernel.settings("rh.embedder-openrouter");
     assert.equal(settings.model, "acme/embed-native");
     assert.equal(settings.dims, 256, "the offline embedder's native size");
-    await assert.rejects(s.upgrades.approve(proposal.id), /is approved/);
-    await s.p.plugins.kernel.undo(approved.commit!, "user");
-    assert.notEqual(s.p.plugins.kernel.settings("rh.embedder-openrouter").model, "acme/embed-native");
+    await assert.rejects(env.upgrades.approve(proposal.id), /is approved/);
+    await env.p.plugins.kernel.undo(approved.commit!, "user");
+    assert.notEqual(env.p.plugins.kernel.settings("rh.embedder-openrouter").model, "acme/embed-native");
 
     // Without research the newest cheap models are tried; no winner, nothing proposed.
-    s.or.answer = "nothing useful";
-    const run2 = await s.upgrades.run({ focus: "embedder" });
+    env.or.answer = "nothing useful";
+    const run2 = await env.upgrades.run({ focus: "embedder" });
     assert.match(run2.report!.result, /^Nothing changed/);
-    assert.equal(s.upgrades.proposals("proposed").length, 0);
+    assert.equal(env.upgrades.proposals("proposed").length, 0);
     // What lost is remembered: the next run has no untried model within the price limit.
-    const run3 = await s.upgrades.run({ focus: "embedder" });
+    const run3 = await env.upgrades.run({ focus: "embedder" });
     assert.match(run3.report!.result, /not tried in the last 90 days/);
-    const p2 = s.upgrades.proposals()[0];
-    assert.throws(() => s.upgrades.reject(p2.id), /is approved/);
+    const p2 = env.upgrades.proposals()[0];
+    assert.throws(() => env.upgrades.reject(p2.id), /is approved/);
   } finally {
-    await s.server.stop();
+    await env.server.stop();
   }
 });
 
 test("a scout run lists new sources from the web that the user can dismiss", async () => {
-  const s = await project();
+  const env = await project();
   try {
-    s.or.answer = JSON.stringify([
+    env.or.answer = JSON.stringify([
       { name: "bioRxiv API", url: "https://api.biorxiv.org", reason: "biology preprints" },
       { name: "arxiv", url: "https://arxiv.org", reason: "already there" },
       { name: "No link", url: "ftp://x", reason: "bad url" },
     ]);
-    const run = await s.upgrades.run({ focus: "scout-addons" });
+    const run = await env.upgrades.run({ focus: "scout-addons" });
     assert.match(run.report!.result, /1 add-on suggestion/);
     assert.equal(run.costUsd, 0.02, "the web search's cost");
-    const [suggestion] = s.upgrades.suggestions();
+    const [suggestion] = env.upgrades.suggestions();
     assert.equal(suggestion.name, "bioRxiv API");
-    assert.match(String(s.or.research[0].messages.at(-1).content), /arxiv/);
-    s.upgrades.dismiss(suggestion.id);
-    assert.equal(s.upgrades.suggestions().length, 0);
-    assert.equal(s.upgrades.suggestions(true).length, 1);
+    assert.match(String(env.or.research[0].messages.at(-1).content), /arxiv/);
+    env.upgrades.dismiss(suggestion.id);
+    assert.equal(env.upgrades.suggestions().length, 0);
+    assert.equal(env.upgrades.suggestions(true).length, 1);
   } finally {
-    await s.server.stop();
+    await env.server.stop();
   }
 });
 
 test("the API starts a run in the background, lists it, decides proposals and dismisses suggestions; the digest shows it", async () => {
-  const s = await project();
+  const env = await project();
   try {
-    const { client } = s.server;
+    const { client } = env.server;
     const empty = await client.upgrades();
     assert.equal(empty.enabled, true);
     assert.equal(empty.due, true);
     assert.deepEqual(empty.runs, []);
     await assert.rejects(client.runUpgrade("everything" as never), /focus must be one of/);
 
-    s.or.answer = '[{"name": "bioRxiv API", "url": "https://api.biorxiv.org", "reason": "biology preprints"}]';
+    env.or.answer = '[{"name": "bioRxiv API", "url": "https://api.biorxiv.org", "reason": "biology preprints"}]';
     assert.deepEqual(await client.runUpgrade("scout-addons"), { started: true });
     await until(async () => (await client.upgrades()).runs[0]?.status === "done", 10_000, "run");
     const view = await client.upgrades();
@@ -277,7 +278,7 @@ test("the API starts a run in the background, lists it, decides proposals and di
     await assert.rejects(client.approveProposal(999), /no proposal 999/);
     await assert.rejects(client.rejectProposal(999), /no proposal 999/);
 
-    const digest = await s.server.hub.project.plugins
+    const digest = await env.server.hub.project.plugins
       .exportsOf<import("../plugins/rh.digest/main.ts").DigestExports>("rh.digest")
       .then((d) => d.buildDigest(Date.now() + 1000));
     assert.equal(digest.upgrade?.runs.length, 1);
@@ -285,6 +286,6 @@ test("the API starts a run in the background, lists it, decides proposals and di
     assert.match(digest.upgrade?.runs[0].result ?? "", /1 add-on suggestion/);
     await client.commentDigest(digest.id, "upgrade", "Nice find");
   } finally {
-    await s.server.stop();
+    await env.server.stop();
   }
 });

@@ -6,7 +6,7 @@ import { test } from "node:test";
 import { validateCharter } from "../src/charter.ts";
 import { appendUnderHeading, noteStem, slug } from "../src/kb/vault.ts";
 import { sampleCharter } from "./fixtures/charter.ts";
-import { startTestServer, tempDir } from "./helpers.ts";
+import { startTestServer, tempDir } from "./test-server.ts";
 
 test("note names: first author's last name, year, first five title words", () => {
   assert.equal(
@@ -101,15 +101,15 @@ test("approving a charter creates the vault with the layout, the hub theme and c
 });
 
 test("an existing project with an approved charter but no vault gets one at startup; index and log are append-only", async () => {
-  const t = tempDir();
+  const temp = tempDir();
   try {
-    let server = await startTestServer({ dataDir: t.dir, hub: { ticker: false } });
+    let server = await startTestServer({ dataDir: temp.dir, hub: { ticker: false } });
     const projectRuntime = server.hub.project;
     projectRuntime.brief.write("# x");
     projectRuntime.charters.saveDraft(validateCharter(sampleCharter()), "agent");
     projectRuntime.charters.approve();
     await server.stop();
-    server = await startTestServer({ dataDir: t.dir, hub: { ticker: false } });
+    server = await startTestServer({ dataDir: temp.dir, hub: { ticker: false } });
     try {
       const vault = server.hub.project.vault;
       assert.ok(vault.exists());
@@ -130,6 +130,6 @@ test("an existing project with an approved charter but no vault gets one at star
       await server.stop();
     }
   } finally {
-    t.cleanup();
+    temp.cleanup();
   }
 });

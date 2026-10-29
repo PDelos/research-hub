@@ -16,14 +16,21 @@ const start = Date.parse("2026-10-01T06:00:00Z");
 /** Sweeps whose most relevant papers are the user's favourites, while importance points the other way. */
 function history(sweeps: number): { history: SweepHistory[]; labels: Labels } {
   const user: Labels["user"] = new Map();
-  const history = Array.from({ length: sweeps }, (_, s) => {
+  const history = Array.from({ length: sweeps }, (_, sweep) => {
     const pool = Array.from({ length: 10 }, (_, i) => {
-      const paperId = s * 100 + i;
+      const paperId = sweep * 100 + i;
       const relevance = 0.5 + i * 0.05;
       user.set(paperId, relevance >= 0.85 ? "star" : relevance <= 0.6 ? "down" : "up");
       return { paperId, relevance, worth: 0.8, importance: 1 - relevance, level: "core" as const };
     });
-    return { sweepId: s + 1, startedAt: start + s * DAY, orientation: false, pool, liked: [], vectors: new Map() };
+    return {
+      sweepId: sweep + 1,
+      startedAt: start + sweep * DAY,
+      orientation: false,
+      pool,
+      liked: [],
+      vectors: new Map(),
+    };
   });
   return { history, labels: { user } };
 }

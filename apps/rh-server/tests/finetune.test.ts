@@ -15,7 +15,7 @@ import { sampleCharter } from "./fixtures/charter.ts";
 import { choice, noul, score, scripted } from "./fixtures/jev-answers.ts";
 import { fakeOpenRouter } from "./fixtures/openrouter.ts";
 import { arxivOnlyFetch, fakePapers } from "./fixtures/sweep-env.ts";
-import { startTestServer, until } from "./helpers.ts";
+import { startTestServer, until } from "./test-server.ts";
 
 /** A fake Kaggle API: SaveKernel, then RUNNING once and COMPLETE, and two model files plus a log to download. */
 function fakeKaggle() {
@@ -43,16 +43,16 @@ function fakeKaggle() {
 }
 
 test("the Kaggle runner pushes a private GPU script, waits for COMPLETE and lists the output; errors and missing tokens say why", async () => {
-  const k = fakeKaggle();
+  const kaggle = fakeKaggle();
   const runner = new KaggleRunner({
-    request: async (url, init) => (await k.handle(url, init as RequestInit))!,
+    request: async (url, init) => (await kaggle.handle(url, init as RequestInit))!,
     credentials: kaggleCredentials((n) => ({ KAGGLE_USERNAME: "me", KAGGLE_API_TOKEN: "tok" })[n]),
     sleep: async () => undefined,
   });
   const pushed = await runner.push("x", "Title", "print(1)");
   assert.equal(pushed.url, "https://www.kaggle.com/code/me/x");
   assert.deepEqual(
-    { ...k.calls[0].body, text: undefined },
+    { ...kaggle.calls[0].body, text: undefined },
     {
       slug: "me/x",
       newTitle: "Title",
@@ -64,10 +64,10 @@ test("the Kaggle runner pushes a private GPU script, waits for COMPLETE and list
       enableInternet: true,
     },
   );
-  assert.equal(k.calls[0].auth, "Bearer tok");
+  assert.equal(kaggle.calls[0].auth, "Bearer tok");
   await runner.wait("x");
   assert.deepEqual(
-    k.calls.filter((c) => c.method === "GetKernelSessionStatus").map((c) => c.body),
+    kaggle.calls.filter((c) => c.method === "GetKernelSessionStatus").map((c) => c.body),
     [
       { userName: "me", kernelSlug: "x" },
       { userName: "me", kernelSlug: "x" },
@@ -99,13 +99,13 @@ test("the engineer fine-tunes an embedder on Kaggle, benchmarks it locally, and 
     request.on("data", (d) => (body += d));
     request.on("end", () => {
       const { texts } = JSON.parse(body) as { texts: string[] };
-      const vectors = texts.map((t, i) => {
-        const near = /Ribosome|transfer to structure/.test(t);
-        const v = Array.from({ length: 8 }, (_, j) =>
-          near ? (j === 0 ? 1 : 0.01 * ((i + j) % 3)) : Math.sin(t.length * (j + 1)),
+      const vectors = texts.map((text, i) => {
+        const near = /Ribosome|transfer to structure/.test(text);
+        const raw = Array.from({ length: 8 }, (_, j) =>
+          near ? (j === 0 ? 1 : 0.01 * ((i + j) % 3)) : Math.sin(text.length * (j + 1)),
         );
-        const n = Math.hypot(...v) || 1;
-        return v.map((x) => x / n);
+        const norm = Math.hypot(...raw) || 1;
+        return raw.map((x) => x / norm);
       });
       response.end(JSON.stringify({ vectors }));
     });
@@ -117,7 +117,7 @@ test("the engineer fine-tunes an embedder on Kaggle, benchmarks it locally, and 
     KAGGLE_API_TOKEN: "tok",
     RH_KAGGLE_POLL_MS: "5",
   });
-  const k = fakeKaggle();
+  const kaggle = fakeKaggle();
   const or = fakeOpenRouter([]);
   let batch = 0;
   const batches = [0, 1].map((b) =>
@@ -141,7 +141,7 @@ test("the engineer fine-tunes an embedder on Kaggle, benchmarks it locally, and 
               : undefined,
       ).decide,
       paperFetch: (async (input: any, init: any) =>
-        (await k.handle(String(input), init)) ??
+        (await kaggle.handle(String(input), init)) ??
         (String(input).startsWith("https://openrouter.ai")
           ? or.fetch(input, init)
           : arxivOnlyFetch(batches[batch])(input, init))) as typeof fetch,
@@ -186,7 +186,7 @@ test("the engineer fine-tunes an embedder on Kaggle, benchmarks it locally, and 
     assert.equal(built.numbers!.dims, 8);
     assert.ok(existsSync(join(server.dataDir, `engineer/${idea.id}/model/1_Pooling/config.json`)));
     assert.ok(!existsSync(join(server.dataDir, `engineer/${idea.id}/model/log.txt`)), "only model/ files");
-    const pushed = k.calls.find((c) => c.method === "SaveKernel")!.body;
+    const pushed = kaggle.calls.find((c) => c.method === "SaveKernel")!.body;
     assert.match(pushed.text, /MultipleNegativesRankingLoss/);
 
     await engineer.enable(idea.id);

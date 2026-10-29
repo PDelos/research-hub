@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { say } from "@rh/durable-agent";
 import { AgentModel, type Frame, type HubClient } from "@rh/sdk";
-import { startTestServer, until } from "./helpers.ts";
+import { startTestServer, until } from "./test-server.ts";
 
 /** Follow a project's stream into an AgentModel until stop() is called. */
 function follow(client: HubClient) {
@@ -28,24 +28,24 @@ const text = (m: AgentModel) => JSON.stringify(m.state.items);
 
 test("a stream starts with hello and a snapshot, then two viewers see the same message and reply", async () => {
   const server = await startTestServer({ hub: { fauxRules: [(t) => say(`echo ${t.lastUser}`)] } });
-  const a = follow(server.client);
-  const b = follow(server.client);
+  const first = follow(server.client);
+  const second = follow(server.client);
   try {
-    await until(() => a.model.state.ready && b.model.state.ready, 10_000, "snapshots");
-    assert.equal(a.frames[0].type, "hello");
-    assert.equal(a.frames[1].type, "agent.snapshot");
+    await until(() => first.model.state.ready && second.model.state.ready, 10_000, "snapshots");
+    assert.equal(first.frames[0].type, "hello");
+    assert.equal(first.frames[1].type, "agent.snapshot");
     await server.client.send("sync me");
     await until(
-      () => text(a.model).includes("echo sync me") && text(b.model).includes("echo sync me"),
+      () => text(first.model).includes("echo sync me") && text(second.model).includes("echo sync me"),
       10_000,
       "both replies",
     );
-    assert.ok(text(a.model).includes("sync me"));
-    assert.ok(a.frames.some((f) => f.type === "agent.state"));
-    assert.ok(a.frames.some((f) => f.type === "usage"));
+    assert.ok(text(first.model).includes("sync me"));
+    assert.ok(first.frames.some((f) => f.type === "agent.state"));
+    assert.ok(first.frames.some((f) => f.type === "usage"));
   } finally {
-    await a.stop();
-    await b.stop();
+    await first.stop();
+    await second.stop();
     await server.stop();
   }
 });
