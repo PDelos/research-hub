@@ -10,31 +10,42 @@ import { startTestServer, tempDir, TOKEN, type TestServer } from "./test-server.
 const at = (iso: string) => Date.parse(iso);
 
 test("5.1 daily and weekly slots in UTC", () => {
-  assert.deepEqual(dailySlot(at("2026-10-23T10:00:00Z"), "06:00", "UTC"), {
+  assert.deepEqual(dailySlot(at("2026-10-23T10:00:00Z"), { time: "06:00", tz: "UTC" }), {
     kind: "sweep",
     key: "sweep:2026-10-23",
     at: at("2026-10-23T06:00:00Z"),
   });
-  assert.equal(dailySlot(at("2026-10-23T05:59:00Z"), "06:00", "UTC").key, "sweep:2026-10-22");
-  assert.equal(dailySlot(at("2026-10-23T10:00:00Z"), "06:00", "UTC", 2).key, "sweep:2026-10-21");
+  assert.equal(dailySlot(at("2026-10-23T05:59:00Z"), { time: "06:00", tz: "UTC" }).key, "sweep:2026-10-22");
+  assert.equal(dailySlot(at("2026-10-23T10:00:00Z"), { time: "06:00", tz: "UTC" }, 2).key, "sweep:2026-10-21");
   // Friday 2026-10-23: the latest Sunday 07:00 slot is 2026-10-18, ISO week 42.
-  const slot = weeklySlot(at("2026-10-23T10:00:00Z"), "sun", "07:00", "UTC");
+  const slot = weeklySlot(at("2026-10-23T10:00:00Z"), { weekday: "sun", time: "07:00", tz: "UTC" });
   assert.equal(slot.key, "review:2026-W42");
   assert.equal(slot.at, at("2026-10-18T07:00:00Z"));
-  assert.equal(weeklySlot(at("2026-10-18T06:59:00Z"), "sun", "07:00", "UTC").key, "review:2026-W41");
+  assert.equal(
+    weeklySlot(at("2026-10-18T06:59:00Z"), { weekday: "sun", time: "07:00", tz: "UTC" }).key,
+    "review:2026-W41",
+  );
 });
 
 test("5.1 Europe/Madrid across both 2026 DST changes keeps 06:00 local", () => {
   const tz = "Europe/Madrid";
-  assert.equal(dailySlot(at("2026-03-28T12:00:00Z"), "06:00", tz).at, at("2026-03-28T05:00:00Z"), "winter UTC+1");
-  assert.equal(dailySlot(at("2026-03-30T12:00:00Z"), "06:00", tz).at, at("2026-03-30T04:00:00Z"), "summer UTC+2");
-  assert.equal(dailySlot(at("2026-10-24T12:00:00Z"), "06:00", tz).at, at("2026-10-24T04:00:00Z"));
-  assert.equal(dailySlot(at("2026-10-26T12:00:00Z"), "06:00", tz).at, at("2026-10-26T05:00:00Z"));
+  assert.equal(
+    dailySlot(at("2026-03-28T12:00:00Z"), { time: "06:00", tz }).at,
+    at("2026-03-28T05:00:00Z"),
+    "winter UTC+1",
+  );
+  assert.equal(
+    dailySlot(at("2026-03-30T12:00:00Z"), { time: "06:00", tz }).at,
+    at("2026-03-30T04:00:00Z"),
+    "summer UTC+2",
+  );
+  assert.equal(dailySlot(at("2026-10-24T12:00:00Z"), { time: "06:00", tz }).at, at("2026-10-24T04:00:00Z"));
+  assert.equal(dailySlot(at("2026-10-26T12:00:00Z"), { time: "06:00", tz }).at, at("2026-10-26T05:00:00Z"));
   // The slot on a DST day is still one per local date.
-  assert.equal(dailySlot(at("2026-03-29T12:00:00Z"), "06:00", tz).key, "sweep:2026-03-29");
-  assert.equal(localParts(dailySlot(at("2026-03-29T12:00:00Z"), "06:00", tz).at, tz).hh, 6);
+  assert.equal(dailySlot(at("2026-03-29T12:00:00Z"), { time: "06:00", tz }).key, "sweep:2026-03-29");
+  assert.equal(localParts(dailySlot(at("2026-03-29T12:00:00Z"), { time: "06:00", tz }).at, tz).hh, 6);
   // 02:30 does not exist on 2026-03-29 in Madrid: it lands just after the jump, at 03:30 local.
-  assert.equal(localParts(zonedToUtc(2026, 3, 29, 2, 30, tz), tz).hh, 3);
+  assert.equal(localParts(zonedToUtc({ y: 2026, m: 3, d: 29 }, "02:30", tz), tz).hh, 3);
 });
 
 test("5.1 schedule configuration is validated", () => {

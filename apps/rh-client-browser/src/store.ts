@@ -9,6 +9,7 @@ import {
   type PrecisionPoint,
   type CharterView,
   type CostTotals,
+  type Frame,
   type PluginSummary,
   type Info,
   type ProjectOverview,
@@ -122,6 +123,25 @@ export function onPlugins(listener: (plugins: PluginSummary[]) => void) {
   pluginListeners.add(listener);
 }
 
+/** Apply one stream frame: project events refresh their views; the rest go to the agent model. */
+function applyFrame(frame: Frame) {
+  if (frame.type === "hello") {
+    model.clear();
+    model.conversationId = frame.mainConversationId;
+  } else if (frame.type === "agent.state") store.agent = frame.state;
+  else if (frame.type === "cards") {
+    store.sweep = frame.sweep ?? undefined;
+    void refreshFeed();
+    void refreshSchedule();
+  } else if (frame.type === "plugins") {
+    for (const listener of pluginListeners) listener(frame.plugins);
+  } else if (frame.type === "usage") {
+    store.totals = frame.totals;
+    refreshRunsSoon();
+    void refreshProject();
+  } else model.apply(frame);
+}
+
 export async function connect() {
   try {
     store.info = await client.info();
@@ -137,21 +157,7 @@ export async function connect() {
         store.connected = true;
         store.error = "";
         delay = 500;
-        if (frame.type === "hello") {
-          model.clear();
-          model.conversationId = frame.mainConversationId;
-        } else if (frame.type === "agent.state") store.agent = frame.state;
-        else if (frame.type === "cards") {
-          store.sweep = frame.sweep ?? undefined;
-          void refreshFeed();
-          void refreshSchedule();
-        } else if (frame.type === "plugins") {
-          for (const listener of pluginListeners) listener(frame.plugins);
-        } else if (frame.type === "usage") {
-          store.totals = frame.totals;
-          refreshRunsSoon();
-          void refreshProject();
-        } else model.apply(frame);
+        applyFrame(frame);
       }
     } catch (error) {
       store.error = error instanceof Error ? error.message : String(error);

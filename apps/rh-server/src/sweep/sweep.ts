@@ -467,11 +467,10 @@ export class SweepRunner {
         });
         const failed = result.sources.filter((s) => s.status === "failed").map((s) => `${s.source}: ${s.error}`);
         if (result.sources.every((s) => s.status !== "ok")) failedQueries++;
+        const base = q.variant ? q.text.replace(/ review$/, "") : q.text;
         for (const p of result.papers) {
           insert.run(sweep.id, p.id);
-          const base = q.variant ? q.text.replace(/ review$/, "") : q.text;
-          if (!foundBy.has(p.id)) foundBy.set(p.id, new Set());
-          foundBy.get(p.id)!.add(base);
+          foundBy.set(p.id, (foundBy.get(p.id) ?? new Set<string>()).add(base));
         }
         detail.push({ query: q.text, found: result.papers.length, failed });
       } catch (error) {

@@ -189,13 +189,10 @@ export function activate(context: PluginContext): UpgradesExports {
     if (!row) throw new UpgradeInvalid(`no proposal ${id}`);
     return toProposal(row);
   };
-  const addProposal = (
-    runId: number,
-    kind: Proposal["kind"],
-    payload: object,
-    status: Proposal["status"],
-    commit: string | null = null,
-  ) => {
+  /** A new proposal for the human to decide; one already `applied` records its settings commit. */
+  const addProposal = (runId: number, kind: Proposal["kind"], payload: object, applied?: { commit: string | null }) => {
+    const status: Proposal["status"] = applied ? "applied" : "proposed";
+    const commit = applied?.commit ?? null;
     const written = db
       .prepare(
         `INSERT INTO ${tables.proposals} (run_id, kind, payload_json, status, commit_id, created_at, decided_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
@@ -345,8 +342,7 @@ export function activate(context: PluginContext): UpgradesExports {
       runId,
       "ranking",
       { variant: best.replay.variant, replayId: best.replay.id, why: best.why },
-      "applied",
-      commit,
+      { commit },
     );
     return {
       report: {
@@ -391,7 +387,7 @@ export function activate(context: PluginContext): UpgradesExports {
       maxPricePerMillion: setting<number>("maxEmbedPricePerMillion"),
       maxRunUsd: setting<number>("maxRunUsd"),
       researchUsd: () => researchUsd,
-      propose: (payload) => addProposal(runId, "embedder", payload, "proposed"),
+      propose: (payload) => addProposal(runId, "embedder", payload),
     });
 
   // --- Converter ------------------------------------------------------------------------------------------------
@@ -423,12 +419,12 @@ export function activate(context: PluginContext): UpgradesExports {
       }
     }
     if (!winner) return { report: { tried, result: "Nothing changed: no converter beat the active one by 0.02." } };
-    const proposed = addProposal(
-      runId,
-      "converter",
-      { converter: winner.id, value: winner.value, activeValue: base.result.value, active: base.candidate.converter },
-      "proposed",
-    );
+    const proposed = addProposal(runId, "converter", {
+      converter: winner.id,
+      value: winner.value,
+      activeValue: base.result.value,
+      active: base.candidate.converter,
+    });
     return {
       report: {
         tried,

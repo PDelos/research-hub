@@ -91,22 +91,24 @@ test("the Kaggle runner pushes a private GPU script, waits for COMPLETE and list
   });
 });
 
+/** Texts about ribosomes or the first research question point along the first axis; the rest spread out. */
+function fakeVector(text: string, index: number): number[] {
+  const near = /Ribosome|transfer to structure/.test(text);
+  const nearAxis = (j: number) => (j === 0 ? 1 : 0.01 * ((index + j) % 3));
+  const raw = Array.from({ length: 8 }, (_, j) => (near ? nearAxis(j) : Math.sin(text.length * (j + 1))));
+  const norm = Math.hypot(...raw) || 1;
+  return raw.map((x) => x / norm);
+}
+
 test("the engineer fine-tunes an embedder on Kaggle, benchmarks it locally, and Enable switches the embedder live", async () => {
-  // The fake embedding server: texts about ribosomes and the first research question point the same way.
+  // The fake embedding server (see fakeVector).
   const embedServer = createServer((request, response) => {
     if (request.url === "/health") return void response.end("{}");
     let body = "";
     request.on("data", (d) => (body += d));
     request.on("end", () => {
       const { texts } = JSON.parse(body) as { texts: string[] };
-      const vectors = texts.map((text, i) => {
-        const near = /Ribosome|transfer to structure/.test(text);
-        // Texts about the topic point along the first axis; the rest spread out.
-        const nearAxis = (j: number) => (j === 0 ? 1 : 0.01 * ((i + j) % 3));
-        const raw = Array.from({ length: 8 }, (_, j) => (near ? nearAxis(j) : Math.sin(text.length * (j + 1))));
-        const norm = Math.hypot(...raw) || 1;
-        return raw.map((x) => x / norm);
-      });
+      const vectors = texts.map(fakeVector);
       response.end(JSON.stringify({ vectors }));
     });
   });

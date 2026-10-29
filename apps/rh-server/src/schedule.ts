@@ -60,9 +60,16 @@ function offsetAt(instant: number, tz: string): number {
   return Date.UTC(parts.y, parts.m - 1, parts.d, parts.hh, parts.mm, seconds) - Math.floor(instant / 1000) * 1000;
 }
 
-/** The instant of local wall time y-m-d hh:mm in `tz` (a time skipped by a DST jump lands just after the jump). */
-export function zonedToUtc(y: number, month: number, day: number, hh: number, mm: number, tz: string): number {
-  const guess = Date.UTC(y, month - 1, day, hh, mm);
+export interface LocalDate {
+  y: number;
+  m: number;
+  d: number;
+}
+
+/** The instant of local wall time `date` `time` ("hh:mm") in `tz` (a time skipped by a DST jump lands just after it). */
+export function zonedToUtc(date: LocalDate, time: string, tz: string): number {
+  const [hh, mm] = time.split(":").map(Number);
+  const guess = Date.UTC(date.y, date.m - 1, date.d, hh, mm);
   let candidate = guess - offsetAt(guess, tz);
   candidate = guess - offsetAt(candidate, tz);
   return candidate;
@@ -98,26 +105,33 @@ export interface Slot {
   at: number;
 }
 
-const hm = (time: string) => time.split(":").map(Number) as [number, number];
+/** When a daily run happens: local time "hh:mm" in a time zone, for the sweep or the nightly run. */
+export interface DailyRule {
+  time: string;
+  tz: string;
+  kind?: "sweep" | "nightly";
+}
 
 /** The daily (sweep or nightly) slot `back` days before the latest one that is due at `now`. */
-export function dailySlot(now: number, time: string, tz: string, back = 0, kind: "sweep" | "nightly" = "sweep"): Slot {
-  const [hh, mm] = hm(time);
-  let date = localParts(now, tz) as { y: number; m: number; d: number };
-  if (zonedToUtc(date.y, date.m, date.d, hh, mm, tz) > now) date = shiftDate(date, -1);
+export function dailySlot(now: number, { time, tz, kind = "sweep" }: DailyRule, back = 0): Slot {
+  let date: LocalDate = localParts(now, tz);
+  if (zonedToUtc(date, time, tz) > now) date = shiftDate(date, -1);
   date = shiftDate(date, -back);
-  return { kind, key: `${kind}:${ymd(date)}`, at: zonedToUtc(date.y, date.m, date.d, hh, mm, tz) };
+  return { kind, key: `${kind}:${ymd(date)}`, at: zonedToUtc(date, time, tz) };
 }
 
 /** The review slot `back` weeks before the latest one that is due at `now`. */
-export function weeklySlot(now: number, weekday: Weekday, time: string, tz: string, back = 0): Slot {
-  const [hh, mm] = hm(time);
+export function weeklySlot(
+  now: number,
+  { weekday, time, tz }: { weekday: Weekday; time: string; tz: string },
+  back = 0,
+): Slot {
   const target = WEEKDAYS.indexOf(weekday);
   const today = localParts(now, tz);
   let date = shiftDate(today, -((today.weekday - target + 7) % 7));
-  if (zonedToUtc(date.y, date.m, date.d, hh, mm, tz) > now) date = shiftDate(date, -7);
+  if (zonedToUtc(date, time, tz) > now) date = shiftDate(date, -7);
   date = shiftDate(date, -7 * back);
-  return { kind: "review", key: `review:${isoWeek(date)}`, at: zonedToUtc(date.y, date.m, date.d, hh, mm, tz) };
+  return { kind: "review", key: `review:${isoWeek(date)}`, at: zonedToUtc(date, time, tz) };
 }
 
 // ---------------------------------------------------------------- schedule settings
@@ -240,8 +254,8 @@ export class Scheduler {
   private latest(kind: RunKind, now: number, back = 0): Slot {
     const scheduleSettings = this.schedule();
     return kind === "review"
-      ? weeklySlot(now, scheduleSettings.review.weekday, scheduleSettings.review.time, scheduleSettings.timeZone, back)
-      : dailySlot(now, scheduleSettings[kind].time, scheduleSettings.timeZone, back, kind);
+      ? weeklySlot(now, { ...scheduleSettings.review, tz: scheduleSettings.timeZone }, back)
+      : dailySlot(now, { time: scheduleSettings[kind].time, tz: scheduleSettings.timeZone, kind }, back);
   }
 
   private record(
@@ -315,20 +329,35 @@ export class Scheduler {
       const slot = this.latest(kind, now);
       if (this.exists(kind, slot.key)) continue;
       const reason = this.ineligible(kind, slot.at, false);
-      if (!reason) {
-        // Older missed slots since the last recorded one are noted once each as skipped, never requested.
-        const bound = this.lowerBound(kind);
-        for (let back = 1; bound !== undefined && back <= CATCH_UP_LIMIT; back++) {
-          const older = this.latest(kind, now, back);
-          if (older.at <= bound || this.exists(kind, older.key)) break;
-          const run = this.record(older, "scheduled", "skipped", MISSED);
-          if (run) recorded.push(run);
-        }
-      }
+      if (!reason) recorded.push(...this.recordMissed(kind, now));
       const run = this.record(slot, "scheduled", reason ? "skipped" : "requested", reason);
       if (run) recorded.push(run);
     }
     return recorded;
+  }
+
+  /** Older missed slots since the last recorded one are noted once each as skipped, never requested. */
+  private recordMissed(kind: Slot["kind"], now: number): ScheduledRun[] {
+    const recorded: ScheduledRun[] = [];
+    const bound = this.lowerBound(kind);
+    for (let back = 1; bound !== undefined && back <= CATCH_UP_LIMIT; back++) {
+      const older = this.latest(kind, now, back);
+      if (older.at <= bound || this.exists(kind, older.key)) break;
+      const run = this.record(older, "scheduled", "skipped", MISSED);
+      if (run) recorded.push(run);
+    }
+    return recorded;
+  }
+
+  /** The earliest slot after `now` among the few slots before `probe`. */
+  private earliestAfter(kind: Slot["kind"], probe: number, now: number): Slot {
+    let cursor = this.latest(kind, probe);
+    for (let back = 1; back <= 3; back++) {
+      const earlier = this.latest(kind, probe, back);
+      if (earlier.at <= now) break;
+      cursor = earlier;
+    }
+    return cursor;
   }
 
   /** Request a run now; it never occupies a scheduled slot. */
@@ -365,16 +394,7 @@ export class Scheduler {
       // The latest due slot one period ahead is the next slot: probe forward until it is after now.
       for (const ahead of [1, 2, 8]) {
         const probe = now + (kind === "review" ? ahead * 7 * 86_400_000 : ahead * 86_400_000);
-        const slot = this.latest(kind, probe);
-        if (slot.at > now) {
-          let cursor = slot;
-          for (let back = 1; back <= 3; back++) {
-            const earlier = this.latest(kind, probe, back);
-            if (earlier.at > now) cursor = earlier;
-            else break;
-          }
-          return new Date(cursor.at).toISOString();
-        }
+        if (this.latest(kind, probe).at > now) return new Date(this.earliestAfter(kind, probe, now).at).toISOString();
       }
       return null;
     };

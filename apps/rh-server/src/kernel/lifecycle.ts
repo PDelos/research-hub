@@ -365,13 +365,7 @@ export class PluginKernel {
       if (json === pluginRecord.settingsJson) continue;
       if (pluginRecord.settingsHandlers?.size) {
         pluginRecord.settingsJson = json;
-        for (const handler of pluginRecord.settingsHandlers) {
-          try {
-            await handler(settings);
-          } catch (error) {
-            this.options.log.warn("plugin.settings_handler_failed", { plugin: id, error: String(error) });
-          }
-        }
+        await this.notifySettings(id, pluginRecord.settingsHandlers, settings);
       } else await this.deactivate(id);
     }
     // A failed plugin gets a fresh chance once it is enabled again or reconfigured.
@@ -516,6 +510,21 @@ export class PluginKernel {
       }
     }
     if (changed) this.emit();
+  }
+
+  /** Tell a plugin's settings handlers about new settings; a failing handler is logged, not fatal. */
+  private async notifySettings(
+    id: string,
+    handlers: NonNullable<Record_["settingsHandlers"]>,
+    settings: Readonly<Record<string, unknown>>,
+  ): Promise<void> {
+    for (const handler of handlers) {
+      try {
+        await handler(settings);
+      } catch (error) {
+        this.options.log.warn("plugin.settings_handler_failed", { plugin: id, error: String(error) });
+      }
+    }
   }
 
   private set(entry: Record_, state: PluginRunState, reason?: string): void {

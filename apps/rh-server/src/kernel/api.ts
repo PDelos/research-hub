@@ -261,17 +261,20 @@ export function createRhApi(plugin: DiscoveredPlugin, services: KernelServices, 
             db.prepare("SELECT version FROM plugin_migrations WHERE plugin_id = ?").all(id) as { version: number }[]
           ).map((r) => Number(r.version)),
         );
-        let applied = 0;
-        for (const m of migrations.toSorted((a, b) => a.version - b.version)) {
-          if (done.has(m.version)) continue;
-          for (const re of [CREATES, TOUCHES])
-            for (const match of m.sql.matchAll(re))
+        const denyForeignTables = (sql: string) => {
+          for (const pattern of [CREATES, TOUCHES])
+            for (const match of sql.matchAll(pattern))
               if (!match[1].startsWith(prefix))
                 guard.deny(
                   "db",
                   match[1],
                   `${id} may only create and change its own tables (${prefix}*), not ${match[1]}`,
                 );
+        };
+        let applied = 0;
+        for (const m of migrations.toSorted((a, b) => a.version - b.version)) {
+          if (done.has(m.version)) continue;
+          denyForeignTables(m.sql);
           db.exec("BEGIN");
           try {
             db.exec(m.sql);

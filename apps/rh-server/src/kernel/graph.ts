@@ -17,6 +17,22 @@ export interface Resolution {
   blocked: Map<string, string>;
 }
 
+/** Why a plugin cannot start because of its first unmet dependency, or undefined when all are met. */
+function dependencyProblem(
+  node: GraphNode,
+  nodes: Map<string, GraphNode>,
+  blocked: Map<string, string>,
+): string | undefined {
+  for (const [dep, range] of Object.entries(node.manifest.dependencies)) {
+    const target = nodes.get(dep);
+    if (!target) return `needs ${dep} (not installed)`;
+    if (!semver.satisfies(target.manifest.version, range))
+      return `needs ${dep} ${range} (installed ${target.manifest.version})`;
+    if (blocked.has(dep)) return `needs ${dep} (${dependencyState(blocked.get(dep)!)})`;
+  }
+  return undefined;
+}
+
 export function resolve(nodes: Map<string, GraphNode>): Resolution {
   const blocked = new Map<string, string>();
   for (const [id, node] of nodes)
@@ -29,18 +45,10 @@ export function resolve(nodes: Map<string, GraphNode>): Resolution {
     changed = false;
     for (const [id, node] of nodes) {
       if (blocked.has(id)) continue;
-      for (const [dep, range] of Object.entries(node.manifest.dependencies)) {
-        const target = nodes.get(dep);
-        let reason: string | undefined;
-        if (!target) reason = `needs ${dep} (not installed)`;
-        else if (!semver.satisfies(target.manifest.version, range))
-          reason = `needs ${dep} ${range} (installed ${target.manifest.version})`;
-        else if (blocked.has(dep)) reason = `needs ${dep} (${dependencyState(blocked.get(dep)!)})`;
-        if (reason) {
-          blocked.set(id, reason);
-          changed = true;
-          break;
-        }
+      const reason = dependencyProblem(node, nodes, blocked);
+      if (reason) {
+        blocked.set(id, reason);
+        changed = true;
       }
     }
   }

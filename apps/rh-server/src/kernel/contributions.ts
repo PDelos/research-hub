@@ -264,6 +264,12 @@ export function contributionsOf(manifest: PluginManifest): Contributions {
   };
 }
 
+type HandlerKind = "commands" | "chatTools";
+/** How each kind of handler is named in messages, and the activation event that calls it. */
+const HANDLER_KINDS: Record<HandlerKind, { label: string; event: string }> = {
+  commands: { label: "command", event: "onCommand" },
+  chatTools: { label: "chat tool", event: "onChatTool" },
+};
 export class ContributionError extends Error {
   constructor(message: string) {
     super(message);
@@ -280,8 +286,10 @@ function owners<T extends { pluginId: string }>(items: T[], name: (t: T) => stri
 
 /** What enabled plugins contribute, resolved across plugins; the kernel's view for the API, the desk and the UI. */
 export class ContributionRegistry {
-  private readonly commandHandlers = new Map<string, { pluginId: string; handler: Handler }>();
-  private readonly toolHandlers = new Map<string, { pluginId: string; handler: Handler }>();
+  private readonly handlers: Record<HandlerKind, Map<string, { pluginId: string; handler: Handler }>> = {
+    commands: new Map(),
+    chatTools: new Map(),
+  };
   private readonly pointValidators = new Map<string, ReturnType<typeof ajv.compile>>();
 
   constructor(
@@ -373,25 +381,20 @@ export class ContributionRegistry {
 
   /** Register the handler of a declared command (from the plugin's activate); disposed with the plugin. */
   registerCommand(pluginId: string, id: string, handler: Handler): Disposable {
-    return this.register(this.commandHandlers, "commands", pluginId, id, handler);
+    return this.register("commands", pluginId, id, handler);
   }
 
   registerChatTool(pluginId: string, name: string, handler: Handler): Disposable {
-    return this.register(this.toolHandlers, "chatTools", pluginId, name, handler);
+    return this.register("chatTools", pluginId, name, handler);
   }
 
-  private register(
-    map: Map<string, { pluginId: string; handler: Handler }>,
-    kind: "commands" | "chatTools",
-    pluginId: string,
-    id: string,
-    handler: Handler,
-  ): Disposable {
+  private register(kind: HandlerKind, pluginId: string, id: string, handler: Handler): Disposable {
+    const map = this.handlers[kind];
     const manifest = this.discovery.plugins.get(pluginId)?.manifest;
     const declared = manifest && contributionsOf(manifest)[kind].some((x) => ("id" in x ? x.id : x.name) === id);
     if (!declared)
       throw new ContributionError(
-        `${pluginId} did not declare ${kind === "commands" ? "command" : "chat tool"} ${id} in contributes.${kind}`,
+        `${pluginId} did not declare ${HANDLER_KINDS[kind].label} ${id} in contributes.${kind}`,
       );
     map.set(id, { pluginId, handler });
     return { dispose: () => void (map.get(id)?.handler === handler && map.delete(id)) };
@@ -400,27 +403,21 @@ export class ContributionRegistry {
   /** Run a command, activating its plugin first (onCommand:<id>). */
   executeCommand(id: string, args?: unknown): Promise<unknown> {
     const owner = this.commands().find((c) => c.id === id)?.pluginId;
-    return this.invoke(this.commandHandlers, `onCommand:${id}`, owner, id, "command", args);
+    return this.invoke("commands", owner, id, args);
   }
 
   /** Call a chat tool, activating its plugin first (onChatTool:<name>). */
   callChatTool(name: string, args?: unknown): Promise<unknown> {
     const owner = this.chatTools().find((t) => t.name === name)?.pluginId;
-    return this.invoke(this.toolHandlers, `onChatTool:${name}`, owner, name, "chat tool", args);
+    return this.invoke("chatTools", owner, name, args);
   }
 
-  private async invoke(
-    map: Map<string, { pluginId: string; handler: Handler }>,
-    event: string,
-    owner: string | undefined,
-    id: string,
-    what: string,
-    args: unknown,
-  ): Promise<unknown> {
+  private async invoke(kind: HandlerKind, owner: string | undefined, id: string, args: unknown): Promise<unknown> {
+    const { label: what, event } = HANDLER_KINDS[kind];
     if (!owner) throw new ContributionError(`no enabled plugin offers the ${what} ${id}`);
-    await this.kernel.fire(event);
+    await this.kernel.fire(`${event}:${id}`);
     await this.kernel.activate(owner);
-    const entry = map.get(id);
+    const entry = this.handlers[kind].get(id);
     if (!entry) throw new ContributionError(`${owner} did not register the ${what} ${id} when it activated`);
     return entry.handler(args);
   }

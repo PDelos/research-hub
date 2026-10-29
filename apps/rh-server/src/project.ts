@@ -51,6 +51,14 @@ import type { SweepExports } from "../plugins/rh.sweep/main.ts";
  * v0.0 first stored the project in <data>/projects/default/. Move those files to <data>/ once, so an existing
  * conversation and its runs survive the switch to one project per container.
  */
+/** Remove a directory left empty by the move, with its stale lock files; one still in use stays. */
+function removeEmptiedDir(dir: string) {
+  try {
+    for (const file of readdirSync(dir)) if (file.endsWith(".lock")) rmSync(join(dir, file));
+    rmdirSync(dir);
+  } catch {}
+}
+
 export function migrateLegacyLayout(dataDir: string, log?: Logger): boolean {
   const legacy = join(dataDir, "projects", "default");
   if (!existsSync(join(legacy, "agent.sqlite")) || existsSync(join(dataDir, "agent.sqlite"))) return false;
@@ -58,12 +66,7 @@ export function migrateLegacyLayout(dataDir: string, log?: Logger): boolean {
     if (name.endsWith(".lock")) continue;
     renameSync(join(legacy, name), join(dataDir, name));
   }
-  for (const dir of [legacy, join(dataDir, "projects")]) {
-    try {
-      for (const f of readdirSync(dir)) if (f.endsWith(".lock")) rmSync(join(dir, f));
-      rmdirSync(dir);
-    } catch {}
-  }
+  for (const dir of [legacy, join(dataDir, "projects")]) removeEmptiedDir(dir);
   log?.info("storage.migrated", { from: legacy, to: dataDir });
   return true;
 }

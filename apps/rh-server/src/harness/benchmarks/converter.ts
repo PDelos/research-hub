@@ -65,6 +65,16 @@ export interface ConverterPaper {
   pdf: Uint8Array;
 }
 
+/** Fetch a paper's HTML (the truth) and PDF from arXiv, and cache both as one JSON file. */
+async function downloadPaper(io: DatasetIo, id: string, file: string): Promise<string> {
+  if (io.offline) throw new Error("offline and not cached");
+  const html = new TextDecoder().decode(await io.fetchBytes(`https://arxiv.org/html/${id}`));
+  const pdf = await io.fetchBytes(`https://arxiv.org/pdf/${id}`);
+  const cached = JSON.stringify({ id, truth: arxivHtmlToSections(html), pdf: Buffer.from(pdf).toString("base64") });
+  io.writeCache(file, cached);
+  return cached;
+}
+
 /** Load the sample (cached in the harness's storage); papers that cannot be loaded are left out with a note. */
 export async function loadConverterSample(io: DatasetIo): Promise<{ papers: ConverterPaper[]; notes: string[] }> {
   const papers: ConverterPaper[] = [];
@@ -72,14 +82,7 @@ export async function loadConverterSample(io: DatasetIo): Promise<{ papers: Conv
   for (const id of CONVERTER_PAPERS) {
     const file = `benchmarks/converter-v${CONVERTER_SAMPLE_VERSION}/${id}.json`;
     try {
-      let cached = io.readCache(file);
-      if (!cached) {
-        if (io.offline) throw new Error("offline and not cached");
-        const html = new TextDecoder().decode(await io.fetchBytes(`https://arxiv.org/html/${id}`));
-        const pdf = await io.fetchBytes(`https://arxiv.org/pdf/${id}`);
-        cached = JSON.stringify({ id, truth: arxivHtmlToSections(html), pdf: Buffer.from(pdf).toString("base64") });
-        io.writeCache(file, cached);
-      }
+      const cached = io.readCache(file) ?? (await downloadPaper(io, id, file));
       const entry = JSON.parse(cached) as { id: string; truth: Section[]; pdf: string };
       papers.push({ id, truth: entry.truth, pdf: new Uint8Array(Buffer.from(entry.pdf, "base64")) });
     } catch (error) {
