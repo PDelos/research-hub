@@ -9,6 +9,7 @@ import type { FullTextExports } from "../plugins/rh.fulltext/main.ts";
 import type { PapersExports } from "../plugins/rh.papers/main.ts";
 import { ARXIV_HTML, DOCLING_MD, JATS_XML } from "./fixtures/fulltext/documents.ts";
 import { startTestServer } from "./test-server.ts";
+import { byId, pick } from "./fixtures/jev-answers.ts";
 
 const PDF = readFileSync(join(import.meta.dirname, "fixtures/fulltext/paper.pdf"));
 
@@ -162,15 +163,7 @@ test("a starred paper's note is written with its full text; facet vectors come f
     hub: {
       ticker: false,
       fauxRules: [cardWriterRule, librarianRule],
-      jevDecide: scripted((id, _c, q: any) =>
-        id === "relevance"
-          ? score(0.75, 5)
-          : id === "matched_question"
-            ? choice("Q1", Object.keys(q.criteria))
-            : id === "worth"
-              ? noul(0.8)
-              : undefined,
-      ).decide,
+      jevDecide: scripted(byId({ relevance: score(0.75, 5), matched_question: pick("Q1"), worth: noul(0.8) })).decide,
       paperFetch: ((input: any, init: any) =>
         String(input).startsWith("https://arxiv.org/html/")
           ? Promise.resolve(new Response(ARXIV_HTML))

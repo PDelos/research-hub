@@ -4,22 +4,17 @@ import { test } from "node:test";
 import { validateCharter } from "../src/charter.ts";
 import { cardWriterRule } from "../src/faux-rules.ts";
 import { sampleCharter } from "./fixtures/charter.ts";
-import { choice, noul, score, scripted } from "./fixtures/jev-answers.ts";
+import { byId, noul, pick, score, scripted } from "./fixtures/jev-answers.ts";
 import { arxivOnlyFetch, fakePapers } from "./fixtures/sweep-env.ts";
 import { startTestServer } from "./test-server.ts";
 
-const passAll = (id: string, _c: string, q: any) =>
-  id === "relevance"
-    ? score(0.75, 5)
-    : id === "matched_question"
-      ? choice("Q2", Object.keys(q.criteria))
-      : id === "worth"
-        ? noul(0.8)
-        : id === "generalizable"
-          ? noul(0.1)
-          : id === "reason_kind"
-            ? choice("great-foundation", Object.keys(q.criteria))
-            : undefined;
+const passAll = byId({
+  relevance: score(0.75, 5),
+  matched_question: pick("Q2"),
+  worth: noul(0.8),
+  generalizable: noul(0.1),
+  reason_kind: pick("great-foundation"),
+});
 
 test("judging through the API: verdicts on cards, weight effects in details, weights, and precision@5 (2 ⭐, 1 👎, 2 unjudged → 67%)", async () => {
   const jev = scripted(passAll);

@@ -123,19 +123,16 @@ test("gate: relevance 0.2 is rejected with the reason, 0.5 passes as borderline,
     },
     { id: "2610.20004", title: "Strong protein paper", abstract: "We propose a protein language model." },
   ];
+  const relevanceOf = (title: string) => {
+    if (title.startsWith("Hospital") || title.startsWith("Injected")) return 0.25;
+    if (title.startsWith("Borderline")) return 0.5;
+    return 1;
+  };
   const env = sweepEnv({
     fetch: arxivOnlyFetch(papers),
     script: (id, cmd, question, state: any) => {
       const title = String(state.paper?.title ?? "");
-      if (id === "relevance")
-        return score(
-          title.startsWith("Hospital") || title.startsWith("Injected")
-            ? 0.25
-            : title.startsWith("Borderline")
-              ? 0.5
-              : 1,
-          5,
-        );
+      if (id === "relevance") return score(relevanceOf(title), 5);
       return passAll(id, cmd, question, state);
     },
   });

@@ -6,7 +6,7 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import { validateCharter } from "../src/charter.ts";
 import { cardWriterRule, librarianRule } from "../src/faux-rules.ts";
 import { sampleCharter } from "./fixtures/charter.ts";
-import { choice, noul, score, scripted } from "./fixtures/jev-answers.ts";
+import { byId, noul, pick, score, scripted } from "./fixtures/jev-answers.ts";
 import { arxivOnlyFetch, fakePapers } from "./fixtures/sweep-env.ts";
 import { startTestServer, TOKEN } from "./test-server.ts";
 
@@ -29,15 +29,7 @@ test("an MCP client lists the read-only tools and reads the knowledge base, pape
     hub: {
       ticker: false,
       fauxRules: [cardWriterRule, librarianRule],
-      jevDecide: scripted((id, _c, q: any) =>
-        id === "relevance"
-          ? score(0.75, 5)
-          : id === "matched_question"
-            ? choice("Q1", Object.keys(q.criteria))
-            : id === "worth"
-              ? noul(0.8)
-              : undefined,
-      ).decide,
+      jevDecide: scripted(byId({ relevance: score(0.75, 5), matched_question: pick("Q1"), worth: noul(0.8) })).decide,
       paperFetch: arxivOnlyFetch(fakePapers(3)),
     },
   });

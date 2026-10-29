@@ -6,7 +6,7 @@ import { levelFit } from "../src/sweep/sweep.ts";
 import { validateCharter } from "../src/charter.ts";
 import { cardWriterRule } from "../src/faux-rules.ts";
 import { sampleCharter } from "./fixtures/charter.ts";
-import { choice, noul, score, scripted } from "./fixtures/jev-answers.ts";
+import { byId, noul, pick, score, scripted } from "./fixtures/jev-answers.ts";
 import { arxivOnlyFetch, fakePapers } from "./fixtures/sweep-env.ts";
 import { startTestServer, until } from "./test-server.ts";
 
@@ -36,15 +36,7 @@ test("a replay with a level ranks papers at that level first", () => {
 });
 
 test("approved taste rules go with every paper decision; settings are validated", async () => {
-  const jev = scripted((id, _c, q: any) =>
-    id === "relevance"
-      ? score(0.75, 5)
-      : id === "matched_question"
-        ? choice("Q1", Object.keys(q.criteria))
-        : id === "worth"
-          ? noul(0.8)
-          : undefined,
-  );
+  const jev = scripted(byId({ relevance: score(0.75, 5), matched_question: pick("Q1"), worth: noul(0.8) }));
   const server = await startTestServer({
     hub: {
       ticker: false,

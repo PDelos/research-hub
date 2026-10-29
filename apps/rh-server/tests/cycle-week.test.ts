@@ -6,20 +6,16 @@ import type { DigestExports } from "../plugins/rh.digest/main.ts";
 import { validateCharter } from "../src/charter.ts";
 import { cardWriterRule } from "../src/faux-rules.ts";
 import { sampleCharter } from "./fixtures/charter.ts";
-import { choice, noul, score, scripted } from "./fixtures/jev-answers.ts";
+import { byId, noul, pick, score, scripted } from "./fixtures/jev-answers.ts";
 import { arxivOnlyFetch, fakePapers } from "./fixtures/sweep-env.ts";
 import { startTestServer, until } from "./test-server.ts";
 
-const passAll = (id: string, _c: string, q: any) =>
-  id === "relevance"
-    ? score(0.5, 5)
-    : id === "matched_question"
-      ? choice("Q1", Object.keys(q.criteria))
-      : id === "kind"
-        ? choice("survey", Object.keys(q.criteria))
-        : id === "worth"
-          ? noul(0.9)
-          : undefined;
+const passAll = byId({
+  relevance: score(0.5, 5),
+  matched_question: pick("Q1"),
+  kind: pick("survey"),
+  worth: noul(0.9),
+});
 const at = (iso: string) => Date.parse(iso);
 const days = ["19", "20", "21", "22", "23", "24", "25"]; // Mon 2026-10-19 … Sun 2026-10-25 (ISO week 43)
 

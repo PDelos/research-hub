@@ -5,6 +5,7 @@ import { test } from "node:test";
 import { RhError } from "@rh/sdk";
 import { discover } from "../src/kernel/registry.ts";
 import { startTestServer } from "./test-server.ts";
+import { byId, pick } from "./fixtures/jev-answers.ts";
 
 const FIXTURES = join(import.meta.dirname, "fixtures/plugins");
 
@@ -90,16 +91,8 @@ test("each source is credited with the cards it brought and the ones you liked, 
     hub: {
       ticker: false,
       fauxRules: [cardWriterRule],
-      jevDecide: scripted((id: string, _c: string, q: any) =>
-        id === "relevance"
-          ? score(0.6, 5)
-          : id === "matched_question"
-            ? choice("Q1", Object.keys(q.criteria))
-            : id === "kind"
-              ? choice("survey", Object.keys(q.criteria))
-              : id === "worth"
-                ? noul(0.9)
-                : undefined,
+      jevDecide: scripted(
+        byId({ relevance: score(0.6, 5), matched_question: pick("Q1"), kind: pick("survey"), worth: noul(0.9) }),
       ).decide,
       paperFetch: arxivOnlyFetch(fakePapers(8)),
     },

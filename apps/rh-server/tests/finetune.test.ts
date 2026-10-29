@@ -12,7 +12,7 @@ import { trainingScript } from "../src/engineer/finetune.ts";
 import { validateCharter } from "../src/charter.ts";
 import { cardWriterRule, engineerRule } from "../src/faux-rules.ts";
 import { sampleCharter } from "./fixtures/charter.ts";
-import { choice, noul, score, scripted } from "./fixtures/jev-answers.ts";
+import { byId, noul, pick, score, scripted } from "./fixtures/jev-answers.ts";
 import { fakeOpenRouter } from "./fixtures/openrouter.ts";
 import { arxivOnlyFetch, fakePapers } from "./fixtures/sweep-env.ts";
 import { startTestServer, until } from "./test-server.ts";
@@ -101,9 +101,9 @@ test("the engineer fine-tunes an embedder on Kaggle, benchmarks it locally, and 
       const { texts } = JSON.parse(body) as { texts: string[] };
       const vectors = texts.map((text, i) => {
         const near = /Ribosome|transfer to structure/.test(text);
-        const raw = Array.from({ length: 8 }, (_, j) =>
-          near ? (j === 0 ? 1 : 0.01 * ((i + j) % 3)) : Math.sin(text.length * (j + 1)),
-        );
+        // Texts about the topic point along the first axis; the rest spread out.
+        const nearAxis = (j: number) => (j === 0 ? 1 : 0.01 * ((i + j) % 3));
+        const raw = Array.from({ length: 8 }, (_, j) => (near ? nearAxis(j) : Math.sin(text.length * (j + 1))));
         const norm = Math.hypot(...raw) || 1;
         return raw.map((x) => x / norm);
       });
@@ -131,15 +131,7 @@ test("the engineer fine-tunes an embedder on Kaggle, benchmarks it locally, and 
     hub: {
       ticker: false,
       fauxRules: [engineerRule, cardWriterRule],
-      jevDecide: scripted((id, _c, q: any) =>
-        id === "relevance"
-          ? score(0.75, 5)
-          : id === "matched_question"
-            ? choice("Q1", Object.keys(q.criteria))
-            : id === "worth"
-              ? noul(0.9)
-              : undefined,
-      ).decide,
+      jevDecide: scripted(byId({ relevance: score(0.75, 5), matched_question: pick("Q1"), worth: noul(0.9) })).decide,
       paperFetch: (async (input: any, init: any) =>
         (await kaggle.handle(String(input), init)) ??
         (String(input).startsWith("https://openrouter.ai")

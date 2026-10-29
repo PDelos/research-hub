@@ -14,13 +14,19 @@ const DAY = 86_400_000;
 const start = Date.parse("2026-10-01T06:00:00Z");
 
 /** Sweeps whose most relevant papers are the user's favourites, while importance points the other way. */
+function verdictFor(relevance: number) {
+  if (relevance >= 0.85) return "star";
+  if (relevance <= 0.6) return "down";
+  return "up";
+}
+
 function history(sweeps: number): { history: SweepHistory[]; labels: Labels } {
   const user: Labels["user"] = new Map();
   const history = Array.from({ length: sweeps }, (_, sweep) => {
     const pool = Array.from({ length: 10 }, (_, i) => {
       const paperId = sweep * 100 + i;
       const relevance = 0.5 + i * 0.05;
-      user.set(paperId, relevance >= 0.85 ? "star" : relevance <= 0.6 ? "down" : "up");
+      user.set(paperId, verdictFor(relevance));
       return { paperId, relevance, worth: 0.8, importance: 1 - relevance, level: "core" as const };
     });
     return {

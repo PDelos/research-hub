@@ -12,6 +12,12 @@ import { arxivOnlyFetch, fakePapers } from "./fixtures/sweep-env.ts";
 import { startTestServer, until } from "./test-server.ts";
 
 /** Three sweeps of 12 papers, half "Good" (the user likes them) and half "Bad". */
+/** The user likes the "Good" papers, starring every other one, and dislikes the rest. */
+const userVerdict = (title: string, cardId: number) => {
+  if (!title.startsWith("Good")) return "down";
+  return cardId % 2 ? "star" : "up";
+};
+
 async function project(judgeLikes: (title: string) => number) {
   let batch = 0;
   const batches = [0, 1, 2].map((b) =>
@@ -49,8 +55,7 @@ async function project(judgeLikes: (title: string) => number) {
     await projectRuntime.sweeps.settled(projectRuntime.sweeps.list(1)[0].id, 30_000);
   }
   for (const group of (await server.client.cards(100)).groups)
-    for (const card of group.cards)
-      await server.client.judge(card.id, card.paper.title.startsWith("Good") ? (card.id % 2 ? "star" : "up") : "down");
+    for (const card of group.cards) await server.client.judge(card.id, userVerdict(card.paper.title, card.id));
   const harness = await projectRuntime.plugins.exportsOf<HarnessExports>("rh.harness");
   const likeCalls = () => jev.calls.filter((c) => c.questions.includes("like")).length;
   return { server, p: projectRuntime, harness, likeCalls };

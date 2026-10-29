@@ -28,6 +28,26 @@ export function choice(option: string, options: string[], confidence = 0.9): Ans
 /** `answer(question id without command prefix, command, question, state)`; return undefined for a neutral default. */
 export type Script = (id: string, command: string, q: Question, state: State) => Answer | undefined;
 
+const optionsOf = (question: Question) => Object.keys((question as { criteria: object }).criteria);
+
+/** A choice of `option` among the question's own options. */
+export const pick = (option: string) => (question: Question) => choice(option, optionsOf(question));
+
+/** A script with one answer per question id (a function gets the question); other ids get the neutral default. */
+export function byId(answers: Record<string, Answer | ((question: Question) => Answer)>): Script {
+  return (id, _command, question) => {
+    const answer = answers[id];
+    return typeof answer === "function" ? answer(question) : answer;
+  };
+}
+
+/** Uncertain: the middle score, an even yes/no, or the first option. */
+function neutral(question: Question): Answer {
+  if (question.type === "score") return score(0.5, question.criteria.length);
+  if (question.type === "noul") return noul(0.5);
+  return choice(optionsOf(question)[0], optionsOf(question));
+}
+
 export function scripted(script: Script, cost = 0.00003) {
   const calls: { questions: string[]; state: State }[] = [];
   let failing: Error | undefined;
@@ -37,13 +57,7 @@ export function scripted(script: Script, cost = 0.00003) {
     const answers: Record<string, Answer> = {};
     for (const [fullId, q] of Object.entries(questions)) {
       const [command, id] = fullId.includes("__") ? fullId.split("__") : ["", fullId];
-      answers[fullId] =
-        script(id, command, q, state) ??
-        (q.type === "score"
-          ? score(0.5, q.criteria.length)
-          : q.type === "noul"
-            ? noul(0.5)
-            : choice(Object.keys(q.criteria)[0], Object.keys(q.criteria)));
+      answers[fullId] = script(id, command, q, state) ?? neutral(q);
     }
     return {
       model: "jev-scripted",

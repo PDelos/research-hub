@@ -43,7 +43,7 @@ export default defineConfig({
       "max-lines": ["warn", { max: 400, skipBlankLines: true, skipComments: true }],
       "max-params": ["warn", { max: 4 }],
       "no-else-return": "error",
-      "no-nested-ternary": "warn",
+      "no-nested-ternary": "error",
       "unicorn/no-nested-ternary": "off",
       "unicorn/no-lonely-if": "error",
       "aesthetic/no-single-letter": "error",

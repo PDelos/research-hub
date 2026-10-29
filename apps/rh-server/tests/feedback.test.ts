@@ -2,19 +2,15 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { sampleCharter } from "./fixtures/charter.ts";
-import { choice, noul, score } from "./fixtures/jev-answers.ts";
+import { byId, noul, pick, score } from "./fixtures/jev-answers.ts";
 import { arxivOnlyFetch, fakePapers, sweepEnv } from "./fixtures/sweep-env.ts";
 
-const passAll = (id: string, _c: string, q: any) =>
-  id === "relevance"
-    ? score(0.75, 5)
-    : id === "matched_question"
-      ? choice("Q1", Object.keys(q.criteria))
-      : id === "kind"
-        ? choice("method", Object.keys(q.criteria))
-        : id === "worth"
-          ? noul(0.8)
-          : undefined;
+const passAll = byId({
+  relevance: score(0.75, 5),
+  matched_question: pick("Q1"),
+  kind: pick("method"),
+  worth: noul(0.8),
+});
 
 async function withCards(count = 4, over: Record<string, unknown> = {}) {
   const env = sweepEnv({ fetch: arxivOnlyFetch(fakePapers(count)), script: passAll, ...over });

@@ -9,7 +9,7 @@ import { PaperStore } from "../src/papers/store.ts";
 import { EmbeddingLedger } from "../src/representations/embed.ts";
 import { GATE, PaperDecisions } from "../src/sweep/decisions.ts";
 import { Telemetry } from "../src/telemetry.ts";
-import { choice, noul, score, scripted } from "./fixtures/jev-answers.ts";
+import { byId, noul, pick, score, scripted } from "./fixtures/jev-answers.ts";
 import { tempDir } from "./test-server.ts";
 
 const JEV_DIR = join(import.meta.dirname, "../prompt_engineering/jev");
@@ -28,16 +28,8 @@ function setup() {
   const { db } = openProjectDb(join(temp.dir, "project.sqlite"));
   const telemetry = new Telemetry(db);
   const ledger = new JevLedger((r) => telemetry.jevCall(r));
-  const jev = scripted((id, _cmd, q) =>
-    id === "relevance"
-      ? score(0.75, 5)
-      : id === "matched_question"
-        ? choice("Q1", Object.keys((q as any).criteria))
-        : id === "kind"
-          ? choice("method", Object.keys((q as any).criteria))
-          : id === "worth"
-            ? noul(0.8)
-            : undefined,
+  const jev = scripted(
+    byId({ relevance: score(0.75, 5), matched_question: pick("Q1"), kind: pick("method"), worth: noul(0.8) }),
   );
   const decisions = new PaperDecisions({ db, jevDir: JEV_DIR, decide: jev.decide, ledger });
   const store = new PaperStore(db);

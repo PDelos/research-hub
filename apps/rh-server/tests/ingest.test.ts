@@ -7,20 +7,16 @@ import { call, say, type FauxRule } from "@rh/durable-agent";
 import { validateCharter } from "../src/charter.ts";
 import { cardWriterRule, librarianRule } from "../src/faux-rules.ts";
 import { sampleCharter } from "./fixtures/charter.ts";
-import { choice, noul, score, scripted } from "./fixtures/jev-answers.ts";
+import { byId, noul, pick, score, scripted } from "./fixtures/jev-answers.ts";
 import { arxivOnlyFetch, fakePapers, type FakePaper } from "./fixtures/sweep-env.ts";
 import { startTestServer, tempDir } from "./test-server.ts";
 
-const passAll = (id: string, _c: string, q: any) =>
-  id === "relevance"
-    ? score(0.75, 5)
-    : id === "matched_question"
-      ? choice("Q1", Object.keys(q.criteria))
-      : id === "worth"
-        ? noul(0.8)
-        : id === "generalizable"
-          ? noul(0.1)
-          : undefined;
+const passAll = byId({
+  relevance: score(0.75, 5),
+  matched_question: pick("Q1"),
+  worth: noul(0.8),
+  generalizable: noul(0.1),
+});
 
 async function project(
   papers: FakePaper[],

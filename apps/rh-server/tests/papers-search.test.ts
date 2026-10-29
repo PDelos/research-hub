@@ -27,6 +27,13 @@ function setup(routes: Route[], options: { s2ApiKey?: string; now?: () => number
 }
 
 /** OpenAlex DOI batch lookups answer nothing (works not in OpenAlex yet). */
+/** arXiv and the OpenAlex search find nothing, so Europe PMC is the only source with results. */
+const onlyEpmc: Route = (url) => {
+  if (url.host === "export.arxiv.org") return new Response("<feed/>");
+  if (url.searchParams.has("search")) return Response.json({ results: [] });
+  return undefined;
+};
+
 const openalexKnowsNothing: Route = (url) =>
   url.host === "api.openalex.org" && url.searchParams.get("filter")?.startsWith("doi:")
     ? Response.json({ results: [] })
@@ -125,12 +132,6 @@ test("a fresh preprint not yet in OpenAlex stays pending, is retried on a later 
           : [],
     });
   };
-  const onlyEpmc: Route = (url) =>
-    url.host === "export.arxiv.org"
-      ? new Response("<feed/>")
-      : url.searchParams.has("search")
-        ? Response.json({ results: [] })
-        : undefined;
   const env = setup([lookup, onlyEpmc, recorded], { now: () => now });
   try {
     const first = await env.search.search({ query: "protein language model" });
@@ -158,14 +159,7 @@ test("a fresh preprint not yet in OpenAlex stays pending, is retried on a later 
 test("the same DOI found by two queries on the same day is looked up in OpenAlex once", async () => {
   const env = setup([
     openalexKnowsNothing,
-    (url) =>
-      url.host === "www.ebi.ac.uk"
-        ? undefined
-        : url.host === "export.arxiv.org"
-          ? new Response("<feed/>")
-          : url.searchParams.has("search")
-            ? Response.json({ results: [] })
-            : undefined,
+    (url) => (url.host === "www.ebi.ac.uk" ? undefined : onlyEpmc(url)),
     recorded,
   ]);
   try {
