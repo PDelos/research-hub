@@ -3,7 +3,17 @@
 import type { Charter } from "../../src/charter.ts";
 import type { Db } from "../../src/db.ts";
 
-export type ChangeKind = "weight" | "retire-question" | "drop-query" | "add-question" | "add-out-of-scope";
+export type ChangeKind =
+  | "weight"
+  | "retire-question"
+  | "drop-query"
+  | "add-question"
+  | "add-out-of-scope"
+  | "level"
+  | "taste-rule";
+
+/** Kinds that change the sweep's settings (v1-7), not the charter. */
+export const SETTING_KINDS: readonly ChangeKind[] = ["level", "taste-rule"];
 
 export interface Change {
   kind: ChangeKind;
@@ -15,6 +25,11 @@ export interface Change {
   text?: string;
   queries?: string[];
   topic?: string;
+  /** level: the level now and the one proposed. */
+  level?: { from: string; to: string };
+  /** taste-rule: the rule and the rule candidates (card ids) it generalizes. */
+  rule?: string;
+  candidateIds?: number[];
 }
 
 export interface Evidence {
@@ -27,7 +42,55 @@ export interface Evidence {
 export interface Proposed {
   change: Change;
   evidence: Evidence;
+  /** The question finder a new question came from (v1-7), or "interests". */
+  finder?: string;
 }
+
+const LEVELS = ["foundational", "core", "advanced", "frontier"] as const;
+
+/**
+ * Level up (v1-7 D4): most liked cards in the window are above the current level (8+ liked, 60 %), or "too basic"
+ * dislikes (3+) outnumber "too advanced" ones. "auto" counts as core.
+ */
+export function levelRule(db: Db, current: string, sinceIso: string): Proposed | undefined {
+  const now = current === "auto" ? "core" : current;
+  const i = LEVELS.indexOf(now as (typeof LEVELS)[number]);
+  if (i < 0 || i >= LEVELS.length - 1) return undefined;
+  const next = LEVELS[i + 1];
+  const rows = db
+    .prepare(
+      `SELECT p.id, p.title, c.level, j.verdict, j.reason, j.reason_kind FROM judgments j JOIN cards c ON c.id = j.card_id
+         JOIN papers p ON p.id = j.paper_id WHERE j.updated_at >= ? ORDER BY j.updated_at DESC`,
+    )
+    .all(sinceIso) as {
+    id: number;
+    title: string;
+    level: string;
+    verdict: string;
+    reason: string | null;
+    reason_kind: string | null;
+  }[];
+  const liked = rows.filter((r) => liked0(r.verdict));
+  const above = liked.filter((r) => LEVELS.indexOf(r.level as (typeof LEVELS)[number]) > i);
+  const tooBasic = rows.filter((r) => r.verdict === "down" && r.reason_kind === "too-basic");
+  const tooAdvanced = rows.filter((r) => r.verdict === "down" && r.reason_kind === "too-advanced");
+  const byLiked = liked.length >= 8 && above.length / liked.length >= 0.6;
+  const byReasons = tooBasic.length >= 3 && tooBasic.length > tooAdvanced.length;
+  if (!byLiked && !byReasons) return undefined;
+  const papers = (byLiked ? above : tooBasic)
+    .slice(0, 5)
+    .map((r) => ({ id: Number(r.id), title: r.title, verdict: r.verdict, reason: r.reason }));
+  return {
+    change: { kind: "level", level: { from: current, to: next } },
+    evidence: {
+      summary: byLiked
+        ? `${above.length} of the ${liked.length} cards you liked in the window are above ${now} (${[...new Set(above.map((a) => a.level))].join(", ")}).`
+        : `You marked ${tooBasic.length} cards “too basic” and ${tooAdvanced.length} “too advanced”.`,
+      papers,
+    },
+  };
+}
+const liked0 = (v: string | null) => v === "up" || v === "star";
 
 export const WEIGHT_DRIFT = 0.25;
 export const RETIRE_MIN_CARDS = 8;
@@ -156,6 +219,9 @@ export function applyChange(charter: Charter, change: Change): Charter {
         if (c.queries.length < 20 && !have.has(text.toLowerCase())) c.queries.push({ text, weight: 1 });
       break;
     }
+    case "level":
+    case "taste-rule":
+      throw new ChangeRefused(`${change.kind} changes the sweep's settings, not the charter`);
     case "add-out-of-scope":
       if (c.outOfScope.length >= 20) throw new ChangeRefused("the charter has 20 out-of-scope topics");
       if (!c.outOfScope.some((t) => t.toLowerCase() === change.topic!.toLowerCase())) c.outOfScope.push(change.topic!);
@@ -178,5 +244,9 @@ export function describeChange(change: Change, charter?: Charter): string {
       return `Add the question “${change.text}” with the queries ${(change.queries ?? []).map((q) => `“${q}”`).join(", ")}`;
     case "add-out-of-scope":
       return `Add “${change.topic}” to out of scope`;
+    case "level":
+      return `Raise your level from ${change.level?.from} to ${change.level?.to}`;
+    case "taste-rule":
+      return `Add the taste rule “${change.rule}”`;
   }
 }

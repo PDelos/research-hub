@@ -5,7 +5,9 @@
   "kind": "core",
   "topic": "knowledge",
   "description": "Before each weekly digest, turns your judgments, reasons and comments into charter proposals with evidence (weights, questions and queries to retire, new research questions, out-of-scope topics); an approved proposal becomes the next charter version.",
-  "engines": { "research-hub": "^1.0.0" },
+  "engines": {
+    "research-hub": "^1.0.0"
+  },
   "main": "main.ts",
   "required": true,
   "activationEvents": ["onStartup"],
@@ -47,7 +49,23 @@
           "description": "Jev's promise score a new question needs."
         }
       }
+    },
+    "extensionPoints": {
+      "knowledge.finder": {
+        "description": "Finds leads for new research questions (method transfer, missing links, rising topics, …); judged by what its proposals bring.",
+        "cardinality": "many",
+        "schema": {
+          "required": ["id", "title"],
+          "properties": {
+            "title": {
+              "type": "string"
+            }
+          }
+        }
+      }
     }
   },
-  "permissions": { "budgetUsdPerDay": 0.5 }
+  "permissions": {
+    "budgetUsdPerDay": 0.5
+  }
 }

@@ -1,0 +1,14 @@
+{
+  "id": "rh.finder-method-transfer",
+  "version": "1.0.0",
+  "displayName": "Finder: same method, different problem",
+  "kind": "addon",
+  "topic": "knowledge",
+  "description": "Leads for new research questions from pairs of papers you liked that use similar methods on different problems (method and background vectors).",
+  "engines": { "research-hub": "^1.0.0" },
+  "main": "main.ts",
+  "activationEvents": ["onExtensionPoint:knowledge.finder"],
+  "dependencies": { "rh.papers": "^1.0.0" },
+  "contributes": { "knowledge.finder": [{ "id": "method-transfer", "title": "Same method, different problem" }] },
+  "permissions": {}
+}

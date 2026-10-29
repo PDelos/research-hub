@@ -120,7 +120,7 @@ test("a review proposes from evidence and from the review model; approving creat
     assert.equal(s.knowledge.proposals("proposed").length, open.length);
 
     // Approve the new question: version 2 with Q5 and its queries; the next sweep searches them.
-    const approved = s.knowledge.approve(add.id);
+    const approved = await s.knowledge.approve(add.id);
     assert.equal(approved.appliedVersion, 2);
     const v2 = s.p.charters.approved()!;
     assert.equal(v2.version, 2);
@@ -131,19 +131,19 @@ test("a review proposes from evidence and from the review model; approving creat
     assert.match(queries, /profiling methods/);
 
     // Retire Q4 (ids stay), then the weight proposal for Q4 is stale.
-    s.knowledge.approve(retire.id);
+    await s.knowledge.approve(retire.id);
     assert.deepEqual(
       s.p.charters.approved()!.charter.questions.map((q) => q.id),
       ["Q1", "Q2", "Q3", "Q5"],
     );
     const weight = s.knowledge.proposals("proposed").find((p) => p.kind === "weight" && p.change.target === "Q4");
     if (weight) {
-      assert.throws(() => s.knowledge.approve(weight.id), /stale/);
+      await assert.rejects(s.knowledge.approve(weight.id), /stale/);
       assert.equal(s.knowledge.proposals("stale").length, 1);
     }
     // Undo works only on the latest change.
-    assert.throws(() => s.knowledge.undo(add.id), /a later charter version exists/);
-    const undone = s.knowledge.undo(retire.id);
+    await assert.rejects(s.knowledge.undo(add.id), /a later charter version exists/);
+    const undone = await s.knowledge.undo(retire.id);
     assert.equal(undone.status, "undone");
     assert.equal(s.p.charters.approved()!.version, 4);
     assert.ok(s.p.charters.approved()!.charter.questions.some((q) => q.id === "Q4"));
@@ -164,7 +164,7 @@ test("rejected proposals are not proposed again; low-promise directions are drop
     assert.equal(s.knowledge.reject(retire.id, "I still care about clinics").reason, "I still care about clinics");
     await s.knowledge.review();
     assert.ok(!s.knowledge.proposals("proposed").some((p) => p.kind === "retire-question"));
-    assert.throws(() => s.knowledge.approve(retire.id), /is rejected/);
+    await assert.rejects(s.knowledge.approve(retire.id), /is rejected/);
   } finally {
     await s.server.stop();
   }

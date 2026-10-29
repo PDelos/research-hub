@@ -21,7 +21,12 @@ export function knowledgeRoutes(hub: Hub): Router {
 
   r.get("/v1/knowledge", async (_req, res) => {
     const k = await knowledge();
-    const view: KnowledgeView = { running: k.busy(), reviews: k.reviews(10), proposals: k.proposals() };
+    const view: KnowledgeView = {
+      running: k.busy(),
+      reviews: k.reviews(10),
+      proposals: k.proposals(),
+      finders: await k.finders(),
+    };
     res.json(view);
   });
   r.post("/v1/knowledge/review", async (_req, res) => {

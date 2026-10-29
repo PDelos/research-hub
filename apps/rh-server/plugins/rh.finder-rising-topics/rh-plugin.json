@@ -1,0 +1,13 @@
+{
+  "id": "rh.finder-rising-topics",
+  "version": "1.0.0",
+  "displayName": "Finder: rising topics",
+  "kind": "addon",
+  "topic": "knowledge",
+  "description": "Leads for new research questions from words rising among the papers the sweeps gathered in the last two weeks that the charter does not mention.",
+  "engines": { "research-hub": "^1.0.0" },
+  "main": "main.ts",
+  "activationEvents": ["onExtensionPoint:knowledge.finder"],
+  "contributes": { "knowledge.finder": [{ "id": "rising-topics", "title": "Rising topics" }] },
+  "permissions": {}
+}

@@ -221,6 +221,8 @@ export const knowledgeReviewRule: FauxRule = (turn) => {
     liked.map((l) => l.title),
     covered,
   );
+  // A lead from a question finder, when there is one, is credited with the direction.
+  const lead = section(prompt, "Leads from the question finders").match(/^- \[([a-z0-9-]+)\]/m)?.[1];
   const directions = term
     ? [
         {
@@ -228,6 +230,7 @@ export const knowledgeReviewRule: FauxRule = (turn) => {
           why: `${liked.length} papers you liked are about ${term}, such as #${liked[0].id}.`,
           paperIds: liked.slice(0, 3).map((l) => l.id),
           queries: [`${term} methods`, `${term} survey`],
+          finder: lead ?? "interests",
         },
       ]
     : [];
@@ -241,7 +244,12 @@ export const knowledgeReviewRule: FauxRule = (turn) => {
         },
       ]
     : [];
-  return say(JSON.stringify({ directions, outOfScope }));
+  // The first rule candidate becomes a rule.
+  const candidate = section(prompt, "Rule candidates (reasons that may generalize)").match(
+    /^- candidate (\d+)[^:]*: “(.+)”$/m,
+  );
+  const tasteRules = candidate ? [{ rule: `Avoid: ${candidate[2]}`, candidateIds: [Number(candidate[1])] }] : [];
+  return say(JSON.stringify({ directions, outOfScope, tasteRules }));
 };
 
 export const offlineRules: FauxRule[] = [

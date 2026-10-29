@@ -1,0 +1,17 @@
+{
+  "id": "rh.finder-missing-links",
+  "version": "1.0.0",
+  "displayName": "Finder: missing links",
+  "kind": "addon",
+  "topic": "knowledge",
+  "description": "Leads for new research questions from papers you liked that are close, serve different research questions and never cite each other, when Jev judges that one could inform the other.",
+  "engines": { "research-hub": "^1.0.0" },
+  "main": "main.ts",
+  "activationEvents": ["onExtensionPoint:knowledge.finder"],
+  "dependencies": { "rh.papers": "^1.0.0", "rh.decision-jev": "^1.0.0" },
+  "contributes": {
+    "knowledge.finder": [{ "id": "missing-links", "title": "Missing links" }],
+    "jevCommands": ["jev/link-candidate"]
+  },
+  "permissions": { "budgetUsdPerDay": 0.1 }
+}

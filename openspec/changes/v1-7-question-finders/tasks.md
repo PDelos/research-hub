@@ -4,12 +4,12 @@
 
 ## 2. Finders
 
-- [ ] 2.1 Extension point, lead collection, prompt section, finder field, attribution (migration); verify with a fake finder
-- [ ] 2.2 The three finders (vectors, citations, Jev link-candidate, rising words); verify each on seeded data
+- [x] 2.1 Extension point, lead collection, prompt section, finder field, attribution (migration); verify with a fake finder
+- [x] 2.2 The three finders (vectors, citations, Jev link-candidate, rising words); verify each on seeded data
 
 ## 3. Proposals
 
-- [ ] 3.1 Level-up and taste-rule proposals with approve into rh.sweep (undoable); verify
+- [x] 3.1 Level-up and taste-rule proposals with approve into rh.sweep (undoable); verify
 
 ## 4. UI and integration
 

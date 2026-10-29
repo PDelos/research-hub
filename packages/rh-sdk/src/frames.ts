@@ -571,7 +571,7 @@ export interface DigestBody {
     }[];
   };
   /** The knowledge review (v1.5): charter proposals open now or decided this week. */
-  charter?: { proposals: KnowledgeProposal[]; reviewNotes: string[] };
+  charter?: { proposals: KnowledgeProposal[]; reviewNotes: string[]; finders?: FinderStats[] };
   /** The harness (v1.2): the judge's agreement with you and the week's replays. */
   quality?: {
     judge: { agreement: number | null; cases: number; trusted: boolean } | null;
@@ -769,7 +769,7 @@ export interface UpgradesView {
 // ---------------------------------------------------------------- the knowledge loop (v1.5)
 
 export interface KnowledgeChange {
-  kind: "weight" | "retire-question" | "drop-query" | "add-question" | "add-out-of-scope";
+  kind: "weight" | "retire-question" | "drop-query" | "add-question" | "add-out-of-scope" | "level" | "taste-rule";
   target?: string;
   targetKind?: "question" | "query";
   from?: number;
@@ -777,6 +777,20 @@ export interface KnowledgeChange {
   text?: string;
   queries?: string[];
   topic?: string;
+  level?: { from: string; to: string };
+  rule?: string;
+  candidateIds?: number[];
+}
+
+/** What a question finder brought (v1.7): its proposals and what came of them. */
+export interface FinderStats {
+  finder: string;
+  title: string;
+  proposed: number;
+  approved: number;
+  rejected: number;
+  /** 👍/⭐ cards matched to its approved questions since approval. */
+  liked: number;
 }
 
 export interface KnowledgeProposal {
@@ -791,6 +805,8 @@ export interface KnowledgeProposal {
     score?: number;
   };
   status: "proposed" | "approved" | "rejected" | "stale" | "undone";
+  /** For a new question: the finder it came from (or "interests"). */
+  finder: string | null;
   baseVersion: number;
   appliedVersion: number | null;
   reason: string | null;
@@ -817,6 +833,7 @@ export interface KnowledgeView {
   running: boolean;
   reviews: KnowledgeReview[];
   proposals: KnowledgeProposal[];
+  finders: FinderStats[];
 }
 
 // ---------------------------------------------------------------- full text (v1.6)
