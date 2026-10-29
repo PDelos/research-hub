@@ -39,10 +39,10 @@ export function activate(context: PluginContext): DeskExports {
             description: `${t.description} (from the ${t.pluginId} plugin)`,
             returns: "Text: the plugin's answer.",
             parameters: Type.Unsafe<Record<string, unknown>>(t.parameters),
-            execute: async (args, api, context) => {
+            execute: async (args, api, toolContext) => {
               // Once per call: a replay after a crash returns the stored answer instead of calling the plugin again.
               const answer = JSON.parse(
-                await once<string>(api, "plugin-tool", context, async () => {
+                await once<string>(api, "plugin-tool", toolContext, async () => {
                   try {
                     const value = await contributions.callChatTool(t.name, args);
                     return JSON.stringify({ text: typeof value === "string" ? value : JSON.stringify(value) });

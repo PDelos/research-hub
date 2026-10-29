@@ -195,7 +195,7 @@ export function activate(context: PluginContext): KnowledgeExports {
       decidedAt: proposalRow.decided_at,
     };
   };
-  const row = (id: number) => {
+  const loadProposal = (id: number) => {
     const row = db.prepare(`SELECT * FROM ${tables.proposals} WHERE id = ?`).get(id) as ProposalRow | undefined;
     if (!row) throw new KnowledgeInvalid(`no proposal ${id}`);
     return row;
@@ -536,31 +536,31 @@ export function activate(context: PluginContext): KnowledgeExports {
       ).map(toProposal);
     },
     async approve(id) {
-      const proposalRow = row(id);
+      const proposalRow = loadProposal(id);
       if (proposalRow.status !== "proposed") throw new KnowledgeInvalid(`proposal ${id} is ${proposalRow.status}`);
       const change = JSON.parse(proposalRow.change_json) as Change;
       // Level and taste rules are sweep settings: one undoable plugin-state change.
       if (SETTING_KINDS.includes(change.kind)) await approveSetting(id, change);
       else approveCharterChange(id, change);
-      return toProposal(row(id));
+      return toProposal(loadProposal(id));
     },
     reject(id, reason) {
-      const proposalRow = row(id);
+      const proposalRow = loadProposal(id);
       if (proposalRow.status !== "proposed") throw new KnowledgeInvalid(`proposal ${id} is ${proposalRow.status}`);
       db.prepare(`UPDATE ${tables.proposals} SET status = 'rejected', reason = ?, decided_at = ? WHERE id = ?`).run(
         reason?.trim().slice(0, 500) || null,
         now(),
         id,
       );
-      return toProposal(row(id));
+      return toProposal(loadProposal(id));
     },
     async undo(id) {
-      const proposalRow = row(id);
+      const proposalRow = loadProposal(id);
       if (proposalRow.status !== "approved") throw new KnowledgeInvalid(`proposal ${id} is ${proposalRow.status}`);
       if (proposalRow.commit_id) {
         await host.undo(proposalRow.commit_id, "user");
         db.prepare(`UPDATE ${tables.proposals} SET status = 'undone', decided_at = ? WHERE id = ?`).run(now(), id);
-        return toProposal(row(id));
+        return toProposal(loadProposal(id));
       }
       if (charters.approved()?.version !== proposalRow.applied_version)
         throw new KnowledgeInvalid(
@@ -571,7 +571,7 @@ export function activate(context: PluginContext): KnowledgeExports {
       const restored = charters.approveVersion(before.charter, "user");
       db.prepare(`UPDATE ${tables.proposals} SET status = 'undone', decided_at = ? WHERE id = ?`).run(now(), id);
       afterCharterChange(restored.version!);
-      return toProposal(row(id));
+      return toProposal(loadProposal(id));
     },
     async finders() {
       const titles = new Map<string, string>([[INTERESTS, "Your interests (judgments, reasons, comments)"]]);

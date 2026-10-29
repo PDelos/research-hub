@@ -240,9 +240,9 @@ export function createRhApi(plugin: DiscoveredPlugin, services: KernelServices, 
     kind: K,
     what: string,
   ): NonNullable<KernelServices["providers"][K]> => {
-    const provider = services.providers[kind];
-    if (!provider) throw new Error(`no ${what} plugin is active`);
-    return provider as NonNullable<KernelServices["providers"][K]>;
+    const active = services.providers[kind];
+    if (!active) throw new Error(`no ${what} plugin is active`);
+    return active as NonNullable<KernelServices["providers"][K]>;
   };
 
   return {

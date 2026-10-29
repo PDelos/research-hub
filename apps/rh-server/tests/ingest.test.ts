@@ -51,10 +51,10 @@ async function project(
   return { server, p: projectRuntime };
 }
 
-const done = async (project: any, expected: number, ms = 15_000) => {
+const done = async (target: any, expected: number, ms = 15_000) => {
   const end = Date.now() + ms;
-  while (project.ingest.requests().filter((r: any) => r.status === "done").length < expected) {
-    if (Date.now() > end) throw new Error(`ingest: ${JSON.stringify(project.ingest.requests())}`);
+  while (target.ingest.requests().filter((r: any) => r.status === "done").length < expected) {
+    if (Date.now() > end) throw new Error(`ingest: ${JSON.stringify(target.ingest.requests())}`);
     await new Promise((r) => setTimeout(r, 20));
   }
 };

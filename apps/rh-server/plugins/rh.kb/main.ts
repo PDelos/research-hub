@@ -139,7 +139,7 @@ export function activate(context: PluginContext): KbExports {
     },
     agentExtensions: [kbTools(() => ({ vault, index: kbIndex }))],
     separateExtensions: [ingest.extension],
-    attach: (harness, context) => ingest.attach(harness, context),
+    attach: (harness, agentContext) => ingest.attach(harness, agentContext),
     ready() {
       ingest.pickUp();
       kbIndex.start();

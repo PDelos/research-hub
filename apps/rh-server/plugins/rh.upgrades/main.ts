@@ -423,7 +423,7 @@ export function activate(context: PluginContext): UpgradesExports {
       }
     }
     if (!winner) return { report: { tried, result: "Nothing changed: no converter beat the active one by 0.02." } };
-    const proposal = addProposal(
+    const proposed = addProposal(
       runId,
       "converter",
       { converter: winner.id, value: winner.value, activeValue: base.result.value, active: base.candidate.converter },
@@ -432,7 +432,7 @@ export function activate(context: PluginContext): UpgradesExports {
     return {
       report: {
         tried,
-        result: `Proposed switching the converter to ${winner.id}: ${winner.value.toFixed(3)} vs ${(base.result.value ?? 0).toFixed(3)}. Approve it in the Upgrades tab (proposal ${proposal.id}).`,
+        result: `Proposed switching the converter to ${winner.id}: ${winner.value.toFixed(3)} vs ${(base.result.value ?? 0).toFixed(3)}. Approve it in the Upgrades tab (proposal ${proposed.id}).`,
       },
     };
   };

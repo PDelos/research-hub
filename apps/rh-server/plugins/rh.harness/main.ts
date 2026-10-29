@@ -533,9 +533,9 @@ export async function activate(context: PluginContext): Promise<HarnessExports> 
     parameters: Type.Object({
       variant: Type.Unsafe<Variant>({ type: "object", description: 'e.g. {"cardsPerSweep": 10}' }),
     }),
-    execute: async (args, api, context) => {
+    execute: async (args, api, toolContext) => {
       const answer = JSON.parse(
-        await once<string>(api, "replay", context, async () => {
+        await once<string>(api, "replay", toolContext, async () => {
           try {
             return JSON.stringify({ text: summarize((await exports.replay(args.variant, "desk")).report) });
           } catch (error) {

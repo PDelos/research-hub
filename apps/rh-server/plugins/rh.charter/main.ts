@@ -38,6 +38,6 @@ export function activate(context: PluginContext): CharterExports {
     state,
     charterWriter,
     separateExtensions: [charterWriter.extension],
-    attach: (harness, context) => charterWriter.attach(harness, context),
+    attach: (harness, agentContext) => charterWriter.attach(harness, agentContext),
   };
 }
