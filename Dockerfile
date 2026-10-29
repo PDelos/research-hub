@@ -74,17 +74,21 @@ ENV RH_KB_VIEWER=on \
     RH_KB_VIEWER_DIR=/opt/ignis
 COPY --from=ignis /app /opt/ignis
 
-# 6. Everything: the Obsidian image plus Docling Serve (CPU) in a Python virtual environment with its models
-#    downloaded at build time; the hub starts it on the first PDF conversion (RH_DOCLING=on).
+# 6. Everything: the Obsidian image plus Docling Serve (CPU) and sentence-transformers in a Python virtual environment
+#    with Docling's models downloaded at build time; the hub starts Docling on the first PDF conversion (RH_DOCLING=on)
+#    and the local embedding server for a fine-tuned embedder (RH_LOCAL_EMBED=on).
 FROM obsidian AS full
 USER root
 RUN apt-get update && apt-get install -y --no-install-recommends python3 python3-venv libgl1 libglib2.0-0 \
   && rm -rf /var/lib/apt/lists/* \
   && python3 -m venv /opt/docling \
   && /opt/docling/bin/pip install --no-cache-dir --extra-index-url https://download.pytorch.org/whl/cpu docling-serve \
+  && /opt/docling/bin/pip install --no-cache-dir --extra-index-url https://download.pytorch.org/whl/cpu sentence-transformers \
   && HF_HOME=/opt/docling/hf /opt/docling/bin/docling-tools models download -o /opt/docling/models \
   && chown -R node:node /opt/docling
 ENV RH_DOCLING=on \
+    RH_LOCAL_EMBED=on \
+    RH_LOCAL_EMBED_PYTHON=/opt/docling/bin/python \
     RH_DOCLING_CMD=/opt/docling/bin/docling-serve \
     DOCLING_SERVE_ARTIFACTS_PATH=/opt/docling/models \
     DOCLING_SERVE_MAX_SYNC_WAIT=600 \

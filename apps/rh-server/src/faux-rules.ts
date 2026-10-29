@@ -291,7 +291,7 @@ export const engineerRule: FauxRule = (turn) => {
   } } } };
 }
 `;
-    return say(JSON.stringify({ main, notes: retry ? "fixed the source field" : "first version" }));
+    return say(`${retry ? "Fixed the source field." : "First version."}\n\n\`\`\`js\n${main}\`\`\``);
   }
   return undefined;
 };

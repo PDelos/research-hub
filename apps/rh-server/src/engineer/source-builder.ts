@@ -11,7 +11,23 @@ export async function activate({ rh }) {
 
 q = { query: string, limit: number, since?: "YYYY-MM-DD", until?: "YYYY-MM-DD" }. Use only rh.http.json(url, { headers }) or rh.http.text(url) for requests (plain fetch is blocked), only to the API's host, and return at most q.limit papers, each:
 { source: "<SOURCE_ID>", externalId: string, ids: { doi?: string, arxiv?: string, pmid?: string, pmcid?: string }, title: string, abstract?: string, authors: string[], year?: number, publishedAt?: "YYYY-MM-DD", venue?: string, url?: string }.
-Skip records without a title. No other imports, no top-level await, no API keys. Answer only with JSON: {"main": "<the whole main.mjs as a string>", "notes": "<one sentence>"}.`;
+Skip records without a title. The module must not contain any import or require statement (URLSearchParams, encodeURIComponent and JSON are globals), no top-level await, no API keys. Answer with the whole main.mjs in one fenced code block (\`\`\`js … \`\`\`) and nothing else after it.`;
+
+/**
+ * The module from the model's answer: the text between code fences that holds `export … activate` (models sometimes
+ * open with a doubled fence), else a JSON {"main": …}, else the answer itself when it is the module.
+ */
+export function extractMain(text: string): string {
+  if (text.trim().startsWith("{"))
+    try {
+      const main = (JSON.parse(text.trim()) as { main?: unknown }).main;
+      if (typeof main === "string") return main;
+    } catch {
+      // not JSON
+    }
+  const segments = text.split(/^\s*```[a-z]*\s*$/m).map((x) => x.trim());
+  return segments.find((x) => /export\s+(async\s+)?function\s+activate/.test(x)) ?? "";
+}
 
 export interface BuiltPlugin {
   manifest: Record<string, unknown>;
@@ -77,7 +93,14 @@ export function codeProblems(main: string, sourceId: string): string[] {
   const problems: string[] = [];
   if (!/export\s+(async\s+)?function\s+activate/.test(main))
     problems.push("main.mjs must export async function activate({ rh })");
-  if (/^\s*import\s/m.test(main) || /require\(/.test(main)) problems.push("main.mjs must not import anything");
+  const imports = main.split("\n").filter((l) => /^\s*import[\s{*"']/.test(l) || /\brequire\(/.test(l));
+  if (imports.length)
+    problems.push(
+      `main.mjs must not import anything; remove: ${imports
+        .map((l) => l.trim())
+        .join(" | ")
+        .slice(0, 300)}`,
+    );
   if (/(^|[^.\w])fetch\(/.test(main)) problems.push("use rh.http.json or rh.http.text, not fetch");
   if (!main.includes(sourceId)) problems.push(`the source id "${sourceId}" must appear in sources`);
   return problems;

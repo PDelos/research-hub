@@ -45,7 +45,7 @@ export function activate(context: PluginContext): LocalEmbedderExports {
     starting ??= (async () => {
       if (await healthy()) return;
       const python = process.env.RH_LOCAL_EMBED_PYTHON?.trim() || "/opt/docling/bin/python";
-      child = spawn(python, [join(import.meta.dirname, "embed-server.py"), "--port", String(port)], {
+      child = spawn(python, [join(context.dir, "embed-server.py"), "--port", String(port)], {
         stdio: ["ignore", "ignore", "pipe"],
       });
       let stderr = "";

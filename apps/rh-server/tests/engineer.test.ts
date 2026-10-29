@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { EngineerExports } from "../plugins/rh.engineer/main.ts";
-import { codeProblems, contractProblems, slug } from "../src/engineer/source-builder.ts";
+import { codeProblems, contractProblems, extractMain, slug } from "../src/engineer/source-builder.ts";
 import { validateCharter } from "../src/charter.ts";
 import { engineerRule } from "../src/faux-rules.ts";
 import { sampleCharter } from "./fixtures/charter.ts";
@@ -45,6 +45,11 @@ async function setup() {
 
 test("contract and code checks name what is wrong", () => {
   assert.equal(slug("Paperbase API (v2)!"), "paperbase-api-v2");
+  const module = "export async function activate({ rh }) {\n  return {};\n}";
+  assert.equal(extractMain("```js\n```js\n" + module + "\n```"), module, "a doubled opening fence");
+  assert.equal(extractMain("Here:\n```javascript\n" + module + "\n```\nDone."), module);
+  assert.equal(extractMain(JSON.stringify({ main: module })), module);
+  assert.equal(extractMain("I cannot do that."), "");
   assert.deepEqual(contractProblems([], "x", 5), ["search returned no papers for a common query"]);
   assert.match(
     contractProblems([{ title: "T", source: "y", externalId: "1", authors: [], ids: {} }], "x", 5).join(),

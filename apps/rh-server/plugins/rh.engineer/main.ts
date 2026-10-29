@@ -8,6 +8,7 @@ import type { PluginContext } from "../../src/kernel/lifecycle.ts";
 import {
   BUILD_SYSTEM,
   codeProblems,
+  extractMain,
   contractProblems,
   slug,
   sourceManifest,
@@ -249,10 +250,10 @@ export function activate(context: PluginContext): EngineerExports {
         maxTokens: 4_000,
       });
       charge(current.id, answer.costUsd);
-      const main = String(jsonObject(answer.text)?.main ?? "");
+      const main = extractMain(answer.text);
       const staticProblems = main
         ? codeProblems(main, sourceId)
-        : ["no main.mjs in the answer (JSON with a main field)"];
+        : [`no main.mjs in the answer (one fenced code block); it began: ${answer.text.slice(0, 160)}`];
       if (staticProblems.length) {
         feedback = staticProblems.join("; ");
         note(`Rejected before running: ${feedback}`);
