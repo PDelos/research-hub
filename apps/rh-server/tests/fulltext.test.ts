@@ -97,12 +97,15 @@ test("the converter slot: pdf-text is active; Docling is unavailable without its
   const received: string[] = [];
   docling = createServer((req, res) => {
     if (req.url === "/health") return void res.end("ok");
+    res.setHeader("content-type", "application/json");
+    if (req.url?.startsWith("/v1/status/poll/")) return void res.end(JSON.stringify({ task_status: "success" }));
+    if (req.url?.startsWith("/v1/result/"))
+      return void res.end(JSON.stringify({ document: { md_content: DOCLING_MD }, status: "success" }));
     let body = "";
     req.on("data", (d: Buffer) => (body += d.toString("latin1")));
     req.on("end", () => {
-      received.push(body);
-      res.setHeader("content-type", "application/json");
-      res.end(JSON.stringify({ document: { md_content: DOCLING_MD }, status: "success" }));
+      received.push(`${req.url} ${body}`);
+      res.end(JSON.stringify({ task_id: "t1", task_status: "pending" }));
     });
   });
   await new Promise<void>((r) => docling!.listen(0, "127.0.0.1", r));
@@ -133,6 +136,7 @@ test("the converter slot: pdf-text is active; Docling is unavailable without its
       sections.map((x) => x.title),
       ["Abstract", "1 Introduction", "2 Methods"],
     );
+    assert.match(received[0], /^\/v1\/convert\/file\/async /, "the async API");
     assert.match(received[0], /name="files"; filename="paper.pdf"/);
     assert.match(received[0], /name="to_formats"\r\n\r\nmd/);
     await s.p.plugins.kernel.configure("rh.fulltext", { "fulltext.converter": "docling" });

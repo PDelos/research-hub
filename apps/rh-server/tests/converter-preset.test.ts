@@ -64,8 +64,11 @@ test("with Docling available, a better converter is proposed and approving switc
   const md = TRUTH.map((s) => `## ${s.title}\n\n${s.text}`).join("\n\n");
   const docling = createServer((req, res) => {
     if (req.url === "/health") return void res.end("ok");
+    if (req.url?.startsWith("/v1/status/poll/")) return void res.end(JSON.stringify({ task_status: "success" }));
+    if (req.url?.startsWith("/v1/result/"))
+      return void res.end(JSON.stringify({ document: { md_content: md }, status: "success" }));
     req.resume();
-    req.on("end", () => res.end(JSON.stringify({ document: { md_content: md }, status: "success" })));
+    req.on("end", () => res.end(JSON.stringify({ task_id: "t1", task_status: "pending" })));
   });
   await new Promise<void>((r) => docling.listen(0, "127.0.0.1", r));
   process.env.RH_DOCLING_URL = `http://127.0.0.1:${(docling.address() as { port: number }).port}`;

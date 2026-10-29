@@ -87,6 +87,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends python3 python3
 ENV RH_DOCLING=on \
     RH_DOCLING_CMD=/opt/docling/bin/docling-serve \
     DOCLING_SERVE_ARTIFACTS_PATH=/opt/docling/models \
+    DOCLING_SERVE_MAX_SYNC_WAIT=600 \
     HF_HOME=/opt/docling/hf \
     HF_HUB_OFFLINE=1
 USER node

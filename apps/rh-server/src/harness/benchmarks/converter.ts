@@ -106,6 +106,8 @@ export async function converterTask(
           .join("\n");
       perPaper.push({ id: p.id, f1: wordF1(text(out), text(p.truth)), headings: headingRecall(out, p.truth) });
     } catch (error) {
+      // A failed conversion scores 0: every converter is judged on the same papers.
+      perPaper.push({ id: p.id, f1: 0, headings: 0 });
       notes.push(`${p.id}: ${error instanceof Error ? error.message : String(error)}`);
     }
   }

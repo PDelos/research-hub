@@ -1,5 +1,5 @@
 // Built-in plugin rh.converter-docling (spec full-text: Converter slot; design v1-6 D3): PDFs through Docling Serve,
-// either one at RH_DOCLING_URL or, with RH_DOCLING=on (the research-hub:full image), a local `docling-serve` this
+// (its async API: submit, poll, collect), either one at RH_DOCLING_URL or, with RH_DOCLING=on (the research-hub:full image), a local `docling-serve` this
 // plugin starts on first use and supervises (restarted with backoff). Markdown out, split into sections.
 import { spawn, type ChildProcess } from "node:child_process";
 import { hostOf } from "../../src/kernel/builtin.ts";
@@ -9,6 +9,7 @@ import type { ConverterExports } from "../rh.fulltext/main.ts";
 
 export const START_TIMEOUT_MS = 180_000;
 export const CONVERT_TIMEOUT_MS = 600_000;
+export const POLL_MS = Number(process.env.RH_DOCLING_POLL_MS ?? 2_000);
 
 export function activate(context: PluginContext): ConverterExports {
   const host = hostOf(context);
@@ -35,6 +36,8 @@ export function activate(context: PluginContext): ConverterExports {
       const cmd = process.env.RH_DOCLING_CMD?.trim() || "docling-serve";
       child = spawn(cmd, ["run", "--host", "127.0.0.1", "--port", String(port)], {
         stdio: ["ignore", "ignore", "pipe"],
+        // A long paper takes minutes on CPU; Docling Serve's default 120 s answers 504.
+        env: { ...process.env, DOCLING_SERVE_MAX_SYNC_WAIT: process.env.DOCLING_SERVE_MAX_SYNC_WAIT ?? "600" },
       });
       let stderr = "";
       child.stderr?.on("data", (d) => (stderr = (stderr + String(d)).slice(-2_000)));
@@ -81,11 +84,31 @@ export function activate(context: PluginContext): ConverterExports {
       form.append("to_formats", "md");
       form.append("image_export_mode", "placeholder");
       form.append("do_ocr", "false");
-      const res = await fetch(`${base}/v1/convert/file`, {
+      // The async API: a long paper takes minutes on CPU, longer than one HTTP request should stay open.
+      const submitted = await fetch(`${base}/v1/convert/file/async`, {
         method: "POST",
         body: form,
-        signal: AbortSignal.timeout(CONVERT_TIMEOUT_MS),
+        signal: AbortSignal.timeout(60_000),
       });
+      if (!submitted.ok)
+        throw new Error(`docling-serve: HTTP ${submitted.status} ${(await submitted.text()).slice(0, 200)}`);
+      const { task_id: task } = (await submitted.json()) as { task_id?: string };
+      if (!task) throw new Error("docling-serve: no task id (an older Docling Serve without the async API?)");
+      const deadline = Date.now() + CONVERT_TIMEOUT_MS;
+      for (;;) {
+        const poll = (await (
+          await fetch(`${base}/v1/status/poll/${task}`, { signal: AbortSignal.timeout(30_000) })
+        ).json()) as {
+          task_status?: string;
+          error_message?: string | null;
+        };
+        if (poll.task_status === "success") break;
+        if (poll.task_status === "failure")
+          throw new Error(`docling-serve: ${poll.error_message ?? "conversion failed"}`);
+        if (Date.now() > deadline) throw new Error("docling-serve: conversion took more than 10 minutes");
+        await new Promise((r) => setTimeout(r, POLL_MS));
+      }
+      const res = await fetch(`${base}/v1/result/${task}`, { signal: AbortSignal.timeout(60_000) });
       if (!res.ok) throw new Error(`docling-serve: HTTP ${res.status} ${(await res.text()).slice(0, 200)}`);
       const body = (await res.json()) as { document?: { md_content?: string }; status?: string; errors?: unknown[] };
       if (!body.document?.md_content)
