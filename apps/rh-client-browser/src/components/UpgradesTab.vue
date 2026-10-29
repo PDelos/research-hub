@@ -3,7 +3,7 @@
 // why, every candidate it tried with its numbers, proposals waiting for Approve / Reject, add-on suggestions to
 // dismiss, and earlier runs. Ranking winners are already applied; Undo takes them back.
 import { computed, onMounted, onUnmounted, ref } from "vue";
-import type { UpgradeFocus, UpgradeProposal, UpgradeRun, UpgradesView } from "@rh/sdk";
+import type { EngineerIdea, UpgradeFocus, UpgradeProposal, UpgradeRun, UpgradesView } from "@rh/sdk";
 import { isRhError } from "@rh/sdk";
 import { client } from "../store.ts";
 import { usePlugins } from "../stores/plugins.ts";
@@ -15,9 +15,13 @@ const notice = ref("");
 const busy = ref(false);
 let timer: ReturnType<typeof setInterval> | undefined;
 
+// The engineer (v1.8): ideas researched, built and tested on request.
+const ideas = ref<EngineerIdea[]>([]);
+const ideaText = ref("");
+const working = computed(() => ideas.value.some((i) => i.stage === "researching" || i.stage === "building"));
 const load = async () => {
   try {
-    view.value = await client.upgrades();
+    [view.value, ideas.value] = await Promise.all([client.upgrades(), client.ideas()]);
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e);
   }
@@ -25,7 +29,7 @@ const load = async () => {
 onMounted(async () => {
   await load();
   // While a run is in progress, follow it.
-  timer = setInterval(() => void (view.value?.running && load()), 3000);
+  timer = setInterval(() => void ((view.value?.running || working.value) && load()), 3000);
 });
 onUnmounted(() => clearInterval(timer));
 
@@ -70,6 +74,38 @@ const approve = (p: UpgradeProposal) =>
   act(() => client.approveProposal(p.id), "Approved: the papers are re-embedded in the background.");
 const reject = (p: UpgradeProposal) => act(() => client.rejectProposal(p.id), "Rejected.");
 const dismiss = (id: number) => act(() => client.dismissSuggestion(id), "Dismissed.");
+const STAGE: Record<EngineerIdea["stage"], string> = {
+  researching: "researching…",
+  assessed: "waiting for you",
+  building: "building…",
+  proposed: "built: waiting for you",
+  installed: "in use",
+  rejected: "rejected",
+  failed: "failed",
+  "not-buildable": "cannot build this yet",
+};
+const KIND: Record<string, string> = {
+  "paper-source": "paper source",
+  "embedder-finetune": "fine-tuned embedder",
+  other: "other",
+};
+const propose = () =>
+  act(async () => {
+    await client.proposeIdea(ideaText.value);
+    ideaText.value = "";
+  }, "The engineer is researching it.");
+const ask = (s: { name: string; url: string; reason: string }) =>
+  act(
+    () => client.proposeIdea(`Add ${s.name} (${s.url}) as a paper source: ${s.reason}`, "suggestion"),
+    "The engineer is researching it.",
+  );
+const buildIdea = (id: number) => act(() => client.buildIdea(id), "Building; the log follows below.");
+const rejectIdea = (id: number) => act(() => client.rejectIdea(id), "Rejected.");
+const enableIdea = (id: number) =>
+  act(async () => {
+    await client.enableIdea(id);
+    await plugins.refresh();
+  }, "Enabled.");
 const undo = (p: UpgradeProposal) =>
   act(async () => {
     await client.undoPluginChange(p.commit!);
@@ -125,7 +161,68 @@ const undo = (p: UpgradeProposal) =>
               <a :href="s.url" target="_blank" rel="noopener noreferrer">{{ s.name }}</a>
               <span class="muted small"> · {{ s.reason }}</span>
             </div>
+            <button class="ghost small" :disabled="busy" @click="ask(s)">Ask the engineer</button>
             <button class="ghost small" :disabled="busy" @click="dismiss(s.id)">Dismiss</button>
+          </li>
+        </ul>
+      </section>
+
+      <section class="digest-section" data-test="engineer">
+        <h3>The engineer</h3>
+        <p class="muted small">
+          Give it an idea (a paper API to add, “try fine-tuning the embedder on my stars”). It researches whether it is
+          worth it and asks you; on Build it writes and tests the plugin and proposes it. Nothing is turned on without
+          you.
+        </p>
+        <form class="comment-form" @submit.prevent="propose">
+          <input
+            v-model="ideaText"
+            aria-label="An idea for the engineer"
+            placeholder="An idea for the engineer"
+            maxlength="2000"
+          />
+          <button class="ghost" type="submit" :disabled="busy || ideaText.trim().length < 5">Propose</button>
+        </form>
+        <ul class="replays">
+          <li v-for="i in ideas" :key="i.id" :data-idea="i.id" :data-stage="i.stage">
+            <div>
+              <strong>{{ i.text }}</strong>
+              <span class="badge">{{ STAGE[i.stage] }}</span>
+              <span v-if="i.assessment" class="badge">{{ KIND[i.assessment.kind] }}</span>
+            </div>
+            <div v-if="i.assessment" class="small">
+              <span :class="i.assessment.worth ? '' : 'muted'"
+                >{{ i.assessment.worth ? "Worth it" : "Probably not worth it" }}.</span
+              >
+              Gain: {{ i.assessment.gain }} Cost: {{ i.assessment.cost }} Risk: {{ i.assessment.risk }}
+            </div>
+            <div v-if="i.numbers" class="small muted">
+              <template v-for="(v, k) in i.numbers" :key="k"
+                >{{ k }}
+                {{
+                  typeof v === "number"
+                    ? Number(v)
+                        .toFixed(3)
+                        .replace(/\.?0+$/, "")
+                    : v
+                }}
+                ·
+              </template>
+            </div>
+            <div class="row">
+              <template v-if="i.stage === 'assessed'">
+                <button class="primary" :disabled="busy" @click="buildIdea(i.id)">Build</button>
+                <button class="ghost" :disabled="busy" @click="rejectIdea(i.id)">Reject</button>
+              </template>
+              <template v-else-if="i.stage === 'proposed'">
+                <button class="primary" :disabled="busy" @click="enableIdea(i.id)">Enable</button>
+                <button class="ghost" :disabled="busy" @click="rejectIdea(i.id)">Remove</button>
+              </template>
+            </div>
+            <details class="small">
+              <summary>Log ({{ i.log.length }}) · {{ usd(i.costUsd) }}</summary>
+              <p v-for="(l, k) in i.log" :key="k" class="muted">{{ day(l.at) }} · {{ l.text }}</p>
+            </details>
           </li>
         </ul>
       </section>

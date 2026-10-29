@@ -857,3 +857,28 @@ export interface ConverterInfo {
   available: boolean;
   reason?: string;
 }
+
+// ---------------------------------------------------------------- the engineer (v1.8)
+
+export interface EngineerIdea {
+  id: number;
+  source: "suggestion" | "user" | "slot";
+  text: string;
+  stage: "researching" | "assessed" | "building" | "proposed" | "installed" | "rejected" | "failed" | "not-buildable";
+  assessment: {
+    worth: boolean;
+    kind: "paper-source" | "embedder-finetune" | "other";
+    gain: string;
+    cost: string;
+    risk: string;
+    plan: string;
+    api?: { baseUrl?: string; docsUrl?: string; name?: string };
+    citations?: { url: string; title?: string }[];
+  } | null;
+  pluginId: string | null;
+  log: { at: string; text: string }[];
+  numbers: Record<string, unknown> | null;
+  costUsd: number;
+  createdAt: string;
+  updatedAt: string;
+}

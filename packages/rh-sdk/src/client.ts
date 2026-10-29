@@ -13,6 +13,7 @@ import type {
   SlotView,
   SourceAttribution,
   ConverterInfo,
+  EngineerIdea,
   FullTextView,
   KnowledgeProposal,
   KnowledgeView,
@@ -204,6 +205,16 @@ export class HubClient {
   approveProposal = (id: number) => this.call<UpgradeProposal>("POST", `/proposals/${id}/approve`, {});
   rejectProposal = (id: number) => this.call<UpgradeProposal>("POST", `/proposals/${id}/reject`, {});
   dismissSuggestion = (id: number) => this.call<UpgradeSuggestion>("POST", `/suggestions/${id}/dismiss`, {});
+
+  // The engineer (v1.8)
+  ideas = () => this.call<EngineerIdea[]>("GET", "/engineer/ideas");
+  /** Give the engineer an idea; it is researched and assessed in the background. */
+  proposeIdea = (text: string, source: "user" | "suggestion" = "user") =>
+    this.call<EngineerIdea>("POST", "/engineer/ideas", { text, source });
+  buildIdea = (id: number) => this.call<EngineerIdea>("POST", `/engineer/ideas/${id}/build`, {});
+  rejectIdea = (id: number) => this.call<EngineerIdea>("POST", `/engineer/ideas/${id}/reject`, {});
+  /** Enable what the engineer built (a plugin, or the fine-tuned embedder). */
+  enableIdea = (id: number) => this.call<EngineerIdea>("POST", `/engineer/ideas/${id}/enable`, {});
 
   // Full text (v1.6)
   fullText = (paperId: number) => this.call<FullTextView>("GET", `/papers/${paperId}/fulltext`);

@@ -10,7 +10,7 @@
 
 ## 3. API, UI, image
 
-- [ ] 3.1 Routes, SDK, the Engineer section and "Ask the engineer"; Playwright
+- [x] 3.1 Routes, SDK, the Engineer section and "Ask the engineer"; Playwright
 - [ ] 3.2 Dockerfile `full`: sentence-transformers and the embedding server; verify a real embedding in the full image
 
 ## 4. Integration
