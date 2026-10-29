@@ -27,17 +27,57 @@ export default defineConfig({
   lint: {
     ignorePatterns: untouched,
     plugins: ["typescript", "unicorn", "oxc", "vue"],
+    // Name rules Oxlint has no built-in for (the code-aesthetic skill): lint/code-aesthetic.mjs.
+    jsPlugins: ["./lint/code-aesthetic.mjs"],
     categories: { correctness: "error", suspicious: "warn" },
     rules: {
       // Tests and fixtures use `any` to poke at internals.
       "typescript/no-explicit-any": "off",
       // Express 5 forwards rejected promises from async handlers to the error middleware itself.
       "oxc/no-async-endpoint-handlers": "off",
+      // Code aesthetics (the code-aesthetic skill; CODE_STYLE.md): warnings until STYLE_REPORT.md is empty, then errors.
+      "max-depth": ["warn", { max: 3 }],
+      "max-nested-callbacks": ["warn", { max: 3 }],
+      complexity: ["warn", { max: 15 }],
+      "max-lines-per-function": ["warn", { max: 80, skipBlankLines: true, skipComments: true }],
+      "max-lines": ["warn", { max: 400, skipBlankLines: true, skipComments: true }],
+      "max-params": ["warn", { max: 4 }],
+      "no-else-return": "error",
+      "no-nested-ternary": "warn",
+      "unicorn/no-nested-ternary": "off",
+      "unicorn/no-lonely-if": "error",
+      "aesthetic/no-single-letter": "warn",
+      "aesthetic/no-abbreviations": "warn",
+      "aesthetic/no-utils-module": "warn",
     },
     overrides: [
       {
-        files: ["**/tests/**", "**/*.test.ts"],
-        rules: { "no-unused-vars": "off" },
+        files: ["**/tests/**", "**/*.test.ts", "**/e2e/**"],
+        rules: {
+          "no-unused-vars": "off",
+          // Tests are long lists of steps and assertions; the nesting and naming rules still apply.
+          "max-lines-per-function": "off",
+          "max-lines": "off",
+          complexity: "off",
+        },
+      },
+      {
+        // Vendored from pi-durable-news-agent (NOTICE.md): kept close to upstream.
+        files: ["packages/durable-agent/**", "packages/jev/**"],
+        rules: {
+          "max-depth": "off",
+          "max-nested-callbacks": "off",
+          complexity: "off",
+          "max-lines-per-function": "off",
+          "max-lines": "off",
+          "max-params": "off",
+          "no-nested-ternary": "off",
+          "unicorn/no-lonely-if": "off",
+          "no-else-return": "off",
+          "aesthetic/no-single-letter": "off",
+          "aesthetic/no-abbreviations": "off",
+          "aesthetic/no-utils-module": "off",
+        },
       },
     ],
   },
