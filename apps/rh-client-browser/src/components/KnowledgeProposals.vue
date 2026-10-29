@@ -30,17 +30,17 @@ const FINDER: Record<string, string> = {
 const VERDICT_ICON: Record<string, string> = { star: "⭐", up: "👍", down: "👎" };
 const verdict = (judgment: string | null) => VERDICT_ICON[judgment ?? ""] ?? "";
 
-async function act(fn: () => Promise<unknown>) {
+async function act(action: () => Promise<unknown>) {
   error.value = "";
   busy.value = true;
   try {
-    await fn();
+    await action();
     rejecting.value = undefined;
     reason.value = "";
     await refreshProject();
     emit("changed");
-  } catch (e) {
-    error.value = isRhError(e) ? e.message : String(e);
+  } catch (failure) {
+    error.value = isRhError(failure) ? failure.message : String(failure);
   } finally {
     busy.value = false;
   }

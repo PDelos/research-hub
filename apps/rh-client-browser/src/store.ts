@@ -59,8 +59,8 @@ export async function refreshProject() {
         charterPoll = undefined;
         void refreshProject();
       }, 1500);
-  } catch (e) {
-    store.error = e instanceof Error ? e.message : String(e);
+  } catch (error) {
+    store.error = error instanceof Error ? error.message : String(error);
   }
 }
 
@@ -72,8 +72,8 @@ export async function refreshFeed() {
     store.sweeps = sweeps;
     store.sweep = sweeps[0];
     if (store.sweepDetail) store.sweepDetail = await client.sweep(store.sweepDetail.id);
-  } catch (e) {
-    store.error = e instanceof Error ? e.message : String(e);
+  } catch (error) {
+    store.error = error instanceof Error ? error.message : String(error);
   }
 }
 
@@ -92,13 +92,13 @@ export async function refreshSchedule() {
 }
 
 /** Run an action, then refresh the project; errors land in store.error and are rethrown for the caller. */
-export async function act<T>(fn: () => Promise<T>): Promise<T> {
+export async function act<T>(action: () => Promise<T>): Promise<T> {
   try {
     store.error = "";
-    return await fn();
-  } catch (e) {
-    store.error = e instanceof Error ? e.message : String(e);
-    throw e;
+    return await action();
+  } catch (error) {
+    store.error = error instanceof Error ? error.message : String(error);
+    throw error;
   } finally {
     await refreshProject();
   }
@@ -118,8 +118,8 @@ function refreshRunsSoon() {
 
 const pluginListeners = new Set<(plugins: PluginSummary[]) => void>();
 /** Plugin states from the stream (the plugins store subscribes). */
-export function onPlugins(fn: (plugins: PluginSummary[]) => void) {
-  pluginListeners.add(fn);
+export function onPlugins(listener: (plugins: PluginSummary[]) => void) {
+  pluginListeners.add(listener);
 }
 
 export async function connect() {
@@ -127,8 +127,8 @@ export async function connect() {
     store.info = await client.info();
     document.title = `${store.info.project} · Research Hub`;
     await Promise.all([refreshProject(), refreshSchedule()]);
-  } catch (e) {
-    store.error = String(e);
+  } catch (error) {
+    store.error = String(error);
   }
   let delay = 500;
   for (;;) {
@@ -146,15 +146,15 @@ export async function connect() {
           void refreshFeed();
           void refreshSchedule();
         } else if (frame.type === "plugins") {
-          for (const fn of pluginListeners) fn(frame.plugins);
+          for (const listener of pluginListeners) listener(frame.plugins);
         } else if (frame.type === "usage") {
           store.totals = frame.totals;
           refreshRunsSoon();
           void refreshProject();
         } else model.apply(frame);
       }
-    } catch (e) {
-      store.error = e instanceof Error ? e.message : String(e);
+    } catch (error) {
+      store.error = error instanceof Error ? error.message : String(error);
     }
     store.connected = false;
     await new Promise((r) => setTimeout(r, delay));

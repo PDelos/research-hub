@@ -82,8 +82,8 @@ async function comment(section: DigestSection) {
     await client.commentDigest(digest.value.id, section, text);
     drafts.value[section] = "";
     await open(digest.value.id);
-  } catch (e) {
-    error.value = e instanceof Error ? e.message : String(e);
+  } catch (failure) {
+    error.value = failure instanceof Error ? failure.message : String(failure);
   }
 }
 async function undo(commit: string, message: string) {
@@ -93,8 +93,8 @@ async function undo(commit: string, message: string) {
     notice.value = `Undone: ${message}`;
     await plugins.refresh();
     await plugins.loadHistory();
-  } catch (e) {
-    error.value = isRhError(e) ? e.message : String(e);
+  } catch (failure) {
+    error.value = isRhError(failure) ? failure.message : String(failure);
   }
 }
 </script>

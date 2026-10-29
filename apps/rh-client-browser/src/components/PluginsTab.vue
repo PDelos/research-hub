@@ -81,9 +81,9 @@ async function load(id = selected.value) {
   if (!id) return;
   try {
     details.value = await client.plugin(id);
-  } catch (e) {
+  } catch (failure) {
     details.value = undefined;
-    error.value = e instanceof Error ? e.message : String(e);
+    error.value = failure instanceof Error ? failure.message : String(failure);
   }
 }
 async function loadHistory() {
@@ -106,15 +106,15 @@ watch(
   () => void load(),
 );
 
-async function run(fn: () => Promise<unknown>) {
+async function run(action: () => Promise<unknown>) {
   error.value = "";
   problems.value = [];
   try {
-    await fn();
-  } catch (e) {
-    error.value = e instanceof Error ? e.message : String(e);
-    if (isRhError(e) && Array.isArray(e.details)) problems.value = e.details as string[];
-    throw e;
+    await action();
+  } catch (failure) {
+    error.value = failure instanceof Error ? failure.message : String(failure);
+    if (isRhError(failure) && Array.isArray(failure.details)) problems.value = failure.details as string[];
+    throw failure;
   } finally {
     await plugins.refresh();
     await loadHistory();
@@ -127,10 +127,10 @@ async function setEnabled(enabled: boolean, cascade = false) {
   try {
     await run(() => client.setPluginEnabled(id, enabled, cascade));
     dependents.value = [];
-  } catch (e) {
+  } catch (failure) {
     // Others depend on it: ask before disabling them too.
-    if (isRhError(e) && e.code === "conflict" && Array.isArray(e.details)) {
-      dependents.value = e.details as string[];
+    if (isRhError(failure) && failure.code === "conflict" && Array.isArray(failure.details)) {
+      dependents.value = failure.details as string[];
       error.value = "";
       problems.value = [];
     }
@@ -151,12 +151,12 @@ async function check() {
   }).catch(() => undefined);
 }
 async function approve() {
-  const p = plan.value!;
-  await run(() => client.approveInstall(p.planId)).catch(() => undefined);
+  const approved = plan.value!;
+  await run(() => client.approveInstall(approved.planId)).catch(() => undefined);
   plan.value = undefined;
   installing.value = false;
   source.value.value = "";
-  select(p.id);
+  select(approved.id);
 }
 async function cancel() {
   if (plan.value) await client.cancelInstall(plan.value.planId);

@@ -38,11 +38,11 @@ function decode(value) {
   return value;
 }
 
-function call(fn, args) {
+function call(name, args) {
   const id = nextCall++;
   return new Promise((resolve, reject) => {
     pending.set(id, { resolve, reject });
-    process.send({ t: "call", id, fn, args: encode(args) });
+    process.send({ t: "call", id, fn: name, args: encode(args) });
   });
 }
 
@@ -62,7 +62,7 @@ const own = {
   async activate(context) {
     const module = await import(pathToFileURL(context.main).href);
     plugin = module;
-    const ctx = {
+    const pluginContext = {
       ...context,
       rh: rhProxy(context.rhPaths),
       subscriptions: [],
@@ -73,8 +73,8 @@ const own = {
         warn: (event, fields) => call("ctx.log", ["warn", event, fields]),
       },
     };
-    own.context = ctx;
-    return module.activate ? await module.activate(ctx) : undefined;
+    own.context = pluginContext;
+    return module.activate ? await module.activate(pluginContext) : undefined;
   },
   async deactivate() {
     try {
@@ -95,10 +95,10 @@ process.on("message", async (message) => {
     return;
   }
   if (message.t !== "call") return;
-  const fn = typeof message.fn === "number" ? local.get(message.fn) : own[message.fn];
+  const target = typeof message.fn === "number" ? local.get(message.fn) : own[message.fn];
   try {
-    if (typeof fn !== "function") throw new Error(`unknown function ${message.fn}`);
-    const value = await fn(...decode(message.args));
+    if (typeof target !== "function") throw new Error(`unknown function ${message.fn}`);
+    const value = await target(...decode(message.args));
     process.send({ t: "reply", id: message.id, value: encode(value) });
   } catch (error) {
     process.send({

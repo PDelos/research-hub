@@ -18,12 +18,12 @@ type Listener = () => void;
 
 export class Emitter {
   private listeners = new Set<Listener>();
-  subscribe(fn: Listener) {
-    this.listeners.add(fn);
-    return () => void this.listeners.delete(fn);
+  subscribe(listener: Listener) {
+    this.listeners.add(listener);
+    return () => void this.listeners.delete(listener);
   }
   protected emit() {
-    for (const fn of this.listeners) fn();
+    for (const listener of this.listeners) listener();
   }
 }
 

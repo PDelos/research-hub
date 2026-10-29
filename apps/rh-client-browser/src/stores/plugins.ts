@@ -31,8 +31,8 @@ export const usePlugins = defineStore("plugins", {
         this.kernelApi = list.kernelApi;
         this.invalid = list.invalid;
         this.error = "";
-      } catch (e) {
-        this.error = e instanceof Error ? e.message : String(e);
+      } catch (error) {
+        this.error = error instanceof Error ? error.message : String(error);
       }
     },
     async loadHistory() {

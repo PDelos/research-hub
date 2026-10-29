@@ -16,14 +16,15 @@ const briefText = ref("");
 /** Which charter is shown: the open draft, or an approved version. */
 const selected = ref<"draft" | number>("draft");
 const shown = computed(() => {
-  const v = view.value;
-  if (!v) return undefined;
-  if (selected.value === "draft") return v.draft ?? v.approved ?? undefined;
-  return selected.value === v.approved?.version ? v.approved : versionCache.value[selected.value];
+  const charter = view.value;
+  if (!charter) return undefined;
+  if (selected.value === "draft") return charter.draft ?? charter.approved ?? undefined;
+  return selected.value === charter.approved?.version ? charter.approved : versionCache.value[selected.value];
 });
 const versionCache = ref<Record<number, NonNullable<typeof store.charter>["approved"]>>({});
-watch(selected, async (s) => {
-  if (s !== "draft" && !versionCache.value[s]) versionCache.value[s] = await client.charterVersion(s);
+watch(selected, async (version) => {
+  if (version !== "draft" && !versionCache.value[version])
+    versionCache.value[version] = await client.charterVersion(version);
 });
 
 // Editing works on a copy of the shown charter; lists are edited one item per line.

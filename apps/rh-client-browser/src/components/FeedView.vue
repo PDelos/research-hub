@@ -49,8 +49,8 @@ async function judge(card: CardView, verdict: Verdict) {
         : await client.judge(card.id, verdict, reason || undefined);
     if (open.value[card.id]) open.value = { ...open.value, [card.id]: detail };
     await refreshFeed();
-  } catch (e) {
-    store.error = e instanceof Error ? e.message : String(e);
+  } catch (error) {
+    store.error = error instanceof Error ? error.message : String(error);
   } finally {
     busy.value = { ...busy.value, [card.id]: false };
   }

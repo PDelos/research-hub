@@ -12,8 +12,8 @@ const hits = ref<KbSearchHit[] | undefined>();
 async function load() {
   try {
     papers.value = await client.kbPapers();
-  } catch (e) {
-    store.error = e instanceof Error ? e.message : String(e);
+  } catch (error) {
+    store.error = error instanceof Error ? error.message : String(error);
   }
 }
 onMounted(load);
@@ -43,8 +43,8 @@ async function getFullText() {
   fullTextError.value = "";
   try {
     fullText.value = await client.fetchFullText(fullText.value.paperId);
-  } catch (e) {
-    fullTextError.value = isRhError(e) ? e.message : String(e);
+  } catch (error) {
+    fullTextError.value = isRhError(error) ? error.message : String(error);
   } finally {
     fetching.value = false;
   }
@@ -56,8 +56,8 @@ async function open(stem: string | null, paperId?: number) {
     note.value = await client.kbNote(stem);
     const id = paperId ?? papers.value.find((p) => p.stem === stem)?.paperId;
     if (id !== undefined) await loadFullText(id);
-  } catch (e) {
-    store.error = e instanceof Error ? e.message : String(e);
+  } catch (error) {
+    store.error = error instanceof Error ? error.message : String(error);
   }
 }
 
@@ -67,10 +67,10 @@ async function search() {
 
 /** Wikilinks inside a rendered note open that note here. */
 function follow(event: MouseEvent) {
-  const a = (event.target as HTMLElement).closest("a.wikilink") as HTMLElement | null;
-  if (a?.dataset.stem) {
+  const link = (event.target as HTMLElement).closest("a.wikilink") as HTMLElement | null;
+  if (link?.dataset.stem) {
     event.preventDefault();
-    void open(a.dataset.stem);
+    void open(link.dataset.stem);
   }
 }
 

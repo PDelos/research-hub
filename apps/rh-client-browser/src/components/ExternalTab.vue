@@ -14,12 +14,12 @@ onMounted(async () => {
     await import(/* @vite-ignore */ props.tab.script!);
     if (!customElements.get(props.tab.view))
       throw new Error(`${props.tab.pluginId} did not define <${props.tab.view}>`);
-    const el = document.createElement(props.tab.view) as HTMLElement & { rhClient?: unknown; rhPlugin?: string };
-    el.rhClient = client;
-    el.rhPlugin = props.tab.pluginId;
-    host.value?.replaceChildren(el);
-  } catch (e) {
-    error.value = e instanceof Error ? e.message : String(e);
+    const element = document.createElement(props.tab.view) as HTMLElement & { rhClient?: unknown; rhPlugin?: string };
+    element.rhClient = client;
+    element.rhPlugin = props.tab.pluginId;
+    host.value?.replaceChildren(element);
+  } catch (failure) {
+    error.value = failure instanceof Error ? failure.message : String(failure);
   }
 });
 onBeforeUnmount(() => host.value?.replaceChildren());

@@ -87,10 +87,15 @@ export class HubClient {
     const text = await response.text();
     const json = text ? JSON.parse(text) : undefined;
     if (!response.ok) {
-      const e = json?.error ?? {};
-      throw new RhError((e.code as ErrorCode) ?? "internal", e.message ?? `HTTP ${response.status}`, response.status, {
-        details: e.details,
-      });
+      const failure = json?.error ?? {};
+      throw new RhError(
+        (failure.code as ErrorCode) ?? "internal",
+        failure.message ?? `HTTP ${response.status}`,
+        response.status,
+        {
+          details: failure.details,
+        },
+      );
     }
     return json as T;
   }

@@ -12,14 +12,14 @@ const running = ref(false);
 const load = async () => {
   try {
     quality.value = await client.quality();
-  } catch (e) {
-    error.value = e instanceof Error ? e.message : String(e);
+  } catch (failure) {
+    error.value = failure instanceof Error ? failure.message : String(failure);
   }
 };
 onMounted(load);
 
 const pct = (x: number | null | undefined) => (x === null || x === undefined ? "—" : `${Math.round(x * 100)}%`);
-const num = (x: number | undefined) => (x === undefined ? "—" : x.toFixed(2));
+const twoDecimals = (x: number | undefined) => (x === undefined ? "—" : x.toFixed(2));
 const signed = (x: number) => `${x >= 0 ? "+" : ""}${x.toFixed(2)}`;
 const day = (iso: string) => new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short" });
 const describe = (r: StoredReplay) =>
@@ -47,8 +47,8 @@ async function replay() {
   try {
     await client.replay(variant as never);
     await load();
-  } catch (e) {
-    error.value = e instanceof Error ? e.message : String(e);
+  } catch (failure) {
+    error.value = failure instanceof Error ? failure.message : String(failure);
   } finally {
     running.value = false;
   }
@@ -94,7 +94,7 @@ async function replay() {
           <tbody>
             <tr v-for="q in quality.overTime" :key="q.sweepId" class="static">
               <td>{{ day(q.startedAt) }}</td>
-              <td>{{ num(q.ndcg) }}</td>
+              <td>{{ twoDecimals(q.ndcg) }}</td>
               <td>{{ pct(q.precision5) }}</td>
               <td>{{ pct(q.coverage) }}</td>
             </tr>
@@ -121,8 +121,8 @@ async function replay() {
               {{ r.report.sweeps.labelled }} of {{ r.report.sweeps.total }} past sweeps have judged cards; 3 are needed.
             </div>
             <div v-else class="small">
-              nDCG {{ num(r.report.mean.current.ndcg) }} → {{ num(r.report.mean.candidate.ndcg) }}; latest
-              {{ r.report.heldOut.n }} sweeps {{ signed(r.report.heldOut.diff) }} (95 % interval
+              nDCG {{ twoDecimals(r.report.mean.current.ndcg) }} → {{ twoDecimals(r.report.mean.candidate.ndcg) }};
+              latest {{ r.report.heldOut.n }} sweeps {{ signed(r.report.heldOut.diff) }} (95 % interval
               {{ signed(r.report.heldOut.low) }} to {{ signed(r.report.heldOut.high) }}); precision@5
               {{ pct(r.report.mean.current.precision5) }} → {{ pct(r.report.mean.candidate.precision5) }}
               <span v-if="r.report.estimated" class="muted"> · {{ r.report.estimated }} estimated</span>

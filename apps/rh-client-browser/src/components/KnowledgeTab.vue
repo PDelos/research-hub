@@ -24,9 +24,9 @@ type ObsidianWindow = Window & {
 const win = () => frame.value?.contentWindow as ObsidianWindow | null | undefined;
 
 (window as ObsidianWindow).require = (name: string) => {
-  const r = win()?.require;
-  if (!r) throw new Error("The knowledge base viewer is not loaded");
-  return r(name);
+  const viewerRequire = win()?.require;
+  if (!viewerRequire) throw new Error("The knowledge base viewer is not loaded");
+  return viewerRequire(name);
 };
 
 // The vault index is the first note shown, unless "Open in knowledge base" asked for another.

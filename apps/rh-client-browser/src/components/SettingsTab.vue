@@ -27,16 +27,16 @@ const form = ref({
 });
 const saved = ref("");
 const fill = () => {
-  const s = store.schedule;
-  if (!s) return;
+  const schedule = store.schedule;
+  if (!schedule) return;
   form.value = {
-    sweepEnabled: s.sweep.enabled,
-    sweepTime: s.sweep.time,
-    nightlyEnabled: s.nightly.enabled,
-    nightlyTime: s.nightly.time,
-    reviewEnabled: s.review.enabled,
-    reviewDay: s.review.weekday,
-    reviewTime: s.review.time,
+    sweepEnabled: schedule.sweep.enabled,
+    sweepTime: schedule.sweep.time,
+    nightlyEnabled: schedule.nightly.enabled,
+    nightlyTime: schedule.nightly.time,
+    reviewEnabled: schedule.review.enabled,
+    reviewDay: schedule.review.weekday,
+    reviewTime: schedule.review.time,
   };
 };
 const weights = ref<WeightView[]>([]);
@@ -53,8 +53,8 @@ async function saveCards() {
   try {
     cardsPerSweep.value = (await client.setSweepSettings({ cardsPerSweep: Number(cardsPerSweep.value) })).cardsPerSweep;
     saved.value = "Saved.";
-  } catch (e) {
-    store.error = e instanceof Error ? e.message : String(e);
+  } catch (error) {
+    store.error = error instanceof Error ? error.message : String(error);
   }
 }
 const kindLabel = { question: "Research question", query: "Search query", source: "Source" } as const;
@@ -70,8 +70,8 @@ async function save() {
     });
     saved.value = "Saved.";
     await refreshProject();
-  } catch (e) {
-    store.error = e instanceof Error ? e.message : String(e);
+  } catch (error) {
+    store.error = error instanceof Error ? error.message : String(error);
   }
 }
 

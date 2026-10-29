@@ -21,10 +21,10 @@ const saved = ref("");
 watch(
   () => props.values,
   // A choice that is not saved shows as "" (Automatic, for the viewer).
-  (v) => {
-    form.value = Object.fromEntries(Object.keys(props.properties).map((k) => [k, v[k] ?? ""]));
+  (values) => {
+    form.value = Object.fromEntries(Object.keys(props.properties).map((k) => [k, values[k] ?? ""]));
     json.value = Object.fromEntries(
-      Object.keys(props.properties).map((k) => [k, v[k] === undefined ? "" : JSON.stringify(v[k], null, 1)]),
+      Object.keys(props.properties).map((k) => [k, values[k] === undefined ? "" : JSON.stringify(values[k], null, 1)]),
     );
   },
   { immediate: true, deep: true },
@@ -72,9 +72,11 @@ async function save() {
     saved.value = "Saved.";
     await plugins.refresh();
     emit("saved");
-  } catch (e) {
+  } catch (error) {
     problems.value =
-      isRhError(e) && Array.isArray(e.details) ? (e.details as string[]) : [e instanceof Error ? e.message : String(e)];
+      isRhError(error) && Array.isArray(error.details)
+        ? (error.details as string[])
+        : [error instanceof Error ? error.message : String(error)];
   }
 }
 </script>

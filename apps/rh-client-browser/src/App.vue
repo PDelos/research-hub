@@ -47,9 +47,9 @@ const kbView = computed(() => plugins.viewer?.view ?? "kb-obsidian");
 const kbMounted = ref(false);
 watch(
   [tab, kbView],
-  ([t, v]) => {
-    if (t === "kb" && v === "kb-obsidian") kbMounted.value = true;
-    if (v !== "kb-obsidian") kbMounted.value = false;
+  ([shownTab, view]) => {
+    if (shownTab === "kb" && view === "kb-obsidian") kbMounted.value = true;
+    if (view !== "kb-obsidian") kbMounted.value = false;
   },
   { immediate: true },
 );
@@ -57,10 +57,10 @@ watch(
 const opened = new Set<string>();
 watch(
   tab,
-  (t) => {
-    if (opened.has(t)) return;
-    opened.add(t);
-    void client.openView(t).catch(() => opened.delete(t));
+  (shownTab) => {
+    if (opened.has(shownTab)) return;
+    opened.add(shownTab);
+    void client.openView(shownTab).catch(() => opened.delete(shownTab));
   },
   { immediate: true },
 );

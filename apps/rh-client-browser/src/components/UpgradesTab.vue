@@ -22,8 +22,8 @@ const working = computed(() => ideas.value.some((i) => i.stage === "researching"
 const load = async () => {
   try {
     [view.value, ideas.value] = await Promise.all([client.upgrades(), client.ideas()]);
-  } catch (e) {
-    error.value = e instanceof Error ? e.message : String(e);
+  } catch (failure) {
+    error.value = failure instanceof Error ? failure.message : String(failure);
   }
 };
 onMounted(async () => {
@@ -56,16 +56,16 @@ function describe(proposal: UpgradeProposal): string {
   return `Sweep settings ${JSON.stringify(payload.variant)}`;
 }
 
-async function act(fn: () => Promise<unknown>, done: string) {
+async function act(action: () => Promise<unknown>, done: string) {
   error.value = "";
   notice.value = "";
   busy.value = true;
   try {
-    await fn();
+    await action();
     notice.value = done;
     await load();
-  } catch (e) {
-    error.value = isRhError(e) ? e.message : String(e);
+  } catch (failure) {
+    error.value = isRhError(failure) ? failure.message : String(failure);
   } finally {
     busy.value = false;
   }

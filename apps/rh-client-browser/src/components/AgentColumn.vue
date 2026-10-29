@@ -11,8 +11,8 @@ watch(
   () => transcript.value.items,
   async () => {
     await nextTick();
-    const el = scroller.value;
-    if (el) el.scrollTop = el.scrollHeight;
+    const element = scroller.value;
+    if (element) element.scrollTop = element.scrollHeight;
   },
 );
 
@@ -23,16 +23,16 @@ async function submit() {
   try {
     await send(text);
     draft.value = "";
-  } catch (e) {
-    store.error = e instanceof Error ? e.message : String(e);
+  } catch (error) {
+    store.error = error instanceof Error ? error.message : String(error);
   } finally {
     sending.value = false;
   }
 }
 
-function onKey(e: KeyboardEvent) {
-  if (e.key === "Enter" && !e.shiftKey) {
-    e.preventDefault();
+function onKey(event: KeyboardEvent) {
+  if (event.key === "Enter" && !event.shiftKey) {
+    event.preventDefault();
     void submit();
   }
 }
