@@ -79,76 +79,128 @@ export const PROJECT_NAME = /^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/;
 
 // Relative paths in configuration resolve against the repository root, whatever directory npm runs in.
 
-export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
-  const projectName = env.RH_PROJECT_NAME?.trim() || "research";
-  if (!PROJECT_NAME.test(projectName))
-    throw new ConfigError(
-      `RH_PROJECT_NAME must be 1 to 40 lowercase letters, digits or dashes (no leading or trailing dash), got "${env.RH_PROJECT_NAME}"`,
-      "RH_PROJECT_NAME",
-    );
-  const mode = (env.RH_MODE?.trim() || "live") as Mode;
-  if (mode !== "live" && mode !== "offline")
-    throw new ConfigError(`RH_MODE must be live or offline, got "${env.RH_MODE}"`, "RH_MODE");
-  const openrouterKey = env.OPENROUTER_API_KEY?.trim() || undefined;
-  if (mode === "live" && !openrouterKey)
-    throw new ConfigError(
-      "OPENROUTER_API_KEY is required in live mode (or set RH_MODE=offline to run without keys)",
-      "OPENROUTER_API_KEY",
-    );
-  const port = Number(env.RH_PORT?.trim() || 4850);
-  if (!Number.isInteger(port) || port < 1 || port > 65535)
-    throw new ConfigError(`RH_PORT must be a port number, got "${env.RH_PORT}"`, "RH_PORT");
-  const level = (env.RH_LOG_LEVEL?.trim() || "info") as LogLevel;
-  if (!["debug", "info", "warn", "error"].includes(level))
-    throw new ConfigError(`RH_LOG_LEVEL must be debug, info, warn or error`, "RH_LOG_LEVEL");
-  const timeZone = env.RH_TIMEZONE?.trim() || "UTC";
+type Env = NodeJS.ProcessEnv;
+
+/** A variable without surrounding spaces, or `fallback` when it is unset or blank. */
+const setting = (env: Env, name: string, fallback: string) => env[name]?.trim() || fallback;
+
+/** Stop with a ConfigError about `variable` unless `ok`. */
+function ensure(ok: boolean, variable: string, message: string): asserts ok {
+  if (!ok) throw new ConfigError(message, variable);
+}
+
+const isTimeZone = (timeZone: string) => {
   try {
-    new Intl.DateTimeFormat("en-US", { timeZone });
+    return !!new Intl.DateTimeFormat("en-US", { timeZone }).resolvedOptions().timeZone;
   } catch {
-    throw new ConfigError(
-      `RH_TIMEZONE must be an IANA time zone such as Europe/Madrid, got "${timeZone}"`,
-      "RH_TIMEZONE",
-    );
+    return false;
   }
-  const sweepTime = env.RH_SWEEP_TIME?.trim() || "06:00";
-  if (!TIME.test(sweepTime))
-    throw new ConfigError(`RH_SWEEP_TIME must be HH:MM (24 h), got "${sweepTime}"`, "RH_SWEEP_TIME");
-  const nightlyTime = env.RH_NIGHTLY_TIME?.trim() || "02:00";
-  if (!TIME.test(nightlyTime))
-    throw new ConfigError(`RH_NIGHTLY_TIME must be HH:MM (24 h), got "${nightlyTime}"`, "RH_NIGHTLY_TIME");
-  const reviewRaw = (env.RH_REVIEW_TIME?.trim() || "sun 07:00").toLowerCase();
-  const [weekday, reviewTime] = reviewRaw.split(/\s+/);
-  if (!WEEKDAYS.includes(weekday as Weekday) || !TIME.test(reviewTime ?? ""))
-    throw new ConfigError(`RH_REVIEW_TIME must be "<sun..sat> HH:MM", got "${env.RH_REVIEW_TIME}"`, "RH_REVIEW_TIME");
+};
+
+function serverFromEnv(env: Env) {
+  const projectName = setting(env, "RH_PROJECT_NAME", "research");
+  ensure(
+    PROJECT_NAME.test(projectName),
+    "RH_PROJECT_NAME",
+    `RH_PROJECT_NAME must be 1 to 40 lowercase letters, digits or dashes (no leading or trailing dash), got "${env.RH_PROJECT_NAME}"`,
+  );
+  const mode = setting(env, "RH_MODE", "live") as Mode;
+  ensure(mode === "live" || mode === "offline", "RH_MODE", `RH_MODE must be live or offline, got "${env.RH_MODE}"`);
+  const openrouterKey = env.OPENROUTER_API_KEY?.trim() || undefined;
+  ensure(
+    mode === "offline" || !!openrouterKey,
+    "OPENROUTER_API_KEY",
+    "OPENROUTER_API_KEY is required in live mode (or set RH_MODE=offline to run without keys)",
+  );
+  const port = Number(setting(env, "RH_PORT", "4850"));
+  ensure(
+    Number.isInteger(port) && port >= 1 && port <= 65535,
+    "RH_PORT",
+    `RH_PORT must be a port number, got "${env.RH_PORT}"`,
+  );
+  const logLevel = setting(env, "RH_LOG_LEVEL", "info") as LogLevel;
+  ensure(
+    ["debug", "info", "warn", "error"].includes(logLevel),
+    "RH_LOG_LEVEL",
+    `RH_LOG_LEVEL must be debug, info, warn or error`,
+  );
+  return { projectName, mode, openrouterKey, port, logLevel };
+}
+
+function scheduleFromEnv(env: Env): Config["schedule"] {
+  const timeZone = setting(env, "RH_TIMEZONE", "UTC");
+  ensure(
+    isTimeZone(timeZone),
+    "RH_TIMEZONE",
+    `RH_TIMEZONE must be an IANA time zone such as Europe/Madrid, got "${timeZone}"`,
+  );
+  const sweepTime = setting(env, "RH_SWEEP_TIME", "06:00");
+  ensure(TIME.test(sweepTime), "RH_SWEEP_TIME", `RH_SWEEP_TIME must be HH:MM (24 h), got "${sweepTime}"`);
+  const nightlyTime = setting(env, "RH_NIGHTLY_TIME", "02:00");
+  ensure(TIME.test(nightlyTime), "RH_NIGHTLY_TIME", `RH_NIGHTLY_TIME must be HH:MM (24 h), got "${nightlyTime}"`);
+  const [weekday, reviewTime] = setting(env, "RH_REVIEW_TIME", "sun 07:00").toLowerCase().split(/\s+/);
+  ensure(
+    WEEKDAYS.includes(weekday as Weekday) && TIME.test(reviewTime ?? ""),
+    "RH_REVIEW_TIME",
+    `RH_REVIEW_TIME must be "<sun..sat> HH:MM", got "${env.RH_REVIEW_TIME}"`,
+  );
+  return { timeZone, sweepTime, nightlyTime, review: { weekday: weekday as Weekday, time: reviewTime } };
+}
+
+function papersFromEnv(env: Env): PapersConfig {
   const contactEmail = env.CONTACT_EMAIL?.trim() || undefined;
-  if (contactEmail && !EMAIL.test(contactEmail))
-    throw new ConfigError(`CONTACT_EMAIL must be an email address, got "${contactEmail}"`, "CONTACT_EMAIL");
-  const embedDims = Number(env.RH_EMBED_DIMS?.trim() || 1024);
-  if (!Number.isInteger(embedDims) || embedDims < 32 || embedDims > 4096)
-    throw new ConfigError(
-      `RH_EMBED_DIMS must be a whole number from 32 to 4096, got "${env.RH_EMBED_DIMS}"`,
-      "RH_EMBED_DIMS",
-    );
-  const papers: PapersConfig = {
+  ensure(
+    !contactEmail || EMAIL.test(contactEmail),
+    "CONTACT_EMAIL",
+    `CONTACT_EMAIL must be an email address, got "${contactEmail}"`,
+  );
+  const embedDims = Number(setting(env, "RH_EMBED_DIMS", "1024"));
+  ensure(
+    Number.isInteger(embedDims) && embedDims >= 32 && embedDims <= 4096,
+    "RH_EMBED_DIMS",
+    `RH_EMBED_DIMS must be a whole number from 32 to 4096, got "${env.RH_EMBED_DIMS}"`,
+  );
+  return {
     contactEmail,
-    embedModel: env.RH_MODEL_EMBED?.trim() || DEFAULT_EMBED_MODEL,
+    embedModel: setting(env, "RH_MODEL_EMBED", DEFAULT_EMBED_MODEL),
     embedDims,
     s2ApiKey: env.S2_API_KEY?.trim() || undefined,
   };
-  const viewerFlag = (env.RH_KB_VIEWER?.trim() || "on").toLowerCase();
-  if (!["on", "off"].includes(viewerFlag))
-    throw new ConfigError(`RH_KB_VIEWER must be on or off, got "${env.RH_KB_VIEWER}"`, "RH_KB_VIEWER");
-  const obsidianVersion = env.RH_KB_OBSIDIAN_VERSION?.trim() || "1.14.4";
-  if (!/^\d+\.\d+\.\d+$/.test(obsidianVersion))
-    throw new ConfigError(
-      `RH_KB_OBSIDIAN_VERSION must look like 1.14.4, got "${obsidianVersion}"`,
-      "RH_KB_OBSIDIAN_VERSION",
-    );
-  const kbViewer = {
+}
+
+function kbViewerFromEnv(env: Env): Config["kbViewer"] {
+  const viewerFlag = setting(env, "RH_KB_VIEWER", "on").toLowerCase();
+  ensure(
+    ["on", "off"].includes(viewerFlag),
+    "RH_KB_VIEWER",
+    `RH_KB_VIEWER must be on or off, got "${env.RH_KB_VIEWER}"`,
+  );
+  const obsidianVersion = setting(env, "RH_KB_OBSIDIAN_VERSION", "1.14.4");
+  ensure(
+    /^\d+\.\d+\.\d+$/.test(obsidianVersion),
+    "RH_KB_OBSIDIAN_VERSION",
+    `RH_KB_OBSIDIAN_VERSION must look like 1.14.4, got "${obsidianVersion}"`,
+  );
+  return {
     enabled: viewerFlag === "on",
-    dir: resolve(REPO_ROOT, env.RH_KB_VIEWER_DIR?.trim() || "/opt/ignis"),
+    dir: resolve(REPO_ROOT, setting(env, "RH_KB_VIEWER_DIR", "/opt/ignis")),
     obsidianVersion,
   };
+}
+
+/** Host names the server answers to: local names, the project's own, the bind host and RH_ALLOWED_HOSTS. */
+function allowedHostsOf(env: Env, projectName: string, host: string): Set<string> {
+  const names = ["localhost", "127.0.0.1", `${projectName}.localhost`, host, ...(env.RH_ALLOWED_HOSTS ?? "").split(",")]
+    .map((name) => name.trim().toLowerCase())
+    .filter((name) => name && name !== "0.0.0.0");
+  return new Set(names);
+}
+
+export function loadConfig(env: Env = process.env): Config {
+  const server = serverFromEnv(env);
+  const schedule = scheduleFromEnv(env);
+  const papers = papersFromEnv(env);
+  const kbViewer = kbViewerFromEnv(env);
   const generatedTokens: string[] = [];
   const token = (name: string) => {
     const value = env[name]?.trim();
@@ -156,37 +208,26 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     generatedTokens.push(name);
     return randomBytes(24).toString("hex");
   };
-  const host = env.RH_HOST?.trim() || "127.0.0.1";
-  const allowedHosts = new Set<string>();
-  for (const h of [
-    "localhost",
-    "127.0.0.1",
-    `${projectName}.localhost`,
-    host,
-    ...(env.RH_ALLOWED_HOSTS ?? "").split(","),
-  ]) {
-    const name = h.trim().toLowerCase();
-    if (!name || name === "0.0.0.0") continue;
-    allowedHosts.add(name);
-  }
+  const host = setting(env, "RH_HOST", "127.0.0.1");
+  const mcpToken = env.RH_MCP_TOKEN?.trim();
   return {
-    projectName,
-    mode,
+    projectName: server.projectName,
+    mode: server.mode,
     host,
-    port,
-    dataDir: resolve(REPO_ROOT, env.RH_DATA_DIR?.trim() || "./data"),
-    logLevel: level,
+    port: server.port,
+    dataDir: resolve(REPO_ROOT, setting(env, "RH_DATA_DIR", "./data")),
+    logLevel: server.logLevel,
     apiToken: token("RH_API_TOKEN"),
-    ...(env.RH_MCP_TOKEN?.trim() ? { mcpToken: env.RH_MCP_TOKEN.trim() } : {}),
+    ...(mcpToken ? { mcpToken } : {}),
     clientToken: token("RH_CLIENT_TOKEN"),
     generatedTokens,
     models: jobModelsFromEnv(env),
     jevModel: jevModelFromEnv(env),
-    openrouterKey,
+    openrouterKey: server.openrouterKey,
     promptsDir: join(APP_DIR, "prompt_engineering"),
-    uiDir: resolve(REPO_ROOT, env.RH_UI_DIR?.trim() || "apps/rh-client-browser/dist"),
-    allowedHosts,
-    schedule: { timeZone, sweepTime, nightlyTime, review: { weekday: weekday as Weekday, time: reviewTime } },
+    uiDir: resolve(REPO_ROOT, setting(env, "RH_UI_DIR", "apps/rh-client-browser/dist")),
+    allowedHosts: allowedHostsOf(env, server.projectName, host),
+    schedule,
     papers,
     kbViewer,
   };

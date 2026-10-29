@@ -71,15 +71,30 @@ export class OpenAlexSource implements PaperSource {
   }
 }
 
+const countOf = (value: unknown) => (typeof value === "number" ? value : undefined);
+
+/** A repository (bioRxiv, arXiv) is the preprint server; any other host is the venue. */
+function hostOf(work: any): { venue: string | undefined; server: string | undefined } {
+  const host = work.primary_location?.source ?? {};
+  if (host.type === "repository") return { venue: undefined, server: serverName(host.display_name) };
+  return { venue: host.display_name ? cleanText(host.display_name) : undefined, server: undefined };
+}
+
+/** The open-access copy (PDF first) and the landing page, falling back to the DOI and then OpenAlex. */
+function linksOf(work: any, ids: SourcePaper["ids"], openalex: string): { oaUrl?: string; url: string } {
+  const open = work.best_oa_location;
+  const fallback = ids.doi ? `https://doi.org/${ids.doi}` : `https://openalex.org/${openalex}`;
+  return {
+    oaUrl: open?.pdf_url ?? open?.landing_page_url ?? undefined,
+    url: work.primary_location?.landing_page_url ?? fallback,
+  };
+}
+
 export function mapOpenAlexWork(work: any): SourcePaper | null {
   const openalex = normalizeOpenAlexId(work?.id);
   const title = cleanText(work?.display_name ?? work?.title);
   if (!openalex || !title) return null;
   const ids = normalizeIds({ openalex, doi: work.doi ?? work.ids?.doi, pmid: work.ids?.pmid, pmcid: work.ids?.pmcid });
-  const location = work.primary_location ?? {};
-  const host = location.source ?? {};
-  const isRepository = host.type === "repository";
-  const server = isRepository ? serverName(host.display_name) : undefined;
   return {
     source: "openalex",
     externalId: openalex,
@@ -91,12 +106,10 @@ export function mapOpenAlexWork(work: any): SourcePaper | null {
       .filter(Boolean),
     year: work.publication_year ?? undefined,
     publishedAt: normalizeDate(work.publication_date),
-    venue: !isRepository && host.display_name ? cleanText(host.display_name) : undefined,
-    server,
-    oaUrl: work.best_oa_location?.pdf_url ?? work.best_oa_location?.landing_page_url ?? undefined,
-    url: location.landing_page_url ?? (ids.doi ? `https://doi.org/${ids.doi}` : `https://openalex.org/${openalex}`),
-    citedByCount: typeof work.cited_by_count === "number" ? work.cited_by_count : undefined,
-    referencesCount: typeof work.referenced_works_count === "number" ? work.referenced_works_count : undefined,
+    ...hostOf(work),
+    ...linksOf(work, ids, openalex),
+    citedByCount: countOf(work.cited_by_count),
+    referencesCount: countOf(work.referenced_works_count),
     retracted: work.is_retracted === true,
     references: Array.isArray(work.referenced_works) ? work.referenced_works : undefined,
   };

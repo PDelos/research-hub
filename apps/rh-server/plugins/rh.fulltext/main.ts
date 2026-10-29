@@ -159,73 +159,75 @@ export function activate(context: PluginContext): FullTextExports {
     return bytes;
   };
 
-  /** Each source in order; the first with sections wins. */
-  const fetchFullText = async (paperId: number): Promise<FullText> => {
-    const paper = papers.store.get(paperId);
-    if (!paper) throw new FullTextInvalid(`no paper ${paperId}`);
-    const notes: string[] = [];
-    const attempts: { source: string; run: () => Promise<Section[]> }[] = [];
+  type Attempt = { source: string; run: () => Promise<Section[]> };
+  type Paper = NonNullable<ReturnType<typeof papers.store.get>>;
+
+  /** A bioRxiv or medRxiv DOI: the newest JATS version the server lists. */
+  const biorxivSections = async (doi: string): Promise<Section[]> => {
+    for (const server of ["biorxiv", "medrxiv"]) {
+      const body = (await rh.http.json<{ collection?: { jatsxml?: string }[] }>(
+        `https://api.biorxiv.org/details/${server}/${doi}`,
+      )) ?? { collection: [] };
+      const jats = body.collection?.at(-1)?.jatsxml;
+      if (jats) return jatsToSections(await fetchText(jats, "application/xml"));
+    }
+    throw new Error("no JATS version listed");
+  };
+
+  /** A PDF from an open-access host, through the active converter. */
+  const pdfAttempt = (url: string): Attempt => {
+    const active = contributions.activeContribution("fulltext.converter", context.settings);
+    return {
+      source: `pdf:${active?.id ?? "none"}`,
+      run: async () => {
+        if (!openAccessHost(url, hosts))
+          throw new Error(`${new URL(url).hostname} is not on the open-access host list`);
+        return convert(await fetchPdf(url));
+      },
+    };
+  };
+
+  /** The sources a paper can be read from, best first: arXiv HTML, Europe PMC JATS, bioRxiv JATS, then PDFs. */
+  const attemptsFor = (paper: Paper): Attempt[] => {
+    const attempts: Attempt[] = [];
     const arxiv = paper.ids.arxiv?.replace(/v\d+$/, "");
     const doi = paper.ids.doi?.toLowerCase();
+    const pmcid = paper.ids.pmcid?.toUpperCase();
     if (arxiv)
       attempts.push({
         source: "arxiv-html",
         run: async () => arxivHtmlToSections(await fetchText(`https://arxiv.org/html/${arxiv}`, "text/html")),
       });
-    if (paper.ids.pmcid)
+    if (pmcid)
       attempts.push({
         source: "europepmc-jats",
         run: async () =>
           jatsToSections(
-            await fetchText(
-              `https://www.ebi.ac.uk/europepmc/webservices/rest/${paper.ids.pmcid!.toUpperCase()}/fullTextXML`,
-              "application/xml",
-            ),
+            await fetchText(`https://www.ebi.ac.uk/europepmc/webservices/rest/${pmcid}/fullTextXML`, "application/xml"),
           ),
       });
-    if (doi?.startsWith("10.1101/"))
-      attempts.push({
-        source: "biorxiv-jats",
-        run: async () => {
-          for (const server of ["biorxiv", "medrxiv"]) {
-            const body = (await rh.http.json<{ collection?: { jatsxml?: string }[] }>(
-              `https://api.biorxiv.org/details/${server}/${doi}`,
-            )) ?? { collection: [] };
-            const jats = body.collection?.at(-1)?.jatsxml;
-            if (jats) return jatsToSections(await fetchText(jats, "application/xml"));
-          }
-          throw new Error("no JATS version listed");
-        },
-      });
+    if (doi?.startsWith("10.1101/")) attempts.push({ source: "biorxiv-jats", run: () => biorxivSections(doi) });
     const pdfUrls = [...(arxiv ? [`https://arxiv.org/pdf/${arxiv}`] : []), ...(paper.oaUrl ? [paper.oaUrl] : [])];
-    for (const url of pdfUrls) {
-      const active = contributions.activeContribution("fulltext.converter", context.settings);
-      attempts.push({
-        source: `pdf:${active?.id ?? "none"}`,
-        run: async () => {
-          if (!openAccessHost(url, hosts))
-            throw new Error(`${new URL(url).hostname} is not on the open-access host list`);
-          return convert(await fetchPdf(url));
-        },
-      });
-    }
-    if (!attempts.length) notes.push("no arXiv id, PMCID, bioRxiv DOI or open-access link");
-    let found: { source: string; sections: Section[] } | undefined;
-    for (const a of attempts) {
+    return [...attempts, ...pdfUrls.map(pdfAttempt)];
+  };
+
+  /** The first attempt that finds at least two sections; every miss leaves a note. */
+  const firstWithSections = async (attempts: Attempt[], notes: string[]) => {
+    for (const attempt of attempts) {
       try {
-        const sections = await a.run();
-        if (sections.length >= 2) {
-          found = { source: a.source, sections };
-          break;
-        }
-        notes.push(`${a.source}: no sections found`);
+        const sections = await attempt.run();
+        if (sections.length >= 2) return { source: attempt.source, sections };
+        notes.push(`${attempt.source}: no sections found`);
       } catch (error) {
-        notes.push(`${a.source}: ${error instanceof Error ? error.message : String(error)}`);
+        notes.push(`${attempt.source}: ${error instanceof Error ? error.message : String(error)}`);
       }
     }
+    return undefined;
+  };
+
+  const save = (paperId: number, found: { source: string; sections: Section[] } | undefined, notes: string[]) => {
     const sections = found?.sections ?? [];
     const chars = sections.reduce((n, s) => n + s.text.length, 0);
-    const fetchedAt = new Date().toISOString();
     db.prepare(
       `INSERT INTO ${table} (paper_id, status, source, sections_json, chars, notes_json, fetched_at) VALUES (?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT (paper_id) DO UPDATE SET status = excluded.status, source = excluded.source, sections_json = excluded.sections_json,
@@ -237,18 +239,31 @@ export function activate(context: PluginContext): FullTextExports {
       JSON.stringify(sections),
       chars,
       JSON.stringify(notes),
-      fetchedAt,
+      new Date().toISOString(),
     );
     context.log.info("fulltext.fetched", { paperId, source: found?.source ?? null, sections: sections.length, chars });
-    if (found) {
-      rh.events.emit("fulltext.ready", { paperId });
-      // Facet vectors from the sections (background, method, result).
-      try {
-        await papers.vectors.refresh(paperId);
-      } catch (error) {
-        context.log.warn("fulltext.vectors_failed", { paperId, error: String(error) });
-      }
+  };
+
+  /** Tell listeners, and refresh the facet vectors (background, method, result) from the sections. */
+  const announce = async (paperId: number) => {
+    rh.events.emit("fulltext.ready", { paperId });
+    try {
+      await papers.vectors.refresh(paperId);
+    } catch (error) {
+      context.log.warn("fulltext.vectors_failed", { paperId, error: String(error) });
     }
+  };
+
+  /** Each source in order; the first with sections wins. */
+  const fetchFullText = async (paperId: number): Promise<FullText> => {
+    const paper = papers.store.get(paperId);
+    if (!paper) throw new FullTextInvalid(`no paper ${paperId}`);
+    const notes: string[] = [];
+    const attempts = attemptsFor(paper);
+    if (!attempts.length) notes.push("no arXiv id, PMCID, bioRxiv DOI or open-access link");
+    const found = await firstWithSections(attempts, notes);
+    save(paperId, found, notes);
+    if (found) await announce(paperId);
     return get(paperId)!;
   };
 
