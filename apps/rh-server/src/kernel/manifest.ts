@@ -124,21 +124,27 @@ function describe(error: ErrorObject): string {
   return `${path || "manifest"}: ${error.message}`;
 }
 
+/** What the schema cannot check: versions and ranges that must parse, and a slot plugin's slot. */
+function semanticProblems(fields: Partial<PluginManifest>): string[] {
+  const problems: string[] = [];
+  if (typeof fields.version === "string" && !semver.valid(fields.version))
+    problems.push(`version: "${fields.version}" is not a semantic version`);
+  const range = fields.engines?.["research-hub"];
+  if (typeof range === "string" && !semver.validRange(range))
+    problems.push(`engines.research-hub: "${range}" is not a version range`);
+  if (fields.kind === "slot" && !fields.slot) problems.push("slot: required for a plugin of kind slot");
+  for (const [id, dependencyRange] of Object.entries(fields.dependencies ?? {}))
+    if (!semver.validRange(dependencyRange))
+      problems.push(`dependencies.${id}: "${dependencyRange}" is not a version range`);
+  return problems;
+}
+
 /** Validate a parsed manifest; returns it with defaults filled in, or throws ManifestInvalid. */
 export function parseManifest(raw: unknown, where = MANIFEST_FILE): PluginManifest {
   const problems: string[] = [];
   if (!validate(raw)) problems.push(...(validate.errors ?? []).map(describe));
   const fields = raw as Partial<PluginManifest> & { builtin?: unknown };
-  if (fields && typeof fields === "object") {
-    if (typeof fields.version === "string" && !semver.valid(fields.version))
-      problems.push(`version: "${fields.version}" is not a semantic version`);
-    const range = fields.engines?.["research-hub"];
-    if (typeof range === "string" && !semver.validRange(range))
-      problems.push(`engines.research-hub: "${range}" is not a version range`);
-    if (fields.kind === "slot" && !fields.slot) problems.push("slot: required for a plugin of kind slot");
-    for (const [id, r] of Object.entries(fields.dependencies ?? {}))
-      if (!semver.validRange(r)) problems.push(`dependencies.${id}: "${r}" is not a version range`);
-  }
+  if (fields && typeof fields === "object") problems.push(...semanticProblems(fields));
   if (problems.length) throw new ManifestInvalid(where, [...new Set(problems)]);
   return {
     ...(fields as PluginManifest),

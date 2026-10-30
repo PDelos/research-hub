@@ -29,6 +29,59 @@ function bodyOf(request: Request): Record<string, unknown> {
   return body as Record<string, unknown>;
 }
 
+type Harness = ProjectRuntime["harness"]["harness"];
+type HarnessContext = ProjectRuntime["harness"]["ctx"];
+type Submission = Awaited<ReturnType<ProjectRuntime["root"]["submit"]>>;
+type SubmissionRecord = Awaited<ReturnType<Submission["status"]>>;
+
+/** The checked body of POST /v1/chat. */
+function chatInput(body: Record<string, unknown>) {
+  const content = body.content;
+  if (typeof content !== "string" || !content.trim()) throw invalid("content must be a nonblank string");
+  if (content.length > MAX_MESSAGE) throw invalid(`content must be at most ${MAX_MESSAGE} characters`);
+  const requestId = body.requestId === undefined ? randomUUID() : body.requestId;
+  if (typeof requestId !== "string" || requestId.length > 128)
+    throw invalid("requestId must be a string of at most 128 characters");
+  const waitMs = body.waitMs === undefined ? 0 : Number(body.waitMs);
+  if (!Number.isInteger(waitMs) || waitMs < 0 || waitMs > 300_000) throw invalid("waitMs must be 0 to 300000");
+  return { content, requestId, waitMs };
+}
+
+/** The submission's state after waiting up to `waitMs` for an answer, or until the client goes away. */
+async function settledWithin(
+  submission: Submission,
+  context: HarnessContext,
+  waitMs: number,
+  closed: AbortSignal,
+): Promise<SubmissionRecord> {
+  const record = await submission.status(context);
+  if (waitMs === 0 || record.status === "done" || record.status === "unanswered") return record;
+  const stop = AbortSignal.any([AbortSignal.timeout(waitMs), closed]);
+  const aborted = new Promise<undefined>((ok) => stop.addEventListener("abort", () => ok(undefined), { once: true }));
+  return (await Promise.race([submission.wait(context), aborted])) ?? (await submission.status(context));
+}
+
+/** What POST /v1/chat answers: the reply text when done, the reason when unanswered, otherwise the state. */
+async function sendResult(
+  harness: Harness,
+  context: HarnessContext,
+  submission: Submission,
+  record: SubmissionRecord,
+): Promise<SendResult> {
+  const submissionId = submission.id as number;
+  if (record.status === "done" && record.answer !== undefined) {
+    const entry = await harness.commit((tx) => tx.entry(record.answer as EntryId), context);
+    const text = (entry?.model ?? [])
+      .map((m) => messageText(m as WireMessage))
+      .join("")
+      .trim();
+    return { submissionId, status: "done", answer: { entryId: record.answer as number, text } };
+  }
+  if (record.status === "unanswered")
+    return { submissionId, status: "unanswered", reason: (record as { reason?: string }).reason };
+  return { submissionId, status: record.status === "queued" ? "queued" : "pending" };
+}
+
 export function routes(hub: Hub, streams: StreamHub): Router {
   const router = express.Router();
   const health = (): Health => ({
@@ -61,52 +114,17 @@ export function routes(hub: Hub, streams: StreamHub): Router {
 
   router.post("/v1/chat", async (request, response) => {
     const projectRuntime = await project(request);
-    const body = bodyOf(request);
-    const content = body.content;
-    if (typeof content !== "string" || !content.trim()) throw invalid("content must be a nonblank string");
-    if (content.length > MAX_MESSAGE) throw invalid(`content must be at most ${MAX_MESSAGE} characters`);
-    const requestId = body.requestId === undefined ? randomUUID() : body.requestId;
-    if (typeof requestId !== "string" || requestId.length > 128)
-      throw invalid("requestId must be a string of at most 128 characters");
-    const waitMs = body.waitMs === undefined ? 0 : Number(body.waitMs);
-    if (!Number.isInteger(waitMs) || waitMs < 0 || waitMs > 300_000) throw invalid("waitMs must be 0 to 300000");
+    const { content, requestId, waitMs } = chatInput(bodyOf(request));
     const { harness, ctx: context } = projectRuntime.harness;
     const submission = await projectRuntime.root.submit(
       { type: "input", content, requestId: `chat:${requestId}`, whenBusy: "followUp" },
       context,
     );
     hub.log.info("agent.message", { submissionId: submission.id, chars: content.length });
-    let record = await submission.status(context);
-    if (waitMs > 0 && record.status !== "done" && record.status !== "unanswered") {
-      const closed = new AbortController();
-      response.on("close", () => closed.abort());
-      const stop = AbortSignal.any([AbortSignal.timeout(waitMs), closed.signal]);
-      const aborted = new Promise<undefined>((ok) =>
-        stop.addEventListener("abort", () => ok(undefined), { once: true }),
-      );
-      record = (await Promise.race([submission.wait(context), aborted])) ?? (await submission.status(context));
-    }
-    let result: SendResult;
-    if (record.status === "done" && record.answer !== undefined) {
-      const entry = await harness.commit((tx) => tx.entry(record.answer as EntryId), context);
-      const text = (entry?.model ?? [])
-        .map((m) => messageText(m as WireMessage))
-        .join("")
-        .trim();
-      result = {
-        submissionId: submission.id as number,
-        status: "done",
-        answer: { entryId: record.answer as number, text },
-      };
-    } else if (record.status === "unanswered") {
-      result = {
-        submissionId: submission.id as number,
-        status: "unanswered",
-        reason: (record as { reason?: string }).reason,
-      };
-    } else {
-      result = { submissionId: submission.id as number, status: record.status === "queued" ? "queued" : "pending" };
-    }
+    const closed = new AbortController();
+    response.on("close", () => closed.abort());
+    const record = await settledWithin(submission, context, waitMs, closed.signal);
+    const result = await sendResult(harness, context, submission, record);
     response.status(result.status === "done" || result.status === "unanswered" ? 200 : 202).json(result);
   });
 

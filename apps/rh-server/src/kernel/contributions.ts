@@ -182,8 +182,7 @@ function field(prefix: string, error: ErrorObject): string {
   return `${path}: ${error.message}`;
 }
 
-/** Shape problems of a manifest's `contributes`, and missing folders for Jev commands, prompts and process entries. */
-export function contributionProblems(manifest: PluginManifest, dir?: string): string[] {
+function shapeProblems(manifest: PluginManifest): string[] {
   const problems: string[] = [];
   for (const [key, value] of Object.entries(manifest.contributes)) {
     const kind = contributionKind(key);
@@ -196,39 +195,55 @@ export function contributionProblems(manifest: PluginManifest, dir?: string): st
     const validate = shapeValidators[kind];
     if (!validate(value)) problems.push(...(validate.errors ?? []).map((e) => field(`contributes.${key}`, e)));
   }
-  const contributions = contributionsOf(manifest);
-  const seen = new Set<string>();
-  for (const [key, list] of [
+  return problems;
+}
+
+function duplicateProblems(contributions: Contributions): string[] {
+  const problems: string[] = [];
+  for (const [key, ids] of [
     ["tabs", contributions.tabs.map((t) => t.id)],
     ["commands", contributions.commands.map((t) => t.id)],
     ["chatTools", contributions.chatTools.map((t) => t.name)],
   ] as const)
-    for (const id of list) {
-      if (seen.has(`${key}:${id}`)) problems.push(`contributes.${key}: "${id}" is declared twice`);
-      seen.add(`${key}:${id}`);
-    }
-  for (const id of contributions.commands.map((cmd) => cmd.id))
-    if (
-      !manifest.activationEvents.includes(`onCommand:${id}`) &&
-      !manifest.activationEvents.includes("*") &&
-      !manifest.activationEvents.includes("onStartup")
-    )
-      problems.push(`contributes.commands: "${id}" needs the activation event onCommand:${id}`);
-  for (const tool of contributions.chatTools)
-    if (
-      !manifest.activationEvents.includes(`onChatTool:${tool.name}`) &&
-      !manifest.activationEvents.includes("*") &&
-      !manifest.activationEvents.includes("onStartup")
-    )
-      problems.push(`contributes.chatTools: "${tool.name}" needs the activation event onChatTool:${tool.name}`);
-  if (dir) {
-    for (const path of contributions.jevCommands)
-      if (!existsSync(join(resolvePath(dir, path), "command.json")))
-        problems.push(`contributes.jevCommands: ${path} has no command.json`);
-    for (const p of contributions.prompts)
-      if (!existsSync(resolvePath(dir, p.path))) problems.push(`contributes.prompts: ${p.path} does not exist`);
-  }
+    for (const [index, id] of ids.entries())
+      if (ids.indexOf(id) !== index) problems.push(`contributes.${key}: "${id}" is declared twice`);
   return problems;
+}
+
+/** Commands and chat tools need an activation event that starts their plugin before they are called. */
+function activationProblems(manifest: PluginManifest, contributions: Contributions): string[] {
+  const events = manifest.activationEvents;
+  const activates = (event: string) => events.includes(event) || events.includes("*") || events.includes("onStartup");
+  return [
+    ...contributions.commands
+      .filter((command) => !activates(`onCommand:${command.id}`))
+      .map((command) => `contributes.commands: "${command.id}" needs the activation event onCommand:${command.id}`),
+    ...contributions.chatTools
+      .filter((tool) => !activates(`onChatTool:${tool.name}`))
+      .map((tool) => `contributes.chatTools: "${tool.name}" needs the activation event onChatTool:${tool.name}`),
+  ];
+}
+
+function fileProblems(contributions: Contributions, dir: string): string[] {
+  return [
+    ...contributions.jevCommands
+      .filter((path) => !existsSync(join(resolvePath(dir, path), "command.json")))
+      .map((path) => `contributes.jevCommands: ${path} has no command.json`),
+    ...contributions.prompts
+      .filter((prompt) => !existsSync(resolvePath(dir, prompt.path)))
+      .map((prompt) => `contributes.prompts: ${prompt.path} does not exist`),
+  ];
+}
+
+/** Shape problems of a manifest's `contributes`, and missing folders for Jev commands, prompts and process entries. */
+export function contributionProblems(manifest: PluginManifest, dir?: string): string[] {
+  const contributions = contributionsOf(manifest);
+  return [
+    ...shapeProblems(manifest),
+    ...duplicateProblems(contributions),
+    ...activationProblems(manifest, contributions),
+    ...(dir ? fileProblems(contributions, dir) : []),
+  ];
 }
 
 export interface Contributions {
@@ -478,6 +493,10 @@ export class ContributionRegistry {
     const plugin = this.discovery.plugins.get(pluginId);
     if (!plugin) return [];
     const contributions = contributionsOf(plugin.manifest);
+    return [...this.pointProblems(contributions), ...this.takenNames(pluginId, plugin.dir, contributions)];
+  }
+
+  private pointProblems(contributions: Contributions): string[] {
     const offers = this.extensionPoints();
     const out: string[] = [];
     for (const [point, list] of Object.entries(contributions.points)) {
@@ -493,6 +512,12 @@ export class ContributionRegistry {
             `contribution ${point}/${item.id}: ${(validate.errors ?? []).map((e) => field(point, e)).join("; ")}`,
           );
     }
+    return out;
+  }
+
+  /** Chat tools, tabs and Jev commands whose name another plugin already uses. */
+  private takenNames(pluginId: string, dir: string, contributions: Contributions): string[] {
+    const out: string[] = [];
     const tools = owners(this.chatTools(), (t) => t.name);
     for (const t of contributions.chatTools)
       if (tools.has(t.name) && tools.get(t.name) !== pluginId)
@@ -503,7 +528,7 @@ export class ContributionRegistry {
         out.push(`tab ${t.id} is already contributed by ${tabs.get(t.id)}`);
     const jev = this.jevCommands();
     for (const path of contributions.jevCommands) {
-      const folder = resolvePath(plugin.dir, path);
+      const folder = resolvePath(dir, path);
       const name = folder.split("/").at(-1)!;
       if (jev.has(name) && jev.get(name) !== folder)
         out.push(`Jev command ${name} is already contributed by another plugin`);
