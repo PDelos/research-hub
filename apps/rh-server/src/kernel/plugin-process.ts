@@ -56,108 +56,126 @@ export interface ExternalOptions {
   callTimeoutMs?: number;
 }
 
-export function externalModule(plugin: DiscoveredPlugin, options: ExternalOptions): PluginModule {
-  const id = plugin.manifest.id;
-  const log = options.log.child({ plugin: id });
-  let child: ChildProcess | undefined;
-  let stopping = false;
-  const local = new Map<number, Fn>();
-  let nextHandle = 1;
-  const pending = new Map<
+interface Message {
+  t: string;
+  id: number;
+  fn: number | string;
+  args: unknown[];
+  value?: unknown;
+  error?: { name: string; message: string };
+}
+
+/** One external plugin's process and the calls in flight both ways; functions travel as numbered handles. */
+class PluginProcess {
+  private readonly id: string;
+  private readonly log: Logger;
+  private child?: ChildProcess;
+  private stopping = false;
+  private readonly local = new Map<number, Fn>();
+  private nextHandle = 1;
+  private readonly pending = new Map<
     number,
     { resolve: (v: unknown) => void; reject: (e: Error) => void; timer: NodeJS.Timeout }
   >();
-  let nextCall = 1;
-  let named: Record<string, Fn> = {};
+  private nextCall = 1;
+  private named: Record<string, Fn> = {};
 
-  const encode = (value: unknown): unknown => {
+  constructor(
+    private readonly plugin: DiscoveredPlugin,
+    private readonly options: ExternalOptions,
+  ) {
+    this.id = plugin.manifest.id;
+    this.log = options.log.child({ plugin: this.id });
+  }
+
+  private encode(value: unknown): unknown {
     if (typeof value === "function") {
-      const handle = nextHandle++;
-      local.set(handle, value as Fn);
+      const handle = this.nextHandle++;
+      this.local.set(handle, value as Fn);
       return { $fn: handle };
     }
-    if (Array.isArray(value)) return value.map(encode);
+    if (Array.isArray(value)) return value.map((v) => this.encode(v));
     if (value && typeof value === "object" && !(value instanceof Date)) {
       // Error objects and class instances travel as their plain fields.
-      return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, encode(v)]));
+      return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, this.encode(v)]));
     }
     return value;
-  };
-  const decode = (value: unknown): unknown => {
-    if (Array.isArray(value)) return value.map(decode);
+  }
+
+  private decode(value: unknown): unknown {
+    if (Array.isArray(value)) return value.map((v) => this.decode(v));
     if (value && typeof value === "object") {
       const handle = (value as { $fn?: unknown }).$fn;
-      if (typeof handle === "number") return (...args: unknown[]) => call(handle, args);
-      return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, decode(v)]));
+      if (typeof handle === "number") return (...args: unknown[]) => this.call(handle, args);
+      return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, this.decode(v)]));
     }
     return value;
-  };
+  }
 
   /** The process died or hung: stop it, let the kernel mark the plugin failed, then reject what was waiting. */
-  const fail = async (reason: string) => {
-    if (stopping) return;
-    stopping = true;
-    log.warn("plugin.process_failed", { reason });
-    child?.kill("SIGKILL");
-    const waiting = [...pending.values()];
-    pending.clear();
+  private async fail(reason: string): Promise<void> {
+    if (this.stopping) return;
+    this.stopping = true;
+    this.log.warn("plugin.process_failed", { reason });
+    this.child?.kill("SIGKILL");
+    const waiting = [...this.pending.values()];
+    this.pending.clear();
     for (const p of waiting) clearTimeout(p.timer);
     try {
-      await options.onFailure(id, reason);
+      await this.options.onFailure(this.id, reason);
     } finally {
-      for (const p of waiting) p.reject(new Error(`${id}: ${reason}`));
+      for (const p of waiting) p.reject(new Error(`${this.id}: ${reason}`));
     }
-  };
+  }
 
-  const call = (target: number | string, args: unknown[]): Promise<unknown> => {
-    if (stopping || !child?.connected) return Promise.reject(new Error(`${id} is not running`));
-    const callId = nextCall++;
-    const timeoutMs = options.callTimeoutMs ?? 30_000;
+  private call(target: number | string, args: unknown[]): Promise<unknown> {
+    if (this.stopping || !this.child?.connected) return Promise.reject(new Error(`${this.id} is not running`));
+    const callId = this.nextCall++;
+    const timeoutMs = this.options.callTimeoutMs ?? 30_000;
     return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => void fail(`did not answer within ${timeoutMs / 1000} s`), timeoutMs);
+      const timer = setTimeout(() => void this.fail(`did not answer within ${timeoutMs / 1000} s`), timeoutMs);
       timer.unref?.();
-      pending.set(callId, { resolve, reject, timer });
-      child!.send({ t: "call", id: callId, fn: target, args: encode(args) });
+      this.pending.set(callId, { resolve, reject, timer });
+      this.child!.send({ t: "call", id: callId, fn: target, args: this.encode(args) });
     });
-  };
+  }
 
-  const onMessage = async (message: {
-    t: string;
-    id: number;
-    fn: number | string;
-    args: unknown[];
-    value?: unknown;
-    error?: { name: string; message: string };
-  }) => {
-    if (message.t === "reply") {
-      const waiting = pending.get(message.id);
-      if (!waiting) return;
-      pending.delete(message.id);
-      clearTimeout(waiting.timer);
-      if (message.error) waiting.reject(Object.assign(new Error(message.error.message), { name: message.error.name }));
-      else waiting.resolve(decode(message.value));
-      return;
-    }
-    if (message.t !== "call") return;
-    const handler = typeof message.fn === "number" ? local.get(message.fn) : named[message.fn];
+  private reply(message: Message): void {
+    const waiting = this.pending.get(message.id);
+    if (!waiting) return;
+    this.pending.delete(message.id);
+    clearTimeout(waiting.timer);
+    if (message.error) waiting.reject(Object.assign(new Error(message.error.message), { name: message.error.name }));
+    else waiting.resolve(this.decode(message.value));
+  }
+
+  /** A call from the plugin: to a function handle it was given, or to a named rh API function. */
+  private async answer(message: Message): Promise<void> {
+    const handler = typeof message.fn === "number" ? this.local.get(message.fn) : this.named[message.fn];
     try {
-      if (!handler) throw new Error(`${id} may not call ${message.fn}`);
-      const value = await handler(...(decode(message.args) as unknown[]));
-      child?.send({ t: "reply", id: message.id, value: encode(value) });
+      if (!handler) throw new Error(`${this.id} may not call ${message.fn}`);
+      const value = await handler(...(this.decode(message.args) as unknown[]));
+      this.child?.send({ t: "reply", id: message.id, value: this.encode(value) });
     } catch (error) {
       const failure = error instanceof Error ? error : new Error(String(error));
-      child?.send({ t: "reply", id: message.id, error: { name: failure.name, message: failure.message } });
+      this.child?.send({ t: "reply", id: message.id, error: { name: failure.name, message: failure.message } });
     }
-  };
+  }
 
-  const start = (context: PluginContext) =>
-    new Promise<void>((resolve, reject) => {
+  private onMessage(message: Message): void {
+    if (message.t === "reply") this.reply(message);
+    else if (message.t === "call") void this.answer(message);
+  }
+
+  /** Fork the runner with Node's permission model: it reads only its own code and storage, writes only storage. */
+  private start(context: PluginContext): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
       const storage = context.storageDir;
-      child = fork(RUNNER, [], {
+      const child = fork(RUNNER, [], {
         execArgv: [
           "--permission",
           `--allow-fs-read=${RUNNER}`,
-          `--allow-fs-read=${plugin.dir}`,
+          `--allow-fs-read=${this.plugin.dir}`,
           `--allow-fs-read=${storage}`,
           `--allow-fs-write=${storage}`,
         ],
@@ -166,53 +184,68 @@ export function externalModule(plugin: DiscoveredPlugin, options: ExternalOption
         stdio: ["ignore", "pipe", "pipe", "ipc"],
         serialization: "json",
       });
-      child.stdout?.on("data", forwardTo(log, "info"));
-      child.stderr?.on("data", forwardTo(log, "warn"));
-      child.on("message", (m) => void onMessage(m as never));
+      this.child = child;
+      child.stdout?.on("data", forwardTo(this.log, "info"));
+      child.stderr?.on("data", forwardTo(this.log, "warn"));
+      child.on("message", (m) => this.onMessage(m as Message));
       child.once("message", (m) => ((m as { t: string }).t === "ready" ? resolve() : undefined));
       child.once("error", reject);
       child.once("exit", (code, signal) => {
-        if (!stopping) void fail(`the plugin process exited (${signal ?? `code ${code}`})`);
-        reject(new Error(`${id}: the plugin process exited before it was ready`));
+        if (!this.stopping) void this.fail(`the plugin process exited (${signal ?? `code ${code}`})`);
+        reject(new Error(`${this.id}: the plugin process exited before it was ready`));
       });
     });
+  }
 
+  /** What the plugin may call by name: a few context functions and the rh API paths. */
+  private nameTargets(context: PluginContext): void {
+    const rh = context.rh as RhApi;
+    this.named = {
+      "ctx.onSettingsChange": (handler) => context.onSettingsChange(handler as never),
+      "ctx.log": (level, event, fields) => this.log[level === "warn" ? "warn" : "info"](String(event), fields as never),
+    };
+    for (const path of RH_PATHS) {
+      const [ns, name] = path.split(".") as [keyof RhApi, string];
+      const target = (rh[ns] as unknown as Record<string, Fn>)[name];
+      this.named[`rh.${path}`] = (...args) => target.apply(rh[ns], args);
+    }
+  }
+
+  async activate(context: PluginContext): Promise<unknown> {
+    this.stopping = false;
+    // First in, last out: the process stops after everything else the plugin registered is disposed.
+    context.subscriptions.push({
+      dispose: () => {
+        this.stopping = true;
+        this.child?.kill("SIGTERM");
+      },
+    });
+    this.nameTargets(context);
+    await this.start(context);
+    const { plugin } = this;
+    return this.call("activate", [
+      {
+        id: this.id,
+        manifest: plugin.manifest,
+        dir: plugin.dir,
+        storageDir: context.storageDir,
+        settings: context.settings,
+        main: join(plugin.dir, plugin.manifest.main ?? "main.mjs"),
+        rhPaths: RH_PATHS,
+      },
+    ]);
+  }
+
+  async deactivate(): Promise<void> {
+    if (this.stopping || !this.child?.connected) return;
+    await this.call("deactivate", []).catch(() => undefined);
+  }
+}
+
+export function externalModule(plugin: DiscoveredPlugin, options: ExternalOptions): PluginModule {
+  const pluginProcess = new PluginProcess(plugin, options);
   return {
-    async activate(context) {
-      stopping = false;
-      // First in, last out: the process stops after everything else the plugin registered is disposed.
-      context.subscriptions.push({
-        dispose: () => {
-          stopping = true;
-          child?.kill("SIGTERM");
-        },
-      });
-      const rh = context.rh as RhApi;
-      named = {
-        "ctx.onSettingsChange": (handler) => context.onSettingsChange(handler as never),
-        "ctx.log": (level, event, fields) => log[level === "warn" ? "warn" : "info"](String(event), fields as never),
-      };
-      for (const path of RH_PATHS) {
-        const [ns, name] = path.split(".") as [keyof RhApi, string];
-        const target = (rh[ns] as unknown as Record<string, Fn>)[name];
-        named[`rh.${path}`] = (...args) => target.apply(rh[ns], args);
-      }
-      await start(context);
-      return call("activate", [
-        {
-          id,
-          manifest: plugin.manifest,
-          dir: plugin.dir,
-          storageDir: context.storageDir,
-          settings: context.settings,
-          main: join(plugin.dir, plugin.manifest.main ?? "main.mjs"),
-          rhPaths: RH_PATHS,
-        },
-      ]);
-    },
-    async deactivate() {
-      if (stopping || !child?.connected) return;
-      await call("deactivate", []).catch(() => undefined);
-    },
+    activate: (context) => pluginProcess.activate(context),
+    deactivate: () => pluginProcess.deactivate(),
   };
 }

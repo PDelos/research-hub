@@ -195,22 +195,25 @@ const TOUCHES =
   /\b(?:ALTER\s+TABLE|DROP\s+(?:TABLE|INDEX|TRIGGER|VIEW)(?:\s+IF\s+EXISTS)?|INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+["`]?([A-Za-z0-9_]+)/gi;
 const READS = /\b(?:FROM|JOIN)\s+["`]?([A-Za-z0-9_]+)/gi;
 
-export function createRhApi(plugin: DiscoveredPlugin, services: KernelServices, subscriptions: Disposable[]): RhApi {
-  const { manifest } = plugin;
-  const id = manifest.id;
-  const log = services.log.child({ plugin: id });
-  const guard = new Guard(manifest, services.log);
-  const prefix = tablePrefix(id);
-  const storageDir = join(services.storageRoot, id);
-  const http = new PoliteHttp({ ...(services.fetch ? { fetch: services.fetch } : {}), log });
-  const limit = manifest.permissions.budgetUsdPerDay;
-  const track = <T>(subscription: T & Disposable): T => {
-    subscriptions.push(subscription);
-    return subscription;
-  };
+/** What every part of a plugin's rh API shares: who it is, its guard and its folders. */
+interface ApiScope {
+  plugin: DiscoveredPlugin;
+  services: KernelServices;
+  id: string;
+  log: Logger;
+  guard: Guard;
+  prefix: string;
+  storageDir: string;
+  limit: number | undefined;
+  track: <T>(subscription: T & Disposable) => T;
+  /** A path inside one of the plugin's file scopes; anything else is denied. */
+  file: (scope: FileScope, path: string, write: boolean) => string;
+}
 
+function fileResolver(plugin: DiscoveredPlugin, services: KernelServices, guard: Guard, storageDir: string) {
+  const id = plugin.manifest.id;
   const roots: Record<FileScope, string> = { storage: storageDir, plugin: plugin.dir, vault: services.vaultDir };
-  const file = (scope: FileScope, path: string, write: boolean): string => {
+  return (scope: FileScope, path: string, write: boolean): string => {
     if (scope === "vault") guard.vault(write);
     else if (scope === "plugin" && write)
       guard.deny("files", `plugin:${path}`, `${id} may not change its own installed files`);
@@ -221,13 +224,162 @@ export function createRhApi(plugin: DiscoveredPlugin, services: KernelServices, 
       guard.deny("files", `${scope}:${path}`, `${id} may not reach ${path} outside its ${scope} folder`);
     return full;
   };
+}
 
+/** Apply a plugin's numbered migrations once each; they may only create and change the plugin's own tables. */
+function migrate({ services, id, guard, prefix }: ApiScope, migrations: { version: number; sql: string }[]): number {
+  const db = services.db;
+  db.exec(
+    "CREATE TABLE IF NOT EXISTS plugin_migrations (plugin_id TEXT NOT NULL, version INTEGER NOT NULL, applied_at TEXT NOT NULL, PRIMARY KEY (plugin_id, version))",
+  );
+  const done = new Set(
+    (db.prepare("SELECT version FROM plugin_migrations WHERE plugin_id = ?").all(id) as { version: number }[]).map(
+      (r) => Number(r.version),
+    ),
+  );
+  const denyForeignTables = (sql: string) => {
+    for (const pattern of [CREATES, TOUCHES])
+      for (const match of sql.matchAll(pattern))
+        if (!match[1].startsWith(prefix))
+          guard.deny("db", match[1], `${id} may only create and change its own tables (${prefix}*), not ${match[1]}`);
+  };
+  let applied = 0;
+  for (const m of migrations.toSorted((a, b) => a.version - b.version)) {
+    if (done.has(m.version)) continue;
+    denyForeignTables(m.sql);
+    db.exec("BEGIN");
+    try {
+      db.exec(m.sql);
+      db.prepare("INSERT INTO plugin_migrations (plugin_id, version, applied_at) VALUES (?, ?, ?)").run(
+        id,
+        m.version,
+        new Date().toISOString(),
+      );
+      db.exec("COMMIT");
+    } catch (error) {
+      db.exec("ROLLBACK");
+      throw error;
+    }
+    applied++;
+  }
+  return applied;
+}
+
+function dbApi(scope: ApiScope): RhApi["db"] {
+  const { services, id, guard, prefix } = scope;
   /** Statements a plugin runs through rh.db may only read and change its own tables. */
   const ownTables = (sql: string) => {
     for (const re of [CREATES, TOUCHES, READS])
       for (const match of sql.matchAll(re))
         if (!match[1].startsWith(prefix))
           guard.deny("db", match[1], `${id} may only use its own tables (${prefix}*), not ${match[1]}`);
+  };
+  return {
+    table: (name) => `${prefix}${name}`,
+    migrate: (migrations) => migrate(scope, migrations),
+    prepare: (sql) => services.db.prepare(sql),
+    run(sql, ...params) {
+      ownTables(sql);
+      const written = services.db.prepare(sql).run(...params);
+      return { changes: Number(written.changes), lastInsertRowid: Number(written.lastInsertRowid) };
+    },
+    all(sql, ...params) {
+      ownTables(sql);
+      return services.db.prepare(sql).all(...params) as Record<string, unknown>[];
+    },
+    get(sql, ...params) {
+      ownTables(sql);
+      return services.db.prepare(sql).get(...params) as Record<string, unknown> | undefined;
+    },
+  };
+}
+
+function filesApi({ file }: ApiScope): RhApi["files"] {
+  return {
+    read: (scope, path) => readFileSync(file(scope, path, false), "utf8"),
+    write(scope, path, content) {
+      const full = file(scope, path, true);
+      mkdirSync(dirname(full), { recursive: true });
+      writeFileSync(full, content);
+    },
+    list(scope, path = ".") {
+      const full = file(scope, path, false);
+      return existsSync(full) ? readdirSync(full).toSorted() : [];
+    },
+    exists: (scope, path) => existsSync(file(scope, path, false)),
+  };
+}
+
+function httpApi({ services, id, guard, limit, log }: ApiScope): RhApi["http"] {
+  const http = new PoliteHttp({ ...(services.fetch ? { fetch: services.fetch } : {}), log });
+  return {
+    async request(url, options = {}) {
+      guard.host(url);
+      const { costUsd, ...rest } = options;
+      if (costUsd) services.budgets.assertWithin(id, limit);
+      const response = await http.request(url, { source: id, ...rest });
+      if (costUsd) services.budgets.charge(id, costUsd);
+      return response;
+    },
+    async json<T>(url: string, options: Partial<RequestOptions> & { costUsd?: number } = {}) {
+      const response = await this.request(url, {
+        ...options,
+        headers: { accept: "application/json", ...options.headers },
+      });
+      return (await response.json()) as T;
+    },
+    async text(url, options = {}) {
+      return (await this.request(url, options)).text();
+    },
+  };
+}
+
+function processesApi({ services, id, plugin, storageDir, log, track, file }: ApiScope): RhApi["processes"] {
+  return {
+    async start(processId, options = {}) {
+      const declared = services.contributions.processes(id).find((p) => p.id === processId);
+      if (!declared) throw new Error(`${id} did not declare the process ${processId} in contributes.processes`);
+      const entry = file("plugin", declared.entry, false);
+      mkdirSync(storageDir, { recursive: true });
+      const supervisor = new Supervisor({
+        name: `${id}/${processId}`,
+        entry,
+        args: [...(declared.args ?? []), ...(options.args ?? [])],
+        cwd: plugin.dir,
+        home: storageDir,
+        env: options.env ?? {},
+        log,
+        ...(options.http === undefined ? {} : { http: options.http }),
+      });
+      track({ dispose: () => supervisor.stop() });
+      await supervisor.start();
+      return { port: supervisor.port!, stop: () => supervisor.stop() };
+    },
+  };
+}
+
+export function createRhApi(plugin: DiscoveredPlugin, services: KernelServices, subscriptions: Disposable[]): RhApi {
+  const { manifest } = plugin;
+  const id = manifest.id;
+  const log = services.log.child({ plugin: id });
+  const guard = new Guard(manifest, services.log);
+  const storageDir = join(services.storageRoot, id);
+  const limit = manifest.permissions.budgetUsdPerDay;
+  const track = <T>(subscription: T & Disposable): T => {
+    subscriptions.push(subscription);
+    return subscription;
+  };
+  const scope: ApiScope = {
+    plugin,
+    services,
+    id,
+    log,
+    guard,
+    prefix: tablePrefix(id),
+    storageDir,
+    limit,
+    track,
+    file: fileResolver(plugin, services, guard, storageDir),
   };
 
   const paid = async <T extends { costUsd: number }>(call: () => Promise<T>): Promise<T> => {
@@ -249,97 +401,9 @@ export function createRhApi(plugin: DiscoveredPlugin, services: KernelServices, 
     version: RH_API_VERSION,
     pluginId: id,
     log,
-    db: {
-      table: (name) => `${prefix}${name}`,
-      migrate(migrations) {
-        const db = services.db;
-        db.exec(
-          "CREATE TABLE IF NOT EXISTS plugin_migrations (plugin_id TEXT NOT NULL, version INTEGER NOT NULL, applied_at TEXT NOT NULL, PRIMARY KEY (plugin_id, version))",
-        );
-        const done = new Set(
-          (
-            db.prepare("SELECT version FROM plugin_migrations WHERE plugin_id = ?").all(id) as { version: number }[]
-          ).map((r) => Number(r.version)),
-        );
-        const denyForeignTables = (sql: string) => {
-          for (const pattern of [CREATES, TOUCHES])
-            for (const match of sql.matchAll(pattern))
-              if (!match[1].startsWith(prefix))
-                guard.deny(
-                  "db",
-                  match[1],
-                  `${id} may only create and change its own tables (${prefix}*), not ${match[1]}`,
-                );
-        };
-        let applied = 0;
-        for (const m of migrations.toSorted((a, b) => a.version - b.version)) {
-          if (done.has(m.version)) continue;
-          denyForeignTables(m.sql);
-          db.exec("BEGIN");
-          try {
-            db.exec(m.sql);
-            db.prepare("INSERT INTO plugin_migrations (plugin_id, version, applied_at) VALUES (?, ?, ?)").run(
-              id,
-              m.version,
-              new Date().toISOString(),
-            );
-            db.exec("COMMIT");
-          } catch (error) {
-            db.exec("ROLLBACK");
-            throw error;
-          }
-          applied++;
-        }
-        return applied;
-      },
-      prepare: (sql) => services.db.prepare(sql),
-      run(sql, ...params) {
-        ownTables(sql);
-        const written = services.db.prepare(sql).run(...params);
-        return { changes: Number(written.changes), lastInsertRowid: Number(written.lastInsertRowid) };
-      },
-      all(sql, ...params) {
-        ownTables(sql);
-        return services.db.prepare(sql).all(...params) as Record<string, unknown>[];
-      },
-      get(sql, ...params) {
-        ownTables(sql);
-        return services.db.prepare(sql).get(...params) as Record<string, unknown> | undefined;
-      },
-    },
-    files: {
-      read: (scope, path) => readFileSync(file(scope, path, false), "utf8"),
-      write(scope, path, content) {
-        const full = file(scope, path, true);
-        mkdirSync(dirname(full), { recursive: true });
-        writeFileSync(full, content);
-      },
-      list(scope, path = ".") {
-        const full = file(scope, path, false);
-        return existsSync(full) ? readdirSync(full).toSorted() : [];
-      },
-      exists: (scope, path) => existsSync(file(scope, path, false)),
-    },
-    http: {
-      async request(url, options = {}) {
-        guard.host(url);
-        const { costUsd, ...rest } = options;
-        if (costUsd) services.budgets.assertWithin(id, limit);
-        const response = await http.request(url, { source: id, ...rest });
-        if (costUsd) services.budgets.charge(id, costUsd);
-        return response;
-      },
-      async json<T>(url: string, options: Partial<RequestOptions> & { costUsd?: number } = {}) {
-        const response = await this.request(url, {
-          ...options,
-          headers: { accept: "application/json", ...options.headers },
-        });
-        return (await response.json()) as T;
-      },
-      async text(url, options = {}) {
-        return (await this.request(url, options)).text();
-      },
-    },
+    db: dbApi(scope),
+    files: filesApi(scope),
+    http: httpApi(scope),
     secrets: {
       get(name) {
         guard.secret(name);
@@ -364,27 +428,7 @@ export function createRhApi(plugin: DiscoveredPlugin, services: KernelServices, 
       on: (type, handler) => track(services.events.on(type, handler)),
       emit: (type, payload) => services.events.emit(type, payload),
     },
-    processes: {
-      async start(processId, options = {}) {
-        const declared = services.contributions.processes(id).find((p) => p.id === processId);
-        if (!declared) throw new Error(`${id} did not declare the process ${processId} in contributes.processes`);
-        const entry = file("plugin", declared.entry, false);
-        mkdirSync(storageDir, { recursive: true });
-        const supervisor = new Supervisor({
-          name: `${id}/${processId}`,
-          entry,
-          args: [...(declared.args ?? []), ...(options.args ?? [])],
-          cwd: plugin.dir,
-          home: storageDir,
-          env: options.env ?? {},
-          log,
-          ...(options.http === undefined ? {} : { http: options.http }),
-        });
-        track({ dispose: () => supervisor.stop() });
-        await supervisor.start();
-        return { port: supervisor.port!, stop: () => supervisor.stop() };
-      },
-    },
+    processes: processesApi(scope),
     ui: { notify: (message, level = "info") => services.events.emit("ui.notify", { pluginId: id, message, level }) },
     proposals: {
       submit() {
