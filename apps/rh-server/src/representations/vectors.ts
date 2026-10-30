@@ -117,42 +117,60 @@ export class PaperVectors {
 
   /** Represent these papers: label facets (one Jev call each) and embed every text in batched calls. */
   async represent(ids: number[]): Promise<RepresentResult> {
-    const { store, facets, embedder } = this.options;
-    const todo: { paper: Paper; labels: FacetLabel[] }[] = [];
-    let skipped = 0;
-    let facetFailures = 0;
+    const { papers, skipped } = this.stalePapers(ids);
+    const { labeled, facetFailures } = await this.labelAll(papers);
+    const todo = papers.map((paper) => ({ paper, labels: labeled.get(paper.id) ?? [] }));
+    if (!todo.length) return { represented: 0, skipped, facetFailures };
+    const { texts, slots } = this.embeddingTexts(todo);
+    this.saveVectors(
+      todo.map(({ paper }) => paper.id),
+      slots,
+      await this.options.embedder.embed(texts),
+    );
+    return { represented: todo.length, skipped, facetFailures };
+  }
+
+  /** The known papers among `ids` whose vectors are missing or from another model; the rest count as skipped. */
+  private stalePapers(ids: number[]): { papers: Paper[]; skipped: number } {
     const papers: Paper[] = [];
+    let skipped = 0;
     for (const id of new Set(ids)) {
-      const paper = store.get(id);
+      const paper = this.options.store.get(id);
       if (!paper) continue;
       if (this.isCurrent(paper)) skipped++;
       else papers.push(paper);
     }
-    // Facet labels: one Jev call per paper, five at a time; stored labels are reused.
+    return { papers, skipped };
+  }
+
+  /** Facet labels: one Jev call per paper, five at a time; stored labels are reused, a failure leaves none. */
+  private async labelAll(papers: Paper[]) {
+    const { facets } = this.options;
     const labeled = new Map<number, FacetLabel[]>();
+    let facetFailures = 0;
     const label = async (paper: Paper) => {
-      let labels: FacetLabel[] = [];
-      if (!paper.titleOnly) {
-        try {
-          labels = facets.stored(paper.id) ?? (await facets.label(paper));
-        } catch (error) {
-          facetFailures++;
-          this.options.log?.warn("representations.facets_failed", {
-            paperId: paper.id,
-            error: error instanceof Error ? error.message : String(error),
-          });
-        }
+      if (paper.titleOnly) return void labeled.set(paper.id, []);
+      try {
+        labeled.set(paper.id, facets.stored(paper.id) ?? (await facets.label(paper)));
+      } catch (error) {
+        facetFailures++;
+        labeled.set(paper.id, []);
+        this.options.log?.warn("representations.facets_failed", {
+          paperId: paper.id,
+          error: error instanceof Error ? error.message : String(error),
+        });
       }
-      labeled.set(paper.id, labels);
     };
     await Promise.all(
       Array.from({ length: FACET_LANES }, async (_, lane) => {
         for (let k = lane; k < papers.length; k += FACET_LANES) await label(papers[k]);
       }),
     );
-    for (const paper of papers) todo.push({ paper, labels: labeled.get(paper.id) ?? [] });
-    if (!todo.length) return { represented: 0, skipped, facetFailures };
+    return { labeled, facetFailures };
+  }
 
+  /** One text per vector: title and abstract for the whole paper, then each facet (full-text sections first). */
+  private embeddingTexts(todo: { paper: Paper; labels: FacetLabel[] }[]) {
     const texts: string[] = [];
     const slots: { paperId: number; kind: VectorKind }[] = [];
     for (const { paper, labels } of todo) {
@@ -161,20 +179,23 @@ export class PaperVectors {
       const groups = FacetLabeler.group(labels);
       const full = this.fullTextFacets?.(paper.id);
       for (const facet of FACETS) {
-        const fromFullText = full?.[facet];
-        const sentences = groups[facet];
-        if (!fromFullText && !sentences?.length) continue;
-        texts.push(fromFullText ?? sentences!.join(" "));
+        const text = full?.[facet] ?? groups[facet]?.join(" ");
+        if (!text) continue;
+        texts.push(text);
         slots.push({ paperId: paper.id, kind: facet });
       }
     }
-    const vectors = await embedder.embed(texts);
-    const { db } = this.options;
+    return { texts, slots };
+  }
+
+  /** Replace these papers' vectors in one transaction. */
+  private saveVectors(paperIds: number[], slots: { paperId: number; kind: VectorKind }[], vectors: Float32Array[]) {
+    const { db, embedder } = this.options;
     db.exec("BEGIN IMMEDIATE");
     try {
-      for (const { paper } of todo) {
-        db.prepare("DELETE FROM representations WHERE paper_id = ?").run(paper.id);
-        for (const kind of VECTOR_KINDS) db.prepare(`DELETE FROM vec_${kind} WHERE rowid = ?`).run(BigInt(paper.id));
+      for (const paperId of paperIds) {
+        db.prepare("DELETE FROM representations WHERE paper_id = ?").run(paperId);
+        for (const kind of VECTOR_KINDS) db.prepare(`DELETE FROM vec_${kind} WHERE rowid = ?`).run(BigInt(paperId));
       }
       const now = nowIso();
       slots.forEach((slot, i) => {
@@ -195,7 +216,6 @@ export class PaperVectors {
       db.exec("ROLLBACK");
       throw error;
     }
-    return { represented: todo.length, skipped, facetFailures };
   }
 
   /** Re-embed papers missing current vectors, a batch at a time (after a model change). */
@@ -241,15 +261,10 @@ export class PaperVectors {
     const by = options.by ?? "whole";
     const count = options.k ?? SIMILAR_K_DEFAULT;
     if (!Number.isInteger(count) || count < 1 || count > 100) throw new RangeError(`k must be 1 to 100, got ${count}`);
-    let query: Float32Array | undefined;
-    let self: number | undefined;
-    if ("paperId" in from) {
-      self = from.paperId;
-      query = this.vector(from.paperId, by);
-      if (!query) return [];
-    } else {
-      [query] = await this.options.embedder.embed([from.text]);
-    }
+    const self = "paperId" in from ? from.paperId : undefined;
+    const query =
+      "paperId" in from ? this.vector(from.paperId, by) : (await this.options.embedder.embed([from.text]))[0];
+    if (!query) return [];
     const rows = this.options.db
       .prepare(`SELECT rowid, distance FROM vec_${by} WHERE embedding MATCH ? AND k = ? ORDER BY distance`)
       .all(query, count + (self === undefined ? 0 : 1)) as { rowid: number | bigint; distance: number }[];
@@ -257,17 +272,20 @@ export class PaperVectors {
       .map((r) => ({ paperId: Number(r.rowid), distance: r.distance }))
       .filter((h) => h.paperId !== self)
       .slice(0, count) as SimilarHit[];
-    if (self !== undefined && by !== "whole") {
-      const background = this.vector(self, "background");
-      const whole = this.vector(self, "whole");
-      for (const hit of hits) {
-        const otherBackground = background && this.vector(hit.paperId, "background");
-        if (background && otherBackground) hit.backgroundDistance = cosineDistance(background, otherBackground);
-        const otherWhole = whole && this.vector(hit.paperId, "whole");
-        if (whole && otherWhole) hit.wholeDistance = cosineDistance(whole, otherWhole);
-      }
-    }
+    if (self !== undefined && by !== "whole") this.addContextDistances(self, hits);
     return hits;
+  }
+
+  /** Each hit's background and whole distance from the paper, beside the facet distance it was found by. */
+  private addContextDistances(paperId: number, hits: SimilarHit[]) {
+    const background = this.vector(paperId, "background");
+    const whole = this.vector(paperId, "whole");
+    for (const hit of hits) {
+      const otherBackground = background && this.vector(hit.paperId, "background");
+      if (background && otherBackground) hit.backgroundDistance = cosineDistance(background, otherBackground);
+      const otherWhole = whole && this.vector(hit.paperId, "whole");
+      if (whole && otherWhole) hit.wholeDistance = cosineDistance(whole, otherWhole);
+    }
   }
 }
 

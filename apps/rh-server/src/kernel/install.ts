@@ -49,6 +49,47 @@ export class InstallRefused extends Error {
   }
 }
 
+/** Copy a folder (without .git and node_modules) or shallow-clone a git repository into `dir`. */
+async function copySource(source: InstallSource, dir: string): Promise<PluginSource> {
+  if ("folder" in source) {
+    const from = resolve(source.folder);
+    if (!existsSync(join(from, "rh-plugin.json"))) throw new InstallRefused(`${source.folder} has no rh-plugin.json`);
+    cpSync(from, dir, {
+      recursive: true,
+      filter: (p) => !/\/(\.git|node_modules)(\/|$)/.test(p.slice(from.length)),
+    });
+    return { kind: "folder", path: from };
+  }
+  await git.clone({
+    fs,
+    http,
+    dir,
+    url: source.git,
+    ...(source.ref ? { ref: source.ref } : {}),
+    singleBranch: true,
+    depth: 1,
+  });
+  rmSync(join(dir, ".git"), { recursive: true, force: true });
+  return { kind: "git", url: source.git, ...(source.ref ? { ref: source.ref } : {}) };
+}
+
+/** The staged plugin's manifest, when it and its contributions are valid for a plugin that is not built in. */
+function checkedManifest(dir: string): PluginManifest {
+  let manifest: PluginManifest;
+  try {
+    manifest = loadManifest(dir);
+  } catch (error) {
+    if (error instanceof ManifestInvalid) throw new InstallRefused("the manifest is invalid", error.problems);
+    throw error;
+  }
+  const problems = contributionProblems(manifest, dir);
+  if (manifest.required) problems.push("required: only built-in plugins can be required");
+  if (manifest.kind === "core") problems.push("kind: only the hub's own plugins are core");
+  if (manifest.main && !existsSync(join(dir, manifest.main))) problems.push(`main: ${manifest.main} does not exist`);
+  if (problems.length) throw new InstallRefused("the plugin is invalid", problems);
+  return manifest;
+}
+
 export class PluginInstaller {
   private readonly plans = new Map<string, { plan: InstallPlan; dir: string; manifest: PluginManifest }>();
 
@@ -65,43 +106,9 @@ export class PluginInstaller {
     const planId = randomUUID();
     const dir = join(this.staging, planId);
     mkdirSync(dir, { recursive: true });
-    let lockSource: PluginSource;
     try {
-      if ("folder" in source) {
-        const from = resolve(source.folder);
-        if (!existsSync(join(from, "rh-plugin.json")))
-          throw new InstallRefused(`${source.folder} has no rh-plugin.json`);
-        cpSync(from, dir, {
-          recursive: true,
-          filter: (p) => !/\/(\.git|node_modules)(\/|$)/.test(p.slice(from.length)),
-        });
-        lockSource = { kind: "folder", path: from };
-      } else {
-        await git.clone({
-          fs,
-          http,
-          dir,
-          url: source.git,
-          ...(source.ref ? { ref: source.ref } : {}),
-          singleBranch: true,
-          depth: 1,
-        });
-        rmSync(join(dir, ".git"), { recursive: true, force: true });
-        lockSource = { kind: "git", url: source.git, ...(source.ref ? { ref: source.ref } : {}) };
-      }
-      let manifest: PluginManifest;
-      try {
-        manifest = loadManifest(dir);
-      } catch (error) {
-        if (error instanceof ManifestInvalid) throw new InstallRefused("the manifest is invalid", error.problems);
-        throw error;
-      }
-      const problems = contributionProblems(manifest, dir);
-      if (manifest.required) problems.push("required: only built-in plugins can be required");
-      if (manifest.kind === "core") problems.push("kind: only the hub's own plugins are core");
-      if (manifest.main && !existsSync(join(dir, manifest.main)))
-        problems.push(`main: ${manifest.main} does not exist`);
-      if (problems.length) throw new InstallRefused("the plugin is invalid", problems);
+      const lockSource = await copySource(source, dir);
+      const manifest = checkedManifest(dir);
       const existing = this.options.discovery.plugins.get(manifest.id);
       if (existing?.builtin) throw new InstallRefused(`${manifest.id} is a built-in plugin`);
       const incompatible = engineProblem(manifest);

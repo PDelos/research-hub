@@ -13,6 +13,40 @@ export const WEIGHT_MAX = 2;
 export const REASON_MAX = 1000;
 export type WeightKind = "question" | "query" | "source";
 
+/** The verdict must be known; the reason is optional text up to REASON_MAX characters. Returns the trimmed reason. */
+function checkedReason(verdict: unknown, reason: unknown): string {
+  if (!VERDICTS.includes(verdict as Verdict))
+    throw new JudgmentInvalid(`verdict must be one of ${VERDICTS.join(", ")}`);
+  if (reason !== undefined && reason !== null && typeof reason !== "string")
+    throw new JudgmentInvalid("reason must be text");
+  const text = typeof reason === "string" ? reason.trim() : "";
+  if (text.length > REASON_MAX)
+    throw new JudgmentInvalid(`reason has ${text.length} characters, at most ${REASON_MAX} allowed`);
+  return text;
+}
+
+const weightId = (kind: WeightKind, key: string) => `${kind}\u0000${key}`;
+interface WeightState {
+  kind: WeightKind;
+  key: string;
+  base: number;
+  value: number;
+}
+interface ReplayedEffect {
+  cardId: number;
+  kind: WeightKind;
+  key: string;
+  before: number;
+  after: number;
+}
+interface JudgedCard {
+  card_id: number;
+  paper_id: number;
+  verdict: Verdict;
+  matched_question: string | null;
+  sweep_id: number;
+}
+
 export class JudgmentInvalid extends Error {}
 
 export interface Judgment {
@@ -64,20 +98,30 @@ export class Feedback {
 
   /** Record (or replace) the judgment of a card; replays weights and updates the knowledge-base request. */
   judge(cardId: number, verdict: unknown, reason?: unknown): Judgment {
-    if (!VERDICTS.includes(verdict as Verdict))
-      throw new JudgmentInvalid(`verdict must be one of ${VERDICTS.join(", ")}`);
-    if (reason !== undefined && reason !== null && typeof reason !== "string")
-      throw new JudgmentInvalid("reason must be text");
-    const text = typeof reason === "string" ? reason.trim() : "";
-    if (text.length > REASON_MAX)
-      throw new JudgmentInvalid(`reason has ${text.length} characters, at most ${REASON_MAX} allowed`);
+    const text = checkedReason(verdict, reason);
     const card = this.deps.db.prepare("SELECT id, paper_id FROM cards WHERE id = ?").get(cardId) as
       | { id: number; paper_id: number }
       | undefined;
     if (!card) throw new JudgmentInvalid(`no card ${cardId}`);
     const previous = this.get(cardId);
-    const now = nowIso();
     const reasonChanged = (previous?.reason ?? "") !== text;
+    this.save(card, verdict as Verdict, text, reasonChanged);
+    this.handOff(Number(card.paper_id), cardId, verdict as Verdict);
+    this.replay();
+    this.deps.log.info("feedback.judged", {
+      cardId,
+      verdict,
+      reason: text ? `${text.length} chars` : undefined,
+      previous: previous?.verdict,
+    });
+    for (const l of this.listeners) l(cardId);
+    return this.get(cardId)!;
+  }
+
+  /** Insert or replace the judgment; a changed reason resets its rule classification and candidates. */
+  private save(card: { id: number; paper_id: number }, verdict: Verdict, text: string, reasonChanged: boolean) {
+    const now = nowIso();
+    const cardId = card.id;
     this.deps.db
       .prepare(
         `INSERT INTO judgments (card_id, paper_id, verdict, reason, rule_status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -89,7 +133,7 @@ export class Feedback {
       .run(
         cardId,
         card.paper_id,
-        verdict as string,
+        verdict,
         text || null,
         text ? "pending" : "none",
         now,
@@ -99,16 +143,6 @@ export class Feedback {
         reasonChanged ? 1 : 0,
       );
     if (reasonChanged) this.deps.db.prepare("DELETE FROM rule_candidates WHERE card_id = ?").run(cardId);
-    this.handOff(Number(card.paper_id), cardId, verdict as Verdict);
-    this.replay();
-    this.deps.log.info("feedback.judged", {
-      cardId,
-      verdict,
-      reason: text ? `${text.length} chars` : undefined,
-      previous: previous?.verdict,
-    });
-    for (const l of this.listeners) l(cardId);
-    return this.get(cardId)!;
   }
 
   /** Remove a card's judgment (its weight effects disappear in the replay; a pending ⭐ request is cancelled). */
@@ -188,50 +222,61 @@ export class Feedback {
 
   /** Recompute effective weights from the approved charter by replaying current judgments in time order. */
   replay(): void {
-    const db = this.deps.db;
+    const weights = this.charterWeights();
+    const effects: ReplayedEffect[] = [];
+    for (const judgment of this.judgmentsInOrder())
+      for (const [kind, key] of this.targetsOf(judgment, weights)) {
+        const weight = weights.get(weightId(kind, key))!;
+        const before = weight.value;
+        weight.value = clamp(before + STEP[judgment.verdict]);
+        effects.push({ cardId: Number(judgment.card_id), kind, key, before, after: weight.value });
+      }
+    this.saveWeights(weights, effects);
+  }
+
+  private charterWeights(): Map<string, WeightState> {
     const charter = this.deps.charters.approved()?.charter;
-    const weights = new Map<string, { kind: WeightKind; key: string; base: number; value: number }>();
-    const id = (kind: WeightKind, key: string) => `${kind}\u0000${key}`;
+    const weights = new Map<string, WeightState>();
     for (const q of charter?.questions ?? [])
-      weights.set(id("question", q.id), { kind: "question", key: q.id, base: q.weight, value: q.weight });
+      weights.set(weightId("question", q.id), { kind: "question", key: q.id, base: q.weight, value: q.weight });
     for (const q of charter?.queries ?? [])
-      weights.set(id("query", q.text), { kind: "query", key: q.text, base: q.weight, value: q.weight });
-    const judgments = db
+      weights.set(weightId("query", q.text), { kind: "query", key: q.text, base: q.weight, value: q.weight });
+    return weights;
+  }
+
+  private judgmentsInOrder(): JudgedCard[] {
+    return this.deps.db
       .prepare(
         `SELECT j.card_id, j.paper_id, j.verdict, c.matched_question, c.sweep_id FROM judgments j JOIN cards c ON c.id = j.card_id
          ORDER BY j.updated_at, j.card_id`,
       )
-      .all() as {
-      card_id: number;
-      paper_id: number;
-      verdict: Verdict;
-      matched_question: string | null;
-      sweep_id: number;
-    }[];
-    const effects: { cardId: number; kind: WeightKind; key: string; before: number; after: number }[] = [];
-    for (const j of judgments) {
-      const targets: [WeightKind, string][] = [];
-      if (j.matched_question && weights.has(id("question", j.matched_question)))
-        targets.push(["question", j.matched_question]);
-      const found = db
-        .prepare("SELECT queries_json FROM sweep_papers WHERE sweep_id = ? AND paper_id = ?")
-        .get(j.sweep_id, j.paper_id) as { queries_json: string | null } | undefined;
-      for (const q of found?.queries_json ? (JSON.parse(found.queries_json) as string[]) : [])
-        if (weights.has(id("query", q))) targets.push(["query", q]);
-      for (const { source } of db
-        .prepare("SELECT source FROM paper_sources WHERE paper_id = ? ORDER BY source")
-        .all(j.paper_id) as { source: string }[]) {
-        if (!weights.has(id("source", source)))
-          weights.set(id("source", source), { kind: "source", key: source, base: 1, value: 1 });
-        targets.push(["source", source]);
-      }
-      for (const [kind, key] of targets) {
-        const weight = weights.get(id(kind, key))!;
-        const before = weight.value;
-        weight.value = clamp(before + STEP[j.verdict]);
-        effects.push({ cardId: Number(j.card_id), kind, key, before, after: weight.value });
-      }
+      .all() as unknown as JudgedCard[];
+  }
+
+  /** The weights a judgment moves: its matched question, the charter queries that found it, and its sources. */
+  private targetsOf(judgment: JudgedCard, weights: Map<string, WeightState>): [WeightKind, string][] {
+    const db = this.deps.db;
+    const targets: [WeightKind, string][] = [];
+    if (judgment.matched_question && weights.has(weightId("question", judgment.matched_question)))
+      targets.push(["question", judgment.matched_question]);
+    const found = db
+      .prepare("SELECT queries_json FROM sweep_papers WHERE sweep_id = ? AND paper_id = ?")
+      .get(judgment.sweep_id, judgment.paper_id) as { queries_json: string | null } | undefined;
+    for (const q of found?.queries_json ? (JSON.parse(found.queries_json) as string[]) : [])
+      if (weights.has(weightId("query", q))) targets.push(["query", q]);
+    const sources = db
+      .prepare("SELECT source FROM paper_sources WHERE paper_id = ? ORDER BY source")
+      .all(judgment.paper_id) as { source: string }[];
+    for (const { source } of sources) {
+      if (!weights.has(weightId("source", source)))
+        weights.set(weightId("source", source), { kind: "source", key: source, base: 1, value: 1 });
+      targets.push(["source", source]);
     }
+    return targets;
+  }
+
+  private saveWeights(weights: Map<string, WeightState>, effects: ReplayedEffect[]) {
+    const db = this.deps.db;
     db.exec("BEGIN IMMEDIATE");
     try {
       db.exec("DELETE FROM weights; DELETE FROM weight_effects;");

@@ -95,29 +95,13 @@ export class PoliteHttp {
       await this.pace(host);
       const remaining = budget - (this.now() - started);
       if (remaining <= 0) break;
-      let retryAfter: number | undefined;
-      try {
-        const response = await this.fetchImpl(url, {
-          method: options.method ?? "GET",
-          body: options.body,
-          headers: { "user-agent": this.userAgent, ...options.headers },
-          signal: AbortSignal.timeout(Math.min(options.timeoutMs ?? 20_000, remaining)),
-        });
-        if (response.ok || response.status === 404) return response;
-        lastError = `HTTP ${response.status}`;
-        if (!RETRYABLE.has(response.status)) {
-          await response.body?.cancel();
-          throw new SourceError(options.source, lastError, response.status);
-        }
-        retryAfter = parseRetryAfter(response.headers.get("retry-after"), this.now());
-        await response.body?.cancel();
-        if (attempt === attempts)
-          throw new SourceError(options.source, `${lastError} after ${attempts} attempts`, response.status);
-      } catch (error) {
-        if (error instanceof SourceError) throw error;
-        lastError = describeFailure(error);
-        if (attempt === attempts) break;
-      }
+      const outcome = await this.tryOnce(url, options, Math.min(options.timeoutMs ?? 20_000, remaining));
+      if (outcome instanceof Response) return outcome;
+      lastError = outcome.error;
+      if (attempt === attempts && outcome.status)
+        throw new SourceError(options.source, `${lastError} after ${attempts} attempts`, outcome.status);
+      if (attempt === attempts) break;
+      const retryAfter = outcome.retryAfter;
       const wait = retryAfter ?? 2_000 * 2 ** (attempt - 1);
       if (this.now() - started + wait >= budget) {
         lastError += `; the next retry (in ${Math.round(wait / 1000)} s) would exceed the ${Math.round(budget / 1000)} s budget`;
@@ -127,6 +111,37 @@ export class PoliteHttp {
       await this.sleep(wait);
     }
     throw new SourceError(options.source, lastError || "no attempt fit the time budget");
+  }
+
+  /**
+   * One request: a usable response (ok or 404), or why it failed and when to retry. A status that retrying cannot fix
+   * throws SourceError.
+   */
+  private async tryOnce(
+    url: string,
+    options: RequestOptions,
+    timeoutMs: number,
+  ): Promise<Response | { error: string; status?: number; retryAfter?: number }> {
+    let response: Response;
+    try {
+      response = await this.fetchImpl(url, {
+        method: options.method ?? "GET",
+        body: options.body,
+        headers: { "user-agent": this.userAgent, ...options.headers },
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+    } catch (error) {
+      return { error: describeFailure(error) };
+    }
+    if (response.ok || response.status === 404) return response;
+    await response.body?.cancel();
+    const error = `HTTP ${response.status}`;
+    if (!RETRYABLE.has(response.status)) throw new SourceError(options.source, error, response.status);
+    return {
+      error,
+      status: response.status,
+      retryAfter: parseRetryAfter(response.headers.get("retry-after"), this.now()),
+    };
   }
 
   /** Wait for this host's next free slot; concurrent callers get consecutive slots. */

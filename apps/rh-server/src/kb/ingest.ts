@@ -238,24 +238,23 @@ export class Ingest {
   /** Full texts given to the librarian, for the number check. */
   private readonly fullTexts = new Map<number, string>();
 
-  private async start(request: KbRequest): Promise<void> {
-    if (!this.harness || !this.ctx) return;
-    // A note may already exist and be connected (a crash before the request was marked done).
-    if (this.tryComplete(request.paperId)) {
-      queueMicrotask(() => this.pickUp());
-      return;
+  /** The paper's full text when a provider has it (kept for the number check); none on failure. */
+  private async readFullText(paperId: number): Promise<string | undefined> {
+    try {
+      const fullText = await this.fullText?.(paperId);
+      if (fullText) this.fullTexts.set(paperId, fullText);
+      return fullText;
+    } catch (error) {
+      this.deps.log.warn("kb.fulltext_failed", { paperId, error: String(error) });
+      return undefined;
     }
-    const paper = this.deps.store.get(request.paperId)!;
+  }
+
+  /** The librarian's task: the paper, why it was kept, the charter, and what the vault already holds. */
+  private ingestPrompt(paper: Paper, request: KbRequest, fullText: string | undefined): string {
     const card = this.deps.cards.get(request.cardId);
     const charter = this.deps.charters.approved()!.charter;
-    let fullText: string | undefined;
-    try {
-      fullText = await this.fullText?.(paper.id);
-    } catch (error) {
-      this.deps.log.warn("kb.fulltext_failed", { paperId: paper.id, error: String(error) });
-    }
-    if (fullText) this.fullTexts.set(paper.id, fullText);
-    const prompt = loadPrompt(join(this.deps.promptsDir, "agents"), "librarian", "USER_PROMPT_ingest.md", {
+    return loadPrompt(join(this.deps.promptsDir, "agents"), "librarian", "USER_PROMPT_ingest.md", {
       title: paper.title,
       authors: paper.authors.slice(0, 8).join(", ") || "unknown",
       year: String(paper.year ?? "unknown"),
@@ -270,6 +269,18 @@ export class Ingest {
       charter_concepts: charter.concepts.join("; "),
       notes: this.existing("sources").slice(-30).join("; ") || "(none yet)",
     });
+  }
+
+  private async start(request: KbRequest): Promise<void> {
+    if (!this.harness || !this.ctx) return;
+    // A note may already exist and be connected (a crash before the request was marked done).
+    if (this.tryComplete(request.paperId)) {
+      queueMicrotask(() => this.pickUp());
+      return;
+    }
+    const paper = this.deps.store.get(request.paperId)!;
+    const fullText = await this.readFullText(paper.id);
+    const prompt = this.ingestPrompt(paper, request, fullText);
     const conversation = await this.harness.createConversation(
       {
         ownership: { kind: "ownerless" },
@@ -390,35 +401,8 @@ export class Ingest {
   }
 
   private writeNote(paper: Paper, request: KbRequest, sections: Record<string, string>): string {
-    const card = this.deps.cards.get(request.cardId);
-    const judgment = this.deps.feedback.get(request.cardId);
     const stem = this.deps.vault.freeStem(noteStem(paper));
-    const props: [string, unknown][] = [
-      ["title", paper.title],
-      ["authors", paper.authors.slice(0, 10)],
-      ...(Object.entries(paper.ids) as [string, string][]).filter(([k]) => k !== "s2"),
-      ["year", paper.year ?? null],
-      ["venue", paper.venue ?? paper.server ?? null],
-      ["level", card?.level ?? null],
-      [
-        "kind",
-        (
-          this.deps.db
-            .prepare("SELECT kind FROM sweep_papers WHERE paper_id = ? AND kind IS NOT NULL LIMIT 1")
-            .get(paper.id) as { kind: string } | undefined
-        )?.kind ?? null,
-      ],
-      ["relevance", card?.relevance ?? null],
-      ["trust", card?.trust ?? null],
-      ["value", card?.value ?? null],
-      ["kb_added", new Date(this.now()).toISOString().slice(0, 10)],
-      ["why", judgment?.reason ?? ""],
-      ["link", paper.ids.doi ? `https://doi.org/${paper.ids.doi}` : (paper.url ?? null)],
-    ];
-    const front = props
-      .filter(([, v]) => v !== null && v !== undefined)
-      .map(([k, v]) => `${k}: ${yaml(v)}`)
-      .join("\n");
+    const front = this.frontMatter(paper, request);
     const body = SECTIONS.map(([key, heading]) => `## ${heading}\n\n${sections[key].trim()}\n`).join("\n");
     this.deps.vault.create(`sources/${stem}.md`, `---\n${front}\n---\n\n${body}\n## Related papers\n`);
     const first = sections.summary.trim().split(/(?<=[.!?])\s+/)[0];
@@ -427,6 +411,34 @@ export class Ingest {
       .prepare("INSERT OR IGNORE INTO kb_notes (paper_id, stem, summary, created_at) VALUES (?, ?, ?, ?)")
       .run(paper.id, stem, summary, nowIso());
     return this.note(paper.id)!;
+  }
+
+  /** The note's properties: identifiers, the card's scores, when it was added, and why the user kept it. */
+  private frontMatter(paper: Paper, request: KbRequest): string {
+    const card = this.deps.cards.get(request.cardId);
+    const judgment = this.deps.feedback.get(request.cardId);
+    const kind = this.deps.db
+      .prepare("SELECT kind FROM sweep_papers WHERE paper_id = ? AND kind IS NOT NULL LIMIT 1")
+      .get(paper.id) as { kind: string } | undefined;
+    const props: [string, unknown][] = [
+      ["title", paper.title],
+      ["authors", paper.authors.slice(0, 10)],
+      ...(Object.entries(paper.ids) as [string, string][]).filter(([k]) => k !== "s2"),
+      ["year", paper.year ?? null],
+      ["venue", paper.venue ?? paper.server ?? null],
+      ["level", card?.level ?? null],
+      ["kind", kind?.kind ?? null],
+      ["relevance", card?.relevance ?? null],
+      ["trust", card?.trust ?? null],
+      ["value", card?.value ?? null],
+      ["kb_added", new Date(this.now()).toISOString().slice(0, 10)],
+      ["why", judgment?.reason ?? ""],
+      ["link", paper.ids.doi ? `https://doi.org/${paper.ids.doi}` : (paper.url ?? null)],
+    ];
+    return props
+      .filter(([, v]) => v !== null && v !== undefined)
+      .map(([k, v]) => `${k}: ${yaml(v)}`)
+      .join("\n");
   }
 
   private link(stem: string, concepts: string[], questions: string[], related: string[]): string {
