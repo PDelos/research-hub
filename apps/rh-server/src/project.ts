@@ -146,6 +146,59 @@ export interface OpenProjectOptions {
   kbViewer?: { enabled: boolean; dir: string; obsidianVersion: string; restartDelays?: number[] };
 }
 
+type HostFactory = NonNullable<Parameters<typeof startPluginHost>[0]["builtinHost"]>;
+
+/** What built-in plugins get as `context.host`: the project's shared services and plugin management. */
+function builtinHostFactory(
+  shared: Pick<BuiltinHost, "name" | "dir" | "db" | "settings" | "telemetry" | "log" | "options" | "observe">,
+  plugins: () => PluginHost,
+): HostFactory {
+  return (services, exportsOf, pluginState, kernel): BuiltinHost => ({
+    ...shared,
+    offline: shared.options.offline,
+    services,
+    exportsOf,
+    pluginHistory: (limit = 100) => pluginState.history(limit),
+    configure: (pluginId, changes, actor) => kernel().configure(pluginId, changes, actor),
+    undo: async (commit, actor) => void (await kernel().undo(commit, actor)),
+    settingsOf: (pluginId) => kernel().settings(pluginId),
+    // Called after start-up (the engineer builds later), when the plugin host exists.
+    manage: {
+      install: async (folder, actor) => {
+        const plan = await plugins().installer.prepare({ folder });
+        await plugins().installer.confirm(plan.planId, actor);
+        return plan.id;
+      },
+      setEnabled: (pluginId, enabled, actor) => kernel().setEnabled(pluginId, enabled, { actor }),
+      uninstall: (pluginId, actor) => plugins().installer.uninstall(pluginId, { actor, deleteData: true }),
+    },
+  });
+}
+
+/** Every active plugin's agent extensions and lifecycle hooks (the agent runtime is the kernel's, design D2). */
+async function agentHooks(plugins: PluginHost): Promise<AgentHooks[]> {
+  const hooks: AgentHooks[] = [];
+  for (const plugin of plugins.kernel.list())
+    if (plugin.state === "active") hooks.push(await plugins.exportsOf<AgentHooks>(plugin.id));
+  return hooks;
+}
+
+type RootConversation = Awaited<ReturnType<ProjectRuntime["harness"]["harness"]["root"]>>;
+type ChatModel = ReturnType<ModelCatalog["forJob"]>;
+
+/** The root conversation keeps the model it was created with; apply the configured chat model on every start. */
+async function applyChatModel(
+  root: RootConversation,
+  context: ProjectRuntime["ctx"],
+  chatModel: ChatModel,
+  log: Logger,
+): Promise<void> {
+  const current = (await root.agent(context)).model;
+  if (current?.modelId === chatModel.modelId && current?.provider === chatModel.provider) return;
+  await root.configure({ model: chatModel }, context);
+  log.info("agent.model_applied", { from: current?.modelId, to: chatModel.modelId });
+}
+
 export async function openProject(options: OpenProjectOptions): Promise<ProjectRuntime> {
   const { name, log } = options;
   const dir = options.dataDir;
@@ -174,33 +227,7 @@ export async function openProject(options: OpenProjectOptions): Promise<ProjectR
     // First-start enablement follows the configuration (RH_KB_VIEWER may come from the .env file).
     env: { ...process.env, RH_KB_VIEWER: options.kbViewer?.enabled === false ? "off" : "on" },
     ...(options.paperFetch ? { fetch: options.paperFetch } : {}),
-    builtinHost: (services, exportsOf, pluginState, kernel): BuiltinHost => ({
-      name,
-      dir,
-      db,
-      settings,
-      telemetry,
-      log: plog,
-      offline: options.offline,
-      options,
-      services,
-      observe,
-      exportsOf,
-      pluginHistory: (limit = 100) => pluginState.history(limit),
-      configure: (pluginId, changes, actor) => kernel().configure(pluginId, changes, actor),
-      undo: async (commit, actor) => void (await kernel().undo(commit, actor)),
-      settingsOf: (pluginId) => kernel().settings(pluginId),
-      // Called after start-up (the engineer builds later), when `plugins` is set.
-      manage: {
-        install: async (folder, actor) => {
-          const plan = await plugins.installer.prepare({ folder });
-          await plugins.installer.confirm(plan.planId, actor);
-          return plan.id;
-        },
-        setEnabled: (pluginId, enabled, actor) => kernel().setEnabled(pluginId, enabled, { actor }),
-        uninstall: (pluginId, actor) => plugins.installer.uninstall(pluginId, { actor, deleteData: true }),
-      },
-    }),
+    builtinHost: builtinHostFactory({ name, dir, db, settings, telemetry, log: plog, options, observe }, () => plugins),
   });
   const { catalog } = await plugins.exportsOf<ProviderExports>("rh.provider-openrouter");
   const jevPlugin = await plugins.exportsOf<DecisionExports>("rh.decision-jev");
@@ -214,10 +241,7 @@ export async function openProject(options: OpenProjectOptions): Promise<ProjectR
   const desk = await plugins.exportsOf<DeskExports>("rh.desk");
   const kb = await plugins.exportsOf<KbExports>("rh.kb");
   const { vault, kbIndex, ingest } = kb;
-  // The agent runtime (owned by the kernel, design D2): every active plugin's agent extensions.
-  const hooks: AgentHooks[] = [];
-  for (const p of plugins.kernel.list())
-    if (p.state === "active") hooks.push(await plugins.exportsOf<AgentHooks>(p.id));
+  const hooks = await agentHooks(plugins);
   const agents = desk.createAgents({
     extra: [
       observe,
@@ -249,12 +273,7 @@ export async function openProject(options: OpenProjectOptions): Promise<ProjectR
   const stopProjector = startProjector(harness.harness, telemetry, plog);
   const chatModel = catalog.forJob("chat");
   const root = await harness.harness.root(context, { agent: { model: chatModel, thinkingLevel: "low" } });
-  // The root conversation keeps the model it was created with; apply the configured chat model on every start.
-  const current = (await root.agent(context)).model;
-  if (current?.modelId !== chatModel.modelId || current?.provider !== chatModel.provider) {
-    await root.configure({ model: chatModel }, context);
-    plog.info("agent.model_applied", { from: current?.modelId, to: chatModel.modelId });
-  }
+  await applyChatModel(root, context, chatModel, plog);
   const model = async () => {
     const agent = await root.agent(context);
     const id = agent.model?.modelId ?? chatModel.modelId;

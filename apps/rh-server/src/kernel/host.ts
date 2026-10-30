@@ -46,6 +46,18 @@ export interface PluginHost {
   stop(): Promise<void>;
 }
 
+const UNAVAILABLE = new Set(["failed", "blocked", "incompatible"]);
+
+/** An installed plugin whose files changed since it was approved does not run (tampering or a manual edit). */
+function markChangedPlugins(discovery: Discovery, state: PluginState): void {
+  for (const plugin of discovery.plugins.values()) {
+    const locked = state.current().plugins[plugin.manifest.id];
+    if (plugin.builtin || !locked?.hash || plugin.incompatible) continue;
+    if (hashFolder(plugin.dir) !== locked.hash)
+      plugin.incompatible = "its files changed since it was installed; reinstall it";
+  }
+}
+
 export async function startPluginHost(options: PluginHostOptions): Promise<PluginHost> {
   const env = options.env ?? process.env;
   const log = options.log.child({ component: "plugins" });
@@ -56,13 +68,7 @@ export async function startPluginHost(options: PluginHostOptions): Promise<Plugi
   });
   for (const invalid of discovery.invalid) log.warn("plugin.invalid", { dir: invalid.dir, problems: invalid.problems });
   await state.open(() => initialPlugins(discovery, env));
-  // An installed plugin whose files changed since it was approved does not run (tampering or a manual edit).
-  for (const plugin of discovery.plugins.values()) {
-    const locked = state.current().plugins[plugin.manifest.id];
-    if (plugin.builtin || !locked?.hash || plugin.incompatible) continue;
-    if (hashFolder(plugin.dir) !== locked.hash)
-      plugin.incompatible = "its files changed since it was installed; reinstall it";
-  }
+  markChangedPlugins(discovery, state);
   const events = new EventBus(log);
   const services: KernelServices = {
     db: options.db,
@@ -106,8 +112,7 @@ export async function startPluginHost(options: PluginHostOptions): Promise<Plugi
   services.contributions = contributions;
   await kernel.start();
   for (const p of kernel.list())
-    if (p.state === "failed" || p.state === "blocked" || p.state === "incompatible")
-      log.warn("plugin.unavailable", { plugin: p.id, state: p.state, reason: p.reason });
+    if (UNAVAILABLE.has(p.state)) log.warn("plugin.unavailable", { plugin: p.id, state: p.state, reason: p.reason });
   const installer = new PluginInstaller({ kernel, state, discovery, db: options.db, log });
   return {
     kernel,

@@ -27,6 +27,12 @@ export interface EmbeddingCall {
 }
 
 /** Records every embedding call for the cost totals. */
+interface EmbeddingsBody {
+  data?: { embedding: number[]; index: number }[];
+  usage?: { total_tokens?: number; prompt_tokens?: number; cost?: number };
+  error?: { message?: string };
+}
+
 export class EmbeddingLedger {
   constructor(private readonly db: Db) {}
 
@@ -97,15 +103,24 @@ export class OpenRouterEmbedder implements Embedder {
     return out;
   }
 
+  /** One unit vector per input, in input order; a short answer or a wrong size is an error. */
+  private vectorsOf(body: EmbeddingsBody, count: number): Float32Array[] {
+    if (!body.data || body.data.length !== count)
+      throw new Error(body.error?.message ?? `expected ${count} embeddings, got ${body.data?.length ?? 0}`);
+    return [...body.data]
+      .sort((a, b) => a.index - b.index)
+      .map((item) => {
+        if (this.dims && item.embedding.length !== this.dims)
+          throw new Error(`${this.model} returned ${item.embedding.length} dimensions, RH_EMBED_DIMS is ${this.dims}`);
+        return l2normalize(Float32Array.from(item.embedding));
+      });
+  }
+
   private async batch(input: string[]): Promise<Float32Array[]> {
     const started = Date.now();
     const call: EmbeddingCall = { model: this.model, inputs: input.length, costSource: "unknown", elapsedMs: 0 };
     try {
-      const body = await this.http.json<{
-        data?: { embedding: number[]; index: number }[];
-        usage?: { total_tokens?: number; prompt_tokens?: number; cost?: number };
-        error?: { message?: string };
-      }>(this.options.url ?? OPENROUTER_EMBEDDINGS, {
+      const body = await this.http.json<EmbeddingsBody>(this.options.url ?? OPENROUTER_EMBEDDINGS, {
         source: "embeddings",
         method: "POST",
         // A batch of 32 abstracts can take a while; allow 60 s per attempt and 3 minutes in all.
@@ -120,17 +135,7 @@ export class OpenRouterEmbedder implements Embedder {
         }),
         headers: { authorization: `Bearer ${this.options.apiKey}`, "content-type": "application/json" },
       });
-      if (!body.data || body.data.length !== input.length)
-        throw new Error(body.error?.message ?? `expected ${input.length} embeddings, got ${body.data?.length ?? 0}`);
-      const vectors = [...body.data]
-        .sort((a, b) => a.index - b.index)
-        .map((item) => {
-          if (this.dims && item.embedding.length !== this.dims)
-            throw new Error(
-              `${this.model} returned ${item.embedding.length} dimensions, RH_EMBED_DIMS is ${this.dims}`,
-            );
-          return l2normalize(Float32Array.from(item.embedding));
-        });
+      const vectors = this.vectorsOf(body, input.length);
       call.tokens = body.usage?.total_tokens ?? body.usage?.prompt_tokens;
       if (typeof body.usage?.cost === "number") {
         call.costUsd = body.usage.cost;

@@ -420,20 +420,21 @@ export class Ingest {
     const kind = this.deps.db
       .prepare("SELECT kind FROM sweep_papers WHERE paper_id = ? AND kind IS NOT NULL LIMIT 1")
       .get(paper.id) as { kind: string } | undefined;
+    // Missing values (null or undefined) are left out.
     const props: [string, unknown][] = [
       ["title", paper.title],
       ["authors", paper.authors.slice(0, 10)],
       ...(Object.entries(paper.ids) as [string, string][]).filter(([k]) => k !== "s2"),
-      ["year", paper.year ?? null],
-      ["venue", paper.venue ?? paper.server ?? null],
-      ["level", card?.level ?? null],
-      ["kind", kind?.kind ?? null],
-      ["relevance", card?.relevance ?? null],
-      ["trust", card?.trust ?? null],
-      ["value", card?.value ?? null],
+      ["year", paper.year],
+      ["venue", paper.venue ?? paper.server],
+      ["level", card?.level],
+      ["kind", kind?.kind],
+      ["relevance", card?.relevance],
+      ["trust", card?.trust],
+      ["value", card?.value],
       ["kb_added", new Date(this.now()).toISOString().slice(0, 10)],
       ["why", judgment?.reason ?? ""],
-      ["link", paper.ids.doi ? `https://doi.org/${paper.ids.doi}` : (paper.url ?? null)],
+      ["link", paper.ids.doi ? `https://doi.org/${paper.ids.doi}` : paper.url],
     ];
     return props
       .filter(([, v]) => v !== null && v !== undefined)

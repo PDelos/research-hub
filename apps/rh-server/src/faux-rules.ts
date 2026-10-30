@@ -155,6 +155,22 @@ export const deskJudgeRule: FauxRule = (turn) => {
   return call("judge_card", { verdict, position, ...(match[3].trim() ? { reason: match[3].trim() } : {}) });
 };
 
+/** Evidence-note sections picked from the abstract's sentences by keyword. */
+function sectionsFromAbstract(prompt: string) {
+  const abstract = prompt.split("ABSTRACT:\n")[1]?.split("\n\nRESEARCH_QUESTIONS:")[0]?.trim() ?? "";
+  const sentences = abstract === "(no abstract)" ? [] : abstract.split(/(?<=[.!?])\s+/).filter(Boolean);
+  const none = "Not stated in the abstract";
+  const find = (pattern: RegExp) => sentences.find((x) => pattern.test(x)) ?? none;
+  return {
+    summary: sentences[0] ?? none,
+    contributions: find(/\b(we (propose|introduce|present)|novel|first)\b/i),
+    method: find(/\b(we (propose|use|train|fine-tune|develop|apply)|our (model|method|approach))\b/i),
+    results: find(/\b(improv|outperform|achiev|\d)/i),
+    limitations: none,
+    open_questions: none,
+  };
+}
+
 /**
  * The offline librarian: sections from the abstract (first sentence as summary, a "we propose/use" sentence as
  * method, a sentence with a number or "improves" as results, the rest "Not stated in the abstract"), then links the
@@ -164,20 +180,8 @@ export const librarianRule: FauxRule = (turn) => {
   if (!turn.sections["librarian"]) return undefined;
   const prompt = turn.lastUser;
   if (turn.results.some((r) => r.name === "link_note" && !r.isError)) return say("Done.");
-  if (!turn.results.some((r) => r.name === "write_evidence_note" && !r.isError)) {
-    const abstract = prompt.split("ABSTRACT:\n")[1]?.split("\n\nRESEARCH_QUESTIONS:")[0]?.trim() ?? "";
-    const sentences = abstract === "(no abstract)" ? [] : abstract.split(/(?<=[.!?])\s+/).filter(Boolean);
-    const find = (re: RegExp) => sentences.find((x) => re.test(x));
-    const none = "Not stated in the abstract";
-    return call("write_evidence_note", {
-      summary: sentences[0] ?? none,
-      contributions: find(/\b(we (propose|introduce|present)|novel|first)\b/i) ?? none,
-      method: find(/\b(we (propose|use|train|fine-tune|develop|apply)|our (model|method|approach))\b/i) ?? none,
-      results: find(/\b(improv|outperform|achiev|\d)/i) ?? none,
-      limitations: none,
-      open_questions: none,
-    });
-  }
+  if (!turn.results.some((r) => r.name === "write_evidence_note" && !r.isError))
+    return call("write_evidence_note", sectionsFromAbstract(prompt));
   const concept = prompt.match(/^CHARTER_CONCEPTS: ([^;\n]+)/m)?.[1]?.trim();
   const question = prompt.match(/^MATCHED_QUESTION: (Q\d+)/m)?.[1];
   return call("link_note", { concepts: concept ? [concept] : ["research"], questions: question ? [question] : [] });

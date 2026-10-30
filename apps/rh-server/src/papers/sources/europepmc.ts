@@ -34,10 +34,15 @@ export class EuropePmcSource implements PaperSource {
   }
 }
 
+/** A preprint ("PPR") names its server as the publisher; anything else has a journal. */
+function hostOf(record: any): { venue: string | undefined; server: string | undefined } {
+  if (record.source === "PPR") return { venue: undefined, server: serverName(record.bookOrReportDetails?.publisher) };
+  return { venue: cleanText(record.journalInfo?.journal?.title) || undefined, server: undefined };
+}
+
 export function mapEuropePmcRecord(record: any): SourcePaper | null {
   const title = cleanText(record?.title).replace(/\.$/, "");
   if (!title || !record.id) return null;
-  const preprint = record.source === "PPR";
   const authors = ((record.authorList?.author ?? []) as any[])
     .map((a) => cleanText(a.fullName ?? a.collectiveName))
     .filter(Boolean);
@@ -53,8 +58,7 @@ export function mapEuropePmcRecord(record: any): SourcePaper | null {
     authors: authors.length ? authors : splitAuthorString(record.authorString),
     year: record.pubYear ? Number(record.pubYear) : undefined,
     publishedAt: normalizeDate(record.firstPublicationDate),
-    venue: preprint ? undefined : cleanText(record.journalInfo?.journal?.title) || undefined,
-    server: preprint ? serverName(record.bookOrReportDetails?.publisher) : undefined,
+    ...hostOf(record),
     oaUrl: free?.url,
     url: `https://europepmc.org/article/${record.source}/${record.id}`,
     citedByCount: typeof record.citedByCount === "number" ? record.citedByCount : undefined,

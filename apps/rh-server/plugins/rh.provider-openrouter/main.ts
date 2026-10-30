@@ -25,6 +25,32 @@ export interface ProviderExports {
 
 const CHAT_URL = "https://openrouter.ai/api/v1/chat/completions";
 
+interface ResearchBody {
+  choices?: {
+    message?: {
+      content?: string;
+      annotations?: { type: string; url_citation?: { url: string; title?: string } }[];
+    };
+  }[];
+  usage?: { cost?: number };
+  error?: { message?: string };
+}
+
+/** The answer text, the pages it cites, and what it cost; an empty answer is an error. */
+function researchAnswer(body: ResearchBody) {
+  const message = body.choices?.[0]?.message;
+  if (!message?.content) throw new Error(body.error?.message ?? "the research answer was empty");
+  return {
+    text: message.content,
+    citations: (message.annotations ?? []).flatMap((a) =>
+      a.url_citation
+        ? [{ url: a.url_citation.url, ...(a.url_citation.title ? { title: a.url_citation.title } : {}) }]
+        : [],
+    ),
+    costUsd: typeof body.usage?.cost === "number" ? body.usage.cost : 0,
+  };
+}
+
 export function activate(context: PluginContext): ProviderExports {
   const host = hostOf(context);
   const catalog = host.options.catalog;
@@ -55,16 +81,7 @@ export function activate(context: PluginContext): ProviderExports {
   const research: ProviderExports["research"] = async (prompt, options = {}) => {
     if (host.offline && !host.options.paperFetch) throw new ResearchUnavailable("offline mode: no web search");
     const model = catalog.forJob("chat").modelId;
-    const body = await context.rh.http.json<{
-      choices?: {
-        message?: {
-          content?: string;
-          annotations?: { type: string; url_citation?: { url: string; title?: string } }[];
-        };
-      }[];
-      usage?: { cost?: number };
-      error?: { message?: string };
-    }>(CHAT_URL, {
+    const body = await context.rh.http.json<ResearchBody>(CHAT_URL, {
       method: "POST",
       // Web search plus a reasoning model can take minutes; this runs in the background (weekly upgrade).
       timeoutMs: 300_000,
@@ -85,18 +102,7 @@ export function activate(context: PluginContext): ProviderExports {
         ],
       }),
     });
-    const message = body.choices?.[0]?.message;
-    if (!message?.content) throw new Error(body.error?.message ?? "the research answer was empty");
-    return {
-      text: message.content,
-      citations: (message.annotations ?? []).flatMap((a) =>
-        a.url_citation
-          ? [{ url: a.url_citation.url, ...(a.url_citation.title ? { title: a.url_citation.title } : {}) }]
-          : [],
-      ),
-      model,
-      costUsd: typeof body.usage?.cost === "number" ? body.usage.cost : 0,
-    };
+    return { ...researchAnswer(body), model };
   };
   return { catalog, research };
 }

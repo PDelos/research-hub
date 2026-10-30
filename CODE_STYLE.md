@@ -14,7 +14,7 @@ inheritance, dependency injection, no premature optimization, pure functions whe
   `unicorn/no-lonely-if`, and the name rules of our plugin `lint/code-aesthetic.mjs` (`aesthetic/no-single-letter`,
   `aesthetic/no-abbreviations`, `aesthetic/no-utils-module`).
 - Rules with work left are **warnings**; `vp lint .` lists every open item, and a rule becomes an **error** when it
-  reaches zero. Errors now: the three name rules, `max-depth`, `max-nested-callbacks`, `max-params`, `no-nested-ternary`, `no-else-return`, `unicorn/no-lonely-if`. Vendored packages (`packages/durable-agent`, `packages/jev`) are out of scope; tests skip the size
+  reaches zero. Errors now: the three name rules, `complexity`, `max-depth`, `max-nested-callbacks`, `max-params`, `no-nested-ternary`, `no-else-return`, `unicorn/no-lonely-if`. Vendored packages (`packages/durable-agent`, `packages/jev`) are out of scope; tests skip the size
   rules (they are lists of steps) but keep nesting and names.
 
 To see what is open: `npx vp lint . 2>&1 | grep -E "aesthetic|max-|complexity|nested-ternary"`.

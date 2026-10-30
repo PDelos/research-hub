@@ -38,7 +38,7 @@ export default defineConfig({
       // Code aesthetics (the code-aesthetic skill; CODE_STYLE.md): warnings until STYLE_REPORT.md is empty, then errors.
       "max-depth": ["error", { max: 3 }],
       "max-nested-callbacks": ["error", { max: 3 }],
-      complexity: ["warn", { max: 15 }],
+      complexity: ["error", { max: 15 }],
       "max-lines-per-function": ["warn", { max: 80, skipBlankLines: true, skipComments: true }],
       "max-lines": ["warn", { max: 400, skipBlankLines: true, skipComments: true }],
       "max-params": ["error", { max: 4 }],

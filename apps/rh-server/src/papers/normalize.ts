@@ -172,6 +172,14 @@ const ABBREVIATIONS = new Set([
   "dec",
 ]);
 
+/** Whether a period after `before` ends an abbreviation ("e.g.", "et al.") or a capital initial, not a sentence. */
+function isAbbreviationEnd(before: string): boolean {
+  const word = before.match(/([A-Za-z.]+)$/)?.[1]?.toLowerCase() ?? "";
+  const phrase = before.match(/([A-Za-z]+ [A-Za-z]+)$/)?.[1]?.toLowerCase() ?? "";
+  if (ABBREVIATIONS.has(word) || ABBREVIATIONS.has(phrase)) return true;
+  return /^[a-z]$/i.test(word) && /\s[A-Z]$|^[A-Z]$/.test(before);
+}
+
 /**
  * Split an abstract into sentences. A sentence ends at ".", "!" or "?" followed by whitespace and an uppercase
  * letter, digit, quote or bracket, unless the period belongs to a decimal, an abbreviation such as "e.g." or
@@ -184,17 +192,7 @@ export function splitSentences(text: string): string[] {
   let start = 0;
   const boundary = /([.!?])["')\]]*\s+(?=["'([]?[A-Z0-9])/g;
   for (let m = boundary.exec(clean); m; m = boundary.exec(clean)) {
-    if (m[1] === ".") {
-      const before = clean.slice(start, m.index);
-      const word = before.match(/([A-Za-z.]+)$/)?.[1]?.toLowerCase() ?? "";
-      const phrase = before.match(/([A-Za-z]+ [A-Za-z]+)$/)?.[1]?.toLowerCase() ?? "";
-      if (
-        ABBREVIATIONS.has(word) ||
-        ABBREVIATIONS.has(phrase) ||
-        (/^[a-z]$/i.test(word) && /\s[A-Z]$|^[A-Z]$/.test(before))
-      )
-        continue;
-    }
+    if (m[1] === "." && isAbbreviationEnd(clean.slice(start, m.index))) continue;
     const sentence = clean.slice(start, m.index + m[0].trimEnd().length).trim();
     if (/\p{L}/u.test(sentence)) out.push(sentence);
     start = m.index + m[0].length;

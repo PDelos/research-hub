@@ -46,25 +46,47 @@ const names: Record<string, string> = { "kb.viewer": "Knowledge base viewer" };
 const label = (key: string) =>
   names[key] ?? key.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/^./, (c) => c.toUpperCase());
 
+/** The value a field holds, as the setting's type: JSON fields parsed, numbers as numbers; "" means unset. */
+function fieldValue(key: string): unknown {
+  const type = props.properties[key].type;
+  if (type === "object" || type === "array") {
+    const text = json.value[key].trim();
+    if (!text) return "";
+    try {
+      return JSON.parse(text);
+    } catch {
+      throw new Error(`${key}: not valid JSON`);
+    }
+  }
+  const value = form.value[key];
+  const isNumber = type === "integer" || type === "number";
+  return isNumber && typeof value === "string" && value.trim() !== "" ? Number(value) : value;
+}
+
+/** The settings that differ from the saved values (an emptied field becomes null, back to its default). */
+function changedSettings(): Record<string, unknown> {
+  const changes: Record<string, unknown> = {};
+  for (const key of Object.keys(props.properties)) {
+    const value = fieldValue(key);
+    if (JSON.stringify(value) !== JSON.stringify(props.values[key] ?? "")) changes[key] = value === "" ? null : value;
+  }
+  return changes;
+}
+
+const problemsOf = (error: unknown): string[] =>
+  isRhError(error) && Array.isArray(error.details)
+    ? (error.details as string[])
+    : [error instanceof Error ? error.message : String(error)];
+
 async function save() {
   problems.value = [];
   saved.value = "";
-  const changes: Record<string, unknown> = {};
-  for (const key of Object.keys(props.properties)) {
-    const before = props.values[key] ?? "";
-    let value = form.value[key];
-    if (props.properties[key].type === "object" || props.properties[key].type === "array") {
-      try {
-        value = json.value[key].trim() ? JSON.parse(json.value[key]) : "";
-      } catch {
-        problems.value = [`${key}: not valid JSON`];
-        return;
-      }
-    }
-    const type = props.properties[key].type;
-    if ((type === "integer" || type === "number") && typeof value === "string" && value.trim() !== "")
-      value = Number(value);
-    if (JSON.stringify(value) !== JSON.stringify(before)) changes[key] = value === "" ? null : value;
+  let changes: Record<string, unknown>;
+  try {
+    changes = changedSettings();
+  } catch (error) {
+    problems.value = problemsOf(error);
+    return;
   }
   if (!Object.keys(changes).length) return void (saved.value = "Nothing changed.");
   try {
@@ -73,10 +95,7 @@ async function save() {
     await plugins.refresh();
     emit("saved");
   } catch (error) {
-    problems.value =
-      isRhError(error) && Array.isArray(error.details)
-        ? (error.details as string[])
-        : [error instanceof Error ? error.message : String(error)];
+    problems.value = problemsOf(error);
   }
 }
 </script>
