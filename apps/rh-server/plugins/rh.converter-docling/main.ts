@@ -1,9 +1,9 @@
 // Built-in plugin rh.converter-docling (spec full-text: Converter slot; design v1-6 D3): PDFs through Docling Serve,
 // (its async API: submit, poll, collect), either one at RH_DOCLING_URL or, with RH_DOCLING=on (the research-hub:full image), a local `docling-serve` this
 // plugin starts on first use and supervises (restarted with backoff). Markdown out, split into sections.
-import { spawn, type ChildProcess } from "node:child_process";
 import { hostOf } from "../../src/kernel/builtin.ts";
 import type { PluginContext } from "../../src/kernel/lifecycle.ts";
+import { LocalServer } from "../../src/kernel/local-server.ts";
 import { markdownToSections } from "../../src/fulltext/parse.ts";
 import type { ConverterExports } from "../rh.fulltext/main.ts";
 
@@ -64,66 +64,31 @@ export function activate(context: PluginContext): ConverterExports {
   const local = (process.env.RH_DOCLING?.trim().toLowerCase() ?? "off") === "on";
   const port = Number(process.env.RH_DOCLING_PORT ?? 5001);
   const base = external || `http://127.0.0.1:${port}`;
-  let child: ChildProcess | undefined;
-  let starting: Promise<void> | undefined;
-  let stopped = false;
-  let restarts = 0;
-
-  const healthy = async () => {
-    try {
-      return (await fetch(`${base}/health`, { signal: AbortSignal.timeout(3_000) })).ok;
-    } catch {
-      return false;
-    }
-  };
-  const start = (): Promise<void> => {
-    if (external || stopped) return Promise.resolve();
-    starting ??= (async () => {
-      if (await healthy()) return;
-      const cmd = process.env.RH_DOCLING_CMD?.trim() || "docling-serve";
-      child = spawn(cmd, ["run", "--host", "127.0.0.1", "--port", String(port)], {
-        stdio: ["ignore", "ignore", "pipe"],
-        // A long paper takes minutes on CPU; Docling Serve's default 120 s answers 504.
-        env: { ...process.env, DOCLING_SERVE_MAX_SYNC_WAIT: process.env.DOCLING_SERVE_MAX_SYNC_WAIT ?? "600" },
-      });
-      let stderr = "";
-      child.stderr?.on("data", (d) => (stderr = (stderr + String(d)).slice(-2_000)));
-      child.on("exit", (code) => {
-        child = undefined;
-        starting = undefined;
-        if (stopped) return;
-        host.log.warn("docling.exited", { code, stderr: stderr.slice(-500) });
-        // Restart on the next conversion, with a growing pause.
-        restarts++;
-      });
-      const deadline = Date.now() + START_TIMEOUT_MS;
-      while (Date.now() < deadline) {
-        if (!child) throw new Error(`docling-serve exited while starting: ${stderr.slice(-300)}`);
-        if (await healthy()) {
-          host.log.info("docling.started", { port });
-          return;
-        }
-        await new Promise((r) => setTimeout(r, 1_000));
-      }
-      throw new Error("docling-serve did not start within 3 minutes");
-    })();
-    return starting;
-  };
-  context.subscriptions.push({
-    dispose: () => {
-      stopped = true;
-      child?.kill("SIGTERM");
-    },
+  const server = new LocalServer({
+    base,
+    command: process.env.RH_DOCLING_CMD?.trim() || "docling-serve",
+    args: ["run", "--host", "127.0.0.1", "--port", String(port)],
+    // A long paper takes minutes on CPU; Docling Serve's default 120 s answers 504.
+    env: { ...process.env, DOCLING_SERVE_MAX_SYNC_WAIT: process.env.DOCLING_SERVE_MAX_SYNC_WAIT ?? "600" },
+    name: "docling-serve",
+    event: "docling",
+    startTimeoutMs: START_TIMEOUT_MS,
+    log: host.log,
   });
+  // An external Docling Serve is not ours to start.
+  const start = () => (external ? Promise.resolve() : server.start());
+  context.subscriptions.push({ dispose: () => server.stop() });
 
   return {
     available: () => {
       if (!external && !local)
         return { ok: false, reason: "needs the research-hub:full image (RH_DOCLING=on) or RH_DOCLING_URL" };
-      if (restarts > 5) return { ok: false, reason: "docling-serve keeps exiting (see the log)" };
+      if (server.restarts > 5) return { ok: false, reason: "docling-serve keeps exiting (see the log)" };
       return { ok: true };
     },
     async convert(pdf) {
+      // Restart after an exit with a growing pause.
+      const { restarts } = server;
       if (restarts) await new Promise((r) => setTimeout(r, Math.min(30_000, 1_000 * 2 ** restarts)));
       await start();
       return markdownToSections(await doclingMarkdown(base, pdf));

@@ -39,6 +39,58 @@ export interface KbExports extends AgentHooks {
   kbViewer(): KbViewer;
 }
 
+/** The registered kb.viewer implementations: the active one is shown, the others paused, one switch at a time. */
+class ViewerSwitch {
+  private readonly viewers = new Map<string, ViewerImpl>();
+  private isReady = false;
+  private switching: Promise<void> = Promise.resolve();
+
+  constructor(private readonly context: PluginContext) {}
+
+  get(id: string): ViewerImpl | undefined {
+    return this.viewers.get(id);
+  }
+
+  /** The saved choice, else Obsidian when it can run here, else the Library. */
+  active() {
+    const saved = this.context.savedSettings["kb.viewer"];
+    const automatic = this.viewers.get("obsidian")?.usable().ok ? "obsidian" : "library";
+    return hostOf(this.context).services.contributions.activeContribution("kb.viewer", {
+      "kb.viewer": saved ?? automatic,
+    });
+  }
+
+  /** A viewer enabled while the project runs is shown or paused at once. */
+  register(id: string, implementation: ViewerImpl): Disposable {
+    this.viewers.set(id, implementation);
+    void this.apply();
+    return { dispose: () => void (this.viewers.get(id) === implementation && this.viewers.delete(id)) };
+  }
+
+  /** The project is ready: viewers may start now. */
+  ready(): void {
+    this.isReady = true;
+    void this.apply();
+  }
+
+  apply(): Promise<void> {
+    if (!this.isReady) return this.switching;
+    const { contributions } = hostOf(this.context).services;
+    this.switching = this.switching.then(async () => {
+      await contributions.contributionsTo("kb.viewer", { activate: true });
+      const active = this.active();
+      for (const [id, implementation] of this.viewers)
+        // A viewer that cannot run here is still asked to start, so it reports why (e.g. no Ignis in this image).
+        if (id === active?.id || !implementation.usable().ok) await implementation.show();
+        else await implementation.hide(`the ${active?.title ?? "selected"} viewer is active`);
+    });
+    this.switching = this.switching.catch((error) =>
+      this.context.log.warn("kb.viewer_switch_failed", { error: String(error) }),
+    );
+    return this.switching;
+  }
+}
+
 /** A viewer that only says why there is none: RH_KB_VIEWER=off, or the Obsidian viewer plugin is disabled. */
 function disabledViewer(host: ReturnType<typeof hostOf>, vault: Vault): KbViewer {
   const { options } = host;
@@ -63,7 +115,6 @@ export function activate(context: PluginContext): KbExports {
   const { charters } = context.exports["rh.charter"] as CharterExports;
   const { feedback } = context.exports["rh.feedback"] as FeedbackExports;
   const { cards } = context.exports["rh.sweep"] as SweepExports;
-  const { contributions } = host.services;
 
   const vault = new Vault(join(host.dir, "vault"), {
     templateDir: join(dirname(options.promptsDir), "vault-template"),
@@ -94,29 +145,9 @@ export function activate(context: PluginContext): KbExports {
   // A new ⭐ (or any judgment change) may queue a knowledge-base request.
   context.subscriptions.push({ dispose: feedback.onChange(() => ingest.pickUp()) });
 
-  const viewers = new Map<string, ViewerImpl>();
-  let ready = false;
+  const viewers = new ViewerSwitch(context);
   let fallback: KbViewer | undefined;
-  const activeViewer = () => {
-    const saved = context.savedSettings["kb.viewer"];
-    const automatic = viewers.get("obsidian")?.usable().ok ? "obsidian" : "library";
-    return contributions.activeContribution("kb.viewer", { "kb.viewer": saved ?? automatic });
-  };
-  /** Show the active viewer and pause the others (once the project is ready); one switch at a time. */
-  let switching: Promise<void> = Promise.resolve();
-  const applyViewer = () => {
-    if (!ready) return switching;
-    switching = switching.then(async () => {
-      await contributions.contributionsTo("kb.viewer", { activate: true });
-      const active = activeViewer();
-      for (const [id, implementation] of viewers)
-        // A viewer that cannot run here is still asked to start, so it reports why (e.g. no Ignis in this image).
-        if (id === active?.id || !implementation.usable().ok) await implementation.show();
-        else await implementation.hide(`the ${active?.title ?? "selected"} viewer is active`);
-    });
-    switching = switching.catch((error) => context.log.warn("kb.viewer_switch_failed", { error: String(error) }));
-    return switching;
-  };
+  const applyViewer = () => viewers.apply();
   context.onSettingsChange(() => applyViewer());
 
   return {
@@ -129,13 +160,8 @@ export function activate(context: PluginContext): KbExports {
       ingest.pickUp();
       void applyViewer();
     },
-    registerViewer(id, implementation) {
-      viewers.set(id, implementation);
-      // A viewer enabled while the project runs is shown or paused at once.
-      void applyViewer();
-      return { dispose: () => void (viewers.get(id) === implementation && viewers.delete(id)) };
-    },
-    activeViewer,
+    registerViewer: (id, implementation) => viewers.register(id, implementation),
+    activeViewer: () => viewers.active(),
     kbViewer() {
       const own = viewers.get("obsidian")?.kbViewer;
       if (own) return own;
@@ -148,8 +174,7 @@ export function activate(context: PluginContext): KbExports {
     ready() {
       ingest.pickUp();
       kbIndex.start();
-      ready = true;
-      void applyViewer();
+      viewers.ready();
     },
   };
 }

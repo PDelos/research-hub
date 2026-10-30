@@ -1,10 +1,10 @@
 // Built-in plugin rh.embedder-local (spec slots: Local embedder alternative; design v1-8 D6): an Embedder slot
 // alternative that embeds with a model stored in the project (e.g. fine-tuned by the engineer on Kaggle), through a
 // small sentence-transformers server: started here with RH_LOCAL_EMBED=on (research-hub:full), or at RH_LOCAL_EMBED_URL.
-import { spawn, type ChildProcess } from "node:child_process";
 import { isAbsolute, join, normalize } from "node:path";
 import { hostOf } from "../../src/kernel/builtin.ts";
 import type { PluginContext } from "../../src/kernel/lifecycle.ts";
+import { LocalServer } from "../../src/kernel/local-server.ts";
 import type { Embedder, EmbeddingLedger } from "../../src/representations/embed.ts";
 import type { EmbedderExports } from "../rh.papers/main.ts";
 
@@ -45,48 +45,18 @@ export function activate(context: PluginContext): LocalEmbedderExports {
   const local = (process.env.RH_LOCAL_EMBED?.trim().toLowerCase() ?? "off") === "on";
   const port = Number(process.env.RH_LOCAL_EMBED_PORT ?? 5002);
   const base = external || `http://127.0.0.1:${port}`;
-  let child: ChildProcess | undefined;
-  let starting: Promise<void> | undefined;
-  let stopped = false;
-
-  const healthy = async () => {
-    try {
-      return (await fetch(`${base}/health`, { signal: AbortSignal.timeout(3_000) })).ok;
-    } catch {
-      return false;
-    }
-  };
-  const start = (): Promise<void> => {
-    if (external || stopped) return Promise.resolve();
-    starting ??= (async () => {
-      if (await healthy()) return;
-      const python = process.env.RH_LOCAL_EMBED_PYTHON?.trim() || "/opt/docling/bin/python";
-      child = spawn(python, [join(context.dir, "embed-server.py"), "--port", String(port)], {
-        stdio: ["ignore", "ignore", "pipe"],
-      });
-      let stderr = "";
-      child.stderr?.on("data", (d) => (stderr = (stderr + String(d)).slice(-2_000)));
-      child.on("exit", (code) => {
-        child = undefined;
-        starting = undefined;
-        if (!stopped) host.log.warn("local_embed.exited", { code, stderr: stderr.slice(-500) });
-      });
-      const deadline = Date.now() + START_TIMEOUT_MS;
-      while (Date.now() < deadline) {
-        if (!child) throw new Error(`the embedding server exited while starting: ${stderr.slice(-300)}`);
-        if (await healthy()) return;
-        await new Promise((r) => setTimeout(r, 1_000));
-      }
-      throw new Error("the embedding server did not start within 3 minutes");
-    })();
-    return starting;
-  };
-  context.subscriptions.push({
-    dispose: () => {
-      stopped = true;
-      child?.kill("SIGTERM");
-    },
+  const server = new LocalServer({
+    base,
+    command: process.env.RH_LOCAL_EMBED_PYTHON?.trim() || "/opt/docling/bin/python",
+    args: [join(context.dir, "embed-server.py"), "--port", String(port)],
+    name: "the embedding server",
+    event: "local_embed",
+    startTimeoutMs: START_TIMEOUT_MS,
+    log: host.log,
   });
+  // An external embedding server is not ours to start.
+  const start = () => (external ? Promise.resolve() : server.start());
+  context.subscriptions.push({ dispose: () => server.stop() });
 
   const embedWith = async (model: string, texts: string[], ledger?: EmbeddingLedger): Promise<Float32Array[]> => {
     await start();
