@@ -16,6 +16,29 @@ export interface LocalEmbedderExports extends EmbedderExports {
   probeDims(model: string): Promise<number>;
 }
 
+const BATCH = 64;
+
+/** A model folder inside the project's data folder (never elsewhere). */
+function modelPath(dataDir: string, model: string): string {
+  const rel = normalize(model).replace(/^(\.\.(\/|\\|$))+/, "");
+  if (!model || isAbsolute(model) || rel.startsWith(".."))
+    throw new Error(`model must be a folder inside the data folder, got "${model}"`);
+  return join(dataDir, rel);
+}
+
+/** One request to the local embedding server. */
+async function embedBatch(base: string, model: string, texts: string[]): Promise<Float32Array[]> {
+  const response = await fetch(`${base}/embed`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ model, texts }),
+    signal: AbortSignal.timeout(300_000),
+  });
+  const body = (await response.json()) as { vectors?: number[][]; error?: string };
+  if (!response.ok || !body.vectors) throw new Error(`local embedder: ${body.error ?? `HTTP ${response.status}`}`);
+  return body.vectors.map((v) => new Float32Array(v));
+}
+
 export function activate(context: PluginContext): LocalEmbedderExports {
   const host = hostOf(context);
   const external = process.env.RH_LOCAL_EMBED_URL?.trim().replace(/\/$/, "");
@@ -26,13 +49,6 @@ export function activate(context: PluginContext): LocalEmbedderExports {
   let starting: Promise<void> | undefined;
   let stopped = false;
 
-  /** A model folder inside the project's data folder (never elsewhere). */
-  const modelPath = (model: string) => {
-    const rel = normalize(model).replace(/^(\.\.(\/|\\|$))+/, "");
-    if (!model || isAbsolute(model) || rel.startsWith(".."))
-      throw new Error(`model must be a folder inside the data folder, got "${model}"`);
-    return join(host.dir, rel);
-  };
   const healthy = async () => {
     try {
       return (await fetch(`${base}/health`, { signal: AbortSignal.timeout(3_000) })).ok;
@@ -76,17 +92,9 @@ export function activate(context: PluginContext): LocalEmbedderExports {
     await start();
     const started = Date.now();
     const out: Float32Array[] = [];
-    for (let i = 0; i < texts.length; i += 64) {
-      const response = await fetch(`${base}/embed`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ model: modelPath(model), texts: texts.slice(i, i + 64) }),
-        signal: AbortSignal.timeout(300_000),
-      });
-      const body = (await response.json()) as { vectors?: number[][]; error?: string };
-      if (!response.ok || !body.vectors) throw new Error(`local embedder: ${body.error ?? `HTTP ${response.status}`}`);
-      out.push(...body.vectors.map((v) => new Float32Array(v)));
-    }
+    const path = modelPath(host.dir, model);
+    for (let i = 0; i < texts.length; i += BATCH)
+      out.push(...(await embedBatch(base, path, texts.slice(i, i + BATCH))));
     ledger?.record({
       model: `local/${model}`,
       inputs: texts.length,

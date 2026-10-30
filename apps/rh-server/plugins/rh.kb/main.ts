@@ -39,6 +39,22 @@ export interface KbExports extends AgentHooks {
   kbViewer(): KbViewer;
 }
 
+/** A viewer that only says why there is none: RH_KB_VIEWER=off, or the Obsidian viewer plugin is disabled. */
+function disabledViewer(host: ReturnType<typeof hostOf>, vault: Vault): KbViewer {
+  const { options } = host;
+  return new KbViewer({
+    enabled: false,
+    disabledReason: options.kbViewer?.enabled === false ? "RH_KB_VIEWER=off" : "the Obsidian viewer plugin is disabled",
+    ignisDir: options.kbViewer?.dir ?? "/opt/ignis",
+    stateDir: join(host.dir, "kb-viewer"),
+    vaultDir: vault.dir,
+    projectName: host.name,
+    obsidianVersion: options.kbViewer?.obsidianVersion ?? "1.14.4",
+    offline: options.offline,
+    log: host.log,
+  });
+}
+
 export function activate(context: PluginContext): KbExports {
   const host = hostOf(context);
   const { options } = host;
@@ -123,18 +139,7 @@ export function activate(context: PluginContext): KbExports {
     kbViewer() {
       const own = viewers.get("obsidian")?.kbViewer;
       if (own) return own;
-      fallback ??= new KbViewer({
-        enabled: false,
-        disabledReason:
-          options.kbViewer?.enabled === false ? "RH_KB_VIEWER=off" : "the Obsidian viewer plugin is disabled",
-        ignisDir: options.kbViewer?.dir ?? "/opt/ignis",
-        stateDir: join(host.dir, "kb-viewer"),
-        vaultDir: vault.dir,
-        projectName: host.name,
-        obsidianVersion: options.kbViewer?.obsidianVersion ?? "1.14.4",
-        offline: options.offline,
-        log: host.log,
-      });
+      fallback ??= disabledViewer(host, vault);
       return fallback;
     },
     agentExtensions: [kbTools(() => ({ vault, index: kbIndex }))],

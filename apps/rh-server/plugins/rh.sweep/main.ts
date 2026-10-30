@@ -27,17 +27,10 @@ export interface SweepExports extends AgentHooks {
   cardWriter: CardWriter;
 }
 
-export function activate(context: PluginContext): SweepExports {
-  const host = hostOf(context);
-  const { catalog } = context.exports["rh.provider-openrouter"] as ProviderExports;
-  const jev = context.exports["rh.decision-jev"] as DecisionExports;
-  const { papers } = context.exports["rh.papers"] as PapersExports;
-  const { charters } = context.exports["rh.charter"] as CharterExports;
-  const { scheduler } = context.exports["rh.schedule"] as ScheduleExports;
-  const { feedback, attachCards } = context.exports["rh.feedback"] as FeedbackExports;
-  migrateExploration(context.rh);
-  const decisions = new PaperDecisions({
-    db: host.db,
+/** Jev decisions for papers, with the user's recent judgments and approved taste rules as context. */
+function paperDecisions(context: PluginContext, jev: DecisionExports, feedback: FeedbackExports["feedback"]) {
+  return new PaperDecisions({
+    db: hostOf(context).db,
     jevDir: jev.jevDir,
     decide: jev.decide,
     ledger: jev.ledger,
@@ -47,6 +40,43 @@ export function activate(context: PluginContext): SweepExports {
         .map((j) => ({ title: j.title, verdict: j.verdict, ...(j.reason ? { reason: j.reason.slice(0, 200) } : {}) })),
     rules: () => (context.settings.tasteRules as string[] | undefined) ?? [],
   });
+}
+
+/** The settings in effect: unset thresholds come from the Jev commands' policies. */
+function sweepSettings(context: PluginContext, decisions: PaperDecisions, cardsPerSweep: number): SweepSettings {
+  const policyOf = (command: "on-theme" | "worth-reading") =>
+    decisions.command(command).policy as Record<string, number>;
+  return {
+    relevanceMin: (context.settings.relevanceMin as number | undefined) ?? policyOf("on-theme").relevance_min,
+    worthMin: (context.settings.worthMin as number | undefined) ?? policyOf("worth-reading").worth_min,
+    rankWeights: (context.settings.rankWeights as RankWeights | undefined) ?? DEFAULT_RANK_WEIGHTS,
+    cardsPerSweep,
+    explorationPicks: context.settings.explorationPicks as number,
+    level: (context.settings.level as TargetLevel | undefined) ?? "auto",
+  };
+}
+
+/** A replay variant may change only sweep settings, to values the manifest allows. */
+function validateVariant(context: PluginContext, variant: Record<string, unknown>): void {
+  const unknown = Object.keys(variant).filter((k) => !(k in DEFAULT_SETTINGS));
+  if (unknown.length)
+    throw new SettingsInvalid(
+      context.id,
+      unknown.map((k) => `${k}: not a sweep setting a replay can change`),
+    );
+  validateSettings(context.manifest, { ...context.settings, ...variant });
+}
+
+export function activate(context: PluginContext): SweepExports {
+  const host = hostOf(context);
+  const { catalog } = context.exports["rh.provider-openrouter"] as ProviderExports;
+  const jev = context.exports["rh.decision-jev"] as DecisionExports;
+  const { papers } = context.exports["rh.papers"] as PapersExports;
+  const { charters } = context.exports["rh.charter"] as CharterExports;
+  const { scheduler } = context.exports["rh.schedule"] as ScheduleExports;
+  const { feedback, attachCards } = context.exports["rh.feedback"] as FeedbackExports;
+  migrateExploration(context.rh);
+  const decisions = paperDecisions(context, jev, feedback);
   const sweeps = new SweepRunner({
     db: host.db,
     settings: host.settings,
@@ -101,27 +131,9 @@ export function activate(context: PluginContext): SweepExports {
       if (run.kind === "sweep" && runSweeps) sweeps.pickUp();
     }),
   });
-  const policyOf = (command: "on-theme" | "worth-reading") =>
-    decisions.command(command).policy as Record<string, number>;
-  const currentSettings = (): SweepSettings => ({
-    relevanceMin: (context.settings.relevanceMin as number | undefined) ?? policyOf("on-theme").relevance_min,
-    worthMin: (context.settings.worthMin as number | undefined) ?? policyOf("worth-reading").worth_min,
-    rankWeights: (context.settings.rankWeights as RankWeights | undefined) ?? DEFAULT_RANK_WEIGHTS,
-    cardsPerSweep: sweeps.cardsPerSweep(),
-    explorationPicks: context.settings.explorationPicks as number,
-    level: (context.settings.level as TargetLevel | undefined) ?? "auto",
-  });
   return {
-    currentSettings,
-    validateVariant: (variant) => {
-      const unknown = Object.keys(variant).filter((k) => !(k in DEFAULT_SETTINGS));
-      if (unknown.length)
-        throw new SettingsInvalid(
-          context.id,
-          unknown.map((k) => `${k}: not a sweep setting a replay can change`),
-        );
-      validateSettings(context.manifest, { ...context.settings, ...variant });
-    },
+    currentSettings: () => sweepSettings(context, decisions, sweeps.cardsPerSweep()),
+    validateVariant: (variant) => validateVariant(context, variant),
     decisions,
     sweeps,
     cards,
