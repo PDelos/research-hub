@@ -5,7 +5,14 @@
 import { join } from "node:path";
 import type { Context } from "@earendil-works/chord";
 import { Type } from "@earendil-works/pi-ai";
-import { defineExtension, section, type Extension, type Harness, type SubmissionId } from "@earendil-works/pi-durable";
+import {
+  defineExtension,
+  section,
+  type Extension,
+  type Harness,
+  type SubmissionId,
+  type ToolExecutionApi,
+} from "@earendil-works/pi-durable";
 import { allowOnly, defineAppTool, loadPrompt, once, toolError, toolText, type ModelCatalog } from "@rh/durable-agent";
 import type { Charters } from "../charter.ts";
 import { nowIso, type Db } from "../db.ts";
@@ -14,18 +21,11 @@ import type { Logger } from "../logger.ts";
 import type { Paper, PaperStore } from "../papers/store.ts";
 import { ungroundedNumbers } from "../sweep/card-writer.ts";
 import type { CardStore } from "../sweep/cards.ts";
-import { noteStem, slug, type Vault } from "./vault.ts";
+import { EvidenceNotes, SECTIONS } from "./notes.ts";
+import { slug, type Vault } from "./vault.ts";
 
 export const LIBRARIAN_TOOLS = ["write_evidence_note", "link_note"] as const;
 export const NOT_STATED = "Not stated in the abstract";
-export const SECTIONS = [
-  ["summary", "Summary"],
-  ["contributions", "Contributions"],
-  ["method", "Method"],
-  ["results", "Results"],
-  ["limitations", "Limitations"],
-  ["open_questions", "Open questions"],
-] as const;
 export const MAX_ATTEMPTS = 3;
 export const RETRY_MS = 60_000;
 
@@ -40,7 +40,7 @@ export interface KbRequest {
   submissionId?: number;
 }
 
-const yaml = (v: unknown) => JSON.stringify(v);
+type NoteSections = Record<(typeof SECTIONS)[number][0], string>;
 
 export class Ingest {
   readonly extension: Extension;
@@ -53,6 +53,7 @@ export class Ingest {
   private starting?: Promise<void>;
   private again = false;
   private readonly listeners = new Set<() => void>();
+  private readonly notes: EvidenceNotes;
 
   constructor(
     private readonly deps: {
@@ -70,6 +71,7 @@ export class Ingest {
       retryMs?: number;
     },
   ) {
+    this.notes = new EvidenceNotes({ ...deps, now: () => this.now() });
     const system = loadPrompt(join(deps.promptsDir, "agents"), "librarian", "SYSTEM_PROMPT.md", {});
     const sectionText = (d: string) => Type.String({ description: d });
     const write = defineAppTool({
@@ -90,21 +92,15 @@ export class Ingest {
         const paper = this.deps.store.get(request.paperId)!;
         const existing = this.note(paper.id);
         if (existing) return toolText(`The note ${existing} already exists; now call link_note.`);
-        const sections = args as Record<(typeof SECTIONS)[number][0], string>;
-        const problems: string[] = [];
-        for (const [key] of SECTIONS)
-          if (!sections[key]?.trim())
-            problems.push(`${key} is empty (write "${NOT_STATED}" if the abstract says nothing about it)`);
-        const reason = this.deps.feedback.get(request.cardId)?.reason ?? "";
-        const source = `${paper.title} ${paper.abstract ?? ""} ${reason} ${this.fullTexts.get(paper.id) ?? ""}`;
-        const invented = ungroundedNumbers(SECTIONS.map(([k]) => sections[k] ?? "").join(" "), source);
-        if (invented.length)
-          problems.push(`numbers not in the title, abstract, full text or reason: ${invented.join(", ")}`);
+        const sections = args as NoteSections;
+        const problems = this.noteProblems(paper, request, sections);
         if (problems.length)
           return toolError(`The note was not written: ${problems.join("; ")}.`, [
             "Fix exactly these and call write_evidence_note again.",
           ]);
-        const stem = await once<string>(api, "note", context, async () => this.writeNote(paper, request, sections));
+        const stem = await once<string>(api, "note", context, async () =>
+          this.notes.write(paper, request.cardId, sections),
+        );
         return toolText(`Wrote sources/${stem}.md. Now call link_note with at least one concept or research question.`);
       },
     });
@@ -118,26 +114,7 @@ export class Ingest {
         questions: Type.Optional(Type.Array(Type.String(), { maxItems: 7 })),
         related: Type.Optional(Type.Array(Type.String(), { maxItems: 5, description: "Stems of existing notes" })),
       }),
-      execute: async (args, api, context) => {
-        const request = this.active();
-        if (!request) return toolError("No paper is being ingested.", ["Stop here."]);
-        const stem = this.note(request.paperId);
-        if (!stem) return toolError("There is no note yet.", ["Call write_evidence_note first."]);
-        const charter = this.deps.charters.approved()?.charter;
-        const questions = (args.questions ?? [])
-          .map((q) => q.trim().toUpperCase())
-          .filter((q) => charter?.questions.some((x) => x.id === q));
-        const concepts = (args.concepts ?? []).map((c) => c.trim()).filter((c) => slug(c));
-        if (!questions.length && !concepts.length)
-          return toolError("Nothing to link: give at least one concept or a research question id from the list.", [
-            "Call link_note again.",
-          ]);
-        const result = await once<string>(api, "link", context, async () =>
-          this.link(stem, concepts, questions, args.related ?? []),
-        );
-        this.tryComplete(request.paperId);
-        return toolText(result);
-      },
+      execute: (args, api, context) => this.linkNote(args, api, context),
     });
     this.extension = defineExtension({
       name: "librarian",
@@ -145,6 +122,45 @@ export class Ingest {
       sections: [section("librarian", () => system, { tag: false })],
       hooks: [allowOnly("librarian", LIBRARIAN_TOOLS)],
     });
+  }
+
+  /** Empty sections, and numbers the paper, its full text and the user's reason do not contain. */
+  private noteProblems(paper: Paper, request: KbRequest, sections: NoteSections): string[] {
+    const problems: string[] = [];
+    for (const [key] of SECTIONS)
+      if (!sections[key]?.trim())
+        problems.push(`${key} is empty (write "${NOT_STATED}" if the abstract says nothing about it)`);
+    const reason = this.deps.feedback.get(request.cardId)?.reason ?? "";
+    const source = `${paper.title} ${paper.abstract ?? ""} ${reason} ${this.fullTexts.get(paper.id) ?? ""}`;
+    const invented = ungroundedNumbers(SECTIONS.map(([k]) => sections[k] ?? "").join(" "), source);
+    if (invented.length)
+      problems.push(`numbers not in the title, abstract, full text or reason: ${invented.join(", ")}`);
+    return problems;
+  }
+
+  private async linkNote(
+    args: { concepts?: string[]; questions?: string[]; related?: string[] },
+    api: ToolExecutionApi,
+    context: Context,
+  ) {
+    const request = this.active();
+    if (!request) return toolError("No paper is being ingested.", ["Stop here."]);
+    const stem = this.note(request.paperId);
+    if (!stem) return toolError("There is no note yet.", ["Call write_evidence_note first."]);
+    const charter = this.deps.charters.approved()?.charter;
+    const questions = (args.questions ?? [])
+      .map((q) => q.trim().toUpperCase())
+      .filter((q) => charter?.questions.some((x) => x.id === q));
+    const concepts = (args.concepts ?? []).map((c) => c.trim()).filter((c) => slug(c));
+    if (!questions.length && !concepts.length)
+      return toolError("Nothing to link: give at least one concept or a research question id from the list.", [
+        "Call link_note again.",
+      ]);
+    const result = await once<string>(api, "link", context, async () =>
+      this.notes.link(stem, concepts, questions, args.related ?? []),
+    );
+    this.tryComplete(request.paperId);
+    return toolText(result);
   }
 
   onChange(listener: () => void): () => void {
@@ -176,9 +192,7 @@ export class Ingest {
   }
 
   note(paperId: number): string | undefined {
-    return (
-      this.deps.db.prepare("SELECT stem FROM kb_notes WHERE paper_id = ?").get(paperId) as { stem: string } | undefined
-    )?.stem;
+    return this.notes.stem(paperId);
   }
 
   /** Start or resume work: re-attach to a running turn, otherwise start the next due request. */
@@ -265,9 +279,9 @@ export class Ingest {
       abstract: paper.abstract ?? "(no abstract)",
       full_text: fullText ?? "(not available: write from the abstract)",
       questions: charter.questions.map((q) => `${q.id}: ${q.text}`).join("\n"),
-      concepts: this.existing("concepts").join("; ") || "(none yet)",
+      concepts: this.notes.existing("concepts").join("; ") || "(none yet)",
       charter_concepts: charter.concepts.join("; "),
-      notes: this.existing("sources").slice(-30).join("; ") || "(none yet)",
+      notes: this.notes.existing("sources").slice(-30).join("; ") || "(none yet)",
     });
   }
 
@@ -356,7 +370,7 @@ export class Ingest {
       | { status: string; card_id: number }
       | undefined;
     if (!stem || !request || request.status === "done") return request?.status === "done";
-    if (!this.connected(stem)) return false;
+    if (!this.notes.connected(stem)) return false;
     const paper = this.deps.store.get(paperId)!;
     const summary =
       (
@@ -378,102 +392,6 @@ export class Ingest {
     this.deps.log.info("kb.ingested", { paperId, stem });
     this.emit();
     return true;
-  }
-
-  /** The note links to at least one concept or question page that exists and links back. */
-  connected(stem: string): boolean {
-    const text = this.deps.vault.read(`sources/${stem}.md`) ?? "";
-    for (const m of text.matchAll(/\[\[([^\]|#]+)(?:[|#][^\]]*)?\]\]/g)) {
-      const target = m[1].trim();
-      for (const folder of ["concepts", "questions"]) {
-        const page = this.deps.vault.read(`${folder}/${target.replace(/^(concepts|questions)\//, "")}.md`);
-        if (page?.includes(`[[${stem}]]`)) return true;
-      }
-    }
-    return false;
-  }
-
-  private existing(folder: "concepts" | "sources"): string[] {
-    return this.deps.vault
-      .markdownFiles()
-      .filter((f) => f.startsWith(`${folder}/`))
-      .map((f) => f.slice(folder.length + 1, -3));
-  }
-
-  private writeNote(paper: Paper, request: KbRequest, sections: Record<string, string>): string {
-    const stem = this.deps.vault.freeStem(noteStem(paper));
-    const front = this.frontMatter(paper, request);
-    const body = SECTIONS.map(([key, heading]) => `## ${heading}\n\n${sections[key].trim()}\n`).join("\n");
-    this.deps.vault.create(`sources/${stem}.md`, `---\n${front}\n---\n\n${body}\n## Related papers\n`);
-    const first = sections.summary.trim().split(/(?<=[.!?])\s+/)[0];
-    const summary = first.length <= 200 ? first : `${first.slice(0, 200).replace(/\s+\S*$/, "")}…`;
-    this.deps.db
-      .prepare("INSERT OR IGNORE INTO kb_notes (paper_id, stem, summary, created_at) VALUES (?, ?, ?, ?)")
-      .run(paper.id, stem, summary, nowIso());
-    return this.note(paper.id)!;
-  }
-
-  /** The note's properties: identifiers, the card's scores, when it was added, and why the user kept it. */
-  private frontMatter(paper: Paper, request: KbRequest): string {
-    const card = this.deps.cards.get(request.cardId);
-    const judgment = this.deps.feedback.get(request.cardId);
-    const kind = this.deps.db
-      .prepare("SELECT kind FROM sweep_papers WHERE paper_id = ? AND kind IS NOT NULL LIMIT 1")
-      .get(paper.id) as { kind: string } | undefined;
-    // Missing values (null or undefined) are left out.
-    const props: [string, unknown][] = [
-      ["title", paper.title],
-      ["authors", paper.authors.slice(0, 10)],
-      ...(Object.entries(paper.ids) as [string, string][]).filter(([k]) => k !== "s2"),
-      ["year", paper.year],
-      ["venue", paper.venue ?? paper.server],
-      ["level", card?.level],
-      ["kind", kind?.kind],
-      ["relevance", card?.relevance],
-      ["trust", card?.trust],
-      ["value", card?.value],
-      ["kb_added", new Date(this.now()).toISOString().slice(0, 10)],
-      ["why", judgment?.reason ?? ""],
-      ["link", paper.ids.doi ? `https://doi.org/${paper.ids.doi}` : paper.url],
-    ];
-    return props
-      .filter(([, v]) => v !== null && v !== undefined)
-      .map(([k, v]) => `${k}: ${yaml(v)}`)
-      .join("\n");
-  }
-
-  private link(stem: string, concepts: string[], questions: string[], related: string[]): string {
-    const { vault } = this.deps;
-    const charter = this.deps.charters.approved()!.charter;
-    const linked: string[] = [];
-    const backlink = `- [[${stem}]]`;
-    const ensurePage = (rel: string, title: string) => {
-      if (vault.create(rel, `# ${title}\n\n## Papers\n\n${backlink}\n`)) return;
-      if (!(vault.read(rel) ?? "").includes(`[[${stem}]]`)) vault.appendUnderHeading(rel, "## Papers", backlink);
-    };
-    for (const concept of concepts) {
-      const page = slug(concept);
-      ensurePage(`concepts/${page}.md`, concept.charAt(0).toUpperCase() + concept.slice(1));
-      vault.appendUnderHeading(`sources/${stem}.md`, "## Related papers", `- Concept: [[${page}]]`);
-      linked.push(`concepts/${page}`);
-    }
-    for (const id of questions) {
-      const charterQuestion = charter.questions.find((x) => x.id === id)!;
-      const page = `${id.toLowerCase()}-${slug(charterQuestion.text, 6)}`;
-      ensurePage(`questions/${page}.md`, `${id}: ${charterQuestion.text}`);
-      vault.appendUnderHeading(`sources/${stem}.md`, "## Related papers", `- Question: [[${page}]]`);
-      linked.push(`questions/${page}`);
-    }
-    // Existing related notes gain a line under their own Related papers; nothing else in them changes.
-    for (const other of related) {
-      const rel = `sources/${other.replace(/\.md$/, "")}.md`;
-      if (other === stem || !vault.read(rel)) continue;
-      if (!(vault.read(rel) ?? "").includes(`[[${stem}]]`))
-        vault.appendUnderHeading(rel, "## Related papers", `- [[${stem}]]`);
-      vault.appendUnderHeading(`sources/${stem}.md`, "## Related papers", `- [[${other.replace(/\.md$/, "")}]]`);
-      linked.push(rel.slice(0, -3));
-    }
-    return `Linked [[${stem}]] with ${linked.join(", ")}.`;
   }
 
   private emit(): void {

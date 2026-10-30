@@ -11,6 +11,7 @@ import {
   type Extension,
   type Harness,
   type SubmissionId,
+  type ToolExecutionApi,
 } from "@earendil-works/pi-durable";
 import { allowOnly, defineAppTool, loadPrompt, once, toolError, toolText, type ModelCatalog } from "@rh/durable-agent";
 import {
@@ -90,40 +91,7 @@ export class CharterWriter {
         queries: Type.Array(weighted, { description: "5 to 20 search queries" }),
         outOfScope: Type.Optional(strings("0 to 20 topics that are out of scope")),
       }),
-      execute: async (args, api, context) => {
-        const run = this.run();
-        if (run?.status === "failed")
-          return toolError("This drafting run has already failed; stop here.", ["Reply with one short sentence."]);
-        let charter;
-        try {
-          charter = validateCharter(args);
-        } catch (error) {
-          if (!(error instanceof CharterInvalid)) throw error;
-          const invalid = await once(api, "invalid", context, async () => {
-            const current = this.run();
-            if (!current) return 0;
-            const next = current.invalidSaves + 1;
-            this.update({ invalidSaves: next });
-            if (next >= MAX_INVALID_SAVES)
-              this.update({ status: "failed", reason: `${next} invalid drafts`, endedAt: nowIso() });
-            return next;
-          });
-          return toolError(
-            `The draft was not saved: ${error.problems.join("; ")}.`,
-            invalid >= MAX_INVALID_SAVES
-              ? ["Stop: this run has failed after too many invalid drafts."]
-              : error.problems.map((p) => `Correct ${p.split(":")[0]} and call save_charter_draft again.`),
-          );
-        }
-        const id = await once(api, "saved", context, async () => {
-          const record = deps.charters.saveDraft(charter, "agent");
-          this.update({ saved: true });
-          return record.id;
-        });
-        return toolText(
-          `Draft saved (#${id}): ${charter.questions.length} questions, ${charter.queries.length} queries, ${charter.concepts.length} concepts.`,
-        );
-      },
+      execute: (args, api, context) => this.saveDraft(args, api, context),
     });
     const ask = defineAppTool({
       name: "ask_scoping_questions",
@@ -163,6 +131,46 @@ export class CharterWriter {
       sections: [section("charter-writer", () => system, { tag: false })],
       hooks: [allowOnly("charter-writer", CHARTER_TOOLS)],
     });
+  }
+
+  private async saveDraft(args: unknown, api: ToolExecutionApi, context: Context) {
+    const run = this.run();
+    if (run?.status === "failed")
+      return toolError("This drafting run has already failed; stop here.", ["Reply with one short sentence."]);
+    let charter;
+    try {
+      charter = validateCharter(args);
+    } catch (error) {
+      if (!(error instanceof CharterInvalid)) throw error;
+      return this.refuseInvalid(error, api, context);
+    }
+    const id = await once(api, "saved", context, async () => {
+      const record = this.deps.charters.saveDraft(charter, "agent");
+      this.update({ saved: true });
+      return record.id;
+    });
+    return toolText(
+      `Draft saved (#${id}): ${charter.questions.length} questions, ${charter.queries.length} queries, ${charter.concepts.length} concepts.`,
+    );
+  }
+
+  /** Count an invalid draft (the run fails after MAX_INVALID_SAVES) and say exactly what to fix. */
+  private async refuseInvalid(error: CharterInvalid, api: ToolExecutionApi, context: Context) {
+    const invalid = await once(api, "invalid", context, async () => {
+      const current = this.run();
+      if (!current) return 0;
+      const next = current.invalidSaves + 1;
+      this.update({ invalidSaves: next });
+      if (next >= MAX_INVALID_SAVES)
+        this.update({ status: "failed", reason: `${next} invalid drafts`, endedAt: nowIso() });
+      return next;
+    });
+    return toolError(
+      `The draft was not saved: ${error.problems.join("; ")}.`,
+      invalid >= MAX_INVALID_SAVES
+        ? ["Stop: this run has failed after too many invalid drafts."]
+        : error.problems.map((p) => `Correct ${p.split(":")[0]} and call save_charter_draft again.`),
+    );
   }
 
   /** Called once the project's harness is open: re-attach to a run that was in flight before a restart. */

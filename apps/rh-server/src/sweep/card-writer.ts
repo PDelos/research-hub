@@ -12,6 +12,7 @@ import {
   type Extension,
   type Harness,
   type SubmissionId,
+  type ToolExecutionApi,
 } from "@earendil-works/pi-durable";
 import { allowOnly, defineAppTool, loadPrompt, once, toolError, toolText, type ModelCatalog } from "@rh/durable-agent";
 import type { Charters } from "../charter.ts";
@@ -67,20 +68,7 @@ export class CardWriter implements CardStage {
         "List today's ranked candidates with title, abstract, level, kind, matched question and computed scores.",
       returns: "Text: one block per candidate, in rank order.",
       parameters: Type.Object({}),
-      execute: async () => {
-        const sweep = this.current();
-        if (!sweep) return toolError("No sweep is waiting for cards.", ["Stop here."]);
-        const blocks = this.candidates(sweep).map(({ sp, paper }) => {
-          const scores = this.scores(sweep, sp, paper);
-          return [
-            `#${paper.id} (rank ${sp.rank}) ${paper.title} (${paper.year ?? "n.d."}) · ${paper.venue ?? paper.server ?? "unknown venue"}`,
-            `level ${scores.level} · kind ${sp.kind ?? "other"} · question ${sp.matchedQuestion ?? "none"}${sp.borderline ? " · BORDERLINE" : ""}`,
-            `scores: relevance ${scores.relevance}, trust ${scores.trust}, value ${scores.value}`,
-            `abstract: ${paper.abstract ? paper.abstract.slice(0, 2000) : "(no abstract)"}`,
-          ].join("\n");
-        });
-        return toolText(blocks.length ? blocks.join("\n\n") : "No candidates.");
-      },
+      execute: async () => this.listCandidates(),
     });
     const present = defineAppTool({
       name: "present_paper",
@@ -90,44 +78,7 @@ export class CardWriter implements CardStage {
         paper_id: Type.Number({ description: "The candidate's id (the number after #)" }),
         summary: Type.String({ description: `At most ${SUMMARY_MAX_WORDS} words, grounded in the abstract` }),
       }),
-      execute: async (args, api, context) => {
-        const sweep = this.current();
-        if (!sweep) return toolError("No sweep is waiting for cards.", ["Stop here."]);
-        const entry = this.candidates(sweep, true).find(({ paper }) => paper.id === args.paper_id);
-        if (!entry)
-          return toolError(`Paper ${args.paper_id} is not a candidate of this sweep.`, [
-            "Use an id from list_candidates.",
-          ]);
-        const summary = args.summary.trim().replace(/\s+/g, " ");
-        const words = summary ? summary.split(" ").length : 0;
-        if (words < 1 || words > SUMMARY_MAX_WORDS)
-          return toolError(`The summary has ${words} words; 1 to ${SUMMARY_MAX_WORDS} are allowed.`, [
-            "Shorten it and call present_paper again.",
-          ]);
-        const invented = ungroundedNumbers(summary, `${entry.paper.title} ${entry.paper.abstract ?? ""}`);
-        if (invented.length)
-          return toolError(
-            `The summary states numbers that are not in the title or abstract: ${invented.join(", ")}.`,
-            ["Remove them and describe only what the abstract says."],
-          );
-        const cardId = await once<number>(api, "card", context, async () => {
-          const { card } = this.deps.cards.create({
-            paperId: entry.paper.id,
-            sweepId: sweep.id,
-            rank: entry.sp.rank,
-            summary,
-            scores: this.scores(sweep, entry.sp, entry.paper),
-          });
-          this.deps.db
-            .prepare("UPDATE sweep_papers SET status = 'presented' WHERE sweep_id = ? AND paper_id = ?")
-            .run(sweep.id, entry.paper.id);
-          return card.id;
-        });
-        const card = this.deps.cards.get(cardId)!;
-        return toolText(
-          `Card #${card.id} for paper ${card.paperId}: relevance ${card.relevance}, trust ${card.trust}, value ${card.value}, ${card.level}${card.borderline ? ", borderline" : ""}.`,
-        );
-      },
+      execute: (args, api, context) => this.presentPaper(args, api, context),
     });
     const complete = defineAppTool({
       name: "complete_sweep",
@@ -141,35 +92,7 @@ export class CardWriter implements CardStage {
           }),
         ),
       }),
-      execute: async (args, api, context) => {
-        const sweep = this.current();
-        if (!sweep) return toolError("No sweep is waiting for cards.", ["Stop here."]);
-        const skipped = (args.skipped ?? []).map((s) => ({ paperId: s.paper_id, reason: s.reason.trim() }));
-        const all = this.candidates(sweep, true);
-        const open = all.filter(
-          ({ sp, paper }) => sp.status !== "presented" && !skipped.some((s) => s.paperId === paper.id && s.reason),
-        );
-        if (open.length)
-          return toolError(
-            `Not complete: ${open.map(({ paper }) => `#${paper.id}`).join(", ")} have neither a card nor a skip reason.`,
-            ["Present them with present_paper or list them in skipped with a reason."],
-          );
-        const result = await once<string>(api, "complete", context, async () => {
-          const mark = this.deps.db.prepare(
-            "UPDATE sweep_papers SET status = 'skipped', reason = ? WHERE sweep_id = ? AND paper_id = ? AND status = 'candidate'",
-          );
-          for (const s of skipped) mark.run(s.reason, sweep.id, s.paperId);
-          const presented = all
-            .filter(({ paper }) => this.deps.cards.byPaper(paper.id)?.sweepId === sweep.id)
-            .map(({ paper }) => paper.id);
-          this.deps.runner.recordCompletion(sweep.id, {
-            presented,
-            skipped: skipped.filter((s) => all.some(({ paper }) => paper.id === s.paperId)),
-          });
-          return `Sweep ${sweep.id} complete: ${presented.length} cards, ${skipped.length} skipped.`;
-        });
-        return toolText(result);
-      },
+      execute: (args, api, context) => this.completeSweep(args, api, context),
     });
     this.tools = { list, present, complete };
     this.extension = defineExtension({
@@ -178,6 +101,91 @@ export class CardWriter implements CardStage {
       sections: [section("card-writer", () => system, { tag: false })],
       hooks: [allowOnly("card-writer", CARD_TOOLS)],
     });
+  }
+
+  private listCandidates() {
+    const sweep = this.current();
+    if (!sweep) return toolError("No sweep is waiting for cards.", ["Stop here."]);
+    const blocks = this.candidates(sweep).map(({ sp, paper }) => {
+      const scores = this.scores(sweep, sp, paper);
+      return [
+        `#${paper.id} (rank ${sp.rank}) ${paper.title} (${paper.year ?? "n.d."}) · ${paper.venue ?? paper.server ?? "unknown venue"}`,
+        `level ${scores.level} · kind ${sp.kind ?? "other"} · question ${sp.matchedQuestion ?? "none"}${sp.borderline ? " · BORDERLINE" : ""}`,
+        `scores: relevance ${scores.relevance}, trust ${scores.trust}, value ${scores.value}`,
+        `abstract: ${paper.abstract ? paper.abstract.slice(0, 2000) : "(no abstract)"}`,
+      ].join("\n");
+    });
+    return toolText(blocks.length ? blocks.join("\n\n") : "No candidates.");
+  }
+
+  private async presentPaper(args: { paper_id: number; summary: string }, api: ToolExecutionApi, context: Context) {
+    const sweep = this.current();
+    if (!sweep) return toolError("No sweep is waiting for cards.", ["Stop here."]);
+    const entry = this.candidates(sweep, true).find(({ paper }) => paper.id === args.paper_id);
+    if (!entry)
+      return toolError(`Paper ${args.paper_id} is not a candidate of this sweep.`, ["Use an id from list_candidates."]);
+    const summary = args.summary.trim().replace(/\s+/g, " ");
+    const words = summary ? summary.split(" ").length : 0;
+    if (words < 1 || words > SUMMARY_MAX_WORDS)
+      return toolError(`The summary has ${words} words; 1 to ${SUMMARY_MAX_WORDS} are allowed.`, [
+        "Shorten it and call present_paper again.",
+      ]);
+    const invented = ungroundedNumbers(summary, `${entry.paper.title} ${entry.paper.abstract ?? ""}`);
+    if (invented.length)
+      return toolError(`The summary states numbers that are not in the title or abstract: ${invented.join(", ")}.`, [
+        "Remove them and describe only what the abstract says.",
+      ]);
+    const cardId = await once<number>(api, "card", context, async () => {
+      const { card } = this.deps.cards.create({
+        paperId: entry.paper.id,
+        sweepId: sweep.id,
+        rank: entry.sp.rank,
+        summary,
+        scores: this.scores(sweep, entry.sp, entry.paper),
+      });
+      this.deps.db
+        .prepare("UPDATE sweep_papers SET status = 'presented' WHERE sweep_id = ? AND paper_id = ?")
+        .run(sweep.id, entry.paper.id);
+      return card.id;
+    });
+    const card = this.deps.cards.get(cardId)!;
+    return toolText(
+      `Card #${card.id} for paper ${card.paperId}: relevance ${card.relevance}, trust ${card.trust}, value ${card.value}, ${card.level}${card.borderline ? ", borderline" : ""}.`,
+    );
+  }
+
+  private async completeSweep(
+    args: { skipped?: { paper_id: number; reason: string }[] },
+    api: ToolExecutionApi,
+    context: Context,
+  ) {
+    const sweep = this.current();
+    if (!sweep) return toolError("No sweep is waiting for cards.", ["Stop here."]);
+    const skipped = (args.skipped ?? []).map((s) => ({ paperId: s.paper_id, reason: s.reason.trim() }));
+    const all = this.candidates(sweep, true);
+    const open = all.filter(
+      ({ sp, paper }) => sp.status !== "presented" && !skipped.some((s) => s.paperId === paper.id && s.reason),
+    );
+    if (open.length)
+      return toolError(
+        `Not complete: ${open.map(({ paper }) => `#${paper.id}`).join(", ")} have neither a card nor a skip reason.`,
+        ["Present them with present_paper or list them in skipped with a reason."],
+      );
+    const result = await once<string>(api, "complete", context, async () => {
+      const mark = this.deps.db.prepare(
+        "UPDATE sweep_papers SET status = 'skipped', reason = ? WHERE sweep_id = ? AND paper_id = ? AND status = 'candidate'",
+      );
+      for (const s of skipped) mark.run(s.reason, sweep.id, s.paperId);
+      const presented = all
+        .filter(({ paper }) => this.deps.cards.byPaper(paper.id)?.sweepId === sweep.id)
+        .map(({ paper }) => paper.id);
+      this.deps.runner.recordCompletion(sweep.id, {
+        presented,
+        skipped: skipped.filter((s) => all.some(({ paper }) => paper.id === s.paperId)),
+      });
+      return `Sweep ${sweep.id} complete: ${presented.length} cards, ${skipped.length} skipped.`;
+    });
+    return toolText(result);
   }
 
   attach(harness: Harness, context: Context): void {
