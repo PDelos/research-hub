@@ -24,9 +24,20 @@ function fault(error: unknown): never {
   throw error;
 }
 
-export function projectRoutes(hub: Hub): Router {
-  const router = express.Router();
-  router.use("/v1", requireAuth(hub.log));
+/** Answers to open scoping questions: each names an open question and has 1 to 2000 characters. */
+function checkedAnswers(answers: unknown[], openQuestions: { id: number }[]): { id: number; answer: string }[] {
+  const open = new Set(openQuestions.map((q) => q.id));
+  return answers.map((entry, i) => {
+    const { id, answer } = (entry ?? {}) as { id?: unknown; answer?: unknown };
+    if (!open.has(Number(id))) throw invalid(`answers[${i + 1}]: question ${id} is not an open scoping question`);
+    if (typeof answer !== "string" || !answer.trim() || answer.length > 2000)
+      throw invalid(`answers[${i + 1}]: answer must be 1 to 2000 characters`);
+    return { id: Number(id), answer: answer.trim() };
+  });
+}
+
+/** The brief, the charter draft and its versions, scoping answers, approval. */
+function charterRoutes(router: Router, hub: Hub): void {
   const currentProject = () => hub.project;
   const charterView = () => {
     const { charters, questions, charterWriter } = currentProject();
@@ -78,20 +89,7 @@ export function projectRoutes(hub: Hub): Router {
   router.post("/v1/charter/answers", async (request, response) => {
     const answers = bodyOf(request).answers;
     if (!Array.isArray(answers) || !answers.length) throw invalid("answers must be a nonempty list of {id, answer}");
-    const open = new Map(
-      currentProject()
-        .questions.open()
-        .map((q) => [q.id, q]),
-    );
-    const clean = answers.map((entry, i) => {
-      const id = Number((entry as any)?.id);
-      const answer = (entry as any)?.answer;
-      if (!open.has(id))
-        throw invalid(`answers[${i + 1}]: question ${(entry as any)?.id} is not an open scoping question`);
-      if (typeof answer !== "string" || !answer.trim() || answer.length > 2000)
-        throw invalid(`answers[${i + 1}]: answer must be 1 to 2000 characters`);
-      return { id, answer: answer.trim() };
-    });
+    const clean = checkedAnswers(answers, currentProject().questions.open());
     if (currentProject().charterWriter.run()?.status === "running") throw busy();
     const answered = currentProject().questions.answer(clean);
     try {
@@ -123,7 +121,11 @@ export function projectRoutes(hub: Hub): Router {
     }
     response.json(charterView());
   });
+}
 
+/** Project status, schedule, manual runs, pause and resume. */
+function statusRoutes(router: Router, hub: Hub): void {
+  const currentProject = () => hub.project;
   router.get("/v1/project", (_request, response) => {
     const project = currentProject();
     const approved = project.charters.approved();
@@ -172,6 +174,12 @@ export function projectRoutes(hub: Hub): Router {
     hub.log.info("project.resumed", {});
     response.json({ status: currentProject().state.status() });
   });
+}
 
+export function projectRoutes(hub: Hub): Router {
+  const router = express.Router();
+  router.use("/v1", requireAuth(hub.log));
+  charterRoutes(router, hub);
+  statusRoutes(router, hub);
   return router;
 }

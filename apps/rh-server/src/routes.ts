@@ -82,6 +82,25 @@ async function sendResult(
   return { submissionId, status: record.status === "queued" ? "queued" : "pending" };
 }
 
+/** POST /v1/chat: send the agent a message, and wait up to `waitMs` for its answer. */
+function chatRoute(router: Router, hub: Hub): void {
+  router.post("/v1/chat", async (request, response) => {
+    const projectRuntime = hub.project;
+    const { content, requestId, waitMs } = chatInput(bodyOf(request));
+    const { harness, ctx: context } = projectRuntime.harness;
+    const submission = await projectRuntime.root.submit(
+      { type: "input", content, requestId: `chat:${requestId}`, whenBusy: "followUp" },
+      context,
+    );
+    hub.log.info("agent.message", { submissionId: submission.id, chars: content.length });
+    const closed = new AbortController();
+    response.on("close", () => closed.abort());
+    const record = await settledWithin(submission, context, waitMs, closed.signal);
+    const result = await sendResult(harness, context, submission, record);
+    response.status(result.status === "done" || result.status === "unanswered" ? 200 : 202).json(result);
+  });
+}
+
 export function routes(hub: Hub, streams: StreamHub): Router {
   const router = express.Router();
   const health = (): Health => ({
@@ -112,21 +131,7 @@ export function routes(hub: Hub, streams: StreamHub): Router {
 
   router.get("/v1/agent", async (request, response) => void response.json(await agentState(await project(request))));
 
-  router.post("/v1/chat", async (request, response) => {
-    const projectRuntime = await project(request);
-    const { content, requestId, waitMs } = chatInput(bodyOf(request));
-    const { harness, ctx: context } = projectRuntime.harness;
-    const submission = await projectRuntime.root.submit(
-      { type: "input", content, requestId: `chat:${requestId}`, whenBusy: "followUp" },
-      context,
-    );
-    hub.log.info("agent.message", { submissionId: submission.id, chars: content.length });
-    const closed = new AbortController();
-    response.on("close", () => closed.abort());
-    const record = await settledWithin(submission, context, waitMs, closed.signal);
-    const result = await sendResult(harness, context, submission, record);
-    response.status(result.status === "done" || result.status === "unanswered" ? 200 : 202).json(result);
-  });
+  chatRoute(router, hub);
 
   router.get("/v1/submissions/:id", async (request, response) => {
     const projectRuntime = await project(request);

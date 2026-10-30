@@ -93,36 +93,72 @@ export function sweepSummary(project: ProjectRuntime, sweepRecord: SweepRecord):
   };
 }
 
+function findCard(project: ProjectRuntime, id: string) {
+  const card = project.cards.get(int(id, "id"));
+  if (!card) throw notFound(`No card ${id}`);
+  return card;
+}
+
+/** The newest cards, grouped by the sweep that found them. */
+function cardGroups(project: ProjectRuntime, limit: number): CardGroup[] {
+  const groups: CardGroup[] = [];
+  for (const card of project.cards.list(limit)) {
+    let group = groups.at(-1);
+    if (!group || group.sweep.id !== card.sweepId) {
+      group = { sweep: sweepSummary(project, project.sweeps.get(card.sweepId)!), cards: [] };
+      groups.push(group);
+    }
+    group.cards.push(cardView(project, card));
+  }
+  return groups;
+}
+
+/** A sweep with its queries, phases and every paper it looked at. */
+function sweepDetail(
+  project: ProjectRuntime,
+  sweep: NonNullable<ReturnType<ProjectRuntime["sweeps"]["get"]>>,
+): SweepDetail {
+  return {
+    ...sweepSummary(project, sweep),
+    queries: sweep.queries,
+    windowSince: sweep.windowSince,
+    phases: sweep.phases,
+    completion: sweep.completion,
+    papers: project.sweeps.papers(sweep.id).map((sp) => ({
+      paperId: sp.paperId,
+      title: project.papers.store.get(sp.paperId)?.title ?? "(removed)",
+      status: sp.status,
+      reason: sp.reason,
+      borderline: sp.borderline,
+      relevance: sp.relevance,
+      level: sp.level,
+      kind: sp.kind,
+      rank: sp.rank,
+      rankScore: sp.rankScore,
+      exploration: isExploration(project.db, sweep.id, sp.paperId),
+    })),
+  };
+}
+
 export function sweepRoutes(hub: Hub): Router {
   const router = express.Router();
   router.use("/v1", requireAuth(hub.log));
   const currentProject = () => hub.project;
 
   router.get("/v1/cards", (request, response) => {
-    const project = currentProject();
-    const groups: CardGroup[] = [];
-    for (const card of project.cards.list(Math.min(int(request.query.limit, "limit", 100), 500))) {
-      let group = groups.at(-1);
-      if (!group || group.sweep.id !== card.sweepId) {
-        group = { sweep: sweepSummary(project, project.sweeps.get(card.sweepId)!), cards: [] };
-        groups.push(group);
-      }
-      group.cards.push(cardView(project, card));
-    }
-    response.json({ groups });
+    const limit = Math.min(int(request.query.limit, "limit", 100), 500);
+    response.json({ groups: cardGroups(currentProject(), limit) });
   });
 
   router.get("/v1/cards/:id", (request, response) => {
     const project = currentProject();
-    const card = project.cards.get(int(request.params.id, "id"));
-    if (!card) throw notFound(`No card ${request.params.id}`);
+    const card = findCard(project, request.params.id);
     response.json(cardDetail(project, card));
   });
 
   router.put("/v1/cards/:id/judgment", (request, response) => {
     const project = currentProject();
-    const card = project.cards.get(int(request.params.id, "id"));
-    if (!card) throw notFound(`No card ${request.params.id}`);
+    const card = findCard(project, request.params.id);
     const body = (request.body ?? {}) as Record<string, unknown>;
     try {
       project.feedback.judge(card.id, body.verdict, body.reason);
@@ -135,8 +171,7 @@ export function sweepRoutes(hub: Hub): Router {
 
   router.delete("/v1/cards/:id/judgment", (request, response) => {
     const project = currentProject();
-    const card = project.cards.get(int(request.params.id, "id"));
-    if (!card) throw notFound(`No card ${request.params.id}`);
+    const card = findCard(project, request.params.id);
     project.feedback.clear(card.id);
     response.json(cardDetail(project, card));
   });
@@ -158,27 +193,7 @@ export function sweepRoutes(hub: Hub): Router {
     const project = currentProject();
     const sweep = project.sweeps.get(int(request.params.id, "id"));
     if (!sweep) throw notFound(`No sweep ${request.params.id}`);
-    const detail: SweepDetail = {
-      ...sweepSummary(project, sweep),
-      queries: sweep.queries,
-      windowSince: sweep.windowSince,
-      phases: sweep.phases,
-      completion: sweep.completion,
-      papers: project.sweeps.papers(sweep.id).map((sp) => ({
-        paperId: sp.paperId,
-        title: project.papers.store.get(sp.paperId)?.title ?? "(removed)",
-        status: sp.status,
-        reason: sp.reason,
-        borderline: sp.borderline,
-        relevance: sp.relevance,
-        level: sp.level,
-        kind: sp.kind,
-        rank: sp.rank,
-        rankScore: sp.rankScore,
-        exploration: isExploration(project.db, sweep.id, sp.paperId),
-      })),
-    };
-    response.json(detail);
+    response.json(sweepDetail(project, sweep));
   });
 
   router.get(
