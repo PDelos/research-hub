@@ -5,52 +5,29 @@
 // state and (de)activate without a restart; every change notifies listeners (the SSE `plugins` frame).
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { pathToFileURL } from "node:url";
 import type { PluginRunState, PluginSummary } from "@rh/sdk";
 import type { Logger } from "../logger.ts";
 import type { RhApi } from "./api.ts";
 import { dependents as dependentsOf, resolve, type GraphNode } from "./graph.ts";
 import type { PluginManifest } from "./manifest.ts";
-import { BUILTIN_MODULES } from "./builtins.ts";
-import { BUILTIN_PLUGINS_DIR, builtinEntry, type Discovery, type DiscoveredPlugin } from "./registry.ts";
+import { builtinEntry, type Discovery, type DiscoveredPlugin } from "./registry.ts";
+import { idleState, matches, problemOf } from "./run-state.ts";
 import { resolveSettings, SettingsInvalid, validateSettings } from "./settings.ts";
 import { UndoRefused, type Actor, type Lockfile, type PluginState } from "./state.ts";
+import {
+  defaultLoad,
+  dispose,
+  HasDependents,
+  pluginContext,
+  PluginUnavailable,
+  withTimeout,
+  type Disposable,
+  type PluginContext,
+  type PluginModule,
+  type SettingsHandler,
+} from "./plugin-module.ts";
 
-export interface Disposable {
-  dispose(): void | Promise<void>;
-}
-
-export interface PluginContext {
-  readonly id: string;
-  readonly manifest: PluginManifest;
-  /** The plugin's own folder (its code and assets). */
-  readonly dir: string;
-  /** The plugin's storage folder, data/plugins/data/<id>/ (not version-controlled). */
-  readonly storageDir: string;
-  /** The plugin's current settings (read again after a change). */
-  readonly settings: Readonly<Record<string, unknown>>;
-  /** Only the values the project saved (no defaults): to tell "chosen" from "automatic". */
-  readonly savedSettings: Readonly<Record<string, unknown>>;
-  /**
-   * Handle setting changes while running. Without a handler, a settings change restarts the plugin (deactivate,
-   * activate); with one, the handler gets the new settings and the plugin keeps running.
-   */
-  onSettingsChange(handler: (settings: Readonly<Record<string, unknown>>) => void | Promise<void>): Disposable;
-  /** Disposed in reverse order when the plugin is deactivated. */
-  readonly subscriptions: Disposable[];
-  /** What each dependency's `activate` returned, by plugin id. */
-  readonly exports: Readonly<Record<string, unknown>>;
-  readonly log: Logger;
-  /** The kernel API. */
-  readonly rh: RhApi;
-  /** Built-in plugins only: the project's v0 objects they wrap (see builtin.ts). */
-  readonly host?: unknown;
-}
-
-export interface PluginModule {
-  activate?(context: PluginContext): unknown;
-  deactivate?(): void | Promise<void>;
-}
+export * from "./plugin-module.ts";
 
 export interface KernelOptions {
   discovery: Discovery;
@@ -69,27 +46,6 @@ export interface KernelOptions {
 
 export { SettingsInvalid, UndoRefused };
 
-export class PluginUnavailable extends Error {
-  constructor(
-    readonly pluginId: string,
-    readonly reason: string,
-  ) {
-    super(`${pluginId} is not available: ${reason}`);
-    this.name = "PluginUnavailable";
-  }
-}
-
-/** Disabling a plugin others depend on needs confirmation: these plugins would be disabled too. */
-export class HasDependents extends Error {
-  constructor(
-    readonly pluginId: string,
-    readonly dependents: string[],
-  ) {
-    super(`${dependents.join(", ")} ${dependents.length === 1 ? "depends" : "depend"} on ${pluginId}`);
-    this.name = "HasDependents";
-  }
-}
-
 interface Record_ {
   plugin: DiscoveredPlugin;
   state: PluginRunState;
@@ -102,11 +58,7 @@ interface Record_ {
   /** The settings the plugin last saw, to notice changes on re-apply. */
   settingsJson?: string;
   /** Live settings handlers registered through context.onSettingsChange. */
-  settingsHandlers?: Set<(settings: Readonly<Record<string, unknown>>) => void | Promise<void>>;
-}
-
-function matches(events: string[], event: string): boolean {
-  return events.includes(event) || (event === "onStartup" && events.includes("*"));
+  settingsHandlers?: Set<SettingsHandler>;
 }
 
 export class PluginKernel {
@@ -217,7 +169,7 @@ export class PluginKernel {
   }
 
   private async doActivate(entry: Record_): Promise<unknown> {
-    const { manifest, dir } = entry.plugin;
+    const { manifest } = entry.plugin;
     const exports: Record<string, unknown> = {};
     for (const dep of Object.keys(manifest.dependencies)) exports[dep] = await this.activate(dep);
     const log = this.options.log.child({ plugin: manifest.id });
@@ -225,47 +177,25 @@ export class PluginKernel {
     const storageDir = join(this.options.state.dir, "data", manifest.id);
     const settings = this.settings(manifest.id);
     const timeoutMs = this.options.activationTimeoutMs ?? 10_000;
-    let timer: ReturnType<typeof setTimeout> | undefined;
     let context: PluginContext | undefined;
     try {
       const module = await (this.options.load ?? defaultLoad)(entry.plugin);
-      const subscriptions: Disposable[] = [];
       mkdirSync(storageDir, { recursive: true });
-      const handlers = new Set<(settings: Readonly<Record<string, unknown>>) => void | Promise<void>>();
+      const handlers = new Set<SettingsHandler>();
       entry.settingsHandlers = handlers;
-      const current = () => this.settings(manifest.id);
-      const saved = () => structuredClone(this.options.state.current().plugins[manifest.id]?.settings ?? {});
-      context = {
-        id: manifest.id,
-        manifest,
-        dir,
+      context = pluginContext({
+        plugin: entry.plugin,
         storageDir,
-        get settings() {
-          return current();
-        },
-        get savedSettings() {
-          return saved();
-        },
-        onSettingsChange(handler) {
-          handlers.add(handler);
-          const subscription = { dispose: () => void handlers.delete(handler) };
-          subscriptions.push(subscription);
-          return subscription;
-        },
-        subscriptions,
         exports,
         log,
+        settings: () => this.settings(manifest.id),
+        savedSettings: () => structuredClone(this.options.state.current().plugins[manifest.id]?.settings ?? {}),
+        handlers,
         // Without an API factory (unit tests of the lifecycle) plugins get no `rh`.
-        rh: this.options.api?.(entry.plugin, subscriptions) as RhApi,
+        rh: (subscriptions) => this.options.api?.(entry.plugin, subscriptions) as RhApi,
         ...(entry.plugin.builtin && this.options.builtinHost !== undefined ? { host: this.options.builtinHost } : {}),
-      };
-      const result = await Promise.race([
-        Promise.resolve(module.activate?.(context)),
-        new Promise<never>((_, reject) => {
-          timer = setTimeout(() => reject(new Error(`activation timed out after ${timeoutMs / 1000} s`)), timeoutMs);
-          timer.unref?.();
-        }),
-      ]);
+      });
+      const result = await withTimeout(Promise.resolve(module.activate?.(context)), timeoutMs, "activation");
       if (entry.state !== "activating") {
         // Disabled while activating: undo.
         await dispose(module, context, log);
@@ -290,8 +220,6 @@ export class PluginKernel {
       this.set(entry, "failed", message);
       this.recompute();
       throw new PluginUnavailable(manifest.id, `failed: ${message}`);
-    } finally {
-      if (timer) clearTimeout(timer);
     }
   }
 
@@ -543,43 +471,4 @@ export class PluginKernel {
       }
     }
   }
-}
-
-export async function defaultLoad(plugin: DiscoveredPlugin): Promise<PluginModule> {
-  if (!plugin.manifest.main) return {};
-  // The hub's own built-ins come from the static map (bundled); others are imported from their folder.
-  const builtin = plugin.builtin ? BUILTIN_MODULES[plugin.manifest.id] : undefined;
-  if (builtin && plugin.dir === join(BUILTIN_PLUGINS_DIR, plugin.manifest.id)) return builtin();
-  return (await import(pathToFileURL(join(plugin.dir, plugin.manifest.main)).href)) as PluginModule;
-}
-
-async function dispose(module: PluginModule | undefined, context: PluginContext, log: Logger): Promise<void> {
-  try {
-    await module?.deactivate?.();
-  } catch (error) {
-    log.warn("plugin.deactivate_failed", { error: String(error) });
-  }
-  for (const subscription of context.subscriptions.splice(0).toReversed()) {
-    try {
-      await subscription.dispose();
-    } catch (error) {
-      log.warn("plugin.dispose_failed", { error: String(error) });
-    }
-  }
-}
-
-/** What the Plugins tab shows as a plugin's problem, if any. */
-function problemOf(record: { plugin: { incompatible?: string }; state: string; reason?: string }): {
-  problem?: string;
-} {
-  if (record.plugin.incompatible) return { problem: record.plugin.incompatible };
-  if (record.state === "failed") return { problem: `failed: ${record.reason}` };
-  return {};
-}
-
-/** The state of a plugin that is not running, from why it is held back (if it is). */
-function idleState(reason: string | undefined, incompatible: boolean): [PluginRunState, string | undefined] {
-  if (reason === undefined) return ["inactive", undefined];
-  if (reason === "disabled") return ["disabled", undefined];
-  return [incompatible ? "incompatible" : "blocked", reason];
 }
