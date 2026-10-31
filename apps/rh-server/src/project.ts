@@ -175,6 +175,78 @@ function builtinHostFactory(
   });
 }
 
+/** The compaction points (saved in settings) and the chat model's context window they apply to. */
+class Compaction {
+  window = 1_000_000;
+  private readonly setting: CompactionSetting;
+
+  constructor(private readonly settings: Settings) {
+    this.setting = settings.get("compaction", { points: DEFAULT_POINTS, enabled: true });
+  }
+
+  /** Keep at most half the background point verbatim, so a low point still leaves something to summarize. */
+  policy() {
+    const { points, enabled } = this.setting;
+    return toPolicy(this.window, points, enabled, Math.min(KEEP_RECENT, Math.floor(points.background / 2)));
+  }
+
+  view() {
+    return { ...this.setting, window: this.window };
+  }
+
+  set(next: Partial<CompactionSetting>): CompactionSetting {
+    if (next.points) this.setting.points = next.points;
+    if (next.enabled !== undefined) this.setting.enabled = next.enabled;
+    this.settings.set("compaction", this.setting);
+    return { ...this.setting };
+  }
+}
+
+/** The root conversation on the configured chat model, and a way to read its model and context window. */
+async function openRoot(harness: ProjectRuntime["harness"], catalog: ModelCatalog, log: Logger) {
+  const context = harness.ctx;
+  const chatModel = catalog.forJob("chat");
+  const root = await harness.harness.root(context, { agent: { model: chatModel, thinkingLevel: "low" } });
+  await applyChatModel(root, context, chatModel, log);
+  const model = async () => {
+    const agent = await root.agent(context);
+    const id = agent.model?.modelId ?? chatModel.modelId;
+    return { id, window: catalog.info(id)?.contextWindow ?? 1_000_000 };
+  };
+  return { root, model };
+}
+
+/** Agent events into the project log as agent.<event>. */
+function agentObserver(log: Logger) {
+  return observability({
+    event: (e) =>
+      log[e.level === "debug" ? "debug" : e.level](`agent.${e.event}`, {
+        conversationId: e.conversationId,
+        taskId: e.taskId,
+        ...e.data,
+      }),
+  });
+}
+
+/** The desk and its separate agents, with every active plugin's agent extensions and tools. */
+function projectAgents(
+  desk: DeskExports,
+  hooks: AgentHooks[],
+  observe: ReturnType<typeof agentObserver>,
+  options: OpenProjectOptions,
+) {
+  return desk.createAgents({
+    extra: [
+      observe,
+      ...hooks.flatMap((h) => h?.agentExtensions ?? []),
+      desk.pluginTools(),
+      ...(options.extensions ?? []),
+    ],
+    separate: hooks.flatMap((h) => h?.separateExtensions ?? []),
+    ...(options.deskTools ? { deskTools: options.deskTools } : {}),
+  });
+}
+
 /** Every active plugin's agent extensions and lifecycle hooks (the agent runtime is the kernel's, design D2). */
 async function agentHooks(plugins: PluginHost): Promise<AgentHooks[]> {
   const hooks: AgentHooks[] = [];
@@ -199,7 +271,8 @@ async function applyChatModel(
   log.info("agent.model_applied", { from: current?.modelId, to: chatModel.modelId });
 }
 
-export async function openProject(options: OpenProjectOptions): Promise<ProjectRuntime> {
+/** The project's database and the plugin host; built-in plugins provide the project's services (design D8). */
+async function startProjectPlugins(options: OpenProjectOptions) {
   const { name, log } = options;
   const dir = options.dataDir;
   mkdirSync(dir, { recursive: true });
@@ -209,26 +282,52 @@ export async function openProject(options: OpenProjectOptions): Promise<ProjectR
   // from RH_EMBED_DIMS after an approved upgrade).
   const settings = new Settings(db);
   const telemetry = new Telemetry(db);
-  const plog = log;
-  const observe = observability({
-    event: (e) =>
-      plog[e.level === "debug" ? "debug" : e.level](`agent.${e.event}`, {
-        conversationId: e.conversationId,
-        taskId: e.taskId,
-        ...e.data,
-      }),
-  });
-  // Plugins first: built-in plugins provide the services below (design D8).
+  const observe = agentObserver(log);
   const plugins = await startPluginHost({
     dataDir: dir,
     db,
     vaultDir: join(dir, "vault"),
-    log: plog,
+    log,
     // First-start enablement follows the configuration (RH_KB_VIEWER may come from the .env file).
     env: { ...process.env, RH_KB_VIEWER: options.kbViewer?.enabled === false ? "off" : "on" },
     ...(options.paperFetch ? { fetch: options.paperFetch } : {}),
-    builtinHost: builtinHostFactory({ name, dir, db, settings, telemetry, log: plog, options, observe }, () => plugins),
+    builtinHost: builtinHostFactory({ name, dir, db, settings, telemetry, log, options, observe }, () => plugins),
   });
+  return { db, check, settings, telemetry, observe, plugins };
+}
+
+/** Stop in reverse order of use: background work first, then the agent harness, the plugins and the database. */
+async function closeProject(parts: {
+  scheduler: ProjectRuntime["scheduler"];
+  ingest: ProjectRuntime["ingest"];
+  kbIndex: ProjectRuntime["kbIndex"];
+  kb: KbExports;
+  sweeps: ProjectRuntime["sweeps"];
+  papers: ProjectRuntime["papers"];
+  stopProjector: () => void;
+  harness: ProjectRuntime["harness"];
+  plugins: PluginHost;
+  db: Db;
+  log: Logger;
+}): Promise<void> {
+  parts.scheduler.stop();
+  await parts.ingest.close();
+  parts.kbIndex.stop();
+  await parts.kb.kbViewer().stop();
+  await parts.sweeps.close();
+  await parts.papers.close();
+  parts.stopProjector();
+  await parts.harness.close();
+  await parts.plugins.stop();
+  parts.db.close();
+  parts.log.info("project.closed", {});
+}
+
+export async function openProject(options: OpenProjectOptions): Promise<ProjectRuntime> {
+  const { name, log } = options;
+  const dir = options.dataDir;
+  const plog = log;
+  const { db, check, settings, telemetry, observe, plugins } = await startProjectPlugins(options);
   const { catalog } = await plugins.exportsOf<ProviderExports>("rh.provider-openrouter");
   const jevPlugin = await plugins.exportsOf<DecisionExports>("rh.decision-jev");
   const { brief, charters, questions, state, charterWriter } = await plugins.exportsOf<CharterExports>("rh.charter");
@@ -242,44 +341,20 @@ export async function openProject(options: OpenProjectOptions): Promise<ProjectR
   const kb = await plugins.exportsOf<KbExports>("rh.kb");
   const { vault, kbIndex, ingest } = kb;
   const hooks = await agentHooks(plugins);
-  const agents = desk.createAgents({
-    extra: [
-      observe,
-      ...hooks.flatMap((h) => h?.agentExtensions ?? []),
-      desk.pluginTools(),
-      ...(options.extensions ?? []),
-    ],
-    separate: hooks.flatMap((h) => h?.separateExtensions ?? []),
-    ...(options.deskTools ? { deskTools: options.deskTools } : {}),
-  });
-  const compaction: CompactionSetting = settings.get("compaction", { points: DEFAULT_POINTS, enabled: true });
-  let window = 1_000_000;
+  const agents = projectAgents(desk, hooks, observe, options);
+  const compaction = new Compaction(settings);
   const harness = await openDurableHarness({
     dbPath: join(dir, "agent.sqlite"),
     catalog,
     extensions: agents.all,
     defaults: agents.defaults,
-    // Keep at most half the background point verbatim, so a low point still leaves something to summarize.
-    compaction: () =>
-      toPolicy(
-        window,
-        compaction.points,
-        compaction.enabled,
-        Math.min(KEEP_RECENT, Math.floor(compaction.points.background / 2)),
-      ),
+    compaction: () => compaction.policy(),
     logger: plog,
   });
   const context = harness.ctx;
   const stopProjector = startProjector(harness.harness, telemetry, plog);
-  const chatModel = catalog.forJob("chat");
-  const root = await harness.harness.root(context, { agent: { model: chatModel, thinkingLevel: "low" } });
-  await applyChatModel(root, context, chatModel, plog);
-  const model = async () => {
-    const agent = await root.agent(context);
-    const id = agent.model?.modelId ?? chatModel.modelId;
-    return { id, window: catalog.info(id)?.contextWindow ?? 1_000_000 };
-  };
-  window = (await model()).window;
+  const { root, model } = await openRoot(harness, catalog, plog);
+  compaction.window = (await model()).window;
   harness.harness.resume();
   for (const h of hooks) h?.attach?.(harness.harness, context);
   for (const h of hooks) h?.ready?.();
@@ -321,26 +396,10 @@ export async function openProject(options: OpenProjectOptions): Promise<ProjectR
     syncVault: () => kb.syncVault(),
     cardWriter,
     model,
-    compaction: () => ({ ...compaction, window }),
-    setCompaction(next) {
-      if (next.points) compaction.points = next.points;
-      if (next.enabled !== undefined) compaction.enabled = next.enabled;
-      settings.set("compaction", compaction);
-      return { ...compaction };
-    },
+    compaction: () => compaction.view(),
+    setCompaction: (next) => compaction.set(next),
     jevPing: (text) => jevPlugin.ping(text),
-    async close() {
-      scheduler.stop();
-      await ingest.close();
-      kbIndex.stop();
-      await kb.kbViewer().stop();
-      await sweeps.close();
-      await papers.close();
-      stopProjector();
-      await harness.close();
-      await plugins.stop();
-      db.close();
-      plog.info("project.closed", {});
-    },
+    close: () =>
+      closeProject({ scheduler, ingest, kbIndex, kb, sweeps, papers, stopProjector, harness, plugins, db, log }),
   };
 }
