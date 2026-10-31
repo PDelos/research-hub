@@ -72,7 +72,11 @@ for (const scheme of ["light", "dark"] as const)
       const page = await browser.newPage({ colorScheme: scheme, viewport: { width: 1280, height: 860 } });
       await page.goto(`#/${view}`);
       await expect(page.getByRole("tab")).toHaveCount(4);
-      if (view === "settings") await expect(page.locator(".advanced li")).toHaveCount(9);
+      // The left pane scrolls by itself: bring the new Settings sections into view.
+      if (view === "settings") {
+        await expect(page.locator(".advanced li")).toHaveCount(9);
+        await page.locator(".advanced").scrollIntoViewIfNeeded();
+      }
       await page.screenshot({ path: join(SHOTS, `core-${view}-${scheme}.png`), fullPage: true });
       await page.close();
     });
