@@ -12,6 +12,9 @@ import { PluginUnavailable } from "../src/kernel/lifecycle.ts";
 import { parseManifest } from "../src/kernel/manifest.ts";
 import { startTestServer, until } from "./test-server.ts";
 
+// Exercises advanced features, so it runs in the full profile whatever RH_PROFILE says (v2-0 D7).
+process.env.RH_PROFILE = "full";
+
 test("a project starts its plugins from a committed lockfile with the provider and Jev plugins active", async () => {
   const server = await startTestServer({ hub: { fauxRules: [(t) => say(`echo ${t.lastUser}`)] } });
   try {

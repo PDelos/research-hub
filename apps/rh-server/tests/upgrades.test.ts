@@ -14,6 +14,9 @@ import { fakeOpenRouter } from "./fixtures/openrouter.ts";
 import { arxivOnlyFetch, fakePapers } from "./fixtures/sweep-env.ts";
 import { startTestServer, until } from "./test-server.ts";
 
+// Exercises advanced features, so it runs in the full profile whatever RH_PROFILE says (v2-0 D7).
+process.env.RH_PROFILE = "full";
+
 const MODELS = [
   { id: "acme/embed-small", prompt: "0.00000002", created: 1_780_000_000, dimensions: true },
   { id: "acme/embed-native", prompt: "0.00000001", created: 1_790_000_000 },

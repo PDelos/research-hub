@@ -6,6 +6,9 @@ import { test } from "node:test";
 import { RhError } from "@rh/sdk";
 import { startTestServer } from "./test-server.ts";
 
+// Lists every plugin's contributions, the advanced ones too, so it runs in the full profile (v2-0 D7).
+process.env.RH_PROFILE = "full";
+
 const FIXTURES = join(import.meta.dirname, "fixtures/plugins");
 
 const rejects = async (p: Promise<unknown>, code: string, message: RegExp, details?: unknown) =>

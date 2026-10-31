@@ -10,6 +10,9 @@ import { sampleCharter } from "./fixtures/charter.ts";
 import { fakeOpenRouter } from "./fixtures/openrouter.ts";
 import { startTestServer } from "./test-server.ts";
 
+// Exercises advanced features, so it runs in the full profile whatever RH_PROFILE says (v2-0 D7).
+process.env.RH_PROFILE = "full";
+
 /** A scholarly API at api.paperbase.org and OpenRouter's web search; counts API calls. */
 function web() {
   const or = fakeOpenRouter([]);

@@ -9,6 +9,9 @@ import { byId, pick } from "./fixtures/jev-answers.ts";
 
 import { fullProfileOnly } from "../src/kernel/settings.ts";
 
+// Exercises advanced features, so it runs in the full profile whatever RH_PROFILE says (v2-0 D7).
+process.env.RH_PROFILE = "full";
+
 const FIXTURES = join(import.meta.dirname, "fixtures/plugins");
 
 test("every built-in plugin is classified; core plugins are required; slot plugins name their slot", () => {
