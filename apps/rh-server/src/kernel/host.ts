@@ -67,7 +67,7 @@ export async function startPluginHost(options: PluginHostOptions): Promise<Plugi
     installedDir: join(state.dir, "installed"),
   });
   for (const invalid of discovery.invalid) log.warn("plugin.invalid", { dir: invalid.dir, problems: invalid.problems });
-  await state.open(() => initialPlugins(discovery, env));
+  await state.open(() => initialPlugins(discovery, env), env.RH_PROFILE === "core" ? "core" : "full");
   markChangedPlugins(discovery, state);
   const events = new EventBus(log);
   const services: KernelServices = {

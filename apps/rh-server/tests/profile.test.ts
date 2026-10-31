@@ -67,3 +67,71 @@ test("a new project in core starts with exactly the nine advanced plugins disabl
     }
   }
 });
+
+test("switching an existing project: one commit each way, user choices stand, Undo keeps the profile", async () => {
+  const { startTestServer, tempDir } = await import("./test-server.ts");
+  const temp = tempDir();
+  const run = async <T>(
+    profile: "core" | "full",
+    work: (server: Awaited<ReturnType<typeof startTestServer>>) => Promise<T>,
+  ) => {
+    const server = await startTestServer({ env: { RH_PROFILE: profile }, dataDir: temp.dir });
+    try {
+      return await work(server);
+    } finally {
+      await server.stop();
+    }
+  };
+  const state = (server: Awaited<ReturnType<typeof startTestServer>>, id: string) =>
+    server.hub.project.plugins.kernel.list().find((p) => p.id === id)!.state;
+  const profileCommits = async (server: Awaited<ReturnType<typeof startTestServer>>) =>
+    (await server.hub.project.plugins.state.history(200)).filter((h) => h.message.startsWith("profile:"));
+  try {
+    // A project that ran in full (no profile commit at creation).
+    await run("full", async (server) => {
+      assert.equal(state(server, "rh.knowledge"), "active");
+      assert.equal((await profileCommits(server)).length, 0);
+    });
+    // First start in core: one commit turns the nine off.
+    const undoTarget = await run("core", async (server) => {
+      for (const id of ADVANCED) assert.equal(state(server, id), "disabled", id);
+      const commits = await profileCommits(server);
+      assert.deepEqual(
+        commits.map((c) => [c.message, c.actor]),
+        [["profile: core", "kernel"]],
+      );
+      return commits[0].id;
+    });
+    // Core again: nothing to switch. The user enables the knowledge review; it stays on after a restart.
+    await run("core", async (server) => {
+      assert.equal((await profileCommits(server)).length, 1);
+      await server.hub.project.plugins.kernel.setEnabled("rh.knowledge", true);
+    });
+    await run("core", async (server) => {
+      assert.notEqual(state(server, "rh.knowledge"), "disabled");
+      assert.equal(state(server, "rh.harness"), "disabled");
+      // Undo of the profile commit is refused while a later change touched the same plugin…
+      await assert.rejects(server.hub.project.plugins.kernel.undo(undoTarget));
+      // …and allowed once the plugin is back as the profile left it; then it turns the nine back on.
+      await server.hub.project.plugins.kernel.setEnabled("rh.knowledge", false);
+      await server.hub.project.plugins.kernel.undo(undoTarget);
+      for (const id of ADVANCED) assert.notEqual(state(server, id), "disabled", id);
+    });
+    // Undo kept the profile: a restart in core does not switch again.
+    await run("core", async (server) => {
+      assert.equal((await profileCommits(server)).length, 1);
+      assert.notEqual(state(server, "rh.harness"), "disabled");
+      // Back to a plain core state for the last step.
+      for (const id of ["rh.engineer", "rh.upgrades", "rh.harness"])
+        await server.hub.project.plugins.kernel.setEnabled(id, false);
+    });
+    // Back to full: what the core profile turned off and is still off comes back on.
+    await run("full", async (server) => {
+      const commits = await profileCommits(server);
+      assert.equal(commits[0].message, "profile: full");
+      for (const id of ADVANCED) assert.notEqual(state(server, id), "disabled", id);
+    });
+  } finally {
+    temp.cleanup();
+  }
+});

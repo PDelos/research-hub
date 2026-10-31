@@ -16,7 +16,7 @@
 
 ## 2. One-time profile switch for existing projects
 
-- [ ] 2.1 Lockfile fields `profile` and `profileDisabled`; at start a differing profile is applied in one `kernel`
+- [x] 2.1 Lockfile fields `profile` and `profileDisabled`; at start a differing profile is applied in one `kernel`
   commit (`profile: core` disables, `profile: full` re-enables what core disabled and is still off); a lockfile
   without `profile` counts as `full`. Verify: kernel-state tests: full→core one commit, core→core no commit,
   core→full restores, user re-enable survives restart, Undo of the profile commit re-enables without re-applying.

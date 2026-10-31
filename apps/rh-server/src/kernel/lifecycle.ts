@@ -12,6 +12,7 @@ import { dependents as dependentsOf, resolve, type GraphNode } from "./graph.ts"
 import type { PluginManifest } from "./manifest.ts";
 import { builtinEntry, type Discovery, type DiscoveredPlugin } from "./registry.ts";
 import { idleState, matches, problemOf } from "./run-state.ts";
+import { applyProfile } from "./profile.ts";
 import { resolveSettings, SettingsInvalid, validateSettings } from "./settings.ts";
 import { UndoRefused, type Actor, type Lockfile, type PluginState } from "./state.ts";
 import {
@@ -106,6 +107,7 @@ export class PluginKernel {
           : "update built-in versions",
         "kernel",
       );
+    await applyProfile(this.options.state, this.options.discovery, this.options.env);
     this.recompute();
     await this.fire("onStartup");
   }
