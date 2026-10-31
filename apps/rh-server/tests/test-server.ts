@@ -31,6 +31,8 @@ export async function startTestServer(
     RH_DATA_DIR: dataDir,
     RH_API_TOKEN: TOKEN,
     RH_UI_DIR: join(dataDir, "no-ui"),
+    // The suite runs in the profile of the environment (full when unset, as before profiles existed).
+    RH_PROFILE: process.env.RH_PROFILE ?? "full",
     ...options.env,
   } as NodeJS.ProcessEnv);
   config.port = 0;

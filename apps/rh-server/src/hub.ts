@@ -87,6 +87,7 @@ export class Hub {
         runSweeps: this.options.sweeps !== false,
         decide: this.options.jevDecide,
         kbViewer: { ...this.config.kbViewer, ...this.options.kbViewer },
+        profile: this.config.profile,
       });
       if (this.options.ticker !== false) this.opened.scheduler.start();
     } catch (error) {

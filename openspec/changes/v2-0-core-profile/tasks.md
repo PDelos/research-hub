@@ -2,7 +2,7 @@
 
 ## 1. Profile setting and declarative enablement
 
-- [ ] 1.1 `loadConfig` reads `RH_PROFILE` (`core` default, `full`; other values a `ConfigError` naming the
+- [x] 1.1 `loadConfig` reads `RH_PROFILE` (`core` default, `full`; other values a `ConfigError` naming the
   variable), `Config.profile`, passed into the plugin host's `env`; `.env.example` documents it. Verify: config
   tests for default, `full` and an invalid value.
 - [ ] 1.2 `contributes.enablement` accepts `profile: "full"` (with or without `env`); `initiallyEnabled` returns
