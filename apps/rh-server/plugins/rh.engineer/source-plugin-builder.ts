@@ -14,7 +14,8 @@ import {
 import type { hostOf } from "../../src/kernel/builtin.ts";
 import type { RhApi } from "../../src/kernel/api.ts";
 import type { SourceExports } from "../rh.papers/main.ts";
-import { EngineerInvalid, type Builder, type Idea } from "./main.ts";
+import { EngineerInvalid } from "./ideas.ts";
+import type { Builder, Idea } from "./main.ts";
 
 const SEARCH_TIMEOUT_MS = 60_000;
 
