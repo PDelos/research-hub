@@ -47,7 +47,8 @@ plugins that profile turned off). At start, after the lockfile is opened:
   is disabled and listed in `profileDisabled`; going to full, every plugin in `profileDisabled` that is still
   disabled is enabled and the list is cleared. Both are one commit `profile: core` / `profile: full`, actor `kernel`;
 - a new project's first lockfile gets `profile` set and the plugins already disabled (no extra commit).
-Because Undo reverses only per-plugin fields, undoing the profile commit re-enables the plugins while `profile`
+The switch lives in `kernel/profile.ts`, called once from the kernel's start-up. Because Undo reverses only
+per-plugin fields, undoing the profile commit re-enables the plugins while `profile`
 stays `core`, so the next restart does not apply the profile again: the user's choice stands. Alternative
 considered: re-applying the profile on every start — rejected, it would fight the user's switches.
 

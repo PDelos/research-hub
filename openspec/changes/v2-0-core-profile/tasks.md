@@ -47,10 +47,10 @@
 ## 5. Docs and verification
 
 - [x] 5.1 README profile section, `new-project.sh` writes `RH_PROFILE=core`, `.env.example`. Verify: `npm run check`.
-- [ ] 5.2 Run `npm test`, `npm run check`, `npm run test:ui` and `scripts/e2e-offline.sh` with `RH_PROFILE=full`
+- [x] 5.2 Run `npm test`, `npm run check`, `npm run test:ui` and `scripts/e2e-offline.sh` with `RH_PROFILE=full`
   and with `RH_PROFILE=core` (e2e steps for gated features run in full and check `feature_off` in core). Verify:
   all pass in both.
-- [ ] 5.3 Light and dark screenshots of the core UI (Feed, Settings with Advanced features and Under the hood).
+- [x] 5.3 Light and dark screenshots of the core UI (Feed, Settings with Advanced features and Under the hood).
   Verify: four PNGs listed in the summary.
 
 ## Workflow follow-up
