@@ -46,7 +46,7 @@
 
 ## 5. Docs and verification
 
-- [ ] 5.1 README profile section, `new-project.sh` writes `RH_PROFILE=core`, `.env.example`. Verify: `npm run check`.
+- [x] 5.1 README profile section, `new-project.sh` writes `RH_PROFILE=core`, `.env.example`. Verify: `npm run check`.
 - [ ] 5.2 Run `npm test`, `npm run check`, `npm run test:ui` and `scripts/e2e-offline.sh` with `RH_PROFILE=full`
   and with `RH_PROFILE=core` (e2e steps for gated features run in full and check `feature_off` in core). Verify:
   all pass in both.
