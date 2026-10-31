@@ -29,7 +29,8 @@ plugins; style or lint work; new images.
 
 ### D1 The profile is declared by the plugins, not listed in the kernel
 `contributes.enablement` gains an optional `profile: "full"` (the schema allows `env`, `profile` or both). A
-plugin with `profile: "full"` starts disabled unless `RH_PROFILE=full`. The nine plugins declare it; the kernel
+plugin with `profile: "full"` starts disabled unless `RH_PROFILE=full` (inside the kernel an unset
+`RH_PROFILE` means `full`, the behavior before profiles; the configuration always sets it, default `core`). The nine plugins declare it; the kernel
 knows no plugin ids. Alternative considered: a hard-coded list in `config.ts` — rejected, it puts plugin knowledge in
 the kernel and would miss a future advanced plugin.
 

@@ -10,6 +10,7 @@
   "main": "main.ts",
   "activationEvents": ["onExtensionPoint:fulltext.converter"],
   "contributes": {
+    "enablement": { "profile": "full" },
     "fulltext.converter": [{ "id": "docling", "title": "Docling (layout-aware)" }]
   },
   "permissions": {}

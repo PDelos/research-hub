@@ -8,6 +8,9 @@
   "engines": { "research-hub": "^1.0.0" },
   "main": "main.ts",
   "activationEvents": ["onExtensionPoint:knowledge.finder"],
-  "contributes": { "knowledge.finder": [{ "id": "rising-topics", "title": "Rising topics" }] },
+  "contributes": {
+    "enablement": { "profile": "full" },
+    "knowledge.finder": [{ "id": "rising-topics", "title": "Rising topics" }]
+  },
   "permissions": {}
 }

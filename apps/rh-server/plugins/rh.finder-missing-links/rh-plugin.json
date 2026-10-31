@@ -10,6 +10,7 @@
   "activationEvents": ["onExtensionPoint:knowledge.finder"],
   "dependencies": { "rh.papers": "^1.0.0", "rh.decision-jev": "^1.0.0" },
   "contributes": {
+    "enablement": { "profile": "full" },
     "knowledge.finder": [{ "id": "missing-links", "title": "Missing links" }],
     "jevCommands": ["jev/link-candidate"]
   },

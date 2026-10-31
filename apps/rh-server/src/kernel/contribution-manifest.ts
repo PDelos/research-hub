@@ -141,8 +141,12 @@ const shapes = {
   enablement: {
     type: "object",
     additionalProperties: false,
-    required: ["env"],
-    properties: { env: { type: "string", pattern: "^[A-Z][A-Z0-9_]*$" } },
+    minProperties: 1,
+    properties: {
+      env: { type: "string", pattern: "^[A-Z][A-Z0-9_]*$" },
+      // "full": an advanced feature, enabled at first start only in the full profile (RH_PROFILE).
+      profile: { enum: ["full"] },
+    },
   },
   extensionPoints: {
     type: "object",

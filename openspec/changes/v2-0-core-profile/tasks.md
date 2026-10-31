@@ -5,9 +5,9 @@
 - [x] 1.1 `loadConfig` reads `RH_PROFILE` (`core` default, `full`; other values a `ConfigError` naming the
   variable), `Config.profile`, passed into the plugin host's `env`; `.env.example` documents it. Verify: config
   tests for default, `full` and an invalid value.
-- [ ] 1.2 `contributes.enablement` accepts `profile: "full"` (with or without `env`); `initiallyEnabled` returns
+- [x] 1.2 `contributes.enablement` accepts `profile: "full"` (with or without `env`); `initiallyEnabled` returns
   false for it unless `RH_PROFILE=full`. Verify: manifest/settings tests (schema accepts it; enablement per profile).
-- [ ] 1.3 The nine plugins declare `enablement.profile: "full"`; `rh.engineer`, `rh.upgrades`, `rh.knowledge`,
+- [x] 1.3 The nine plugins declare `enablement.profile: "full"`; `rh.engineer`, `rh.upgrades`, `rh.knowledge`,
   `rh.harness` drop `"required": true`. Verify: a new project in core lists exactly those nine disabled; in full
   none (kernel test).
 - [ ] 1.4 Tests run in either profile: `tests/test-server.ts` passes `RH_PROFILE` through; tests that exercise the
