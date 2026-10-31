@@ -40,7 +40,7 @@ export default defineConfig({
       "max-nested-callbacks": ["error", { max: 3 }],
       complexity: ["error", { max: 15 }],
       "max-lines-per-function": ["error", { max: 80, skipBlankLines: true, skipComments: true }],
-      "max-lines": ["warn", { max: 400, skipBlankLines: true, skipComments: true }],
+      "max-lines": ["error", { max: 400, skipBlankLines: true, skipComments: true }],
       "max-params": ["error", { max: 4 }],
       "no-else-return": "error",
       "no-nested-ternary": "error",
