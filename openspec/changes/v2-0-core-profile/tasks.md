@@ -36,12 +36,12 @@
 
 ## 4. UI
 
-- [ ] 4.1 Core tab bar: only Feed, Library, Charter, Settings; Settings "Under the hood" lists the other active
+- [x] 4.1 Core tab bar: only Feed, Library, Charter, Settings; Settings "Under the hood" lists the other active
   tabs; their URLs still open. Full unchanged. Verify: Playwright tests in both profiles.
-- [ ] 4.2 Settings "Advanced features": the advanced plugins with description, state and switch (enable/disable
+- [x] 4.2 Settings "Advanced features": the advanced plugins with description, state and switch (enable/disable
   through the existing endpoint; a blocked plugin offers to enable its dependency first). Verify: Playwright test
   switching the harness on and seeing the Quality entry appear.
-- [ ] 4.3 Charter, Digest and Plugins views hide what needs a disabled feature without an error; in core the Digest
+- [x] 4.3 Charter, Digest and Plugins views hide what needs a disabled feature without an error; in core the Digest
   view hides empty sections. Verify: Playwright test in core (no error banner, no Proposals section).
 
 ## 5. Docs and verification

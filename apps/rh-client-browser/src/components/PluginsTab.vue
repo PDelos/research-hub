@@ -48,8 +48,14 @@ const usage = (pluginId: string) => {
   const liked = rows.reduce((n, r) => n + r.liked, 0);
   return `${cards} cards, ${liked} liked (30 days)`;
 };
+/** Slot benchmarks and source attribution come from the harness: with it off there is nothing to show. */
+const unlessOff = <T>(call: Promise<T[]>) =>
+  call.catch((error) => {
+    if (isRhError(error) && error.code === "feature_off") return [] as T[];
+    throw error;
+  });
 async function loadGroups() {
-  [slots.value, attribution.value] = await Promise.all([client.slots(), client.attribution(30)]);
+  [slots.value, attribution.value] = await Promise.all([unlessOff(client.slots()), unlessOff(client.attribution(30))]);
 }
 async function runBenchmark(slot: string) {
   running.value = slot;

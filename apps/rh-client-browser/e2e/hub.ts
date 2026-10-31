@@ -26,6 +26,8 @@ const config = loadConfig({
   RH_UI_DIR: join(import.meta.dirname, "../dist"),
   RH_KB_VIEWER_DIR: join(server, "tests/fixtures/fake-ignis"),
   RH_PROJECT_NAME: "ui-tests",
+  // The specs run in the profile of the environment (full when unset, as before profiles existed).
+  RH_PROFILE: process.env.RH_PROFILE ?? "full",
 } as NodeJS.ProcessEnv);
 const running = await startServer(config, createLogger({ level: "warn" }));
 const project = running.hub.project;
@@ -35,36 +37,41 @@ project.charters.approve();
 project.syncVault();
 const { installer } = project.plugins;
 await installer.confirm((await installer.prepare({ folder: join(FIXTURE_PLUGINS, "acme.reading-list") })).planId);
-// Two charter proposals of the knowledge review, so the Digest and Charter tabs show them.
-await project.plugins.exportsOf("rh.knowledge");
-const seededAt = new Date().toISOString();
-const propose = project.db.prepare(
-  "INSERT INTO p_rh_knowledge__proposals (review_id, kind, change_key, change_json, evidence_json, status, base_version, created_at, finder) VALUES (0, ?, ?, ?, ?, 'proposed', 1, ?, ?)",
-);
-propose.run(
-  "add-question",
-  "add-question||ui",
-  JSON.stringify({
-    kind: "add-question",
-    text: "Do protein language models transfer to RNA?",
-    queries: ["RNA language model", "RNA structure transfer"],
-  }),
-  JSON.stringify({
-    summary: "Three papers you starred apply protein models to RNA.",
-    papers: [{ id: 1, title: "RNA-FM", verdict: "star" }],
-    score: 0.8,
-  }),
-  seededAt,
-  "method-transfer",
-);
-propose.run(
-  "add-out-of-scope",
-  "add-out-of-scope||clinical trials",
-  JSON.stringify({ kind: "add-out-of-scope", topic: "clinical trials" }),
-  JSON.stringify({ summary: "You marked 3 clinical papers off topic.", papers: [] }),
-  seededAt,
-  null,
-);
+// Advanced features (full profile only): seeded below when their plugins are on.
+async function seedKnowledgeProposals() {
+  // Two charter proposals of the knowledge review, so the Digest and Charter tabs show them.
+  await project.plugins.exportsOf("rh.knowledge");
+  const seededAt = new Date().toISOString();
+  const propose = project.db.prepare(
+    "INSERT INTO p_rh_knowledge__proposals (review_id, kind, change_key, change_json, evidence_json, status, base_version, created_at, finder) VALUES (0, ?, ?, ?, ?, 'proposed', 1, ?, ?)",
+  );
+  propose.run(
+    "add-question",
+    "add-question||ui",
+    JSON.stringify({
+      kind: "add-question",
+      text: "Do protein language models transfer to RNA?",
+      queries: ["RNA language model", "RNA structure transfer"],
+    }),
+    JSON.stringify({
+      summary: "Three papers you starred apply protein models to RNA.",
+      papers: [{ id: 1, title: "RNA-FM", verdict: "star" }],
+      score: 0.8,
+    }),
+    seededAt,
+    "method-transfer",
+  );
+  propose.run(
+    "add-out-of-scope",
+    "add-out-of-scope||clinical trials",
+    JSON.stringify({ kind: "add-out-of-scope", topic: "clinical trials" }),
+    JSON.stringify({ summary: "You marked 3 clinical papers off topic.", papers: [] }),
+    seededAt,
+    null,
+  );
+}
+if (config.profile === "full") await seedKnowledgeProposals();
+
 // A knowledge-base paper with its full text, so the Library shows both.
 {
   const paperId = project.papers.store.upsert({
@@ -103,33 +110,41 @@ propose.run(
 // One change and a digest, so the Digest tab has something to show (and to undo).
 await project.plugins.kernel.configure("rh.sweep", { cardsPerSweep: 5 });
 await (await project.plugins.exportsOf<DigestExports>("rh.digest")).buildDigest();
-// A finished upgrade run with an embedder proposal and an add-on suggestion, so the Upgrades tab has them.
-await project.plugins.exportsOf("rh.upgrades");
-const at = new Date().toISOString();
-project.db
-  .prepare(
-    "INSERT INTO p_rh_upgrades__runs (focus, reason, status, report_json, cost_usd, requested_by, started_at, finished_at) VALUES ('embedder', 'Seeded for the UI tests.', 'done', ?, 0.01, 'test', ?, ?)",
-  )
-  .run(
-    JSON.stringify({
-      focus: "embedder",
-      reason: "Seeded for the UI tests.",
-      tried: [{ what: "acme/embed-native", verdict: "better", numbers: { mean: 0.7 } }],
-      result: "Proposed acme/embed-native.",
-    }),
-    at,
-    at,
-  );
-project.db
-  .prepare(
-    "INSERT INTO p_rh_upgrades__proposals (run_id, kind, payload_json, status, created_at) VALUES (1, 'embedder', ?, 'proposed', ?)",
-  )
-  .run(JSON.stringify({ model: "acme/embed-native", dims: 0, mean: 0.7, activeMean: 0.6, activeModel: "offline" }), at);
-project.db
-  .prepare(
-    "INSERT INTO p_rh_upgrades__suggestions (run_id, name, url, reason, created_at) VALUES (1, 'bioRxiv API', 'https://api.biorxiv.org', 'biology preprints', ?)",
-  )
-  .run(at);
+
+async function seedUpgrades() {
+  // A finished upgrade run with an embedder proposal and an add-on suggestion, so the Upgrades tab has them.
+  await project.plugins.exportsOf("rh.upgrades");
+  const at = new Date().toISOString();
+  project.db
+    .prepare(
+      "INSERT INTO p_rh_upgrades__runs (focus, reason, status, report_json, cost_usd, requested_by, started_at, finished_at) VALUES ('embedder', 'Seeded for the UI tests.', 'done', ?, 0.01, 'test', ?, ?)",
+    )
+    .run(
+      JSON.stringify({
+        focus: "embedder",
+        reason: "Seeded for the UI tests.",
+        tried: [{ what: "acme/embed-native", verdict: "better", numbers: { mean: 0.7 } }],
+        result: "Proposed acme/embed-native.",
+      }),
+      at,
+      at,
+    );
+  project.db
+    .prepare(
+      "INSERT INTO p_rh_upgrades__proposals (run_id, kind, payload_json, status, created_at) VALUES (1, 'embedder', ?, 'proposed', ?)",
+    )
+    .run(
+      JSON.stringify({ model: "acme/embed-native", dims: 0, mean: 0.7, activeMean: 0.6, activeModel: "offline" }),
+      at,
+    );
+  project.db
+    .prepare(
+      "INSERT INTO p_rh_upgrades__suggestions (run_id, name, url, reason, created_at) VALUES (1, 'bioRxiv API', 'https://api.biorxiv.org', 'biology preprints', ?)",
+    )
+    .run(at);
+}
+
+if (config.profile === "full") await seedUpgrades();
 console.log(`ui test hub on ${running.url} (data ${dir})`);
 
 const stop = async () => {

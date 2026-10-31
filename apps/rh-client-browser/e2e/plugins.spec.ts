@@ -3,6 +3,9 @@
 import { join } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 
+// Checks the full profile (every tab in the bar, the advanced features); core.spec.ts covers the core profile.
+test.skip(process.env.RH_PROFILE === "core", "a full-profile view");
+
 const FIXTURES = join(import.meta.dirname, "../../rh-server/tests/fixtures/plugins");
 const SHOTS = join(import.meta.dirname, "../screenshots");
 

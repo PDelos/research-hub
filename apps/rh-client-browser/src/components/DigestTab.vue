@@ -4,7 +4,7 @@ import KnowledgeProposals from "./KnowledgeProposals.vue";
 // change with an undo, and a comment box per section. Reading and commenting is the user's whole job here.
 import { computed, onMounted, ref } from "vue";
 import { isRhError, type DigestSection, type DigestSummary, type DigestView, type KnowledgeProposal } from "@rh/sdk";
-import { client } from "../store.ts";
+import { client, store } from "../store.ts";
 import { usePlugins } from "../stores/plugins.ts";
 import CycleStatus from "./CycleStatus.vue";
 
@@ -29,6 +29,29 @@ const sections: { id: DigestSection; title: string }[] = [
   { id: "general", title: "Anything else" },
 ];
 const commentsOf = (section: string) => digest.value?.comments.filter((c) => c.section === section) ?? [];
+/** Whether a section has something to report (the core profile shows only those). */
+function hasContent(view: DigestView, section: DigestSection): boolean {
+  const filled: Record<DigestSection, () => boolean> = {
+    cycle: () => view.cycle.sweeps.length > 0 || view.cycle.nightlyRuns > 0,
+    judgments: () => view.judgments.total > 0 || view.judgments.waiting > 0,
+    exploration: () => view.exploration.picks.length > 0,
+    knowledgeBase: () => view.knowledgeBase.added.length > 0,
+    quality: () => !!view.quality && (!!view.quality.judge || view.quality.replays.length > 0),
+    sources: () => (view.sources?.length ?? 0) > 0,
+    upgrade: () => (view.upgrade?.runs.length ?? 0) > 0,
+    charter: () => (view.charter?.proposals.length ?? 0) > 0 || (view.charter?.reviewNotes.length ?? 0) > 0,
+    cost: () => view.cost.totalUsd > 0,
+    changes: () => view.changes.length > 0,
+    general: () => true,
+  };
+  return filled[section]() || commentsOf(section).length > 0;
+}
+/** In the core profile only the sections with something to report; in full every section, as before. */
+const shownSections = computed(() => {
+  const view = digest.value;
+  if (!view || store.info?.profile !== "core") return sections;
+  return sections.filter((sec) => hasContent(view, sec.id));
+});
 const usd = (n: number) => `$${n.toFixed(n < 0.01 ? 4 : 2)}`;
 const day = (iso: string) =>
   new Date(iso).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
@@ -133,7 +156,7 @@ async function undo(commit: string, message: string) {
         </ul>
       </section>
 
-      <section v-for="sec in sections" :key="sec.id" class="digest-section" :data-section="sec.id">
+      <section v-for="sec in shownSections" :key="sec.id" class="digest-section" :data-section="sec.id">
         <h3>{{ sec.title }}</h3>
         <template v-if="sec.id === 'cycle'">
           <p>
