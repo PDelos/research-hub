@@ -11,6 +11,9 @@ import { choice, noul, score, scripted } from "./fixtures/jev-answers.ts";
 import { arxivOnlyFetch, fakePapers } from "./fixtures/sweep-env.ts";
 import { startTestServer, until } from "./test-server.ts";
 
+// Exercises advanced features, so it runs in the full profile whatever RH_PROFILE says (v2-0 D7).
+process.env.RH_PROFILE = "full";
+
 /** Three sweeps of 12 papers, half "Good" (the user likes them) and half "Bad". */
 /** The user likes the "Good" papers, starring every other one, and dislikes the rest. */
 const userVerdict = (title: string, cardId: number) => {

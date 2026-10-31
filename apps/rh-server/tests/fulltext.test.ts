@@ -11,6 +11,9 @@ import { ARXIV_HTML, DOCLING_MD, JATS_XML } from "./fixtures/fulltext/documents.
 import { startTestServer } from "./test-server.ts";
 import { byId, pick } from "./fixtures/jev-answers.ts";
 
+// Exercises advanced features, so it runs in the full profile whatever RH_PROFILE says (v2-0 D7).
+process.env.RH_PROFILE = "full";
+
 const PDF = readFileSync(join(import.meta.dirname, "fixtures/fulltext/paper.pdf"));
 
 /** Routes the full-text sources; everything else 404. Counts requests per URL. */

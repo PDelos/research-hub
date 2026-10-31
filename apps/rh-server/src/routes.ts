@@ -117,6 +117,7 @@ export function routes(hub: Hub, streams: StreamHub): Router {
     const info: Info = {
       ...health(),
       piDurable: packageVersion("@earendil-works/pi-durable"),
+      profile: hub.config.profile,
       models: hub.catalog.jobs,
       jevModel: hub.config.mode === "offline" ? "mock" : hub.config.jevModel,
       uptimeMs: Date.now() - hub.startedAt,

@@ -2,6 +2,13 @@
 // the weekly upgrade, the knowledge loop, full text and the engineer.
 import type { PluginTopic } from "./plugin-views.ts";
 
+export interface RuleCandidateView {
+  reason: string;
+  /** How many judgments gave this reason. */
+  count: number;
+  cards: { cardId: number; title: string }[];
+}
+
 export interface CycleStatus {
   lastSweep: { id: number; status: string; cards: number; startedAt: string; endedAt: string | null } | null;
   /** Cards of the last sweep without a judgment yet. */
@@ -37,6 +44,11 @@ export interface DigestBody {
     /** Cards from this week's sweeps still waiting for a judgment. */
     waiting: number;
     precision: { sweepId: number; startedAt: string; judged: number; good: number; precision: number | null }[];
+    /**
+     * Open rule candidates (v2.0): your reasons that read like general rules, grouped by reason, with how often you
+     * gave each and the cards behind it. Present only while the knowledge review (rh.knowledge) is off; read-only.
+     */
+    ruleCandidates?: RuleCandidateView[];
   };
   exploration: { picks: { sweepId: number; paperId: number; title: string; verdict: string | null }[] };
   knowledgeBase: { added: { stem: string; title: string }[] };

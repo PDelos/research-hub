@@ -9,6 +9,9 @@ import { ndcgAt } from "../src/harness/benchmarks/runner.ts";
 import { benchmarkFetch } from "./fixtures/benchmarks/datasets.ts";
 import { startTestServer } from "./test-server.ts";
 
+// Exercises advanced features, so it runs in the full profile whatever RH_PROFILE says (v2-0 D7).
+process.env.RH_PROFILE = "full";
+
 async function seedSamples(storage: string, names: ("scidocs" | "litsearch" | "pubmed-rct")[]) {
   const { fetch } = benchmarkFetch();
   for (const name of names)

@@ -24,6 +24,8 @@ export interface ScheduleDefaults {
 export interface Config {
   /** The one research project this container serves (RH_PROJECT_NAME). */
   projectName: string;
+  /** Which features start enabled (RH_PROFILE): core leaves the advanced plugins off; full enables everything. */
+  profile: Profile;
   mode: Mode;
   host: string;
   port: number;
@@ -75,6 +77,9 @@ export class ConfigError extends Error {
   }
 }
 
+export const PROFILES = ["core", "full"] as const;
+export type Profile = (typeof PROFILES)[number];
+
 export const PROJECT_NAME = /^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/;
 
 // Relative paths in configuration resolve against the repository root, whatever directory npm runs in.
@@ -124,7 +129,9 @@ function serverFromEnv(env: Env) {
     "RH_LOG_LEVEL",
     `RH_LOG_LEVEL must be debug, info, warn or error`,
   );
-  return { projectName, mode, openrouterKey, port, logLevel };
+  const profile = setting(env, "RH_PROFILE", "core") as Profile;
+  ensure(PROFILES.includes(profile), "RH_PROFILE", `RH_PROFILE must be core or full, got "${env.RH_PROFILE}"`);
+  return { projectName, profile, mode, openrouterKey, port, logLevel };
 }
 
 function scheduleFromEnv(env: Env): Config["schedule"] {
@@ -212,6 +219,7 @@ export function loadConfig(env: Env = process.env): Config {
   const mcpToken = env.RH_MCP_TOKEN?.trim();
   return {
     projectName: server.projectName,
+    profile: server.profile,
     mode: server.mode,
     host,
     port: server.port,

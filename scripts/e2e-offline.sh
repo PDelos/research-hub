@@ -15,15 +15,17 @@ if [ -n "${E2E_BUNDLE:-}" ]; then ENTRY=(apps/rh-server/dist/server.mjs); else E
 FIXTURES="$ROOT/apps/rh-server/tests/fixtures/plugins"
 CONTAINER="rh-e2e-$PORT"
 MCP="e2e-mcp-token-0123456789"
+# RH_PROFILE=core runs the everyday profile: the advanced features are off and their routes answer feature_off.
+PROFILE="${RH_PROFILE:-full}"
 start() {
   if [ -n "${E2E_IMAGE:-}" ]; then
     mkdir -p "$DATA/data" && chmod 777 "$DATA/data"
-    docker run -d --name "$CONTAINER" -e RH_MODE=offline -e RH_KB_VIEWER=off -e RH_ALLOWED_HOSTS="localhost:$PORT" -e RH_MCP_TOKEN="$MCP" \
+    docker run -d --name "$CONTAINER" -e RH_MODE=offline -e RH_PROFILE="$PROFILE" -e RH_KB_VIEWER=off -e RH_ALLOWED_HOSTS="localhost:$PORT" -e RH_MCP_TOKEN="$MCP" \
       -v "$DATA/data:/data" -v "$ROOT/apps/rh-server/tests/fixtures/plugins:/fixtures:ro" \
       -p "127.0.0.1:$PORT:4850" "$E2E_IMAGE" > /dev/null
     FIXTURES=/fixtures
   else
-    (cd "$ROOT" && RH_ENV_FILE=none RH_MODE=offline RH_DATA_DIR="$DATA/data" RH_PORT="$PORT" RH_KB_VIEWER=off RH_MCP_TOKEN="$MCP" \
+    (cd "$ROOT" && RH_ENV_FILE=none RH_MODE=offline RH_PROFILE="$PROFILE" RH_DATA_DIR="$DATA/data" RH_PORT="$PORT" RH_KB_VIEWER=off RH_MCP_TOKEN="$MCP" \
       exec node "${ENTRY[@]}" >> "$LOG" 2>&1) &
     PID=$!
   fi
@@ -93,15 +95,18 @@ expect "nightly run recorded" "$n" 1
 curl -s -X POST "$U/runs/review" "${H[@]}" -d '{}' > /dev/null
 for _ in $(seq 1 40); do DIG=$(curl -s "$U/digests" "${H[@]}" | j "d[0]['id'] if d else ''"); [ -n "$DIG" ] && break; sleep 0.25; done
 expect "digest lists the sweep" "$(curl -s "$U/digests/$DIG" "${H[@]}" | j "len(d['cycle']['sweeps'])")" 1
+if [ "$PROFILE" = full ]; then
 # The knowledge loop (v1-5): the digest ran a review first; a proposal approved becomes charter version 2.
 expect "knowledge review before the digest" "$(curl -s "$U/knowledge" "${H[@]}" | j "d['reviews'][0]['requestedBy']")" digest
 KP=$(curl -s "$U/knowledge" "${H[@]}" | j "[p['id'] for p in d['proposals'] if p['kind'] == 'add-question'][0]")
 expect "charter proposal approved" "$(curl -s -X POST "$U/knowledge/proposals/$KP/approve" "${H[@]}" -d '{}' | j "d['appliedVersion']")" 2
 expect "next charter version" "$(curl -s "$U/charter" "${H[@]}" | j "d['approved']['version']")" 2
+fi
 expect "comment saved" "$(curl -s -X POST "$U/digests/$DIG/comments" "${H[@]}" -d '{"section":"judgments","text":"more methods papers"}' | j "d['section']")" judgments
 SWAP=$(curl -s "$U/plugins/history?limit=500" "${H[@]}" | j "[h['id'] for h in d if h['message'] == 'configure rh.kb: kb.viewer'][0]")
 curl -s -X POST "$U/plugins/undo" "${H[@]}" -d "{\"commit\":\"$SWAP\"}" > /dev/null
 expect "undo of the viewer choice" "$(curl -s "$U/plugins/history" "${H[@]}" | j "d[0]['message']")" "undo: configure rh.kb: kb.viewer"
+if [ "$PROFILE" = full ]; then
 # The harness (v1-2): a replay of past sweeps and the Quality view.
 expect "replay (one sweep: too little)" "$(curl -s -X POST "$U/harness/replay" "${H[@]}" -d '{"variant":{"cardsPerSweep":5}}' | j "d['report']['verdict']")" "not enough data"
 expect "quality: sweeps over time" "$(curl -s "$U/harness/quality" "${H[@]}" | j "len(d['overTime'])")" 1
@@ -114,6 +119,17 @@ curl -s -X POST "$U/upgrades/run" "${H[@]}" -d '{"focus":"ranking"}' > /dev/null
 for _ in $(seq 1 40); do r=$(curl -s "$U/upgrades" "${H[@]}" | j "d['runs'][0]['status'] if d['runs'] else 'none'"); [ "$r" = done ] || [ "$r" = failed ] && break; sleep 0.25; done
 expect "upgrade run (ranking)" "$(curl -s "$U/upgrades" "${H[@]}" | j "d['runs'][0]['report']['result'][:30]")" "Nothing changed: not enough da"
 expect "nothing applied" "$(curl -s "$U/upgrades" "${H[@]}" | j "len(d['proposals'])")" 0
+else
+# The core profile: the advanced features are off, and their routes say so instead of failing.
+off() { curl -s "$U/$1" "${H[@]}" | j "d['error']['code'] + ' ' + d['error']['details']['plugin']"; }
+expect "profile" "$(curl -s "$U/info" "${H[@]}" | j "d['profile']")" core
+expect "knowledge review off" "$(off knowledge)" "feature_off rh.knowledge"
+expect "harness off" "$(off harness/quality)" "feature_off rh.harness"
+expect "weekly upgrade off" "$(off upgrades)" "feature_off rh.upgrades"
+expect "engineer off" "$(off engineer/ideas)" "feature_off rh.engineer"
+expect "digest without advanced sections" "$(curl -s "$U/digests/$DIG" "${H[@]}" | j "[k for k in ('quality','sources','upgrade','charter') if k in d]")" "[]"
+expect "advanced plugins listed" "$(curl -s "$U/plugins" "${H[@]}" | j "sum(1 for p in d['plugins'] if p.get('advanced') and p['state'] == 'disabled')")" 9
+fi
 # MCP (v1-9): an outside agent lists the tools and searches the knowledge base with the MCP token.
 mcp() { curl -s "http://127.0.0.1:$PORT/mcp" -H "Authorization: Bearer $MCP" -H "content-type: application/json" -H "accept: application/json, text/event-stream" -d "$1" | sed -n 's/^data: //p'; }
 expect "MCP tools" "$(mcp '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' | j "len(d['result']['tools'])")" 6

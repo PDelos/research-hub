@@ -3,13 +3,14 @@ import express, { type Router } from "express";
 import type { KnowledgeView } from "@rh/sdk";
 import { requireAuth } from "./auth.ts";
 import { int, invalid } from "./errors.ts";
+import { featureExports } from "./feature.ts";
 import type { Hub } from "./hub.ts";
 import { KnowledgeInvalid, type KnowledgeExports } from "../plugins/rh.knowledge/main.ts";
 
 export function knowledgeRoutes(hub: Hub): Router {
   const router = express.Router();
   router.use("/v1", requireAuth(hub.log));
-  const knowledge = () => hub.project.plugins.exportsOf<KnowledgeExports>("rh.knowledge");
+  const knowledge = () => featureExports<KnowledgeExports>(hub, "rh.knowledge");
   const guard = async <T>(work: () => T | Promise<T>) => {
     try {
       return await work();

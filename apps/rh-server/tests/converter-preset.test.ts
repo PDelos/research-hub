@@ -12,6 +12,9 @@ import { arxivHtmlToSections } from "../src/fulltext/parse.ts";
 import { ARXIV_HTML } from "./fixtures/fulltext/documents.ts";
 import { startTestServer } from "./test-server.ts";
 
+// Exercises advanced features, so it runs in the full profile whatever RH_PROFILE says (v2-0 D7).
+process.env.RH_PROFILE = "full";
+
 const PDF = readFileSync(join(import.meta.dirname, "fixtures/fulltext/paper.pdf"));
 const TRUTH = arxivHtmlToSections(ARXIV_HTML);
 

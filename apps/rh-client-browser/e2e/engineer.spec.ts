@@ -2,6 +2,9 @@
 import { join } from "node:path";
 import { expect, test } from "@playwright/test";
 
+// Checks the full profile (every tab in the bar, the advanced features); core.spec.ts covers the core profile.
+test.skip(process.env.RH_PROFILE === "core", "a full-profile view");
+
 const SHOTS = join(import.meta.dirname, "../screenshots");
 
 test("ideas are researched and assessed; Ask the engineer turns a suggestion into an idea; Reject ends it", async ({

@@ -26,6 +26,10 @@ export interface LockEntry {
 export interface Lockfile {
   lockfileVersion: 1;
   plugins: Record<string, LockEntry>;
+  /** The profile last applied (RH_PROFILE); missing in a lockfile from before profiles, which counts as full. */
+  profile?: "core" | "full";
+  /** The plugins the core profile turned off, re-enabled when the project goes back to full. */
+  profileDisabled?: string[];
 }
 
 /** Who changed the plugin state: shown in the history. */
@@ -73,7 +77,7 @@ export class PluginState {
   }
 
   /** Open the repository, creating it with `initial()` on first start (an existing v0 project gets all built-ins). */
-  async open(initial: () => Lockfile["plugins"]): Promise<Lockfile> {
+  async open(initial: () => Lockfile["plugins"], profile?: Lockfile["profile"]): Promise<Lockfile> {
     mkdirSync(join(this.dir, "installed"), { recursive: true });
     mkdirSync(join(this.dir, "data"), { recursive: true });
     if (!existsSync(join(this.dir, ".git"))) await git.init({ fs, dir: this.dir, defaultBranch: "main" });
@@ -82,7 +86,8 @@ export class PluginState {
       this.lock = JSON.parse(readFileSync(join(this.dir, LOCK_FILE), "utf8")) as Lockfile;
       return this.current();
     }
-    this.lock = { lockfileVersion: 1, plugins: sortKeys(initial()) };
+    // A new project starts in its profile (the plugins were already enabled for it), so there is nothing to switch.
+    this.lock = { lockfileVersion: 1, plugins: sortKeys(initial()), ...(profile ? { profile } : {}) };
     await this.commit("initialize plugins from the environment", "kernel", [".gitignore"]);
     return this.current();
   }

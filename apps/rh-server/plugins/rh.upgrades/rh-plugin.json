@@ -7,7 +7,6 @@
   "description": "Once a week improves one slot on its fixed benchmark preset (ranking: applied with undo; embedder: proposed for your approval) or scouts add-ons on the web, and reports in the digest and the Upgrades tab.",
   "engines": { "research-hub": "^1.0.0" },
   "main": "main.ts",
-  "required": true,
   "activationEvents": ["onStartup"],
   "dependencies": {
     "rh.provider-openrouter": "^1.0.0",
@@ -17,6 +16,7 @@
     "rh.harness": "^1.0.0"
   },
   "contributes": {
+    "enablement": { "profile": "full" },
     "tabs": [{ "id": "upgrades", "title": "Upgrades", "view": "upgrades", "order": 17 }],
     "jevCommands": ["jev/upgrade-focus"],
     "settings": {

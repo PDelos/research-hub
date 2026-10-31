@@ -5,11 +5,11 @@
 import type { CycleStatus, DigestComment, DigestSection, DigestSummary, DigestView } from "@rh/sdk";
 import type { Db } from "../../src/db.ts";
 import { hostOf } from "../../src/kernel/builtin.ts";
-import type { PluginContext } from "../../src/kernel/lifecycle.ts";
+import { PluginUnavailable, type PluginContext } from "../../src/kernel/lifecycle.ts";
 import { isoWeek, localParts, type ScheduledRun } from "../../src/schedule.ts";
 import type { FeedbackExports } from "../rh.feedback/main.ts";
 import type { ScheduleExports } from "../rh.schedule/main.ts";
-import { buildDigest } from "./digest.ts";
+import { buildDigest, openRuleCandidates } from "./digest.ts";
 import { charterSection, qualitySection, upgradeSection, type Period } from "./sections.ts";
 import { DigestStore } from "./store.ts";
 import type { HarnessExports } from "../rh.harness/main.ts";
@@ -96,7 +96,9 @@ async function reviewKnowledge(context: PluginContext) {
     const knowledge = await hostOf(context).exportsOf<KnowledgeExports>("rh.knowledge");
     return { knowledge, notes: (await knowledge.review("digest")).report.notes };
   } catch (error) {
-    context.log.warn("digest.knowledge_review_failed", { error: String(error) });
+    // The knowledge review is an advanced feature: off means no Charter section, not a failure.
+    if (!(error instanceof PluginUnavailable))
+      context.log.warn("digest.knowledge_review_failed", { error: String(error) });
     return { knowledge: undefined, notes: [] };
   }
 }
@@ -198,6 +200,8 @@ export function activate(context: PluginContext): DigestExports {
       );
       if (upgrade) body.upgrade = upgrade;
       if (review.knowledge) body.charter = await charterSection(review.knowledge, period, review.notes);
+      // In core, without the knowledge review nothing turns reasons into rules: show the open candidates (read-only).
+      else if (host.services.env.RH_PROFILE === "core") body.judgments.ruleCandidates = openRuleCandidates(db);
       const id = store.add(label, period, body);
       context.log.info("digest.built", { id, week: label, sweeps: body.cycle.sweeps.length });
       return store.get(id)!;

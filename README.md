@@ -54,6 +54,31 @@ Open <http://localhost:4850>. Offline mode uses a fake model that echoes you, a 
 synthetic paper-source answers (ask "find papers on protein folding" to see a search); nothing leaves your machine.
 Data goes to `./data`.
 
+## Profiles: core and full
+
+`RH_PROFILE` chooses how much of the hub is on. **core** (the default) is the everyday hub: the daily sweep, cards,
+your judgments and the weights they move, evidence notes on ⭐ and a weekly digest that shows only the sections with
+something in them. The tab bar has five tabs: Feed, Digest, Library, Charter and Settings; Runs, Plugins (and the tabs of any
+advanced feature you switch on) are under **Settings → Under the hood** and keep their addresses. **full** is
+everything, exactly as before profiles existed.
+
+In core these plugins are off; each comes back on its own from **Settings → Advanced features**, at once, without a
+restart, as one change you can undo:
+
+| Feature | Plugin | What it adds |
+|---|---|---|
+| Harness | `rh.harness` | Quality tab, replays, the judge, slot benchmarks, source attribution; digest Quality and Sources |
+| Weekly upgrade | `rh.upgrades` (needs the harness) | Upgrades tab, one slot improved per week; digest Upgrade section |
+| Engineer | `rh.engineer` (needs the harness) | Ideas researched, plugins built and tested, fine-tuning on Kaggle |
+| Knowledge review | `rh.knowledge` | Charter proposals before each digest; Charter Proposals; digest Charter section |
+| Question finders | `rh.finder-method-transfer`, `rh.finder-missing-links`, `rh.finder-rising-topics` | Leads for new research questions (used by the knowledge review) |
+| Docling converter | `rh.converter-docling` | PDFs through Docling (research-hub:full image) |
+| Local embedder | `rh.embedder-local` | Embeddings from a model stored in the project (research-hub:full image) |
+
+A new project starts in its profile. An existing project switches once, at its first start under a new profile, as
+one plugin change (`profile: core` or `profile: full`) you can undo; after that your own switches stay. A route of a
+feature that is off answers 409 `feature_off` with the plugin id.
+
 ## Starting a project
 
 1. **Brief.** Open the UI: a new project asks for a brief (paste it or upload a `.md`, up to 50,000 characters).

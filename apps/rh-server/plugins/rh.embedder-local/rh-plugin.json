@@ -10,6 +10,7 @@
   "main": "main.ts",
   "activationEvents": ["onExtensionPoint:papers.embedder"],
   "contributes": {
+    "enablement": { "profile": "full" },
     "papers.embedder": [{ "id": "local", "title": "Local model" }],
     "settings": {
       "properties": {

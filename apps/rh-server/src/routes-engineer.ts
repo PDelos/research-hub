@@ -2,13 +2,14 @@
 import express, { type Router } from "express";
 import { requireAuth } from "./auth.ts";
 import { int, invalid } from "./errors.ts";
+import { featureExports } from "./feature.ts";
 import type { Hub } from "./hub.ts";
 import { EngineerInvalid, type EngineerExports } from "../plugins/rh.engineer/main.ts";
 
 export function engineerRoutes(hub: Hub): Router {
   const router = express.Router();
   router.use("/v1", requireAuth(hub.log));
-  const engineer = () => hub.project.plugins.exportsOf<EngineerExports>("rh.engineer");
+  const engineer = () => featureExports<EngineerExports>(hub, "rh.engineer");
   const guard = async <T>(work: () => T | Promise<T>) => {
     try {
       return await work();

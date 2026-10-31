@@ -33,6 +33,7 @@ import type { Ingest } from "./kb/ingest.ts";
 import type { KbIndex } from "./kb/search.ts";
 import type { KbViewer } from "./kb/viewer.ts";
 import { openProjectDb, Settings, type Db, type SelfCheck } from "./db.ts";
+import type { Profile } from "./config.ts";
 import type { Logger } from "./logger.ts";
 import { Telemetry } from "./telemetry.ts";
 import type { AgentHooks, BuiltinHost } from "./kernel/builtin.ts";
@@ -144,6 +145,8 @@ export interface OpenProjectOptions {
   /** Tests: answer Jev questions with this instead of the Jev client. */
   decide?: Decide;
   kbViewer?: { enabled: boolean; dir: string; obsidianVersion: string; restartDelays?: number[] };
+  /** RH_PROFILE (default full here, so callers that open a project directly keep every feature). */
+  profile?: Profile;
 }
 
 type HostFactory = NonNullable<Parameters<typeof startPluginHost>[0]["builtinHost"]>;
@@ -289,7 +292,11 @@ async function startProjectPlugins(options: OpenProjectOptions) {
     vaultDir: join(dir, "vault"),
     log,
     // First-start enablement follows the configuration (RH_KB_VIEWER may come from the .env file).
-    env: { ...process.env, RH_KB_VIEWER: options.kbViewer?.enabled === false ? "off" : "on" },
+    env: {
+      ...process.env,
+      RH_KB_VIEWER: options.kbViewer?.enabled === false ? "off" : "on",
+      RH_PROFILE: options.profile ?? "full",
+    },
     ...(options.paperFetch ? { fetch: options.paperFetch } : {}),
     builtinHost: builtinHostFactory({ name, dir, db, settings, telemetry, log, options, observe }, () => plugins),
   });

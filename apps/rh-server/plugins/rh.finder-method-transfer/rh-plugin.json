@@ -9,6 +9,9 @@
   "main": "main.ts",
   "activationEvents": ["onExtensionPoint:knowledge.finder"],
   "dependencies": { "rh.papers": "^1.0.0" },
-  "contributes": { "knowledge.finder": [{ "id": "method-transfer", "title": "Same method, different problem" }] },
+  "contributes": {
+    "enablement": { "profile": "full" },
+    "knowledge.finder": [{ "id": "method-transfer", "title": "Same method, different problem" }]
+  },
   "permissions": {}
 }

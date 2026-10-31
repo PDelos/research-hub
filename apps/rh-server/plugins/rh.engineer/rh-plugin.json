@@ -7,7 +7,6 @@
   "description": "Turns ideas (scout suggestions, your proposals) into plugins: researches whether each is worth it, builds and tests it once you press Build, and proposes it with its numbers. Paper sources and fine-tuned embedders (trained free on Kaggle).",
   "engines": { "research-hub": "^1.0.0" },
   "main": "main.ts",
-  "required": true,
   "activationEvents": ["onStartup"],
   "dependencies": {
     "rh.provider-openrouter": "^1.0.0",
@@ -15,6 +14,7 @@
     "rh.harness": "^1.0.0"
   },
   "contributes": {
+    "enablement": { "profile": "full" },
     "settings": {
       "properties": {
         "maxAttempts": {

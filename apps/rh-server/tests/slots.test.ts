@@ -7,6 +7,11 @@ import { discover } from "../src/kernel/registry.ts";
 import { startTestServer } from "./test-server.ts";
 import { byId, pick } from "./fixtures/jev-answers.ts";
 
+import { fullProfileOnly } from "../src/kernel/settings.ts";
+
+// Exercises advanced features, so it runs in the full profile whatever RH_PROFILE says (v2-0 D7).
+process.env.RH_PROFILE = "full";
+
 const FIXTURES = join(import.meta.dirname, "fixtures/plugins");
 
 test("every built-in plugin is classified; core plugins are required; slot plugins name their slot", () => {
@@ -15,7 +20,9 @@ test("every built-in plugin is classified; core plugins are required; slot plugi
   const raw = [...plugins.values()];
   for (const p of raw) {
     assert.ok(["core", "slot", "addon", "preference"].includes(p.manifest.kind), p.manifest.id);
-    if (p.manifest.kind === "core") assert.equal(p.manifest.required, true, `${p.manifest.id} is core, so required`);
+    // Core plugins are required, except the advanced features the core profile leaves off (v2-0 D4).
+    if (p.manifest.kind === "core" && !fullProfileOnly(p.manifest))
+      assert.equal(p.manifest.required, true, `${p.manifest.id} is core, so required`);
     if (p.manifest.kind === "slot") assert.ok(p.manifest.slot, `${p.manifest.id} names its slot`);
   }
   const kinds = (k: string) =>

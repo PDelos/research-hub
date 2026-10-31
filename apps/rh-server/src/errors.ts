@@ -10,6 +10,7 @@ export type ErrorCode =
   | "invalid"
   | "busy"
   | "conflict"
+  | "feature_off"
   | "unavailable"
   | "internal";
 
@@ -20,6 +21,7 @@ const STATUS: Record<ErrorCode, number> = {
   invalid: 400,
   busy: 409,
   conflict: 409,
+  feature_off: 409,
   unavailable: 503,
   internal: 500,
 };

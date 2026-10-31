@@ -9,7 +9,6 @@
     "research-hub": "^1.0.0"
   },
   "main": "main.ts",
-  "required": true,
   "activationEvents": ["onStartup"],
   "dependencies": {
     "rh.provider-openrouter": "^1.0.0",
@@ -19,6 +18,7 @@
     "rh.kb": "^1.0.0"
   },
   "contributes": {
+    "enablement": { "profile": "full" },
     "jevCommands": ["jev/question-promise"],
     "settings": {
       "properties": {

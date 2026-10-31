@@ -3,6 +3,9 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { startTestServer, until } from "./test-server.ts";
 
+// Exercises advanced features, so it runs in the full profile whatever RH_PROFILE says (v2-0 D7).
+process.env.RH_PROFILE = "full";
+
 test("changing the embedder's model or size re-embeds every paper in the background, without a restart, and undoes", async () => {
   const server = await startTestServer();
   try {

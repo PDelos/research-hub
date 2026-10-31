@@ -5,6 +5,9 @@ import { ResearchUnavailable, type ProviderExports } from "../plugins/rh.provide
 import { fakeOpenRouter } from "./fixtures/openrouter.ts";
 import { startTestServer } from "./test-server.ts";
 
+// Exercises advanced features, so it runs in the full profile whatever RH_PROFILE says (v2-0 D7).
+process.env.RH_PROFILE = "full";
+
 test("research asks OpenRouter with the web plugin and returns the answer, its sources and cost", async () => {
   const or = fakeOpenRouter([]);
   or.answer = "Use model X.";

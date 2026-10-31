@@ -120,8 +120,18 @@ export function resolveSettings(
   return { ...out, ...saved };
 }
 
-/** Whether a plugin starts enabled in a new lockfile: `contributes.enablement.env` set to off/false/0 disables it. */
+/** Whether the plugin is an advanced feature, enabled only in the full profile (`contributes.enablement.profile`). */
+export function fullProfileOnly(manifest: PluginManifest): boolean {
+  return (manifest.contributes.enablement as { profile?: string } | undefined)?.profile === "full";
+}
+
+/**
+ * Whether a plugin starts enabled in a new lockfile: `contributes.enablement.env` set to off/false/0 disables it,
+ * and an advanced feature (`enablement.profile: "full"`) starts disabled unless RH_PROFILE is full.
+ */
 export function initiallyEnabled(manifest: PluginManifest, env: NodeJS.ProcessEnv = process.env): boolean {
+  // Unset means full, as before profiles existed; the configuration always sets RH_PROFILE (default core).
+  if (fullProfileOnly(manifest) && (env.RH_PROFILE ?? "full") !== "full") return false;
   const name = (manifest.contributes.enablement as { env?: string } | undefined)?.env;
   const raw = name ? env[name] : undefined;
   return raw === undefined || !["0", "false", "off", "no"].includes(raw.trim().toLowerCase());

@@ -9,7 +9,6 @@
     "research-hub": "^1.0.0"
   },
   "main": "main.ts",
-  "required": true,
   "activationEvents": ["onStartup", "onChatTool:replay_variant"],
   "dependencies": {
     "rh.decision-jev": "^1.0.0",
@@ -17,6 +16,7 @@
     "rh.sweep": "^1.0.0"
   },
   "contributes": {
+    "enablement": { "profile": "full" },
     "tabs": [
       {
         "id": "quality",
