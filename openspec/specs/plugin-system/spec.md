@@ -122,7 +122,7 @@ The user SHALL be able to install a plugin from a folder or a git URL, and to un
 - **THEN** its data remains and is used again if it is reinstalled
 
 ### Requirement: v0 as built-in plugins
-All v0 features SHALL be provided by built-in plugins with unchanged behavior: paper sources, representations, sweep and cards, feedback, charter, schedule, knowledge base and its viewers, the research desk, the model provider and the decision engine; disabling an optional built-in plugin SHALL remove its feature without breaking the others.
+All v0 features SHALL be provided by built-in plugins with unchanged behavior: paper sources, representations, sweep and cards, feedback, charter, schedule, knowledge base and its viewers, the research desk, the model provider and the decision engine; disabling an optional built-in plugin SHALL remove its feature without breaking the others. The engineer, the weekly upgrade, the knowledge review and the harness SHALL be optional built-ins (not required), like the question finders, the Docling converter and the local embedder.
 
 #### Scenario: Unchanged behavior
 - **WHEN** the v0 test suite runs against the plugin-based hub
@@ -131,6 +131,10 @@ All v0 features SHALL be provided by built-in plugins with unchanged behavior: p
 #### Scenario: Disable an optional feature
 - **WHEN** the Semantic Scholar source plugin or the Obsidian viewer plugin is disabled
 - **THEN** sweeps, chat and the Library keep working
+
+#### Scenario: Disable the self-improvement plugins
+- **WHEN** the engineer, weekly upgrade, knowledge review and harness plugins are all disabled
+- **THEN** sweeps, cards, judgments, the Library, the nightly run and the weekly digest keep working
 
 ### Requirement: Kernel API versioning
 The kernel API SHALL carry a semantic version reported in `/v1/info`; changes that break plugins SHALL raise the major version, and plugins SHALL be checked against it at install and at every start.
