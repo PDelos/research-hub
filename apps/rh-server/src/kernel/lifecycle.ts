@@ -13,7 +13,7 @@ import type { PluginManifest } from "./manifest.ts";
 import { builtinEntry, type Discovery, type DiscoveredPlugin } from "./registry.ts";
 import { idleState, matches, problemOf } from "./run-state.ts";
 import { applyProfile } from "./profile.ts";
-import { resolveSettings, SettingsInvalid, validateSettings } from "./settings.ts";
+import { fullProfileOnly, resolveSettings, SettingsInvalid, validateSettings } from "./settings.ts";
 import { UndoRefused, type Actor, type Lockfile, type PluginState } from "./state.ts";
 import {
   defaultLoad,
@@ -125,6 +125,7 @@ export class PluginKernel {
       state: r.state,
       ...(r.reason ? { reason: r.reason } : {}),
       ...(r.activatedAt ? { activatedAt: r.activatedAt } : {}),
+      ...(fullProfileOnly(r.plugin.manifest) ? { advanced: true } : {}),
     }));
   }
 

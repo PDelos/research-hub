@@ -2,6 +2,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { ConfigError, loadConfig } from "../src/config.ts";
+import { ADVANCED } from "./fixtures/profile.ts";
 
 const offline = { RH_MODE: "offline" };
 
@@ -35,18 +36,6 @@ test("enablement.profile full: the manifest accepts it, and the plugin starts di
   const wrong = parseManifest({ ...manifest, contributes: { enablement: { profile: "core" } } });
   assert.notDeepEqual(contributionProblems(wrong), []);
 });
-
-export const ADVANCED = [
-  "rh.converter-docling",
-  "rh.embedder-local",
-  "rh.engineer",
-  "rh.finder-method-transfer",
-  "rh.finder-missing-links",
-  "rh.finder-rising-topics",
-  "rh.harness",
-  "rh.knowledge",
-  "rh.upgrades",
-];
 
 test("a new project in core starts with exactly the nine advanced plugins disabled; in full with none", async () => {
   const { startTestServer, tempDir } = await import("./test-server.ts");

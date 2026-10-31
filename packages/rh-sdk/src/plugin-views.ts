@@ -129,4 +129,6 @@ export interface PluginSummary {
   /** Why the plugin is not active (blocked, incompatible) or the error that made it fail. */
   reason?: string;
   activatedAt?: string;
+  /** An advanced feature (v2.0): off in the core profile, switched on in Settings → Advanced features. */
+  advanced?: boolean;
 }

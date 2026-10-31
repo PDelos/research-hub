@@ -5,7 +5,7 @@
 import type { CycleStatus, DigestComment, DigestSection, DigestSummary, DigestView } from "@rh/sdk";
 import type { Db } from "../../src/db.ts";
 import { hostOf } from "../../src/kernel/builtin.ts";
-import type { PluginContext } from "../../src/kernel/lifecycle.ts";
+import { PluginUnavailable, type PluginContext } from "../../src/kernel/lifecycle.ts";
 import { isoWeek, localParts, type ScheduledRun } from "../../src/schedule.ts";
 import type { FeedbackExports } from "../rh.feedback/main.ts";
 import type { ScheduleExports } from "../rh.schedule/main.ts";
@@ -96,7 +96,9 @@ async function reviewKnowledge(context: PluginContext) {
     const knowledge = await hostOf(context).exportsOf<KnowledgeExports>("rh.knowledge");
     return { knowledge, notes: (await knowledge.review("digest")).report.notes };
   } catch (error) {
-    context.log.warn("digest.knowledge_review_failed", { error: String(error) });
+    // The knowledge review is an advanced feature: off means no Charter section, not a failure.
+    if (!(error instanceof PluginUnavailable))
+      context.log.warn("digest.knowledge_review_failed", { error: String(error) });
     return { knowledge: undefined, notes: [] };
   }
 }

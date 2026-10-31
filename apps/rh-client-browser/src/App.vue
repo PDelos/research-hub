@@ -35,7 +35,8 @@ const plugins = usePlugins();
 const route = useRoute();
 const router = useRouter();
 const tab = computed(() => String(route.params.tab ?? "feed"));
-const current = computed(() => plugins.tabs.find((t) => t.id === tab.value));
+// Every contributed tab opens by its URL, also those the core profile keeps out of the tab bar.
+const current = computed(() => plugins.allTabs.find((t) => t.id === tab.value));
 const go = (id: string) => void router.replace(`/${id}`);
 // A tab whose plugin was disabled (or an old link) falls back to the first tab.
 watch([() => plugins.contributions, tab], () => {

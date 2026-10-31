@@ -10,7 +10,7 @@
 - [x] 1.3 The nine plugins declare `enablement.profile: "full"`; `rh.engineer`, `rh.upgrades`, `rh.knowledge`,
   `rh.harness` drop `"required": true`. Verify: a new project in core lists exactly those nine disabled; in full
   none (kernel test).
-- [ ] 1.4 Tests run in either profile: `tests/test-server.ts` passes `RH_PROFILE` through; tests that exercise the
+- [x] 1.4 Tests run in either profile: `tests/test-server.ts` passes `RH_PROFILE` through; tests that exercise the
   gated plugins pin `profile: "full"` in their configuration without changing assertions. Verify: `npm test` passes
   with `RH_PROFILE=full` and with `RH_PROFILE=core`.
 
@@ -23,15 +23,15 @@
 
 ## 3. Graceful degradation on the server
 
-- [ ] 3.1 API error `feature_off` (409, `details.plugin`) in `ApiFault` and the SDK's `ErrorCode`; the engineer,
+- [x] 3.1 API error `feature_off` (409, `details.plugin`) in `ApiFault` and the SDK's `ErrorCode`; the engineer,
   upgrades, harness and knowledge routes map `PluginUnavailable` to it. Verify: API test calling one route of each
   with its plugin off.
-- [ ] 3.2 The digest treats a disabled knowledge review as off (no warning) and leaves out Quality, Sources,
+- [x] 3.2 The digest treats a disabled knowledge review as off (no warning) and leaves out Quality, Sources,
   Upgrade and Charter when their plugins are off. Verify: digest test with the four plugins off; cycle-week test in
   core (7 sweeps, 7 nightly, 1 digest, none failed).
-- [ ] 3.3 `/v1/info` reports `profile`; `PluginSummary.advanced` marks plugins declaring `profile: "full"`.
+- [x] 3.3 `/v1/info` reports `profile`; `PluginSummary.advanced` marks plugins declaring `profile: "full"`.
   Verify: API test.
-- [ ] 3.4 Enabling each of the nine live in core works without a restart (its route answers, or for finders /
+- [x] 3.4 Enabling each of the nine live in core works without a restart (its route answers, or for finders /
   converter / embedder, it shows in its extension point). Verify: one test per plugin.
 
 ## 4. UI

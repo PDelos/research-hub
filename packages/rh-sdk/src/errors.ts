@@ -5,6 +5,8 @@ export type ErrorCode =
   | "invalid"
   | "busy"
   | "conflict"
+  /** The feature's plugin is off (v2.0); details.plugin names it. */
+  | "feature_off"
   | "unavailable"
   | "internal"
   | "offline";

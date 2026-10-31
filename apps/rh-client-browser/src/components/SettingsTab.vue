@@ -3,7 +3,9 @@ import { onMounted, ref, watch } from "vue";
 import type { WeightView, Weekday } from "@rh/sdk";
 import { client, refreshProject, refreshSchedule, store } from "../store.ts";
 import { usePlugins } from "../stores/plugins.ts";
+import AdvancedFeatures from "./AdvancedFeatures.vue";
 import PluginSettingsForm from "./PluginSettingsForm.vue";
+import UnderTheHood from "./UnderTheHood.vue";
 
 const plugins = usePlugins();
 
@@ -161,5 +163,8 @@ async function runNow(kind: "sweep" | "nightly" | "review") {
         </tr>
       </tbody>
     </table>
+
+    <AdvancedFeatures />
+    <UnderTheHood />
   </div>
 </template>

@@ -3,13 +3,14 @@
 import express, { type Router } from "express";
 import { requireAuth } from "./auth.ts";
 import { int, invalid } from "./errors.ts";
+import { featureExports } from "./feature.ts";
 import type { Hub } from "./hub.ts";
 import { BenchmarkInvalid, VariantInvalid, type HarnessExports } from "../plugins/rh.harness/main.ts";
 
 export function harnessRoutes(hub: Hub): Router {
   const router = express.Router();
   router.use("/v1", requireAuth(hub.log));
-  const harness = () => hub.project.plugins.exportsOf<HarnessExports>("rh.harness");
+  const harness = () => featureExports<HarnessExports>(hub, "rh.harness");
 
   router.get("/v1/harness/quality", async (_request, response) => void response.json((await harness()).quality()));
   router.get("/v1/harness/replays", async (request, response) => {

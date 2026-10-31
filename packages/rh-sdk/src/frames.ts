@@ -89,6 +89,8 @@ export interface Info extends Health {
   kernelApi: string;
   /** Every plugin with its version and state (v1.0). */
   plugins: { id: string; version: string; state: PluginRunState }[];
+  /** RH_PROFILE (v2.0): core leaves the advanced features off and shows four tabs; full is everything. */
+  profile: "core" | "full";
 }
 
 export interface KbViewerStatus {

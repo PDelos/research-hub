@@ -4,13 +4,14 @@ import express, { type Router } from "express";
 import type { UpgradesView } from "@rh/sdk";
 import { requireAuth } from "./auth.ts";
 import { int, invalid } from "./errors.ts";
+import { featureExports } from "./feature.ts";
 import type { Hub } from "./hub.ts";
 import { FOCUSES, UpgradeInvalid, type Focus, type UpgradesExports } from "../plugins/rh.upgrades/main.ts";
 
 export function upgradeRoutes(hub: Hub): Router {
   const router = express.Router();
   router.use("/v1", requireAuth(hub.log));
-  const upgrades = () => hub.project.plugins.exportsOf<UpgradesExports>("rh.upgrades");
+  const upgrades = () => featureExports<UpgradesExports>(hub, "rh.upgrades");
   const guard = async <T>(work: () => T | Promise<T>) => {
     try {
       return await work();
