@@ -58,7 +58,7 @@ Data goes to `./data`.
 
 `RH_PROFILE` chooses how much of the hub is on. **core** (the default) is the everyday hub: the daily sweep, cards,
 your judgments and the weights they move, evidence notes on ⭐ and a weekly digest that shows only the sections with
-something in them. The tab bar has Feed, Library, Charter and Settings; Runs, Digest, Plugins (and the tabs of any
+something in them. The tab bar has five tabs: Feed, Digest, Library, Charter and Settings; Runs, Plugins (and the tabs of any
 advanced feature you switch on) are under **Settings → Under the hood** and keep their addresses. **full** is
 everything, exactly as before profiles existed.
 

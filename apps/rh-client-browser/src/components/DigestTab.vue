@@ -33,7 +33,8 @@ const commentsOf = (section: string) => digest.value?.comments.filter((c) => c.s
 function hasContent(view: DigestView, section: DigestSection): boolean {
   const filled: Record<DigestSection, () => boolean> = {
     cycle: () => view.cycle.sweeps.length > 0 || view.cycle.nightlyRuns > 0,
-    judgments: () => view.judgments.total > 0 || view.judgments.waiting > 0,
+    judgments: () =>
+      view.judgments.total > 0 || view.judgments.waiting > 0 || (view.judgments.ruleCandidates?.length ?? 0) > 0,
     exploration: () => view.exploration.picks.length > 0,
     knowledgeBase: () => view.knowledgeBase.added.length > 0,
     quality: () => !!view.quality && (!!view.quality.judge || view.quality.replays.length > 0),
@@ -179,6 +180,19 @@ async function undo(commit: string, message: string) {
               {{ day(p.startedAt) }}: precision@5 {{ pct(p.precision) }} ({{ p.good }} good of {{ p.judged }} judged)
             </li>
           </ul>
+          <div v-if="digest.judgments.ruleCandidates?.length" class="rule-candidates" data-test="rule-candidates">
+            <h4>Reasons that read like rules</h4>
+            <p class="muted small">
+              Your reasons that sound general. Read-only: the knowledge review (Settings → Advanced features) turns them
+              into taste rules you can approve.
+            </p>
+            <ul class="small">
+              <li v-for="r in digest.judgments.ruleCandidates" :key="r.reason">
+                “{{ r.reason }}” — {{ r.count }}×
+                <span class="muted">({{ r.cards.map((c) => c.title).join("; ") }})</span>
+              </li>
+            </ul>
+          </div>
         </template>
         <template v-else-if="sec.id === 'exploration'">
           <p v-if="!digest.exploration.picks.length" class="muted">No exploration picks this week.</p>

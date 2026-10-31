@@ -117,3 +117,30 @@ export function buildDigest(input: {
     lastComments: input.lastComments,
   };
 }
+
+/** At most this many rule candidates in the digest (the most frequent first). */
+const RULE_CANDIDATES_SHOWN = 10;
+
+/**
+ * Open rule candidates (v2-0): reasons the reason classifier found general, grouped by their wording (case and spacing
+ * ignored), most frequent first, each with the cards it came from. Read-only: approving rules is the knowledge review's.
+ */
+export function openRuleCandidates(db: Db): NonNullable<DigestBody["judgments"]["ruleCandidates"]> {
+  const rows = db
+    .prepare(
+      `SELECT r.card_id, r.reason, p.title FROM rule_candidates r JOIN cards c ON c.id = r.card_id
+         JOIN papers p ON p.id = c.paper_id WHERE r.status = 'open' ORDER BY r.created_at DESC, r.card_id DESC`,
+    )
+    .all() as { card_id: number; reason: string; title: string }[];
+  const groups = new Map<string, NonNullable<DigestBody["judgments"]["ruleCandidates"]>[number]>();
+  for (const row of rows) {
+    // Shown as the latest wording, spaces collapsed; grouped regardless of case.
+    const reason = row.reason.trim().replace(/\s+/g, " ");
+    const key = reason.toLowerCase();
+    const group = groups.get(key) ?? { reason, count: 0, cards: [] };
+    group.count++;
+    group.cards.push({ cardId: Number(row.card_id), title: row.title });
+    groups.set(key, group);
+  }
+  return [...groups.values()].toSorted((a, b) => b.count - a.count).slice(0, RULE_CANDIDATES_SHOWN);
+}

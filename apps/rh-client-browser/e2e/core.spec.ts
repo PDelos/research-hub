@@ -6,20 +6,22 @@ const SHOTS = join(import.meta.dirname, "../screenshots");
 
 test.skip(process.env.RH_PROFILE !== "core", "the core profile only");
 
-test("the tab bar has only Feed, Library, Charter and Settings; the rest is under the hood and opens by URL", async ({
+test("the tab bar has only Feed, Digest, Library, Charter and Settings; the rest is under the hood and opens by URL", async ({
   page,
 }) => {
   await page.goto("#/feed");
-  await expect(page.getByRole("tab")).toHaveText(["Feed", "Library", "Charter", "Settings"]);
+  await expect(page.getByRole("tab")).toHaveText(["Feed", "Digest", "Library", "Charter", "Settings"]);
+  await page.getByRole("tab", { name: "Digest" }).click();
+  await expect(page.locator(".digest-section").first()).toBeVisible();
   await page.getByRole("tab", { name: "Settings" }).click();
   const hood = page.locator(".under-the-hood");
   await expect(hood.getByRole("heading", { name: "Under the hood" })).toBeVisible();
-  for (const id of ["runs", "digest", "plugins"]) await expect(hood.locator(`[data-tab="${id}"]`)).toBeVisible();
-  await hood.locator('[data-tab="digest"]').click();
-  await expect(page).toHaveURL(/#\/digest$/);
-  await expect(page.locator(".digest-section").first()).toBeVisible();
+  for (const id of ["runs", "plugins"]) await expect(hood.locator(`[data-tab="${id}"]`)).toBeVisible();
+  await expect(hood.locator('[data-tab="digest"]')).toHaveCount(0);
+  await hood.locator('[data-tab="runs"]').click();
+  await expect(page).toHaveURL(/#\/runs$/);
   // The tab bar stays the same on a page that is under the hood.
-  await expect(page.getByRole("tab")).toHaveCount(4);
+  await expect(page.getByRole("tab")).toHaveCount(5);
 });
 
 test("Advanced features: switching the harness on brings its Quality view without a restart, and off again", async ({
@@ -71,7 +73,7 @@ for (const scheme of ["light", "dark"] as const)
     test(`screenshot of the core ${view} (${scheme})`, async ({ browser }) => {
       const page = await browser.newPage({ colorScheme: scheme, viewport: { width: 1280, height: 860 } });
       await page.goto(`#/${view}`);
-      await expect(page.getByRole("tab")).toHaveCount(4);
+      await expect(page.getByRole("tab")).toHaveCount(5);
       // The left pane scrolls by itself: bring the new Settings sections into view.
       if (view === "settings") {
         await expect(page.locator(".advanced li")).toHaveCount(9);

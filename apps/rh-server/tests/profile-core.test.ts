@@ -136,3 +136,43 @@ test("each advanced feature comes back live when switched on, without a restart"
     await server.stop();
   }
 });
+
+test("in core the digest lists open rule candidates under the judgments, grouped by reason; with the knowledge review on, it does not", async () => {
+  const server = await core();
+  approveCharter(server);
+  const projectRuntime = server.hub.project;
+  try {
+    projectRuntime.scheduler.trigger("sweep");
+    await until(() => projectRuntime.sweeps.list(1).length === 1, 10_000, "sweep");
+    await projectRuntime.sweeps.settled(projectRuntime.sweeps.list(1)[0].id, 30_000);
+    const cards = (await server.client.cards()).groups[0].cards;
+    assert.ok(cards.length >= 4);
+    const candidate = projectRuntime.db.prepare(
+      "INSERT INTO rule_candidates (card_id, reason, reason_kind, probability, status, created_at) VALUES (?, ?, 'off-topic', 0.9, ?, ?)",
+    );
+    const now = new Date().toISOString();
+    candidate.run(cards[0].id, "No clinical trials", "open", now);
+    candidate.run(cards[1].id, "  no clinical   TRIALS ", "open", now);
+    candidate.run(cards[2].id, "Too basic for me", "open", now);
+    candidate.run(cards[3].id, "Already a rule", "accepted", now);
+
+    const digest = await (await projectRuntime.plugins.exportsOf<DigestExports>("rh.digest")).buildDigest();
+    const listed = digest.judgments.ruleCandidates ?? [];
+    assert.deepEqual(
+      listed.map((r) => [r.reason, r.count, r.cards.map((c) => c.cardId).toSorted((a, b) => a - b)]),
+      [
+        ["no clinical TRIALS", 2, [cards[0].id, cards[1].id].toSorted((a, b) => a - b)],
+        ["Too basic for me", 1, [cards[2].id]],
+      ],
+    );
+    assert.ok(listed[0].cards.every((c) => c.title.length > 0));
+
+    // The knowledge review on: today's digest (its Charter section), without the read-only list.
+    await server.client.setPluginEnabled("rh.knowledge", true);
+    const withReview = await (await projectRuntime.plugins.exportsOf<DigestExports>("rh.digest")).buildDigest();
+    assert.equal(withReview.judgments.ruleCandidates, undefined);
+    assert.ok(withReview.charter);
+  } finally {
+    await server.stop();
+  }
+});

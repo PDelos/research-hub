@@ -81,16 +81,32 @@ and the UI SHALL hide the tab, section or button that needs it without showing a
 - **THEN** the charter shows without a Proposals section and without an error message
 
 ### Requirement: Core tab bar
-In the core profile the tab bar SHALL show only Feed, Library, Charter and Settings, in that order. Runs, Digest,
-Quality, Upgrades, Plugins and the Obsidian knowledge-base view SHALL be listed under "Under the hood" in Settings
+In the core profile the tab bar SHALL show only Feed, Digest, Library, Charter and Settings (five tabs), in that
+order. Runs, Quality, Upgrades, Plugins and the Obsidian knowledge-base view SHALL be listed under "Under the hood" in Settings
 (each only when its plugin is enabled) and SHALL stay reachable by their URLs. In the full profile the tab bar SHALL
 show every contributed tab as before.
 
 #### Scenario: Core tabs
 - **WHEN** the browser opens a core project
-- **THEN** the tab bar has exactly Feed, Library, Charter, Settings, and Settings has an "Under the hood" list with
-  Runs, Digest and Plugins
+- **THEN** the tab bar has exactly Feed, Digest, Library, Charter, Settings, and Settings has an "Under the hood"
+  list with Runs and Plugins
 
 #### Scenario: Under the hood by URL
-- **WHEN** in core the user opens `/digest`
-- **THEN** the Digest view opens
+- **WHEN** in core the user opens `/runs`
+- **THEN** the Runs view opens
+
+### Requirement: Rule candidates in the core digest
+In the core profile, while the knowledge review (`rh.knowledge`) is off, the weekly digest's judgments section SHALL list
+the open rule candidates (reasons the reason classifier found general): each reason once (wording compared without case
+or extra spaces), how many judgments gave it, and the cards it came from, the most frequent first, at most 10. The list
+SHALL be read-only (no approve or reject). With the knowledge review on, or in the full profile, the digest SHALL be as
+before.
+
+#### Scenario: Grouped candidates
+- **WHEN** in core with the knowledge review off two cards have the reason "No clinical trials" (in different case or
+  spacing), one has "Too basic for me", and one accepted candidate exists
+- **THEN** the digest lists "No clinical trials" 2× with both cards, then "Too basic for me" 1×, and not the accepted one
+
+#### Scenario: Knowledge review on
+- **WHEN** the user switches the knowledge review on and a digest is built
+- **THEN** the digest has its Charter section and no rule-candidate list
